@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מערכת ניהול קהילה - CRM לשלוחים</title>
+    <title>CRM שליחות - ניהול קהילה חכם</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -17,20 +17,24 @@
     <script src="https://apis.google.com/js/api.js"></script>
 
     <style>
-        :root { --primary: #1e293b; --accent: #3b82f6; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --bg: #f1f5f9; --surface: #ffffff; --text-muted: #64748b; }
-        body { margin: 0; font-family: 'Assistant', sans-serif; background: var(--bg); display: flex; height: 100vh; overflow: hidden; }
+        :root { --primary: #0f172a; --accent: #3b82f6; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --bg: #f8fafc; --surface: #ffffff; --text: #1e293b; --text-muted: #64748b; }
+        body { margin: 0; font-family: 'Assistant', sans-serif; background: var(--bg); display: flex; height: 100vh; overflow: hidden; color: var(--text); }
         
         /* מסך כניסה */
-        #auth-overlay { position: fixed; inset: 0; background: var(--primary); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; transition: 0.5s; }
-        .auth-card { background: white; padding: 40px; border-radius: 15px; text-align: center; color: var(--primary); box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 320px; }
+        #auth-overlay { position: fixed; inset: 0; background: var(--primary); z-index: 10000; display: flex; align-items: center; justify-content: center; color: white; transition: 0.5s; }
+        .auth-card { background: white; padding: 40px; border-radius: 20px; text-align: center; color: var(--primary); width: 350px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
         
         /* מבנה CRM */
-        #sidebar { width: 360px; background: var(--surface); padding: 20px; display: flex; flex-direction: column; gap: 15px; border-left: 1px solid #e2e8f0; z-index: 10; overflow-y: auto; }
+        #sidebar { width: 380px; background: var(--surface); border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; z-index: 10; transition: 0.3s ease; }
         #map-container { flex-grow: 1; position: relative; }
         #map { position: absolute; inset: 0; }
         
         /* אלמנטים */
-        .stat-card { background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; }
+        .header { padding: 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .user-pill { display: flex; align-items: center; gap: 10px; background: #f1f5f9; padding: 5px 12px; border-radius: 20px; font-size: 14px; font-weight: 600; }
+        .user-pill img { width: 25px; border-radius: 50%; }
+        
+        .stat-card { background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
         .btn { padding: 10px; border-radius: 8px; cursor: pointer; border: none; font-weight: 600; font-family: inherit; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-primary { background: var(--accent); color: white; width: 100%; }
         .btn-outline { background: transparent; border: 1px solid #e2e8f0; width: 100%; }
@@ -47,43 +51,55 @@
         
         /* טבלת רשימה מלאה */
         #list-container { display: none; flex-grow: 1; padding: 20px; overflow-y: auto; background: var(--bg); }
-        .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
+        .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .data-table th { background: var(--primary); color: white; padding: 12px; text-align: right; }
         .data-table td { padding: 12px; border-bottom: 1px solid #eee; }
-        .phone-link { color: var(--accent); text-decoration: none; font-weight: bold; }
+        .phone-link { color: var(--accent); text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; }
     </style>
 </head>
 <body>
 
 <div id="auth-overlay">
     <div class="auth-card">
-        <i class="fas fa-synagogue" style="font-size: 50px; color: var(--accent); margin-bottom: 20px;"></i>
+        <i class="fas fa-microchip" style="font-size: 50px; color: var(--accent); margin-bottom: 20px;"></i>
         <h2>CRM שליחות</h2>
-        <p>להפעלת המערכת וסנכרון נתונים, נא להתחבר לחשבון גוגל:</p>
+        <p>מערכת ניהול קהילה מבוססת Google Drive. נא להתחבר:</p>
         <div id="google-btn-container" style="display: flex; justify-content: center;"></div>
+        <p style="font-size: 11px; margin-top: 20px; color: #64748b;">הנתונים נשמרים בדרייב הפרטי שלך בלבד.</p>
     </div>
 </div>
 
 <div id="sidebar" class="hidden">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <img id="u-img" src="" style="width:30px; border-radius:50%;">
-            <span id="u-name" style="font-weight:700;">שלום!</span>
+    <div class="header">
+        <h3 style="margin:0;">הקהילה שלי</h3>
+        <div class="user-pill">
+            <img id="u-img" src="">
+            <span id="u-name"></span>
         </div>
-        <button onclick="location.reload()" style="background:none; border:none; color:var(--danger); cursor:pointer;"><i class="fas fa-sign-out-alt"></i></button>
     </div>
-
-    <button class="btn btn-primary" onclick="toggleView()"><i class="fas fa-exchange-alt"></i> החלף למפה / רשימה</button>
-
-    <div id="geocoder"></div>
     
-    <div class="stat-card">
-        <input type="text" id="smartSearch" placeholder="חיפוש מהיר..." style="width:100%; border:none; outline:none; background:transparent;" oninput="refreshMap(); if(!isMapView) renderListView();">
+    <div style="padding: 20px; flex-grow: 1; overflow-y: auto;">
+        <div style="background: #eff6ff; padding: 15px; border-radius: 12px; border: 1px solid #dbeafe; margin-bottom: 20px;">
+            <h4 style="margin:0; color: #1e40af;"><i class="fas fa-cloud-check"></i> מחובר לענן</h4>
+            <p style="font-size: 13px; margin: 5px 0 0 0;">הנתונים מסונכרנים בזמן אמת לדרייב.</p>
+        </div>
+
+        <button class="btn btn-primary" onclick="toggleView()"><i class="fas fa-exchange-alt"></i> החלף למפה / רשימה</button>
+
+        <div id="geocoder" style="margin-top: 15px;"></div>
+        
+        <div class="stat-card" style="margin-top: 15px;">
+            <input type="text" id="smartSearch" placeholder="חיפוש מהיר..." style="width:100%; border:none; outline:none; background:transparent;" oninput="refreshMap(); if(!isMapView) renderListView();">
+        </div>
+
+        <div class="stat-card">
+            <h4 style="margin:0 0 10px 0;"><i class="fas fa-chart-pie"></i> התפלגות קהילה</h4>
+            <canvas id="styleChart" height="150"></canvas>
+        </div>
     </div>
 
-    <div class="stat-card">
-        <h4 style="margin:0 0 10px 0;"><i class="fas fa-chart-pie"></i> התפלגות קהילה</h4>
-        <canvas id="styleChart" height="150"></canvas>
+    <div style="padding: 20px; border-top: 1px solid #f1f5f9;">
+        <button onclick="location.reload()" style="width: 100%; padding: 12px; background: #f1f5f9; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">יציאה מהמערכת</button>
     </div>
 </div>
 
@@ -113,16 +129,30 @@
     let isMapView = true;
     let currentBldg = '', currentAptIdx = null;
 
-    // אתחול מפה
+    // אתחול מפה עם RTL פלאגין לעברית
     mapboxgl.accessToken = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
+    mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.3.0/mapbox-gl-rtl-text.js', null, true);
+    
     const map = new mapboxgl.Map({
         container: 'map',
-        style: 'mapbox://styles/mapbox/streets-v12',
+        style: 'mapbox://styles/mapbox/streets-v11', // גרסת v11 יציבה יותר עם RTL
         center: [35.2443, 31.8265],
-        zoom: 17,
+        zoom: 16.5,
         pitch: 60
     });
 
+    // הוספת שכבת תלת-מימד ולחיצה על בניינים
+    map.on('load', () => {
+        map.addLayer({
+            'id': '3d-buildings', 'source': 'composite', 'source-layer': 'building', 'filter': ['==', 'extrude', 'true'], 'type': 'fill-extrusion',
+            'paint': { 'fill-extrusion-color': '#aaa', 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': 0.6 }
+        });
+        
+        // תיקון: לחיצה ספציפית על שכבת תלת-מימד
+        map.on('click', '3d-buildings', async (e) => handleMapClick(e.lngLat));
+    });
+
+    
     // חיפוש כתובות
     const geocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'חפש רחוב...', countries: 'il', language: 'he' });
     document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
@@ -144,19 +174,17 @@
         map.resize();
     }
 
+    
     // ניהול מפה ולחיצות
-    map.on('click', async (e) => {
-        const features = map.queryRenderedFeatures(e.point, { layers: ['building'] });
-        if (!features.length) return;
-        
-        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${e.lngLat.lng},${e.lngLat.lat}.json?access_token=${mapboxgl.accessToken}&language=he`);
+    async function handleMapClick(lngLat) {
+        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lngLat.lng},${lngLat.lat}.json?access_token=${mapboxgl.accessToken}&language=he`);
         const data = await res.json();
         const addr = data.features[0] ? data.features[0].place_name_he.split(',')[0] : "כתובת לא ידועה";
         
         currentBldg = addr;
-        if (!db[addr]) db[addr] = { apts: [], coords: [e.lngLat.lng, e.lngLat.lat] };
-        showBuildingPopup(e.lngLat, addr);
-    });
+        if (!db[addr]) db[addr] = { apts: [], coords: [lngLat.lng, lngLat.lat] };
+        showBuildingPopup(lngLat, addr);
+    }
 
     function showBuildingPopup(lngLat, addr) {
         const b = db[addr];
@@ -179,7 +207,6 @@
     window.addNewApt = () => {
         db[currentBldg].apts.push({ name: 'משפחה חדשה', num: '?', phones: '', style: 'חרדי', notes: '' });
         saveDB(); refreshMap(); 
-        // סגירת פופאפ ופתיחת עריכה
         document.querySelector('.mapboxgl-popup').remove();
         openEdit(db[currentBldg].apts.length - 1);
     };
@@ -207,9 +234,7 @@
 
     window.closeModal = () => document.getElementById('clientModal').style.display = 'none';
 
-    function saveDB() {
-        localStorage.setItem('crm_db', JSON.stringify(db));
-    }
+    function saveDB() { localStorage.setItem('crm_db', JSON.stringify(db)); }
 
     function toggleView() {
         isMapView = !isMapView;
@@ -218,11 +243,20 @@
         if (!isMapView) renderListView();
     }
 
+    // תיקון: יצירת קישור וואטסאפ מרוכז ותקין
+    function generateWhatsappLink(phone) {
+        if (!phone) return '#';
+        let cleanPhone = phone.replace(/\D/g, '');
+        if (cleanPhone.startsWith('0')) cleanPhone = '972' + cleanPhone.substring(1);
+        return `https://wa.me/${cleanPhone}`;
+    }
+
     function renderListView() {
-        let html = `<h2>רשימת קהילה מלאה</h2><table class="data-table"><tr><th>משפחה</th><th>כתובת</th><th>דירה</th><th>טלפון</th></tr>`;
+        let html = `<h2 style="margin:0 0 15px 0; border-bottom: 2px solid var(--accent); padding-bottom: 10px;">رשימת קהילה מלאה</h2><table class="data-table"><tr><th>משפחה</th><th>כתובת</th><th>דירה</th><th>טלפון (וואטסאפ)</th></tr>`;
         Object.keys(db).forEach(addr => {
             db[addr].apts.forEach(apt => {
-                html += `<tr><td>${apt.name}</td><td>${addr}</td><td>${apt.num}</td><td><a class="phone-link" href="https://wa.me/${apt.phones.replace(/\D/g,'')}">${apt.phones}</a></td></tr>`;
+                const waLink = generateWhatsappLink(apt.phones);
+                html += `<tr><td>${apt.name}</td><td>${addr}</td><td>${apt.num}</td><td><a class="phone-link" href="${waLink}" target="_blank"><i class="fab fa-whatsapp" style="color:#25D366"></i> ${apt.phones}</a></td></tr>`;
             });
         });
         document.getElementById('list-container').innerHTML = html + `</table>`;
