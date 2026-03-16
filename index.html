@@ -31,7 +31,7 @@
         .mobile-header { display:none; background:var(--primary); color:white; padding:15px; justify-content:space-between; align-items:center; z-index:1001; }
         #sidebar { width:360px; background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:15px; z-index:10; overflow-y:auto; box-shadow:4px 0 15px rgba(0,0,0,0.1); border-left:1px solid var(--border-light); transition:0.3s ease; }
         
-        #main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+        #main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; min-width: 0; }
         .top-nav-bar { background:var(--surface); border-bottom:1px solid var(--border-light); display:flex; justify-content:center; padding:10px; z-index:500; box-shadow:0 2px 10px rgba(0,0,0,0.05); }
         .main-tabs { display:flex; background:var(--bg-body); border-radius:8px; border:1px solid var(--border-light); overflow:hidden; }
         .main-tab { padding:8px 25px; cursor:pointer; font-weight:600; color:var(--text-muted); transition:0.2s; border-left:1px solid var(--border-light); }
@@ -41,8 +41,9 @@
 
         #map-container { flex-grow:1; position:relative; }
         #map { position:absolute; top:0; bottom:0; width:100%; }
-        /* NEW: list-container - removed horizontal padding to allow full table width */
-        #list-container { display:none; flex-grow:1; padding:20px 0 0 0; overflow-y:auto; background:var(--bg-body); width:100%; }
+        
+        /* FIXED: Added box-sizing to prevent padding from expanding width beyond 100% */
+        #list-container { display:none; flex-grow:1; padding:20px; overflow-y:auto; background:var(--bg-body); width:100%; box-sizing: border-box; }
         
         #kanban-container { display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; }
         .kanban-hub-header { padding:15px 20px; border-bottom:1px solid var(--border-light); background:var(--surface); display:flex; justify-content:space-between; align-items:center; z-index:10; box-shadow:0 2px 10px rgba(0,0,0,0.02); }
@@ -128,6 +129,7 @@
         .bldg-fam-item { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--border-light); padding:12px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition:0.2s; cursor:pointer;}
         .bldg-fam-item:hover { transform:translateX(-3px); border-right-width:6px; }
 
+        /* Bulk Action Bar */
         #bulkActionBar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--primary); color:white; padding:15px 25px; border-radius:30px; display:none; gap:15px; align-items:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:10000; font-weight:600; }
         .bulk-btn { background:rgba(255,255,255,0.1); border:none; color:white; padding:6px 12px; border-radius:15px; cursor:pointer; transition:0.2s; display:flex; align-items:center; gap:5px;}
         .bulk-btn:hover { background:rgba(255,255,255,0.2); }
@@ -426,7 +428,7 @@
     let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || { 
         center: [35.24430, 31.82650], zoom: 17.5, pitch: 60, chabadHouseCoords: null, themeColor: '#3b82f6', defaultView: 'map',
         tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: [],
-        goal: { text: 'שמואל תמיר', target: 30 } // Default goal
+        goal: { text: 'שמואל תמיר', target: 30 }
     };
     if(!appSettings.customFields) appSettings.customFields = [];
     if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי (רחוב/תגית)', target: 50 };
@@ -467,7 +469,6 @@
     document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
 
     window.onload = () => {
-        // --- GAMIFICATION: Welcome Message ---
         let lastLogin = localStorage.getItem('last_login_date');
         let todayStr = new Date().toISOString().split('T')[0];
         let welcomeDiv = document.getElementById('welcomeMessage');
@@ -526,13 +527,7 @@
     }
     function setSyncStatus(st, txt) { document.getElementById('sync-text').innerText=txt; const ic=document.getElementById('sync-icon'), co=document.getElementById('sync-status'); if(st==='wait'){ic.className='fas fa-spinner fa-spin';co.style.color='var(--warning)';} if(st==='ok'){ic.className='fas fa-cloud-check';co.style.color='var(--success)';} if(st==='error'){ic.className='fas fa-exclamation-triangle';co.style.color='var(--danger)';} }
     
-    // Core Save & Update Goal
-    function saveDB() { 
-        localStorage.setItem('community_data_final', JSON.stringify(db)); 
-        handleOmniSearch(); 
-        pushToDrive(); 
-    }
-    
+    function saveDB() { localStorage.setItem('community_data_final', JSON.stringify(db)); handleOmniSearch(); pushToDrive(); }
     function showToast(msg, type='info') { const c=document.getElementById('toast-container'), t=document.createElement('div'); t.className=`toast toast-${type}`; t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':type==='error'?'fa-exclamation-triangle':'fa-info-circle'}"></i> ${msg}`; c.appendChild(t); setTimeout(() => { t.style.animation='fadeOut 0.3s ease-in forwards'; setTimeout(()=>t.remove(),300); }, 3000); }
 
     window.switchMainView = function(viewName) {
@@ -598,7 +593,7 @@
         document.getElementById('newLogDate').valueAsDate=new Date(); document.getElementById('newDonDate').valueAsDate=new Date(); document.getElementById('newTaskDate').valueAsDate=new Date();
         switchCrmTab('details'); document.getElementById('clientModal').style.display='flex';
     };
-    window.switchCrmTab = (tab) => { document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content').forEach=e=>e.classList.remove('active')); document.getElementById(`tabBtn-${tab}`).classList.add('active'); document.getElementById(`crm-${tab}`).classList.add('active'); };
+    window.switchCrmTab = (tab) => { document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`tabBtn-${tab}`).classList.add('active'); document.getElementById(`crm-${tab}`).classList.add('active'); };
 
     window.renderModalBoards = () => {
         const c = document.getElementById('cBoardsList'); c.innerHTML = '';
@@ -797,7 +792,7 @@
         clearBulkSelection();
     };
 
-    // --- NEW: FIXED TABLE VIEW (Preventing clipping on the left) ---
+    // --- FIXED TABLE VIEW ---
     window.renderListView = (filteredRes = null) => {
         const c=document.getElementById('list-container');
         let html=`<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%; padding: 0 20px; box-sizing: border-box;">
@@ -878,7 +873,7 @@
             const el=document.createElement('div'); el.className='chabad-pin-wrapper';
             el.innerHTML=`<div class="chabad-pin-container"><div class="chabad-pin-circle"><div class="chabad-pin-image"></div></div><div class="chabad-pin-arrow"></div></div>`;
             chabadHouseMarker = new mapboxgl.Marker({element:el, anchor:'bottom'}).setLngLat(appSettings.chabadHouseCoords).addTo(map);
-            el.addEventListener('click', () => { const ch=Object.keys(db).find(k=>db[k].info && db[k].info.coords && Math.abs(db[k].info.coords[0]-appSettings.chabadHouseCoords[0])<0.0001); if(ch){currentBldg=ch;openBuildingModal();} });
+            el.addEventListener('click', () => { const ch=Object.keys(db).find(k=>db[k].info && db[k].info.coords && Math.abs(db[k].info.coords[0]-appSettings.chabadHouseCoords[0])<0.001); if(ch){currentBldg=ch;openBuildingModal();} });
         }
 
         Object.keys(db).forEach(k => {
@@ -898,7 +893,7 @@
             });
             if(showBldg && db[k].apts.length>0 && k!==NO_ADDRESS_KEY) {
                 let coords=db[k].info.coords||k.split(',').map(Number);
-                if(!isNaN(coords[0]) && !(appSettings.chabadHouseCoords && Math.abs(coords[0]-appSettings.chabadHouseCoords[0])<0.0001)) {
+                if(!isNaN(coords[0]) && !(appSettings.chabadHouseCoords && Math.abs(coords[0]-appSettings.chabadHouseCoords[0])<0.001 && Math.abs(coords[1]-appSettings.chabadHouseCoords[1])<0.001)) {
                     activeMarkers.push(new mapboxgl.Marker({color:['#94a3b8','#10b981','#f59e0b','#ef4444'][maxVal]}).setLngLat(coords).addTo(map));
                 }
             }
