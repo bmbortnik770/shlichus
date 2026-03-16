@@ -30,8 +30,23 @@
         
         .mobile-header { display:none; background:var(--primary); color:white; padding:15px; justify-content:space-between; align-items:center; z-index:1001; }
         #sidebar { width:360px; background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:15px; z-index:10; overflow-y:auto; box-shadow:4px 0 15px rgba(0,0,0,0.1); border-left:1px solid var(--border-light); transition:0.3s ease; }
+        
+        /* Main Content Area */
+        #main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+        
+        /* Prominent View Switcher */
+        .top-nav-bar { background:var(--surface); border-bottom:1px solid var(--border-light); display:flex; justify-content:center; padding:10px; z-index:500; box-shadow:0 2px 10px rgba(0,0,0,0.05); }
+        .main-tabs { display:flex; background:var(--bg-body); border-radius:8px; border:1px solid var(--border-light); overflow:hidden; }
+        .main-tab { padding:8px 25px; cursor:pointer; font-weight:600; color:var(--text-muted); transition:0.2s; border-left:1px solid var(--border-light); }
+        .main-tab:last-child { border-left:none; }
+        .main-tab.active { background:var(--accent); color:white; }
+        .main-tab:hover:not(.active) { background:var(--table-hover); color:var(--text-main); }
+
         #map-container { flex-grow:1; position:relative; }
         #map { position:absolute; top:0; bottom:0; width:100%; }
+        #list-container { display:none; flex-grow:1; padding:20px; overflow-y:auto; background:var(--bg-body); width:100%; }
+        #kanban-container { display:none; flex-grow:1; padding:20px; overflow-x:auto; background:var(--bg-body); gap:15px; align-items:flex-start; }
+
         .stat-card { background:var(--bg-body); padding:15px; border-radius:10px; border:1px solid var(--border-light); position:relative; }
         
         #geocoder { position:relative; z-index:3000; }
@@ -53,10 +68,6 @@
         .btn-outline { background:transparent; border:1px solid var(--border-light); color:var(--text-main); }
         .btn-icon { width:auto; background:transparent; color:var(--text-muted); padding:6px 10px; border:1px solid var(--border-light); border-radius:4px; cursor:pointer;}
         
-        .view-switcher { display:flex; background:var(--surface); border-radius:8px; border:1px solid var(--border-light); overflow:hidden; }
-        .view-btn { flex:1; padding:10px; border:none; background:transparent; font-family:'Assistant'; font-weight:600; cursor:pointer; color:var(--text-muted); transition:0.2s; }
-        .view-btn.active { background:var(--accent); color:white; }
-
         @keyframes slideUpModal { from{transform:translateY(30px);opacity:0;} to{transform:translateY(0);opacity:1;} }
         .modal { display:none; position:fixed; z-index:10000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(2px); align-items:center; justify-content:center; }
         .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:90vh; overflow-y:auto; border:1px solid var(--border-light); animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -94,6 +105,7 @@
         .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:5px; }
         .kpi-box { background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); text-align:center; }
         
+        /* Table Styles */
         .data-table { width:100%; border-collapse:collapse; text-align:right; direction:rtl; background:var(--surface); color:var(--text-main); }
         .data-table th, .data-table td { padding:12px; border-bottom:1px solid var(--border-light); font-size:14px; }
         .data-table th { background-color:var(--primary); color:white; position:sticky; top:0; z-index:1; font-weight:600; }
@@ -102,8 +114,7 @@
         .phone-link { color:var(--accent); text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:4px; }
         
         /* Kanban Styles */
-        #kanban-container { display:none; flex-grow:1; padding:20px; overflow-x:auto; background:var(--bg-body); gap:15px; align-items:flex-start; }
-        .kanban-col { background:var(--surface); border-radius:8px; width:300px; min-width:300px; display:flex; flex-direction:column; border:1px solid var(--border-light); max-height:calc(100vh - 40px); transition: 0.2s; }
+        .kanban-col { background:var(--surface); border-radius:8px; width:300px; min-width:300px; display:flex; flex-direction:column; border:1px solid var(--border-light); max-height:calc(100vh - 100px); transition: 0.2s; }
         .kanban-col.drag-over { background:rgba(59,130,246,0.05); border-color:var(--accent); }
         .kanban-header { padding:15px; font-weight:bold; border-bottom:1px solid var(--border-light); background:var(--primary); color:white; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; }
         .kanban-body { padding:10px; flex-grow:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; min-height:100px;}
@@ -111,7 +122,7 @@
         .kanban-card:active { cursor:grabbing; }
         .kanban-card:hover { transform:translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,0.1); }
         .kanban-card-title { font-weight:bold; font-size:15px; margin-bottom:5px; pointer-events: none;}
-        .kanban-card div { pointer-events: none; } /* Prevents drag issues */
+        .kanban-card div { pointer-events: none; }
 
         .bldg-fam-item { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--border-light); padding:12px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition:0.2s; cursor:pointer;}
         .bldg-fam-item:hover { transform:translateX(-3px); border-right-width:6px; }
@@ -178,12 +189,6 @@
     
     <div id="kpiAlerts"></div>
 
-    <div class="view-switcher">
-        <button class="view-btn active" id="btnViewMap" onclick="switchMainView('map')"><i class="fas fa-map-marker-alt"></i> מפה</button>
-        <button class="view-btn" id="btnViewTable" onclick="switchMainView('table')"><i class="fas fa-list"></i> רשימה</button>
-        <button class="view-btn" id="btnViewKanban" onclick="switchMainView('kanban')"><i class="fas fa-columns"></i> קאנבן</button>
-    </div>
-
     <div id="geocoder"></div>
     
     <div class="stat-card" style="z-index:2000;">
@@ -206,14 +211,24 @@
     </div>
 </div>
 
-<div id="map-container">
-    <div id="map"></div>
-    <div class="map-custom-controls">
-        <button class="map-ctrl-btn" onclick="toggleMapStyle()" title="החלף תצוגת לוויין/רחוב"><i class="fas fa-layer-group"></i></button>
+<div id="main-content">
+    <div class="top-nav-bar">
+        <div class="main-tabs">
+            <div class="main-tab active" onclick="switchMainView('map')" id="tab-map"><i class="fas fa-map-marker-alt"></i> מפה</div>
+            <div class="main-tab" onclick="switchMainView('table')" id="tab-table"><i class="fas fa-list"></i> רשימה</div>
+            <div class="main-tab" onclick="switchMainView('kanban')" id="tab-kanban"><i class="fas fa-columns"></i> קאנבן</div>
+        </div>
     </div>
+
+    <div id="map-container">
+        <div id="map"></div>
+        <div class="map-custom-controls">
+            <button class="map-ctrl-btn" onclick="toggleMapStyle()" title="החלף תצוגת לוויין/רחוב"><i class="fas fa-layer-group"></i></button>
+        </div>
+    </div>
+    <div id="list-container"></div>
+    <div id="kanban-container"></div>
 </div>
-<div id="list-container" style="display:none; flex-grow:1; padding:20px; overflow-y:auto; background:var(--bg-body); width:100%;"></div>
-<div id="kanban-container"></div>
 
 <div id="contextMenu">
     <div class="context-item" onclick="ctxEdit()"><i class="fas fa-pen"></i> ערוך פרטים</div>
@@ -223,7 +238,7 @@
 </div>
 
 <div id="bulkActionBar">
-    <span id="bulkCount">0 משפחות סומנו</span>
+    <span id="bulkCount">0 סומנו</span>
     <button class="bulk-btn" onclick="bulkWhatsApp()"><i class="fab fa-whatsapp"></i> הודעה</button>
     <button class="bulk-btn" style="background:var(--success); color:white;" onclick="bulkRoute()"><i class="fas fa-route"></i> נווט מסלול</button>
     <button class="bulk-btn" onclick="bulkAddTagPrompt()"><i class="fas fa-tag"></i> תגית</button>
@@ -231,7 +246,7 @@
     <button class="bulk-btn" style="background:transparent; font-size:20px; padding:0 5px;" onclick="clearBulkSelection()"><i class="fas fa-times"></i></button>
 </div>
 
-<div id="buildingModal" class="modal" style="display:none;">
+<div id="buildingModal" class="modal">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:15px;">
             <div><h2 style="margin:0; color:var(--primary);" id="bModalTitle"><i class="fas fa-building" style="color:var(--accent);"></i> בניין</h2><div id="bModalNavBtn" style="margin-top:8px; display:flex; gap:8px;"></div></div>
@@ -272,12 +287,10 @@
                 <div class="form-group"><label>שם משפחה</label><input type="text" id="cFamilyName" placeholder="הקלד כאן..." oninput="markDirty()"></div>
                 <div class="form-group"><label>מס' דירה</label><input type="text" id="cAptNum" placeholder="הקלד..." oninput="markDirty()"></div>
             </div>
-            
             <div class="form-group" style="background:rgba(59,130,246,0.05); padding:10px; border-radius:8px; border:1px solid rgba(59,130,246,0.2);">
                 <label style="color:var(--accent);"><i class="fas fa-columns"></i> סטטוס קאנבן (תהליך)</label>
                 <select id="cPipeline" onchange="markDirty()" style="font-weight:bold;"></select>
             </div>
-
             <div class="form-group"><label><i class="fas fa-tags"></i> תגיות</label><div class="tags-container" id="cTagsContainer"></div></div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group"><label>שם האב</label><input type="text" id="cFather" placeholder="הקלד..." oninput="markDirty()"></div>
@@ -388,7 +401,7 @@
     if(!appSettings.pipelineStages) appSettings.pipelineStages = ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'];
     
     document.documentElement.style.setProperty('--accent', appSettings.themeColor);
-    let currentMainView = appSettings.defaultView;
+    let currentMainView = appSettings.defaultView || 'map';
 
     let db = JSON.parse(localStorage.getItem('community_data_final')) || {};
     if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
@@ -458,11 +471,11 @@
     function saveDB() { localStorage.setItem('community_data_final', JSON.stringify(db)); handleOmniSearch(); pushToDrive(); }
     function showToast(msg, type='info') { const c=document.getElementById('toast-container'), t=document.createElement('div'); t.className=`toast toast-${type}`; t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':type==='error'?'fa-exclamation-triangle':'fa-info-circle'}"></i> ${msg}`; c.appendChild(t); setTimeout(() => { t.style.animation='fadeOut 0.3s ease-in forwards'; setTimeout(()=>t.remove(),300); }, 3000); }
 
-    // Views
+    // --- VIEW SWITCHER LOGIC ---
     window.switchMainView = function(viewName) {
         currentMainView = viewName;
-        document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
-        document.getElementById(viewName==='map'?'btnViewMap':(viewName==='table'?'btnViewTable':'btnViewKanban')).classList.add('active');
+        document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
+        document.getElementById('tab-' + viewName).classList.add('active');
         
         document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
         document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
@@ -603,7 +616,7 @@
     function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
     window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
-    /* Kanban Drag & Drop Logic */
+    /* --- KANBAN DRAG & DROP --- */
     window.renderKanbanView = (filteredRes = null) => {
         const c = document.getElementById('kanban-container'); c.innerHTML = '';
         let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})));
@@ -631,7 +644,7 @@
         }
     };
 
-    /* Bulk Actions & Routing */
+    /* Bulk Actions & Routing Fixes */
     window.toggleAllBulk = (cb) => { const cbs=document.querySelectorAll('.bulk-cb'); cbs.forEach(c=>c.checked=cb.checked); updateBulkBar(); };
     window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
     window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); const sa=document.getElementById('bulkSelectAll'); if(sa) sa.checked=false; updateBulkBar(); };
@@ -639,19 +652,18 @@
     window.bulkAddTagPrompt = () => { const t=prompt("הקלד תגית להוספה:"); if(t) { ensureAuthAndExecute(()=>{ bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let a=db[b].apts[i]; if(!a.tags)a.tags=[]; if(!a.tags.includes(t))a.tags.push(t); }); if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns();} saveDB(); clearBulkSelection(); showToast("תגית נוספה","success"); }); } };
     window.bulkDelete = () => { if(confirm(`למחוק ${bulkSelection.length} משפחות? פעולה בלתי הפיכה!`)) { ensureAuthAndExecute(()=>{ bulkSelection.sort((x,y)=>y.split('|')[1]-x.split('|')[1]).forEach(v=>{let [b,i]=v.split('|'); db[b].apts.splice(i,1);}); saveDB(); clearBulkSelection(); showToast("נמחקו","success"); }); } };
     
-    // Google Maps Route Fix
     window.bulkRoute = () => {
         let waypoints = [];
         bulkSelection.forEach(v => {
             let [b, i] = v.split('|');
-            if(b !== NO_ADDRESS_KEY && db[b].info.coords) { waypoints.push(`${db[b].info.coords[1]},${db[b].info.coords[0]}`); } // lat,lng
+            if(b !== NO_ADDRESS_KEY && db[b].info.coords) { waypoints.push(`${db[b].info.coords[1]},${db[b].info.coords[0]}`); }
         });
         if(waypoints.length === 0) { showToast("לא נבחרו משפחות עם מיקום על המפה!", "error"); return; }
         if(waypoints.length > 9) { showToast("מגבלת גוגל מפות היא 10 יעדים. נלקחו ה-9 הראשונים.", "warning"); waypoints = waypoints.slice(0,9); }
         
         let origin = '';
         if(appSettings.chabadHouseCoords) { origin = `${appSettings.chabadHouseCoords[1]},${appSettings.chabadHouseCoords[0]}`; } 
-        else { origin = waypoints.shift(); } // Use first selected as origin if no chabad house
+        else { origin = waypoints.shift(); } 
         
         let mapsUrl = `https://www.google.com/maps/dir/${origin}/${waypoints.join('/')}`;
         window.open(mapsUrl, '_blank');
