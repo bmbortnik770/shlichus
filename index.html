@@ -31,7 +31,10 @@
         .mobile-header { display:none; background:var(--primary); color:white; padding:15px; justify-content:space-between; align-items:center; z-index:1001; }
         #sidebar { width:360px; background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:15px; z-index:10; overflow-y:auto; box-shadow:4px 0 15px rgba(0,0,0,0.1); border-left:1px solid var(--border-light); transition:0.3s ease; }
         
+        /* Main Content Area */
         #main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; }
+        
+        /* Prominent View Switcher */
         .top-nav-bar { background:var(--surface); border-bottom:1px solid var(--border-light); display:flex; justify-content:center; padding:10px; z-index:500; box-shadow:0 2px 10px rgba(0,0,0,0.05); }
         .main-tabs { display:flex; background:var(--bg-body); border-radius:8px; border:1px solid var(--border-light); overflow:hidden; }
         .main-tab { padding:8px 25px; cursor:pointer; font-weight:600; color:var(--text-muted); transition:0.2s; border-left:1px solid var(--border-light); }
@@ -42,11 +45,7 @@
         #map-container { flex-grow:1; position:relative; }
         #map { position:absolute; top:0; bottom:0; width:100%; }
         #list-container { display:none; flex-grow:1; padding:20px; overflow-y:auto; background:var(--bg-body); width:100%; }
-        
-        /* New Kanban Hub Styles */
-        #kanban-container { display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; }
-        .kanban-hub-header { padding:15px 20px; border-bottom:1px solid var(--border-light); background:var(--surface); display:flex; justify-content:space-between; align-items:center; z-index:10; box-shadow:0 2px 10px rgba(0,0,0,0.02); }
-        #kanban-board-scroll { flex-grow:1; padding:20px; overflow-x:auto; display:flex; gap:15px; align-items:flex-start; }
+        #kanban-container { display:none; flex-grow:1; padding:20px; overflow-x:auto; background:var(--bg-body); gap:15px; align-items:flex-start; }
 
         .stat-card { background:var(--bg-body); padding:15px; border-radius:10px; border:1px solid var(--border-light); position:relative; }
         
@@ -107,6 +106,7 @@
         .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:5px; }
         .kpi-box { background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); text-align:center; }
         
+        /* Table Styles */
         .data-table { width:100%; border-collapse:collapse; text-align:right; direction:rtl; background:var(--surface); color:var(--text-main); }
         .data-table th, .data-table td { padding:12px; border-bottom:1px solid var(--border-light); font-size:14px; white-space: nowrap;}
         .data-table th { background-color:var(--primary); color:white; position:sticky; top:0; z-index:1; font-weight:600; }
@@ -123,11 +123,12 @@
         .kanban-card:active { cursor:grabbing; }
         .kanban-card:hover { transform:translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,0.1); }
         .kanban-card-title { font-weight:bold; font-size:15px; margin-bottom:5px; pointer-events: none;}
-        .kanban-card div { pointer-events: none; }
+        .kanban-card div { pointer-events: none; } /* Prevents drag issues */
 
         .bldg-fam-item { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--border-light); padding:12px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition:0.2s; cursor:pointer;}
         .bldg-fam-item:hover { transform:translateX(-3px); border-right-width:6px; }
 
+        /* Bulk Action Bar */
         #bulkActionBar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--primary); color:white; padding:15px 25px; border-radius:30px; display:none; gap:15px; align-items:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:10000; font-weight:600; }
         .bulk-btn { background:rgba(255,255,255,0.1); border:none; color:white; padding:6px 12px; border-radius:15px; cursor:pointer; transition:0.2s; display:flex; align-items:center; gap:5px;}
         .bulk-btn:hover { background:rgba(255,255,255,0.2); }
@@ -143,11 +144,11 @@
 
         @media (max-width: 768px) {
             .mobile-header { display:flex; }
-            #sidebar { position:fixed; top:0; right:-360px; height:100vh; z-index:20000; box-shadow:none; }
+            #sidebar { position:fixed; top:0; right:-360px; height:100vh; z-index:20000; box-shadow:none; transition:right 0.3s ease; }
             #sidebar.open { right:0; box-shadow:-10px 0 20px rgba(0,0,0,0.3); }
             .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:19999; } .sidebar-overlay.open { display:block; }
             .modal-content { width:95% !important; margin:5% auto; padding:15px; }
-            .data-table thead { display:none; } .data-table, .data-table tbody, .data-table tr, .data-table td { display:block; width:100%; box-sizing:border-box; white-space: normal; }
+            .data-table thead { display:none; } .data-table, .data-table tbody, .data-table tr, .data-table td { display:block; width:100%; box-sizing:border-box; white-space: normal;}
             .data-table tr { margin-bottom:15px; border:1px solid var(--border-light); border-radius:8px; padding:10px; background:var(--surface); }
             .data-table td { text-align:right; padding:8px 5px; border-bottom:none; border-top:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; }
             .data-table td:first-child { border-top:none; } .data-table td::before { content:attr(data-label); font-weight:600; color:var(--text-muted); font-size:13px; }
@@ -188,6 +189,7 @@
     </div>
     
     <div id="kpiAlerts"></div>
+
     <div id="geocoder"></div>
     
     <div class="stat-card" style="z-index:2000;">
@@ -302,7 +304,7 @@
             <div class="form-group" style="background:rgba(59,130,246,0.05); padding:10px; border-radius:8px; border:1px solid rgba(59,130,246,0.2);">
                 <label style="color:var(--accent); display:flex; justify-content:space-between; align-items:center;">
                     <span><i class="fas fa-project-diagram"></i> השתתפות בפרויקטים ולוחות</span>
-                    <button class="btn-icon" style="padding:2px 6px; font-size:12px; background:white;" onclick="addModalBoard()"><i class="fas fa-plus"></i> צרף ללוח נוסף</button>
+                    <button class="btn-icon" style="padding:2px 6px; font-size:12px; background:white;" onclick="addModalBoard()"><i class="fas fa-plus"></i> צרף ללוח</button>
                 </label>
                 <div id="cBoardsList" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"></div>
             </div>
@@ -420,10 +422,8 @@
     let db = JSON.parse(localStorage.getItem('community_data_final')) || {};
     if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
 
-    // --- MIGRATION: Single Pipeline to Multi-Board ---
     if(!db['__BOARDS__']) {
         db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'] }];
-        // Migrate old pipelines into the default board
         Object.keys(db).forEach(b => {
             if(b !== '__BOARDS__' && db[b].apts) {
                 db[b].apts.forEach(a => {
@@ -501,7 +501,6 @@
     function saveDB() { localStorage.setItem('community_data_final', JSON.stringify(db)); handleOmniSearch(); pushToDrive(); }
     function showToast(msg, type='info') { const c=document.getElementById('toast-container'), t=document.createElement('div'); t.className=`toast toast-${type}`; t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':type==='error'?'fa-exclamation-triangle':'fa-info-circle'}"></i> ${msg}`; c.appendChild(t); setTimeout(() => { t.style.animation='fadeOut 0.3s ease-in forwards'; setTimeout(()=>t.remove(),300); }, 3000); }
 
-    // --- VIEW SWITCHER LOGIC ---
     window.switchMainView = function(viewName) {
         currentMainView = viewName;
         document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
@@ -567,7 +566,6 @@
     };
     window.switchCrmTab = (tab) => { document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`tabBtn-${tab}`).classList.add('active'); document.getElementById(`crm-${tab}`).classList.add('active'); };
 
-    // --- NEW: BOARDS IN MODAL ---
     window.renderModalBoards = () => {
         const c = document.getElementById('cBoardsList'); c.innerHTML = '';
         if(Object.keys(tempBoards).length === 0) { c.innerHTML = '<div style="font-size:13px; color:var(--text-muted);">המשפחה לא משויכת לאף פרויקט כרגע.</div>'; return; }
@@ -591,7 +589,7 @@
         let num = prompt(`לאיזה לוח לצרף את המשפחה?\nהקש את המספר:\n${opts}`);
         if(num && !isNaN(num) && num > 0 && num <= unjoined.length) {
             const chosen = unjoined[num-1];
-            tempBoards[chosen.id] = chosen.columns[0]; // Set to first column automatically
+            tempBoards[chosen.id] = chosen.columns[0]; 
             markDirty(); renderModalBoards();
         }
     };
@@ -674,7 +672,7 @@
     function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
     window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
-    /* --- NEW KANBAN HUB (PROJECTS) --- */
+    /* --- KANBAN HUB --- */
     window.createNewBoard = () => {
         const name = prompt("הכנס שם לפרויקט החדש (למשל: רישום לקייטנה):");
         if(!name) return;
@@ -743,7 +741,7 @@
                 bulkSelection.forEach(v => {
                     let [b, i] = v.split('|'); let a = db[b].apts[i];
                     if(!a.boards) a.boards = {};
-                    a.boards[chosen.id] = chosen.columns[0]; // Add to first column
+                    a.boards[chosen.id] = chosen.columns[0]; 
                 });
                 saveDB(); clearBulkSelection(); showToast(`צורפו בהצלחה ללוח ${chosen.name}`, "success");
             });
@@ -761,20 +759,28 @@
         let origin = '';
         if(appSettings.chabadHouseCoords) { origin = `${appSettings.chabadHouseCoords[1]},${appSettings.chabadHouseCoords[0]}`; } 
         else { origin = waypoints.shift(); } 
-        window.open(`https://www.google.com/maps/dir/$${origin}/${waypoints.join('/')}`, '_blank');
+        window.open(`http://googleusercontent.com/maps.google.com/maps?dirflg=d&saddr=${origin}&daddr=${waypoints.join('+to:')}`, '_blank');
         clearBulkSelection();
     };
 
+    // --- NEW: FIXED TABLE VIEW ---
     window.renderListView = (filteredRes = null) => {
         const c=document.getElementById('list-container');
-        let html=`<div style="display:flex;justify-content:space-between;margin-bottom:15px;align-items:center;flex-wrap:wrap;gap:10px;"><h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2><div style="display:flex;gap:10px;"><button class="btn btn-success" style="width:auto;padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button><button class="btn btn-primary" style="width:auto;padding:8px 15px;" onclick="openAddressSearch()"><i class="fas fa-plus"></i> הוסף משפחה</button></div></div>
-        <div style="overflow-x:auto; width:100%; padding-bottom:80px;"><table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים</th></tr></thead><tbody>`;
+        let html=`<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
+            <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
+                <button class="btn btn-primary" style="width:auto; padding:8px 15px;" onclick="openAddressSearch()"><i class="fas fa-plus"></i> הוסף משפחה</button>
+            </div>
+        </div>
+        <div style="width:100%; overflow-x:auto; padding-bottom:80px;">
+        <table class="data-table" style="min-width: 800px;"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים</th></tr></thead><tbody>`;
+        
         let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__')db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
         arr.forEach(r => {
             const enc=encodeURIComponent(r.bldg), bName=r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg, a=r.apt;
             let lastDate='-'; if(a.interactions&&a.interactions.length>0) lastDate=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date;
             
-            // Format Boards output for Table
             let boardsHtml = '-';
             if(a.boards && Object.keys(a.boards).length > 0) {
                 boardsHtml = Object.entries(a.boards).map(([bid, status]) => {
@@ -816,7 +822,7 @@
 
                 (a.childrenList||[]).forEach(ch => { if(ch.dob && new Date(ch.dob).getMonth()===cMonth) alerts.push(`<div style="padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);"><i class="fas fa-birthday-cake" style="color:var(--warning);"></i> ${ch.name} (משפ' ${a.name||''}) חוגג/ת</div>`); });
                 (a.tasks||[]).forEach((t, tIdx) => { 
-                    if(!t.done) alerts.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);"><span><i class="fas fa-tasks" style="color:var(--accent);"></i> משפ' ${a.name||''}: ${t.text}</span> <button title="סמן כבוצע" onclick="markTaskDoneFromDash('${encodeURIComponent(k)}', ${i}, ${tIdx})" style="background:var(--success); color:white; border:none; border-radius:4px; cursor:pointer; padding:2px 6px; transition:0.2s;"><i class="fas fa-check"></i></button></div>`); 
+                    if(!t.done) alerts.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);"><span><i class="fas fa-tasks" style="color:var(--accent);"></i> משפ' ${a.name||''}: ${t.text}</span></div>`); 
                 });
             });
             if(showBldg && db[k].apts.length>0 && k!==NO_ADDRESS_KEY) {
@@ -831,8 +837,6 @@
         if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding:0; list-style:none; font-weight:normal;">${alerts.slice(0,6).join('')}${alerts.length>6?'<li style="padding-top:5px; color:var(--text-muted);">ועוד...</li>':''}</ul></div>`;
         if(chart) chart.destroy(); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#64748b']}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
     }
-
-    window.markTaskDoneFromDash = (bldgEnc, aptIdx, taskIdx) => { const bldg = decodeURIComponent(bldgEnc); db[bldg].apts[aptIdx].tasks[taskIdx].done = true; saveDB(); showToast("המשימה הושלמה! כל הכבוד 👏", "success"); };
 
     window.toggleDarkMode=() => {document.body.classList.toggle('dark-mode');localStorage.setItem('darkMode',document.body.classList.contains('dark-mode'));document.getElementById('darkModeIcon').className=document.body.classList.contains('dark-mode')?'fas fa-sun':'fas fa-moon';if(chart)refreshMap();};
     function toggleMobileMenu(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open');}
