@@ -4,15 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מערכת ניהול קהילה - CRM</title>
-    
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="apple-touch-icon" href="favicon.ico">
-    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
@@ -43,42 +39,41 @@
         .mapboxgl-ctrl-geocoder--suggestion { text-align:right; }
         .map-custom-controls { position:absolute; bottom:30px; left:10px; z-index:1000; display:flex; flex-direction:column; gap:8px; }
         .map-ctrl-btn { background:var(--surface); border:2px solid rgba(0,0,0,0.1); width:40px; height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-main); font-size:16px; transition:0.2s; box-shadow:0 2px 6px rgba(0,0,0,0.15); }
-        .map-ctrl-btn:hover { background:var(--table-hover); color:var(--accent); }
-
+        
         #searchDropdown { display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--accent); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.2); z-index:2000; max-height:300px; overflow-y:auto; margin-top:5px; }
         .search-item { padding:12px 15px; border-bottom:1px solid var(--border-light); cursor:pointer; transition:0.2s; display:flex; flex-direction:column; gap:4px; }
         .search-item:hover { background:var(--table-hover); }
         .search-item-title { font-weight:600; color:var(--accent); font-size:15px; }
-        .search-item-sub { font-size:13px; color:var(--text-muted); }
-
-        /* Adv Filters */
-        #advFilters { display:none; background:var(--surface); border:1px solid var(--border-light); border-radius:8px; padding:10px; margin-top:10px; box-shadow:0 4px 10px rgba(0,0,0,0.05); }
+        
+        #advFilters { display:none; background:var(--surface); border:1px solid var(--border-light); border-radius:8px; padding:10px; margin-top:10px; }
         .filter-select { width:100%; padding:6px; border:1px solid var(--border-light); border-radius:4px; font-family:'Assistant'; background:var(--bg-body); color:var(--text-main); margin-bottom:8px; }
 
         .btn { padding:10px; border-radius:6px; cursor:pointer; border:none; font-weight:600; font-family:'Assistant',sans-serif; width:100%; transition:all 0.2s ease; color:white; display:flex; justify-content:center; align-items:center; gap:8px; }
-        .btn:hover { transform:translateY(-1px); box-shadow:0 4px 8px rgba(0,0,0,0.15); }
         .btn-primary { background:var(--accent); } .btn-success { background:var(--success); } .btn-warning { background:var(--warning); color:#fff; } .btn-danger { background:var(--danger); }
-        .btn-outline { background:transparent; border:1px solid var(--border-light); color:var(--text-main); } .btn-outline:hover { background:var(--bg-body); }
-        .btn-icon { width:auto; background:transparent; color:var(--text-muted); padding:6px 10px; border:1px solid var(--border-light); border-radius:4px; cursor:pointer; transition:0.2s;} .btn-icon:hover { background:var(--bg-body); color:var(--accent); }
+        .btn-outline { background:transparent; border:1px solid var(--border-light); color:var(--text-main); }
+        .btn-icon { width:auto; background:transparent; color:var(--text-muted); padding:6px 10px; border:1px solid var(--border-light); border-radius:4px; cursor:pointer;}
         
+        .view-switcher { display:flex; background:var(--surface); border-radius:8px; border:1px solid var(--border-light); overflow:hidden; }
+        .view-btn { flex:1; padding:10px; border:none; background:transparent; font-family:'Assistant'; font-weight:600; cursor:pointer; color:var(--text-muted); transition:0.2s; }
+        .view-btn.active { background:var(--accent); color:white; }
+
         @keyframes slideUpModal { from{transform:translateY(30px);opacity:0;} to{transform:translateY(0);opacity:1;} }
         .modal { display:none; position:fixed; z-index:10000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(2px); align-items:center; justify-content:center; }
-        .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:90vh; overflow-y:auto; box-shadow:0 10px 25px rgba(0,0,0,0.3); border:1px solid var(--border-light); margin:auto; animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:90vh; overflow-y:auto; border:1px solid var(--border-light); animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .modal-small { width:400px; }
 
         .form-group { margin-bottom:12px; }
         .form-group label { display:block; font-weight:600; font-size:13px; margin-bottom:4px; color:var(--text-muted); }
-        .form-group input, .form-group select, .form-group textarea, .inline-input { width:100%; padding:8px 10px; border:1px solid var(--border-light); border-radius:6px; box-sizing:border-box; font-family:'Assistant',sans-serif; background:var(--bg-body); color:var(--text-main); transition:0.2s; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus, .inline-input:focus { outline:none; border-color:var(--accent); background:var(--surface); box-shadow:0 0 0 3px rgba(59,130,246,0.1); }
+        .form-group input, .form-group select, .form-group textarea, .inline-input { width:100%; padding:8px 10px; border:1px solid var(--border-light); border-radius:6px; box-sizing:border-box; font-family:'Assistant'; background:var(--bg-body); color:var(--text-main); }
         
         .crm-tabs { display:flex; border-bottom:2px solid var(--border-light); margin-bottom:15px; overflow-x:auto; }
         .crm-tab { flex:1; text-align:center; padding:10px; font-weight:600; color:var(--text-muted); cursor:pointer; transition:0.2s; border-bottom:2px solid transparent; margin-bottom:-2px; white-space:nowrap; }
-        .crm-tab:hover { color:var(--text-main); } .crm-tab.active { color:var(--accent); border-color:var(--accent); }
+        .crm-tab.active { color:var(--accent); border-color:var(--accent); }
         .crm-tab-content { display:none; } .crm-tab-content.active { display:block; animation:fadeIn 0.3s; } @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
 
         .tags-container { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
-        .tag-bubble { padding:4px 10px; border-radius:15px; font-size:12px; font-weight:600; background:var(--bg-body); border:1px solid var(--border-light); color:var(--text-muted); cursor:pointer; transition:0.2s; user-select:none; }
-        .tag-bubble:hover { border-color:var(--accent); } .tag-bubble.active { background:var(--accent); color:white; border-color:var(--accent); }
+        .tag-bubble { padding:4px 10px; border-radius:15px; font-size:12px; font-weight:600; background:var(--bg-body); border:1px solid var(--border-light); color:var(--text-muted); cursor:pointer; user-select:none; }
+        .tag-bubble.active { background:var(--accent); color:white; border-color:var(--accent); }
         .tag-badge { background:rgba(59,130,246,0.1); color:var(--accent); padding:2px 6px; border-radius:4px; font-size:11px; margin-right:4px; border:1px solid rgba(59,130,246,0.2); display:inline-block; }
 
         .log-list { max-height:250px; overflow-y:auto; margin-bottom:15px; padding-right:5px; }
@@ -99,38 +94,48 @@
         .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:5px; }
         .kpi-box { background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); text-align:center; }
         
+        /* Table Styles */
         .data-table { width:100%; border-collapse:collapse; text-align:right; direction:rtl; background:var(--surface); color:var(--text-main); }
         .data-table th, .data-table td { padding:12px; border-bottom:1px solid var(--border-light); font-size:14px; }
         .data-table th { background-color:var(--primary); color:white; position:sticky; top:0; z-index:1; font-weight:600; }
-        .data-table tr { transition:background-color 0.2s; } .data-table tr:hover td { background-color:var(--table-hover); }
+        .data-table tr:hover td { background-color:var(--table-hover); }
         .status-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-left:6px; }
-        .phone-link { color:var(--accent); text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:4px; transition:0.2s; }
-        .phone-link:hover { background:rgba(59,130,246,0.1); }
+        .phone-link { color:var(--accent); text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:4px; }
+        
+        /* Kanban Styles */
+        #kanban-container { display:none; flex-grow:1; padding:20px; overflow-x:auto; background:var(--bg-body); gap:15px; align-items:flex-start; }
+        .kanban-col { background:var(--surface); border-radius:8px; width:300px; min-width:300px; display:flex; flex-direction:column; border:1px solid var(--border-light); max-height:calc(100vh - 40px); }
+        .kanban-header { padding:15px; font-weight:bold; border-bottom:1px solid var(--border-light); background:var(--primary); color:white; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; }
+        .kanban-body { padding:10px; flex-grow:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
+        .kanban-card { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--accent); padding:12px; border-radius:6px; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.05); transition:0.2s; }
+        .kanban-card:hover { transform:translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,0.1); }
+        .kanban-card-title { font-weight:bold; font-size:15px; margin-bottom:5px; }
+
         .bldg-fam-item { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--border-light); padding:12px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition:0.2s; }
-        .bldg-fam-item:hover { transform:translateX(-3px); border-right-width:6px; box-shadow:0 4px 10px rgba(0,0,0,0.05); }
+        .bldg-fam-item:hover { transform:translateX(-3px); border-right-width:6px; }
 
         /* Bulk Action Bar */
         #bulkActionBar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--primary); color:white; padding:15px 25px; border-radius:30px; display:none; gap:15px; align-items:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:10000; font-weight:600; }
-        .bulk-btn { background:rgba(255,255,255,0.1); border:none; color:white; padding:6px 12px; border-radius:15px; cursor:pointer; transition:0.2s; }
+        .bulk-btn { background:rgba(255,255,255,0.1); border:none; color:white; padding:6px 12px; border-radius:15px; cursor:pointer; transition:0.2s; display:flex; align-items:center; gap:5px;}
         .bulk-btn:hover { background:rgba(255,255,255,0.2); }
 
-        #contextMenu { display:none; position:absolute; z-index:4000; background:var(--surface); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.3); padding:8px 0; min-width:180px; font-family:'Assistant'; border:1px solid var(--border-light); }
-        .context-item { padding:10px 16px; cursor:pointer; color:var(--text-main); font-size:14px; font-weight:600; display:flex; align-items:center; gap:12px; transition:0.2s; }
+        #contextMenu { display:none; position:absolute; z-index:4000; background:var(--surface); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.3); padding:8px 0; min-width:180px; border:1px solid var(--border-light); }
+        .context-item { padding:10px 16px; cursor:pointer; color:var(--text-main); font-size:14px; font-weight:600; display:flex; align-items:center; gap:12px; }
         .context-item:hover { background:var(--bg-body); color:var(--accent); }
 
         #toast-container { position:fixed; bottom:20px; left:20px; z-index:99999; display:flex; flex-direction:column; gap:10px; }
         .toast { padding:12px 20px; border-radius:8px; color:white; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:'Assistant'; font-weight:600; display:flex; align-items:center; gap:10px; animation:slideIn 0.3s ease-out forwards; opacity:0; transform:translateX(-50px); }
         .toast-success { background:var(--success); } .toast-error { background:var(--danger); } .toast-info { background:var(--accent); }
-        @keyframes slideIn { to{opacity:1;transform:translateX(0);} } @keyframes fadeOut { to{opacity:0;transform:translateY(10px);} }
+        @keyframes slideIn { to{opacity:1;transform:translateX(0);} }
 
         @media (max-width: 768px) {
             .mobile-header { display:flex; }
-            #sidebar { position:fixed; top:0; right:-360px; height:100vh; z-index:20000; box-shadow:none; transition:right 0.3s ease; }
+            #sidebar { position:fixed; top:0; right:-360px; height:100vh; z-index:20000; box-shadow:none; }
             #sidebar.open { right:0; box-shadow:-10px 0 20px rgba(0,0,0,0.3); }
             .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:19999; } .sidebar-overlay.open { display:block; }
             .modal-content { width:95% !important; margin:5% auto; padding:15px; }
             .data-table thead { display:none; } .data-table, .data-table tbody, .data-table tr, .data-table td { display:block; width:100%; box-sizing:border-box; }
-            .data-table tr { margin-bottom:15px; border:1px solid var(--border-light); border-radius:8px; padding:10px; background:var(--surface); box-shadow:0 2px 5px rgba(0,0,0,0.05); }
+            .data-table tr { margin-bottom:15px; border:1px solid var(--border-light); border-radius:8px; padding:10px; background:var(--surface); }
             .data-table td { text-align:right; padding:8px 5px; border-bottom:none; border-top:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; }
             .data-table td:first-child { border-top:none; } .data-table td::before { content:attr(data-label); font-weight:600; color:var(--text-muted); font-size:13px; }
             #bulkActionBar { width: 90%; flex-wrap: wrap; justify-content: center; bottom: 10px; }
@@ -171,7 +176,12 @@
     
     <div id="kpiAlerts"></div>
 
-    <button class="btn btn-primary" onclick="toggleView();"><i class="fas fa-exchange-alt"></i> החלף תצוגה (מפה/טבלה)</button>
+    <div class="view-switcher">
+        <button class="view-btn active" id="btnViewMap" onclick="switchMainView('map')"><i class="fas fa-map-marker-alt"></i> מפה</button>
+        <button class="view-btn" id="btnViewTable" onclick="switchMainView('table')"><i class="fas fa-list"></i> רשימה</button>
+        <button class="view-btn" id="btnViewKanban" onclick="switchMainView('kanban')"><i class="fas fa-columns"></i> קאנבן</button>
+    </div>
+
     <div id="geocoder"></div>
     
     <div class="stat-card" style="z-index:2000;">
@@ -183,12 +193,8 @@
         <div id="advFilters">
             <select class="filter-select" id="fStyle" onchange="applyAdvFilters()"><option value="">כל הסגנונות</option></select>
             <select class="filter-select" id="fTag" onchange="applyAdvFilters()"><option value="">כל התגיות</option></select>
-            <select class="filter-select" id="fStatus" onchange="applyAdvFilters()">
-                <option value="">כל הסטטוסים</option>
-                <option value="green">קשר טרי (ירוק)</option>
-                <option value="orange">קשר בינוני (כתום)</option>
-                <option value="red">לטיפול (אדום/אפור)</option>
-            </select>
+            <select class="filter-select" id="fStatus" onchange="applyAdvFilters()"><option value="">כל הסטטוסים</option><option value="green">קשר טרי (ירוק)</option><option value="orange">קשר בינוני (כתום)</option><option value="red">לטיפול (אדום/אפור)</option></select>
+            <select class="filter-select" id="fPipeline" onchange="applyAdvFilters()"><option value="">כל שלבי הקאנבן</option></select>
         </div>
     </div>
 
@@ -205,6 +211,7 @@
     </div>
 </div>
 <div id="list-container" style="display:none; flex-grow:1; padding:20px; overflow-y:auto; background:var(--bg-body); width:100%;"></div>
+<div id="kanban-container"></div>
 
 <div id="contextMenu">
     <div class="context-item" onclick="ctxEdit()"><i class="fas fa-pen"></i> ערוך פרטים</div>
@@ -215,9 +222,9 @@
 
 <div id="bulkActionBar">
     <span id="bulkCount">0 משפחות סומנו</span>
-    <button class="bulk-btn" onclick="bulkWhatsApp()"><i class="fab fa-whatsapp"></i> וואטסאפ לכולם</button>
-    <button class="bulk-btn" onclick="bulkAddTagPrompt()"><i class="fas fa-tag"></i> הוסף תגית</button>
-    <button class="bulk-btn" onclick="bulkExport()"><i class="fas fa-file-excel"></i> ייצא נבחרים</button>
+    <button class="bulk-btn" onclick="bulkWhatsApp()"><i class="fab fa-whatsapp"></i> הודעה</button>
+    <button class="bulk-btn" style="background:var(--success); color:white;" onclick="bulkRoute()"><i class="fas fa-route"></i> נווט מסלול</button>
+    <button class="bulk-btn" onclick="bulkAddTagPrompt()"><i class="fas fa-tag"></i> תגית</button>
     <button class="bulk-btn" style="color:#fca5a5;" onclick="bulkDelete()"><i class="fas fa-trash"></i> מחק</button>
     <button class="bulk-btn" style="background:transparent; font-size:20px; padding:0 5px;" onclick="clearBulkSelection()"><i class="fas fa-times"></i></button>
 </div>
@@ -225,28 +232,22 @@
 <div id="buildingModal" class="modal" style="display:none;">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:15px;">
-            <div>
-                <h2 style="margin:0; color:var(--primary);" id="bModalTitle"><i class="fas fa-building" style="color:var(--accent);"></i> רחוב לדוגמה</h2>
-                <div id="bModalNavBtn" style="margin-top:8px; display:flex; gap:8px;"></div>
-            </div>
+            <div><h2 style="margin:0; color:var(--primary);" id="bModalTitle"><i class="fas fa-building" style="color:var(--accent);"></i> בניין</h2><div id="bModalNavBtn" style="margin-top:8px; display:flex; gap:8px;"></div></div>
             <button class="btn-icon" onclick="closeModals()" style="border:none; font-size:18px;"><i class="fas fa-times"></i></button>
         </div>
         <div class="crm-tabs">
-            <div class="crm-tab active" id="bldgTabBtn-apts" onclick="switchBldgTab('apts')"><i class="fas fa-users"></i> משפחות בבניין</div>
-            <div class="crm-tab" id="bldgTabBtn-info" onclick="switchBldgTab('info')"><i class="fas fa-info-circle"></i> פרטי הבניין</div>
+            <div class="crm-tab active" id="bldgTabBtn-apts" onclick="switchBldgTab('apts')"><i class="fas fa-users"></i> משפחות</div>
+            <div class="crm-tab" id="bldgTabBtn-info" onclick="switchBldgTab('info')"><i class="fas fa-info-circle"></i> פרטי בניין</div>
         </div>
         <div id="bldgTab-apts" class="crm-tab-content active">
             <div id="bldgModalAptsList" style="max-height:350px; overflow-y:auto; padding-left:5px; margin-bottom:15px;"></div>
-            <button class="btn btn-success" onclick="quickAddAptModal()"><i class="fas fa-plus"></i> הוסף משפחה חדשה לבניין</button>
+            <button class="btn btn-success" onclick="quickAddAptModal()"><i class="fas fa-plus"></i> הוסף משפחה חדשה</button>
         </div>
         <div id="bldgTab-info" class="crm-tab-content">
-            <div class="form-group"><label>קוד כניסה</label><input type="text" id="bModalCode" placeholder="לדוגמה: 1234"></div>
-            <div class="form-group"><label>איש קשר בבניין</label><input type="text" id="bModalRep" placeholder="שם וטלפון"></div>
+            <div class="form-group"><label>קוד כניסה</label><input type="text" id="bModalCode"></div>
+            <div class="form-group"><label>איש קשר בבניין</label><input type="text" id="bModalRep"></div>
             <div class="form-group"><label>הערות</label><textarea id="bModalNotes" rows="3"></textarea></div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn btn-primary" onclick="saveBldgModalInfo()"><i class="fas fa-save"></i> שמור</button>
-                <button class="btn btn-danger" style="width:auto; padding:10px 15px;" onclick="setThisBuildingAsChabad()"><i class="fas fa-place-of-worship"></i> קבע כ-770</button>
-            </div>
+            <div style="display:flex; gap:10px;"><button class="btn btn-primary" onclick="saveBldgModalInfo()"><i class="fas fa-save"></i> שמור</button><button class="btn btn-danger" style="width:auto; padding:10px 15px;" onclick="setThisBuildingAsChabad()"><i class="fas fa-place-of-worship"></i> קבע כ-770</button></div>
         </div>
     </div>
 </div>
@@ -266,13 +267,19 @@
 
         <div id="crm-details" class="crm-tab-content active">
             <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
-                <div class="form-group"><label>שם משפחה</label><input type="text" id="cFamilyName" placeholder="שם משפחה..." oninput="markDirty()"></div>
-                <div class="form-group"><label>מספר דירה</label><input type="text" id="cAptNum" placeholder="מס' דירה" oninput="markDirty()"></div>
+                <div class="form-group"><label>שם משפחה</label><input type="text" id="cFamilyName" placeholder="הקלד כאן..." oninput="markDirty()"></div>
+                <div class="form-group"><label>מס' דירה</label><input type="text" id="cAptNum" oninput="markDirty()"></div>
             </div>
+            
+            <div class="form-group" style="background:rgba(59,130,246,0.05); padding:10px; border-radius:8px; border:1px solid rgba(59,130,246,0.2);">
+                <label style="color:var(--accent);"><i class="fas fa-columns"></i> סטטוס קאנבן (תהליך)</label>
+                <select id="cPipeline" onchange="markDirty()" style="font-weight:bold;"></select>
+            </div>
+
             <div class="form-group"><label><i class="fas fa-tags"></i> תגיות</label><div class="tags-container" id="cTagsContainer"></div></div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <div class="form-group"><label>שם האב</label><input type="text" id="cFather" placeholder="שם פרטי אב" oninput="markDirty()"></div>
-                <div class="form-group"><label>שם האם</label><input type="text" id="cMother" placeholder="שם פרטי אם" oninput="markDirty()"></div>
+                <div class="form-group"><label>שם האב</label><input type="text" id="cFather" oninput="markDirty()"></div>
+                <div class="form-group"><label>שם האם</label><input type="text" id="cMother" oninput="markDirty()"></div>
             </div>
             <div class="form-group" style="background:var(--bg-body); padding:10px; border-radius:8px; border:1px solid var(--border-light);">
                 <label style="color:var(--accent);"><i class="fas fa-child"></i> ילדים</label>
@@ -284,62 +291,46 @@
                 <div class="form-group"><label>סגנון</label><select id="cStyle" onchange="markDirty()"></select></div>
             </div>
             <div id="cCustomFieldsContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
-            <div class="form-group"><label>הערות כלליות</label><textarea id="cNotes" rows="2" oninput="markDirty()"></textarea></div>
+            <div class="form-group"><label>הערות</label><textarea id="cNotes" rows="2" oninput="markDirty()"></textarea></div>
         </div>
 
         <div id="crm-tasks" class="crm-tab-content">
             <div class="log-list" id="cTasksList"></div>
             <div style="background:var(--bg-body); padding:12px; border-radius:8px; border:1px solid var(--border-light);">
                 <h5 style="margin:0 0 10px 0; color:var(--accent);">משימה חדשה</h5>
-                <div style="display:flex; gap:10px; margin-bottom:10px;">
-                    <input type="text" id="newTaskText" class="inline-input" placeholder="מה צריך לעשות?" style="flex:2;">
-                    <input type="date" id="newTaskDate" class="inline-input" style="flex:1;">
-                </div>
+                <div style="display:flex; gap:10px; margin-bottom:10px;"><input type="text" id="newTaskText" class="inline-input" placeholder="מה צריך לעשות?" style="flex:2;"><input type="date" id="newTaskDate" class="inline-input" style="flex:1;"></div>
                 <button class="btn btn-outline" style="font-size:13px; padding:6px;" onclick="addTask()"><i class="fas fa-plus"></i> הוסף משימה</button>
             </div>
         </div>
-
         <div id="crm-logs" class="crm-tab-content">
             <div class="log-list" id="cLogsList"></div>
             <div style="background:var(--bg-body); padding:12px; border-radius:8px; border:1px solid var(--border-light);">
-                <h5 style="margin:0 0 10px 0; color:var(--accent);">הוסף תיעוד חדש</h5>
-                <div style="display:flex; gap:10px; margin-bottom:10px;">
-                    <input type="date" id="newLogDate" class="inline-input" style="flex:1;">
-                    <select id="newLogType" class="inline-input" style="flex:1;"><option value="ביקור">ביקור</option><option value="שיחה">שיחה</option><option value="הודעה">הודעה</option><option value="אחר">אחר</option></select>
-                </div>
-                <textarea id="newLogText" class="inline-input" rows="2" placeholder="מה היה בפגישה/שיחה?" style="margin-bottom:10px;"></textarea>
+                <h5 style="margin:0 0 10px 0; color:var(--accent);">תיעוד חדש</h5>
+                <div style="display:flex; gap:10px; margin-bottom:10px;"><input type="date" id="newLogDate" class="inline-input" style="flex:1;"><select id="newLogType" class="inline-input" style="flex:1;"><option value="ביקור">ביקור</option><option value="שיחה">שיחה</option><option value="הודעה">הודעה</option><option value="אחר">אחר</option></select></div>
+                <textarea id="newLogText" class="inline-input" rows="2" placeholder="מה היה?" style="margin-bottom:10px;"></textarea>
                 <button class="btn btn-outline" style="font-size:13px; padding:6px;" onclick="addInteractionLog()"><i class="fas fa-plus"></i> שמור תיעוד</button>
             </div>
         </div>
-
         <div id="crm-donations" class="crm-tab-content">
             <div class="sum-box">סך הכל תרומות: <span id="cDonationsSum">₪0</span></div>
             <div class="log-list" id="cDonationsList"></div>
             <div style="background:var(--bg-body); padding:12px; border-radius:8px; border:1px solid var(--border-light);">
-                <h5 style="margin:0 0 10px 0; color:var(--success);">תיעוד תרומה חדשה</h5>
-                <div style="display:flex; gap:10px; margin-bottom:10px;">
-                    <input type="date" id="newDonDate" class="inline-input" style="flex:1;"><input type="number" id="newDonAmount" class="inline-input" placeholder="סכום (₪)" style="flex:1;">
-                </div>
+                <h5 style="margin:0 0 10px 0; color:var(--success);">תרומה חדשה (מעל 500₪ = משימה אוטומטית!)</h5>
+                <div style="display:flex; gap:10px; margin-bottom:10px;"><input type="date" id="newDonDate" class="inline-input" style="flex:1;"><input type="number" id="newDonAmount" class="inline-input" placeholder="סכום (₪)" style="flex:1;"></div>
                 <input type="text" id="newDonReason" class="inline-input" placeholder="עבור מה?" style="margin-bottom:10px;">
                 <button class="btn btn-success" style="font-size:13px; padding:6px;" onclick="addDonation()"><i class="fas fa-plus"></i> הוסף תרומה</button>
             </div>
         </div>
-
-        <div style="margin-top:20px; display:flex; gap:10px;">
-            <button class="btn btn-primary" onclick="saveClientWithAuthCheck()"><i class="fas fa-save"></i> שמור פרטים</button>
-        </div>
+        <div style="margin-top:20px; display:flex; gap:10px;"><button class="btn btn-primary" onclick="saveClientWithAuthCheck()"><i class="fas fa-save"></i> שמור פרטים</button></div>
     </div>
 </div>
 
 <div id="addressSearchModal" class="modal">
     <div class="modal-content modal-small">
-        <h3 style="margin-top:0; color:var(--primary);"><i class="fas fa-map-marker-alt"></i> הוספת משפחה לכתובת</h3>
+        <h3 style="margin-top:0; color:var(--primary);"><i class="fas fa-map-marker-alt"></i> הוספת משפחה</h3>
         <div class="form-group"><input type="text" id="addressSearchInput" placeholder="הקלד עיר, רחוב ומספר..." oninput="searchAddressAPI()"></div>
         <div id="addressSearchResults" style="max-height:200px; overflow-y:auto; margin-bottom:15px; border:1px solid var(--border-light); border-radius:6px; display:none;"></div>
-        <div style="display:flex; gap:10px;">
-            <button class="btn btn-warning" onclick="selectNoAddress()"><i class="fas fa-question-circle"></i> ללא כתובת לעת עתה</button>
-            <button class="btn btn-outline" onclick="closeModals()">ביטול</button>
-        </div>
+        <div style="display:flex; gap:10px;"><button class="btn btn-warning" onclick="selectNoAddress()"><i class="fas fa-question-circle"></i> ללא כתובת עכשיו</button><button class="btn btn-outline" onclick="closeModals()">ביטול</button></div>
     </div>
 </div>
 
@@ -350,9 +341,14 @@
             <h4 style="margin:0 0 10px 0;"><i class="fas fa-palette"></i> מראה ותצוגה</h4>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group"><label>צבע נושא</label><input type="color" id="setThemeColor" style="height:40px; padding:2px;" onchange="updateThemePreview()"></div>
-                <div class="form-group"><label>מסך פתיחה</label><select id="setDefaultView"><option value="map">מפה</option><option value="table">טבלה</option></select></div>
+                <div class="form-group"><label>מסך פתיחה</label><select id="setDefaultView"><option value="map">מפה</option><option value="table">טבלה</option><option value="kanban">קאנבן</option></select></div>
             </div>
-            <button class="btn btn-primary" style="padding:6px; font-size:13px;" onclick="setDefaultLocation()"><i class="fas fa-crosshairs"></i> שמור מיקום נוכחי כברירת מחדל</button>
+            <button class="btn btn-primary" style="padding:6px; font-size:13px;" onclick="setDefaultLocation()"><i class="fas fa-crosshairs"></i> שמור מיקום נוכחי במפה</button>
+        </div>
+        <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
+            <h4 style="margin:0 0 10px 0;"><i class="fas fa-columns"></i> ניהול עמודות קאנבן</h4>
+            <div id="settingsPipelinesList" class="tags-container" style="margin-bottom:10px;"></div>
+            <div style="display:flex; gap:8px;"><input type="text" id="newPipelineInput" class="inline-input" placeholder="שם עמודה חדשה..."><button class="btn btn-success" style="width:auto;" onclick="addNewPipeline()">הוסף</button></div>
         </div>
         <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
             <h4 style="margin:0 0 10px 0;"><i class="fas fa-tags"></i> ניהול תגיות</h4>
@@ -362,7 +358,7 @@
         <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
             <h4 style="margin:0 0 10px 0;"><i class="fas fa-list-alt"></i> שדות אישיים למשפחה</h4>
             <div id="settingsCustomFieldsList" class="tags-container" style="margin-bottom:10px;"></div>
-            <div style="display:flex; gap:8px;"><input type="text" id="newFieldInput" class="inline-input" placeholder="למשל: יום נישואין, תפקיד..."><button class="btn btn-success" style="width:auto;" onclick="addNewCustomField()">הוסף</button></div>
+            <div style="display:flex; gap:8px;"><input type="text" id="newFieldInput" class="inline-input" placeholder="למשל: ארץ מוצא, תפקיד..."><button class="btn btn-success" style="width:auto;" onclick="addNewCustomField()">הוסף</button></div>
         </div>
         <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:20px;">
             <h4 style="margin:0 0 10px 0;"><i class="fas fa-database"></i> גיבוי</h4>
@@ -383,21 +379,24 @@
 
     let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || { 
         center: [35.24430, 31.82650], zoom: 17.5, pitch: 60, chabadHouseCoords: null, themeColor: '#3b82f6', defaultView: 'map',
-        tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: []
+        tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: [],
+        pipelineStages: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי']
     };
     if(!appSettings.customFields) appSettings.customFields = [];
+    if(!appSettings.pipelineStages) appSettings.pipelineStages = ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'];
+    
     document.documentElement.style.setProperty('--accent', appSettings.themeColor);
-    let isMapView = appSettings.defaultView === 'map';
+    let currentMainView = appSettings.defaultView;
 
     let db = JSON.parse(localStorage.getItem('community_data_final')) || {};
     if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
 
     let activeMarkers = [], chart = null, chabadHouseMarker = null;
     let currentBldg = null, currentAptIdx = null;
-    let tempChildren=[], tempTags=[], tempLogs=[], tempDonations=[], tempTasks=[], tempCustom={}; 
+    let tempChildren=[], tempTags=[], tempLogs=[], tempDonations=[], tempTasks=[], tempCustom={}, tempPipeline=''; 
     let pendingMoveMode = false, isDirty = false;
-    let bulkSelection = []; // "bldg|idx"
-    let currentFilters = { tags: '', style: '', status: '' };
+    let bulkSelection = []; 
+    let currentFilters = { tags: '', style: '', status: '', pipeline: '' };
 
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/streets-v12', center: appSettings.center, zoom: appSettings.zoom, pitch: appSettings.pitch });
     map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
@@ -406,7 +405,7 @@
     document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
 
     window.onload = () => {
-        if(!isMapView) { document.getElementById('map-container').style.display='none'; document.getElementById('list-container').style.display='block'; }
+        switchMainView(currentMainView);
         if(localStorage.getItem('darkMode')==='true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className='fas fa-sun'; }
         populateFilterDropdowns();
 
@@ -428,7 +427,7 @@
     window.logout = function() { if(confirm("התנתק מהחשבון?")) { localStorage.removeItem('gdrive_session'); location.reload(); } };
     async function ensureAuthAndExecute(cb) {
         const session = JSON.parse(localStorage.getItem('gdrive_session'));
-        if (!session || session.expiresAt < new Date().getTime() + 60000) { showToast("מחדש אבטחה...", "warning"); window.gClient.callback = (r)=>{ handleAuth(r); setTimeout(cb, 1000); }; window.gClient.requestAccessToken({prompt: ''}); } else { cb(); }
+        if (!session || session.expiresAt < new Date().getTime() + 60000) { showToast("מחדש חיבור...", "warning"); window.gClient.callback = (r)=>{ handleAuth(r); setTimeout(cb, 1000); }; window.gClient.requestAccessToken({prompt: ''}); } else { cb(); }
     }
 
     async function syncWithDrive() {
@@ -447,15 +446,30 @@
             if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: {code:'',rep:'',notes:'',coords:null}, apts:[] };
             localStorage.setItem('community_data_final', JSON.stringify(db)); setSyncStatus('ok', 'מסונכרן');
         } catch(e) { setSyncStatus('error', 'שגיאה'); }
-        document.getElementById('splash-screen').style.opacity='0'; setTimeout(() => { document.getElementById('splash-screen').style.display='none'; map.resize(); refreshMap(); if(!isMapView) renderListView(); }, 800);
+        document.getElementById('splash-screen').style.opacity='0'; setTimeout(() => { document.getElementById('splash-screen').style.display='none'; map.resize(); handleOmniSearch(); }, 800);
     }
     async function pushToDrive() {
         if(!driveFileId || !accessToken) return; setSyncStatus('wait', 'שומר...');
         try { await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, { method:'PATCH', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'}, body:JSON.stringify(db) }); setSyncStatus('ok', 'נשמר'); } catch(e) { setSyncStatus('error', 'שגיאה'); }
     }
     function setSyncStatus(st, txt) { document.getElementById('sync-text').innerText=txt; const ic=document.getElementById('sync-icon'), co=document.getElementById('sync-status'); if(st==='wait'){ic.className='fas fa-spinner fa-spin';co.style.color='var(--warning)';} if(st==='ok'){ic.className='fas fa-cloud-check';co.style.color='var(--success)';} if(st==='error'){ic.className='fas fa-exclamation-triangle';co.style.color='var(--danger)';} }
-    function saveDB() { localStorage.setItem('community_data_final', JSON.stringify(db)); refreshMap(); pushToDrive(); }
+    function saveDB() { localStorage.setItem('community_data_final', JSON.stringify(db)); handleOmniSearch(); pushToDrive(); }
     function showToast(msg, type='info') { const c=document.getElementById('toast-container'), t=document.createElement('div'); t.className=`toast toast-${type}`; t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':type==='error'?'fa-exclamation-triangle':'fa-info-circle'}"></i> ${msg}`; c.appendChild(t); setTimeout(() => { t.style.animation='fadeOut 0.3s ease-in forwards'; setTimeout(()=>t.remove(),300); }, 3000); }
+
+    // Views
+    window.switchMainView = function(viewName) {
+        currentMainView = viewName;
+        document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active'));
+        document.getElementById(viewName==='map'?'btnViewMap':(viewName==='table'?'btnViewTable':'btnViewKanban')).classList.add('active');
+        
+        document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
+        document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
+        document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
+        
+        if(viewName==='map') map.resize();
+        handleOmniSearch(); 
+        if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
+    };
 
     window.toggleMapStyle = () => { const s = map.getStyle().name.includes('Satellite'); map.setStyle(s ? 'mapbox://styles/mapbox/streets-v12' : 'mapbox://styles/mapbox/satellite-streets-v12'); showToast(s ? 'מפת רחובות' : 'מפת לוויין', 'info'); };
     map.on('style.load', () => { if(!map.getLayer('3d-buildings')) map.addLayer({ 'id':'3d-buildings', 'source':'composite', 'source-layer':'building', 'filter':['==','extrude','true'], 'type':'fill-extrusion', 'minzoom':15, 'paint': { 'fill-extrusion-color':['case',['boolean',['feature-state','hover'],false],appSettings.themeColor,'#d1d5db'], 'fill-extrusion-height':['get','height'], 'fill-extrusion-base':['get','min_height'], 'fill-extrusion-opacity':0.8 } }); });
@@ -479,20 +493,23 @@
         switchBldgTab('apts'); document.getElementById('buildingModal').style.display='flex';
     };
     window.switchBldgTab = (tab) => { document.querySelectorAll('#buildingModal .crm-tab, #buildingModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`bldgTabBtn-${tab}`).classList.add('active'); document.getElementById(`bldgTab-${tab}`).classList.add('active'); };
-    window.quickAddAptModal = () => { db[currentBldg].apts.push({ num:'', name:'', style:appSettings.styles[0], tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); saveDB(); document.getElementById('buildingModal').style.display='none'; openClientCard(db[currentBldg].apts.length-1); };
+    window.quickAddAptModal = () => { db[currentBldg].apts.push({ num:'', name:'', style:appSettings.styles[0], pipeline:appSettings.pipelineStages[0], tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); saveDB(); document.getElementById('buildingModal').style.display='none'; openClientCard(db[currentBldg].apts.length-1); };
     window.saveBldgModalInfo = () => ensureAuthAndExecute(() => { db[currentBldg].info.code=document.getElementById('bModalCode').value; db[currentBldg].info.rep=document.getElementById('bModalRep').value; db[currentBldg].info.notes=document.getElementById('bModalNotes').value; saveDB(); showToast("נשמר","success"); });
-    window.setThisBuildingAsChabad = () => { if(confirm("לקבוע כבית חב''ד?")) { const c = db[currentBldg].info.coords; if(c) { appSettings.chabadHouseCoords=c; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); refreshMap(); showToast("ננעץ!","success"); } } };
+    window.setThisBuildingAsChabad = () => { if(confirm("לקבוע כבית חב''ד?")) { const c = db[currentBldg].info.coords; if(c) { appSettings.chabadHouseCoords=c; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); handleOmniSearch(); showToast("ננעץ!","success"); } } };
 
     window.markDirty = () => { isDirty = true; };
-    window.attemptCloseCrmModal = () => { if(isDirty && !confirm("לצאת ללא שמירה?")) return; isDirty=false; document.getElementById('clientModal').style.display='none'; if(currentBldg!==NO_ADDRESS_KEY && isMapView) openBuildingModal(); };
+    window.attemptCloseCrmModal = () => { if(isDirty && !confirm("לצאת ללא שמירה?")) return; isDirty=false; document.getElementById('clientModal').style.display='none'; if(currentBldg!==NO_ADDRESS_KEY && currentMainView==='map') openBuildingModal(); };
     window.formatPhone = (el) => { let v=el.value.replace(/\D/g,''); if(v.length>3&&v.length<=6) v=v.slice(0,3)+'-'+v.slice(3); else if(v.length>6) v=v.slice(0,3)+'-'+v.slice(3,6)+'-'+v.slice(6,10); el.value=v; };
 
     window.openClientCard = function(idx) {
         isDirty = false; document.getElementById('buildingModal').style.display='none'; currentAptIdx = idx; const a = db[currentBldg].apts[idx];
         document.getElementById('crmFamilyTitle').innerHTML = `<i class="fas fa-id-card"></i> ${a.name||'משפחה חדשה'} ${currentBldg===NO_ADDRESS_KEY?'(ללא כתובת)':''}`;
         document.getElementById('cFamilyName').value=a.name||''; document.getElementById('cAptNum').value=a.num||''; document.getElementById('cFather').value=a.father||''; document.getElementById('cMother').value=a.mother||''; document.getElementById('cPhones').value=a.phones||''; document.getElementById('cNotes').value=a.notes||'';
-        const sSel = document.getElementById('cStyle'); sSel.innerHTML = ''; appSettings.styles.forEach(s => sSel.innerHTML += `<option value="${s}" ${a.style===s?'selected':''}>${s}</option>`); if(a.style&&!appSettings.styles.includes(a.style)) sSel.innerHTML+=`<option selected>${a.style}</option>`;
         
+        const sSel = document.getElementById('cStyle'); sSel.innerHTML = ''; appSettings.styles.forEach(s => sSel.innerHTML += `<option value="${s}" ${a.style===s?'selected':''}>${s}</option>`); if(a.style&&!appSettings.styles.includes(a.style)) sSel.innerHTML+=`<option selected>${a.style}</option>`;
+        const pSel = document.getElementById('cPipeline'); pSel.innerHTML = ''; appSettings.pipelineStages.forEach(p => pSel.innerHTML += `<option value="${p}" ${a.pipeline===p?'selected':''}>${p}</option>`); if(a.pipeline&&!appSettings.pipelineStages.includes(a.pipeline)) pSel.innerHTML+=`<option selected>${a.pipeline}</option>`;
+        tempPipeline = a.pipeline || appSettings.pipelineStages[0];
+
         tempTags=[...(a.tags||[])]; renderModalTags();
         tempChildren=[...(a.childrenList||[])]; renderModalChildren();
         tempLogs=[...(a.interactions||[])]; renderLogs();
@@ -521,35 +538,45 @@
             <div class="log-item" style="opacity:${t.done?0.6:1};"><div class="log-header"><span style="text-decoration:${t.done?'line-through':'none'};"><input type="checkbox" ${t.done?'checked':''} onchange="tempTasks[${i}].done=this.checked;markDirty();renderTasks()" style="margin-left:8px;">${t.text}</span><div><span style="color:var(--text-muted);font-size:11px;margin-left:10px;">${t.date||''}</span><button onclick="tempTasks.splice(${i},1);markDirty();renderTasks()" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button></div></div></div>
         `).join('');
     }
-    window.addTask = () => { const t=document.getElementById('newTaskText').value, d=document.getElementById('newTaskDate').value; if(!t)return; markDirty(); tempTasks.push({text:t,date:d,done:false}); document.getElementById('newTaskText').value=''; renderTasks(); };
+    window.addTask = (text='', date='') => { const t=text||document.getElementById('newTaskText').value, d=date||document.getElementById('newTaskDate').value; if(!t)return; markDirty(); tempTasks.push({text:t,date:d,done:false}); document.getElementById('newTaskText').value=''; renderTasks(); };
 
     function renderLogs() { document.getElementById('cLogsList').innerHTML = tempLogs.length===0 ? '<div class="empty-state"><i class="fas fa-comments"></i><div>עוד לא נוצר קשר. זה הזמן!</div></div>' : tempLogs.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((l,i) => `<div class="log-item"><div class="log-header"><span><i class="fas fa-calendar-alt"></i> ${l.date} - ${l.type}</span><button onclick="tempLogs.splice(${i},1);markDirty();renderLogs()" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-times"></i></button></div><div>${l.text}</div></div>`).join(''); }
     window.addInteractionLog = () => { const d=document.getElementById('newLogDate').value, t=document.getElementById('newLogType').value, txt=document.getElementById('newLogText').value; if(!d||!txt)return; markDirty(); tempLogs.push({date:d,type:t,text:txt}); document.getElementById('newLogText').value=''; renderLogs(); };
 
     function renderDonations() { let sum=tempDonations.reduce((a,b)=>a+Number(b.amount||0),0); document.getElementById('cDonationsSum').innerText=`₪${sum}`; document.getElementById('cDonationsList').innerHTML = tempDonations.length===0 ? '<div class="empty-state"><i class="fas fa-hand-holding-heart"></i><div>אין תרומות.</div></div>' : tempDonations.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((d,i) => `<div class="log-item"><div class="log-header"><span style="color:var(--success);"><i class="fas fa-shekel-sign"></i> ${d.amount}</span><span>${d.date}</span></div><div>${d.reason} <button onclick="tempDonations.splice(${i},1);markDirty();renderDonations()" style="float:left;background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button></div></div>`).join(''); }
-    window.addDonation = () => { const d=document.getElementById('newDonDate').value, a=document.getElementById('newDonAmount').value, r=document.getElementById('newDonReason').value; if(!d||!a)return; markDirty(); tempDonations.push({date:d,amount:a,reason:r||'כללי'}); document.getElementById('newDonAmount').value=''; document.getElementById('newDonReason').value=''; renderDonations(); };
+    
+    // NEW: Automation Rules
+    window.addDonation = () => { 
+        const d=document.getElementById('newDonDate').value, a=document.getElementById('newDonAmount').value, r=document.getElementById('newDonReason').value; 
+        if(!d||!a)return; markDirty(); 
+        tempDonations.push({date:d,amount:a,reason:r||'כללי'}); 
+        // Auto-Task Rule
+        if(Number(a) >= 500) { addTask(`להתקשר להגיד תודה אישית על התרומה המכובדת (${a} ש"ח)`, d); showToast('נוצרה משימה אוטומטית להכרת הטוב!', 'info'); switchCrmTab('tasks'); }
+        document.getElementById('newDonAmount').value=''; document.getElementById('newDonReason').value=''; renderDonations(); 
+    };
 
     window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
         const a = db[currentBldg].apts[currentAptIdx];
         a.name=document.getElementById('cFamilyName').value; a.num=document.getElementById('cAptNum').value; a.father=document.getElementById('cFather').value; a.mother=document.getElementById('cMother').value; a.phones=document.getElementById('cPhones').value; a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
+        a.pipeline=document.getElementById('cPipeline').value;
         a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customFields={...tempCustom};
         isDirty=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה", "success");
-        if(!isMapView) renderListView(); else if(currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
+        if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
     });
 
     window.openAddressSearch = (isMove=false) => { pendingMoveMode=isMove; document.getElementById('addressSearchInput').value=''; document.getElementById('addressSearchResults').style.display='none'; document.getElementById('addressSearchModal').style.display='flex'; };
     window.searchAddressAPI = async () => { const q=document.getElementById('addressSearchInput').value, d=document.getElementById('addressSearchResults'); if(q.length<3){d.style.display='none';return;} try{ const r=await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=il&language=he&proximity=${map.getCenter().lng},${map.getCenter().lat}&access_token=${mapboxgl.accessToken}`); const j=await r.json(); if(j.features&&j.features.length>0){d.style.display='block';d.innerHTML=j.features.map(f=>`<div class="search-item" onclick="selectAddress('${(f.place_name_he||f.place_name).split(',')[0].trim()}',${f.center[0]},${f.center[1]})"><div class="search-item-title"><i class="fas fa-map-marker-alt"></i> ${(f.place_name_he||f.place_name).split(',')[0].trim()}</div></div>`).join('');}else d.innerHTML='<div style="padding:10px;">לא נמצאו תוצאות.</div>'; }catch(e){} };
     window.selectAddress = (b,lng,lat) => { if(!db[b]) db[b]={info:{code:'',rep:'',notes:'',coords:[lng,lat]},apts:[]}; processAddressSelection(b); };
     window.selectNoAddress = () => processAddressSelection(NO_ADDRESS_KEY);
-    function processAddressSelection(t) { if(pendingMoveMode) { db[t].apts.push(db[currentBldg].apts.splice(currentAptIdx,1)[0]); showToast('הועבר','success'); } else { db[t].apts.push({num:'',name:'',style:appSettings.styles[0],tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}}); currentAptIdx=db[t].apts.length-1; } currentBldg=t; saveDB(); document.getElementById('addressSearchModal').style.display='none'; openClientCard(currentAptIdx); }
+    function processAddressSelection(t) { if(pendingMoveMode) { db[t].apts.push(db[currentBldg].apts.splice(currentAptIdx,1)[0]); showToast('הועבר','success'); } else { db[t].apts.push({num:'',name:'',style:appSettings.styles[0],pipeline:appSettings.pipelineStages[0],tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}}); currentAptIdx=db[t].apts.length-1; } currentBldg=t; saveDB(); document.getElementById('addressSearchModal').style.display='none'; openClientCard(currentAptIdx); }
 
     window.toggleAdvFilters = () => { const el=document.getElementById('advFilters'); el.style.display = el.style.display==='block'?'none':'block'; };
     function populateFilterDropdowns() {
-        const s = document.getElementById('fStyle'), t = document.getElementById('fTag');
-        s.innerHTML='<option value="">כל הסגנונות</option>'+appSettings.styles.map(x=>`<option value="${x}">${x}</option>`).join('');
-        t.innerHTML='<option value="">כל התגיות</option>'+appSettings.tags.map(x=>`<option value="${x}">${x}</option>`).join('');
+        document.getElementById('fStyle').innerHTML='<option value="">כל הסגנונות</option>'+appSettings.styles.map(x=>`<option value="${x}">${x}</option>`).join('');
+        document.getElementById('fTag').innerHTML='<option value="">כל התגיות</option>'+appSettings.tags.map(x=>`<option value="${x}">${x}</option>`).join('');
+        document.getElementById('fPipeline').innerHTML='<option value="">כל שלבי הקאנבן</option>'+appSettings.pipelineStages.map(x=>`<option value="${x}">${x}</option>`).join('');
     }
-    window.applyAdvFilters = () => { currentFilters.style=document.getElementById('fStyle').value; currentFilters.tags=document.getElementById('fTag').value; currentFilters.status=document.getElementById('fStatus').value; handleOmniSearch(); };
+    window.applyAdvFilters = () => { currentFilters.style=document.getElementById('fStyle').value; currentFilters.tags=document.getElementById('fTag').value; currentFilters.status=document.getElementById('fStatus').value; currentFilters.pipeline=document.getElementById('fPipeline').value; handleOmniSearch(); };
 
     window.handleOmniSearch = () => {
         const q=document.getElementById('smartSearch').value.toLowerCase(), dd=document.getElementById('searchDropdown'); let res=[];
@@ -560,18 +587,87 @@
             let matchTag = !currentFilters.tags || (a.tags||[]).includes(currentFilters.tags);
             let col = getStatusColor(a);
             let matchStat = !currentFilters.status || (currentFilters.status==='green'&&col==='#10b981') || (currentFilters.status==='orange'&&col==='#f59e0b') || (currentFilters.status==='red'&&(col==='#ef4444'||col==='#94a3b8'));
-            if(matchQ && matchStyle && matchTag && matchStat) res.push({bldg:b, idx:i, apt:a});
+            let matchPipe = !currentFilters.pipeline || a.pipeline === currentFilters.pipeline;
+            if(matchQ && matchStyle && matchTag && matchStat && matchPipe) res.push({bldg:b, idx:i, apt:a});
         });});
         if(q.length>=2 && res.length>0) { dd.style.display='block'; dd.innerHTML=res.slice(0,15).map(r=>`<div class="search-item" onclick="jumpToSearchResult('${encodeURIComponent(r.bldg)}',${r.idx})"><div class="search-item-title">${r.apt.name||'ללא שם'} <span style="font-size:12px;">(${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg})</span></div></div>`).join(''); } else { dd.style.display='none'; }
-        refreshMap(res); if(!isMapView) renderListView(res);
+        
+        refreshMap(res); 
+        if(currentMainView==='table') renderListView(res);
+        if(currentMainView==='kanban') renderKanbanView(res);
     };
     window.jumpToSearchResult = (b,i) => { document.getElementById('searchDropdown').style.display='none'; currentBldg=decodeURIComponent(b); openClientCard(i); };
     
     document.addEventListener('mousedown', (e) => { if(e.target.id!=='smartSearch') document.getElementById('searchDropdown').style.display='none'; if(e.target.classList.contains('modal')){if(e.target.id==='clientModal')attemptCloseCrmModal();else e.target.style.display='none';} });
-    window.closeModals = () => { if(isDirty && !confirm("לצאת ללא שמירה?")) return; isDirty=false; document.querySelectorAll('.modal').forEach(m=>m.style.display='none'); };
 
     function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
-    window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} isMapView=true; document.getElementById('map-container').style.display='block'; document.getElementById('list-container').style.display='none'; map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
+    window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
+
+    /* Kanban View */
+    window.renderKanbanView = (filteredRes = null) => {
+        const c = document.getElementById('kanban-container'); c.innerHTML = '';
+        let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})));
+        
+        appSettings.pipelineStages.forEach(stage => {
+            let colCards = arr.filter(r => (r.apt.pipeline||appSettings.pipelineStages[0]) === stage);
+            let colHtml = `<div class="kanban-col"><div class="kanban-header">${stage} <span style="background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:12px;font-size:12px;">${colCards.length}</span></div><div class="kanban-body">`;
+            colCards.forEach(r => {
+                let tags = (r.apt.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('');
+                colHtml += `<div class="kanban-card" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})"><div class="kanban-card-title">${r.apt.name||'ללא שם'}</div><div style="font-size:12px;color:var(--text-muted);margin-bottom:5px;">${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg}</div><div>${tags}</div></div>`;
+            });
+            c.innerHTML += colHtml + `</div></div>`;
+        });
+    };
+
+    /* Bulk Actions & Routing */
+    window.toggleAllBulk = (cb) => { const cbs=document.querySelectorAll('.bulk-cb'); cbs.forEach(c=>c.checked=cb.checked); updateBulkBar(); };
+    window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
+    window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); const sa=document.getElementById('bulkSelectAll'); if(sa) sa.checked=false; updateBulkBar(); };
+    window.bulkWhatsApp = () => { let p=[]; bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let apt=db[b].apts[i]; if(apt.phones) p.push(apt.phones.split(',')[0].trim().replace(/\D/g,'')); }); if(p.length>0) alert(`יישלח וואטסאפ ל-${p.length} מספרים (API בקרוב)`); clearBulkSelection(); };
+    window.bulkAddTagPrompt = () => { const t=prompt("הקלד תגית להוספה:"); if(t) { ensureAuthAndExecute(()=>{ bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let a=db[b].apts[i]; if(!a.tags)a.tags=[]; if(!a.tags.includes(t))a.tags.push(t); }); if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns();} saveDB(); clearBulkSelection(); showToast("תגית נוספה","success"); }); } };
+    window.bulkDelete = () => { if(confirm(`למחוק ${bulkSelection.length} משפחות? פעולה בלתי הפיכה!`)) { ensureAuthAndExecute(()=>{ bulkSelection.sort((x,y)=>y.split('|')[1]-x.split('|')[1]).forEach(v=>{let [b,i]=v.split('|'); db[b].apts.splice(i,1);}); saveDB(); clearBulkSelection(); showToast("נמחקו","success"); }); } };
+    
+    // NEW: Multi-stop Route Optimization
+    window.bulkRoute = () => {
+        let waypoints = [];
+        bulkSelection.forEach(v => {
+            let [b, i] = v.split('|');
+            if(b !== NO_ADDRESS_KEY && db[b].info.coords) {
+                // Add lat,lng. (Mapbox is lng,lat. Google is lat,lng)
+                waypoints.push(`${db[b].info.coords[1]},${db[b].info.coords[0]}`);
+            }
+        });
+        if(waypoints.length === 0) { showToast("לא נבחרו משפחות עם מיקום על המפה!", "error"); return; }
+        if(waypoints.length > 10) { showToast("מגבלת גוגל מפות היא 10 יעדים למסלול. נבחרו 10 ראשונים.", "warning"); waypoints = waypoints.slice(0,10); }
+        
+        // Let's add Chabad house as origin if exists, else first waypoint
+        let origin = '';
+        if(appSettings.chabadHouseCoords) origin = `${appSettings.chabadHouseCoords[1]},${appSettings.chabadHouseCoords[0]}/`;
+        
+        let mapsUrl = `https://www.google.com/maps/dir/${origin}${waypoints.join('/')}`;
+        window.open(mapsUrl, '_blank');
+        clearBulkSelection();
+    };
+
+    window.renderListView = (filteredRes = null) => {
+        const c=document.getElementById('list-container');
+        let html=`<div style="display:flex;justify-content:space-between;margin-bottom:15px;align-items:center;flex-wrap:wrap;gap:10px;"><h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2><div style="display:flex;gap:10px;"><button class="btn btn-success" style="width:auto;padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button><button class="btn btn-primary" style="width:auto;padding:8px 15px;" onclick="openAddressSearch()"><i class="fas fa-plus"></i> הוסף משפחה</button></div></div>
+        <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>שלב קאנבן</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים</th></tr></thead><tbody>`;
+        let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})));
+        arr.forEach(r => {
+            const enc=encodeURIComponent(r.bldg), bName=r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg, a=r.apt;
+            let lastDate='-'; if(a.interactions&&a.interactions.length>0) lastDate=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date;
+            html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
+                <td data-label="בחר" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" value="${r.bldg}|${r.idx}" onchange="updateBulkBar()"></td>
+                <td data-label="כתובת" onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${bName}</td>
+                <td data-label="משפחה"><b>${a.name||'(ללא שם)'}</b></td><td data-label="סטטוס">${a.pipeline||'-'}</td>
+                <td data-label="תגיות">${(a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('')}</td>
+                <td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>
+                <td data-label="טלפונים" onclick="event.stopPropagation()">${(a.phones||'').split(',').map(p=>`<a class="phone-link" href="https://wa.me/972${p.replace(/\D/g,'').replace(/^0/,'')}?text=שלום" target="_blank"><i class="fab fa-whatsapp"></i> ${p}</a>`).join(' ')}</td>
+            </tr>`;
+        });
+        c.innerHTML = html + `</tbody></table>`;
+    };
 
     function refreshMap(filteredRes = null) {
         activeMarkers.forEach(m=>m.remove()); activeMarkers=[]; if(chabadHouseMarker) chabadHouseMarker.remove();
@@ -585,7 +681,6 @@
         }
 
         let keysToLoop = filteredRes ? [...new Set(filteredRes.map(r=>r.bldg))] : Object.keys(db);
-        
         Object.keys(db).forEach(k => {
             let maxVal=0, showBldg=false;
             db[k].apts.forEach((a,i) => {
@@ -594,7 +689,7 @@
                 if(!filteredRes || filteredRes.find(r=>r.bldg===k && r.idx===i)) showBldg=true;
 
                 (a.childrenList||[]).forEach(ch => { if(ch.dob && new Date(ch.dob).getMonth()===cMonth) alerts.push(`<i class="fas fa-birthday-cake" style="color:var(--warning);"></i> ${ch.name} (משפ' ${a.name||''}) חוגג/ת`); });
-                (a.tasks||[]).forEach(t => { if(!t.done) alerts.push(`<i class="fas fa-tasks" style="color:var(--accent);"></i> משפ' ${a.name||''}: ${t.text} (${t.date})`); });
+                (a.tasks||[]).forEach(t => { if(!t.done) alerts.push(`<i class="fas fa-tasks" style="color:var(--accent);"></i> משפ' ${a.name||''}: ${t.text}`); });
             });
             if(showBldg && db[k].apts.length>0 && k!==NO_ADDRESS_KEY) {
                 let coords=db[k].info.coords||k.split(',').map(Number);
@@ -605,80 +700,30 @@
         });
         document.getElementById('kpiTotal').innerText=total; document.getElementById('kpiUrgent').innerText=urgent;
         const alDiv = document.getElementById('kpiAlerts'); alDiv.innerHTML='';
-        if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות לשבוע זה:</div><ul style="margin:0; padding-right:20px; font-weight:normal;">${alerts.slice(0,6).map(a=>`<li>${a}</li>`).join('')}${alerts.length>6?'<li>ועוד...</li>':''}</ul></div>`;
+        if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding-right:20px; font-weight:normal;">${alerts.slice(0,6).map(a=>`<li>${a}</li>`).join('')}${alerts.length>6?'<li>ועוד...</li>':''}</ul></div>`;
         if(chart) chart.destroy(); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#64748b']}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
     }
 
-    window.toggleView = () => { isMapView=!isMapView; document.getElementById('map-container').style.display=isMapView?'block':'none'; document.getElementById('list-container').style.display=isMapView?'none':'block'; if(!isMapView) handleOmniSearch(); if(window.innerWidth<=768) toggleMobileMenu(); };
-
-    /* Bulk Actions Logic */
-    window.toggleAllBulk = (cb) => { const cbs=document.querySelectorAll('.bulk-cb'); cbs.forEach(c=>c.checked=cb.checked); updateBulkBar(); };
-    window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} משפחות סומנו`;} else bar.style.display='none'; };
-    window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); document.getElementById('bulkSelectAll').checked=false; updateBulkBar(); };
-    window.bulkWhatsApp = () => { let p=[]; bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let apt=db[b].apts[i]; if(apt.phones) p.push(apt.phones.split(',')[0].trim().replace(/\D/g,'')); }); if(p.length>0) alert(`בעתיד יפתח API לוואטסאפ מרוכז. כרגע נאספו ${p.length} מספרים.`); clearBulkSelection(); };
-    window.bulkAddTagPrompt = () => { const t=prompt("הקלד את שם התגית שתרצה להוסיף לכל המשפחות המסומנות (למשל: מקורב):"); if(t) { ensureAuthAndExecute(()=>{ bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let a=db[b].apts[i]; if(!a.tags)a.tags=[]; if(!a.tags.includes(t))a.tags.push(t); }); if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns();} saveDB(); clearBulkSelection(); handleOmniSearch(); showToast("תגית נוספה בהצלחה","success"); }); } };
-    window.bulkDelete = () => { if(confirm(`האם אתה בטוח שברצונך למחוק ${bulkSelection.length} משפחות? פעולה זו בלתי הפיכה!`)) { ensureAuthAndExecute(()=>{ bulkSelection.sort((x,y)=>y.split('|')[1]-x.split('|')[1]).forEach(v=>{let [b,i]=v.split('|'); db[b].apts.splice(i,1);}); saveDB(); clearBulkSelection(); handleOmniSearch(); showToast("נמחקו","success"); }); } };
-    window.bulkExport = () => { exportTableToCSV(bulkSelection); clearBulkSelection(); };
-
-    window.renderListView = (filteredRes = null) => {
-        const c=document.getElementById('list-container');
-        let html=`<div style="display:flex;justify-content:space-between;margin-bottom:15px;align-items:center;flex-wrap:wrap;gap:10px;"><h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2><div style="display:flex;gap:10px;"><button class="btn btn-success" style="width:auto;padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא מלא</button><button class="btn btn-primary" style="width:auto;padding:8px 15px;" onclick="openAddressSearch()"><i class="fas fa-plus"></i> הוסף משפחה</button></div></div>
-        <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>סגנון</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים</th></tr></thead><tbody>`;
-        let arr = filteredRes || [];
-        if(!filteredRes) Object.keys(db).forEach(b=>db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})));
-        
-        arr.forEach(r => {
-            const enc=encodeURIComponent(r.bldg), bName=r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg, a=r.apt;
-            let lastDate='-'; if(a.interactions&&a.interactions.length>0) lastDate=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date;
-            let waText=encodeURIComponent(`שלום משפחת ${a.name||''}! מה שלומכם? מחכים לראותכם...`);
-            html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
-                <td data-label="בחר" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" value="${r.bldg}|${r.idx}" onchange="updateBulkBar()"></td>
-                <td data-label="כתובת" onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${bName}</td>
-                <td data-label="משפחה"><b>${a.name||'(ללא שם)'}</b></td><td data-label="סגנון">${a.style||'-'}</td>
-                <td data-label="תגיות">${(a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('')}</td>
-                <td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>
-                <td data-label="טלפונים" onclick="event.stopPropagation()">${(a.phones||'').split(',').map(p=>`<a class="phone-link" href="https://wa.me/972${p.replace(/\D/g,'').replace(/^0/,'')}?text=${waText}" target="_blank"><i class="fab fa-whatsapp"></i> ${p}</a>`).join(' ')}</td>
-            </tr>`;
-        });
-        c.innerHTML = html + `</tbody></table>`;
-    };
-
-    window.toggleDarkMode=() => {document.body.classList.toggle('dark-mode');localStorage.setItem('darkMode',document.body.classList.contains('dark-mode'));document.getElementById('darkModeIcon').className=document.body.classList.contains('dark-mode')?'fas fa-sun':'fas fa-moon';if(chart)refreshMap();};
-    function toggleMobileMenu(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open');}
-    
+    // Settings
     let ctxBldg=null, ctxIdx=null;
     window.showContextMenu=(e,b,i)=>{e.preventDefault();ctxBldg=decodeURIComponent(b);ctxIdx=i;const m=document.getElementById('contextMenu');m.style.display='block';m.style.left=e.pageX+'px';m.style.top=e.pageY+'px';};
-    window.ctxEdit=()=>{currentBldg=ctxBldg;openClientCard(ctxIdx);};
-    window.ctxDelete=()=>{if(confirm("למחוק משפחה זו?")){ensureAuthAndExecute(()=>{db[ctxBldg].apts.splice(ctxIdx,1);saveDB();handleOmniSearch();});}};
-    window.ctxMove=()=>{currentBldg=ctxBldg;currentAptIdx=ctxIdx;openAddressSearch(true);};
+    window.ctxEdit=()=>{currentBldg=ctxBldg;openClientCard(ctxIdx);}; window.ctxDelete=()=>{if(confirm("למחוק?")){ensureAuthAndExecute(()=>{db[ctxBldg].apts.splice(ctxIdx,1);saveDB();});}}; window.ctxMove=()=>{currentBldg=ctxBldg;currentAptIdx=ctxIdx;openAddressSearch(true);};
 
     window.openSettings=()=>{
         document.getElementById('setThemeColor').value=appSettings.themeColor; document.getElementById('setDefaultView').value=appSettings.defaultView;
         document.getElementById('settingsTagsList').innerHTML=appSettings.tags.map((t,i)=>`<span class="tag-bubble">${t} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.tags.splice(${i},1);openSettings()"></i></span>`).join('');
+        document.getElementById('settingsPipelinesList').innerHTML=appSettings.pipelineStages.map((t,i)=>`<span class="tag-bubble">${t} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.pipelineStages.splice(${i},1);openSettings()"></i></span>`).join('');
         document.getElementById('settingsCustomFieldsList').innerHTML=appSettings.customFields.map((f,i)=>`<span class="tag-bubble">${f} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.customFields.splice(${i},1);openSettings()"></i></span>`).join('');
         document.getElementById('settingsModal').style.display='flex';
     };
     window.updateThemePreview=()=>{appSettings.themeColor=document.getElementById('setThemeColor').value; document.documentElement.style.setProperty('--accent',appSettings.themeColor); if(map.getLayer('3d-buildings'))map.setPaintProperty('3d-buildings','fill-extrusion-color',['case',['boolean',['feature-state','hover'],false],appSettings.themeColor,'#d1d5db']);};
     window.addNewTag=()=>{const v=document.getElementById('newTagInput').value.trim();if(v&&!appSettings.tags.includes(v)){appSettings.tags.push(v);openSettings();}};
+    window.addNewPipeline=()=>{const v=document.getElementById('newPipelineInput').value.trim();if(v&&!appSettings.pipelineStages.includes(v)){appSettings.pipelineStages.push(v);openSettings();}};
     window.addNewCustomField=()=>{const v=document.getElementById('newFieldInput').value.trim();if(v&&!appSettings.customFields.includes(v)){appSettings.customFields.push(v);openSettings();}};
     window.saveSettingsAndClose=()=>{appSettings.defaultView=document.getElementById('setDefaultView').value; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns(); document.getElementById('settingsModal').style.display='none'; showToast('הגדרות נשמרו','success');};
     window.setDefaultLocation=()=>{appSettings.center=[map.getCenter().lng,map.getCenter().lat]; appSettings.zoom=map.getZoom(); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); showToast("נשמר מיקום מפה","success");};
     
-    window.exportTableToCSV = (selectedIds = null) => {
-        let csv = "\uFEFFכתובת/בניין,שם משפחה,דירה,סגנון,תגיות,קשר אחרון,טלפונים,הערות\n";
-        let list = [];
-        if(selectedIds) selectedIds.forEach(v=>{let [b,i]=v.split('|'); list.push({b, a:db[b].apts[i]});});
-        else Object.keys(db).forEach(b=>db[b].apts.forEach(a=>list.push({b,a})));
-        
-        list.forEach(r => {
-            let tags=(r.a.tags||[]).join(' - '), phones=(r.a.phones||'').replace(/,/g,' - '), notes=(r.a.notes||'').replace(/,/g,' ').replace(/\n/g,' ');
-            let last='-'; if(r.a.interactions&&r.a.interactions.length>0) last=r.a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date;
-            let bName=r.b===NO_ADDRESS_KEY?'ללא כתובת':r.b.replace(/,/g,'');
-            csv += `${bName},${(r.a.name||'').replace(/,/g,'')},${r.a.num||''},${r.a.style||''},${tags},${last},${phones},${notes}\n`;
-        });
-        const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = `רשימת_קהילה_${new Date().toISOString().slice(0,10)}.csv`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("ייצוא הושלם!","success");
-    };
+    window.exportTableToCSV = () => { let csv = "\uFEFFכתובת/בניין,שם משפחה,דירה,סגנון,סטטוס,תגיות,קשר אחרון,טלפונים,הערות\n"; Object.keys(db).forEach(b=>db[b].apts.forEach(a=>{ let tags=(a.tags||[]).join(' - '), phones=(a.phones||'').replace(/,/g,' - '), notes=(a.notes||'').replace(/,/g,' ').replace(/\n/g,' '); let last='-'; if(a.interactions&&a.interactions.length>0) last=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; csv += `${b===NO_ADDRESS_KEY?'ללא כתובת':b.replace(/,/g,'')},${(a.name||'').replace(/,/g,'')},${a.num||''},${a.style||''},${a.pipeline||''},${tags},${last},${phones},${notes}\n`; })); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = `קהילה_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("ייצוא הושלם!","success"); };
     window.exportData = () => { const a=document.createElement('a'); a.href="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)); a.download=`גיבוי_מלא_${new Date().toISOString().slice(0,10)}.json`; a.click(); };
     window.importData = (e) => { const r=new FileReader(); r.onload=(ev)=>{try{db=JSON.parse(ev.target.result);saveDB();showToast("שוחזר!","success");closeModals();}catch(err){showToast("קובץ שגוי","error");}}; r.readAsText(e.target.files[0]); e.target.value=''; };
 </script>
