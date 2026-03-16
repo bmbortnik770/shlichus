@@ -94,7 +94,6 @@
         .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:5px; }
         .kpi-box { background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); text-align:center; }
         
-        /* Table Styles */
         .data-table { width:100%; border-collapse:collapse; text-align:right; direction:rtl; background:var(--surface); color:var(--text-main); }
         .data-table th, .data-table td { padding:12px; border-bottom:1px solid var(--border-light); font-size:14px; }
         .data-table th { background-color:var(--primary); color:white; position:sticky; top:0; z-index:1; font-weight:600; }
@@ -104,14 +103,17 @@
         
         /* Kanban Styles */
         #kanban-container { display:none; flex-grow:1; padding:20px; overflow-x:auto; background:var(--bg-body); gap:15px; align-items:flex-start; }
-        .kanban-col { background:var(--surface); border-radius:8px; width:300px; min-width:300px; display:flex; flex-direction:column; border:1px solid var(--border-light); max-height:calc(100vh - 40px); }
+        .kanban-col { background:var(--surface); border-radius:8px; width:300px; min-width:300px; display:flex; flex-direction:column; border:1px solid var(--border-light); max-height:calc(100vh - 40px); transition: 0.2s; }
+        .kanban-col.drag-over { background:rgba(59,130,246,0.05); border-color:var(--accent); }
         .kanban-header { padding:15px; font-weight:bold; border-bottom:1px solid var(--border-light); background:var(--primary); color:white; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; }
-        .kanban-body { padding:10px; flex-grow:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
-        .kanban-card { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--accent); padding:12px; border-radius:6px; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.05); transition:0.2s; }
+        .kanban-body { padding:10px; flex-grow:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; min-height:100px;}
+        .kanban-card { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--accent); padding:12px; border-radius:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.05); transition:0.2s; }
+        .kanban-card:active { cursor:grabbing; }
         .kanban-card:hover { transform:translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,0.1); }
-        .kanban-card-title { font-weight:bold; font-size:15px; margin-bottom:5px; }
+        .kanban-card-title { font-weight:bold; font-size:15px; margin-bottom:5px; pointer-events: none;}
+        .kanban-card div { pointer-events: none; } /* Prevents drag issues */
 
-        .bldg-fam-item { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--border-light); padding:12px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition:0.2s; }
+        .bldg-fam-item { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--border-light); padding:12px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition:0.2s; cursor:pointer;}
         .bldg-fam-item:hover { transform:translateX(-3px); border-right-width:6px; }
 
         /* Bulk Action Bar */
@@ -268,7 +270,7 @@
         <div id="crm-details" class="crm-tab-content active">
             <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
                 <div class="form-group"><label>שם משפחה</label><input type="text" id="cFamilyName" placeholder="הקלד כאן..." oninput="markDirty()"></div>
-                <div class="form-group"><label>מס' דירה</label><input type="text" id="cAptNum" oninput="markDirty()"></div>
+                <div class="form-group"><label>מס' דירה</label><input type="text" id="cAptNum" placeholder="הקלד..." oninput="markDirty()"></div>
             </div>
             
             <div class="form-group" style="background:rgba(59,130,246,0.05); padding:10px; border-radius:8px; border:1px solid rgba(59,130,246,0.2);">
@@ -278,8 +280,8 @@
 
             <div class="form-group"><label><i class="fas fa-tags"></i> תגיות</label><div class="tags-container" id="cTagsContainer"></div></div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <div class="form-group"><label>שם האב</label><input type="text" id="cFather" oninput="markDirty()"></div>
-                <div class="form-group"><label>שם האם</label><input type="text" id="cMother" oninput="markDirty()"></div>
+                <div class="form-group"><label>שם האב</label><input type="text" id="cFather" placeholder="הקלד..." oninput="markDirty()"></div>
+                <div class="form-group"><label>שם האם</label><input type="text" id="cMother" placeholder="הקלד..." oninput="markDirty()"></div>
             </div>
             <div class="form-group" style="background:var(--bg-body); padding:10px; border-radius:8px; border:1px solid var(--border-light);">
                 <label style="color:var(--accent);"><i class="fas fa-child"></i> ילדים</label>
@@ -291,7 +293,7 @@
                 <div class="form-group"><label>סגנון</label><select id="cStyle" onchange="markDirty()"></select></div>
             </div>
             <div id="cCustomFieldsContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
-            <div class="form-group"><label>הערות</label><textarea id="cNotes" rows="2" oninput="markDirty()"></textarea></div>
+            <div class="form-group"><label>הערות</label><textarea id="cNotes" rows="2" placeholder="הקלד..." oninput="markDirty()"></textarea></div>
         </div>
 
         <div id="crm-tasks" class="crm-tab-content">
@@ -545,12 +547,10 @@
 
     function renderDonations() { let sum=tempDonations.reduce((a,b)=>a+Number(b.amount||0),0); document.getElementById('cDonationsSum').innerText=`₪${sum}`; document.getElementById('cDonationsList').innerHTML = tempDonations.length===0 ? '<div class="empty-state"><i class="fas fa-hand-holding-heart"></i><div>אין תרומות.</div></div>' : tempDonations.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((d,i) => `<div class="log-item"><div class="log-header"><span style="color:var(--success);"><i class="fas fa-shekel-sign"></i> ${d.amount}</span><span>${d.date}</span></div><div>${d.reason} <button onclick="tempDonations.splice(${i},1);markDirty();renderDonations()" style="float:left;background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button></div></div>`).join(''); }
     
-    // NEW: Automation Rules
     window.addDonation = () => { 
         const d=document.getElementById('newDonDate').value, a=document.getElementById('newDonAmount').value, r=document.getElementById('newDonReason').value; 
         if(!d||!a)return; markDirty(); 
         tempDonations.push({date:d,amount:a,reason:r||'כללי'}); 
-        // Auto-Task Rule
         if(Number(a) >= 500) { addTask(`להתקשר להגיד תודה אישית על התרומה המכובדת (${a} ש"ח)`, d); showToast('נוצרה משימה אוטומטית להכרת הטוב!', 'info'); switchCrmTab('tasks'); }
         document.getElementById('newDonAmount').value=''; document.getElementById('newDonReason').value=''; renderDonations(); 
     };
@@ -603,48 +603,57 @@
     function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
     window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
-    /* Kanban View */
+    /* Kanban Drag & Drop Logic */
     window.renderKanbanView = (filteredRes = null) => {
         const c = document.getElementById('kanban-container'); c.innerHTML = '';
         let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})));
         
         appSettings.pipelineStages.forEach(stage => {
             let colCards = arr.filter(r => (r.apt.pipeline||appSettings.pipelineStages[0]) === stage);
-            let colHtml = `<div class="kanban-col"><div class="kanban-header">${stage} <span style="background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:12px;font-size:12px;">${colCards.length}</span></div><div class="kanban-body">`;
+            let colHtml = `<div class="kanban-col" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropCard(event, '${stage}')"><div class="kanban-header">${stage} <span style="background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:12px;font-size:12px;">${colCards.length}</span></div><div class="kanban-body">`;
             colCards.forEach(r => {
                 let tags = (r.apt.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('');
-                colHtml += `<div class="kanban-card" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})"><div class="kanban-card-title">${r.apt.name||'ללא שם'}</div><div style="font-size:12px;color:var(--text-muted);margin-bottom:5px;">${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg}</div><div>${tags}</div></div>`;
+                colHtml += `<div class="kanban-card" draggable="true" ondragstart="dragCard(event, '${encodeURIComponent(r.bldg)}', ${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})"><div class="kanban-card-title">${r.apt.name||'ללא שם'}</div><div style="font-size:12px;color:var(--text-muted);margin-bottom:5px;">${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg}</div><div>${tags}</div></div>`;
             });
             c.innerHTML += colHtml + `</div></div>`;
         });
+    };
+    window.allowDrop = (e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); };
+    window.dragLeave = (e) => { e.currentTarget.classList.remove('drag-over'); };
+    window.dragCard = (e, encBldg, idx) => { e.dataTransfer.setData("text/plain", `${encBldg}|${idx}`); e.dataTransfer.effectAllowed = "move"; };
+    window.dropCard = (e, stage) => {
+        e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+        const data = e.dataTransfer.getData("text/plain");
+        if(data) {
+            const [encBldg, idx] = data.split('|'); const bldg = decodeURIComponent(encBldg);
+            db[bldg].apts[idx].pipeline = stage;
+            saveDB(); showToast(`הועבר ל-${stage}`, 'info');
+        }
     };
 
     /* Bulk Actions & Routing */
     window.toggleAllBulk = (cb) => { const cbs=document.querySelectorAll('.bulk-cb'); cbs.forEach(c=>c.checked=cb.checked); updateBulkBar(); };
     window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
     window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); const sa=document.getElementById('bulkSelectAll'); if(sa) sa.checked=false; updateBulkBar(); };
-    window.bulkWhatsApp = () => { let p=[]; bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let apt=db[b].apts[i]; if(apt.phones) p.push(apt.phones.split(',')[0].trim().replace(/\D/g,'')); }); if(p.length>0) alert(`יישלח וואטסאפ ל-${p.length} מספרים (API בקרוב)`); clearBulkSelection(); };
+    window.bulkWhatsApp = () => { let p=[]; bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let apt=db[b].apts[i]; if(apt.phones) p.push(apt.phones.split(',')[0].trim().replace(/\D/g,'')); }); if(p.length>0) { window.open(`https://wa.me/972${p[0]}`, '_blank'); showToast(`נפתח חלון לשליחה לנמען הראשון (${p.length} נבחרו)`, 'info'); } clearBulkSelection(); };
     window.bulkAddTagPrompt = () => { const t=prompt("הקלד תגית להוספה:"); if(t) { ensureAuthAndExecute(()=>{ bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let a=db[b].apts[i]; if(!a.tags)a.tags=[]; if(!a.tags.includes(t))a.tags.push(t); }); if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns();} saveDB(); clearBulkSelection(); showToast("תגית נוספה","success"); }); } };
     window.bulkDelete = () => { if(confirm(`למחוק ${bulkSelection.length} משפחות? פעולה בלתי הפיכה!`)) { ensureAuthAndExecute(()=>{ bulkSelection.sort((x,y)=>y.split('|')[1]-x.split('|')[1]).forEach(v=>{let [b,i]=v.split('|'); db[b].apts.splice(i,1);}); saveDB(); clearBulkSelection(); showToast("נמחקו","success"); }); } };
     
-    // NEW: Multi-stop Route Optimization
+    // Google Maps Route Fix
     window.bulkRoute = () => {
         let waypoints = [];
         bulkSelection.forEach(v => {
             let [b, i] = v.split('|');
-            if(b !== NO_ADDRESS_KEY && db[b].info.coords) {
-                // Add lat,lng. (Mapbox is lng,lat. Google is lat,lng)
-                waypoints.push(`${db[b].info.coords[1]},${db[b].info.coords[0]}`);
-            }
+            if(b !== NO_ADDRESS_KEY && db[b].info.coords) { waypoints.push(`${db[b].info.coords[1]},${db[b].info.coords[0]}`); } // lat,lng
         });
         if(waypoints.length === 0) { showToast("לא נבחרו משפחות עם מיקום על המפה!", "error"); return; }
-        if(waypoints.length > 10) { showToast("מגבלת גוגל מפות היא 10 יעדים למסלול. נבחרו 10 ראשונים.", "warning"); waypoints = waypoints.slice(0,10); }
+        if(waypoints.length > 9) { showToast("מגבלת גוגל מפות היא 10 יעדים. נלקחו ה-9 הראשונים.", "warning"); waypoints = waypoints.slice(0,9); }
         
-        // Let's add Chabad house as origin if exists, else first waypoint
         let origin = '';
-        if(appSettings.chabadHouseCoords) origin = `${appSettings.chabadHouseCoords[1]},${appSettings.chabadHouseCoords[0]}/`;
+        if(appSettings.chabadHouseCoords) { origin = `${appSettings.chabadHouseCoords[1]},${appSettings.chabadHouseCoords[0]}`; } 
+        else { origin = waypoints.shift(); } // Use first selected as origin if no chabad house
         
-        let mapsUrl = `https://www.google.com/maps/dir/${origin}${waypoints.join('/')}`;
+        let mapsUrl = `https://www.google.com/maps/dir/${origin}/${waypoints.join('/')}`;
         window.open(mapsUrl, '_blank');
         clearBulkSelection();
     };
@@ -680,7 +689,6 @@
             el.addEventListener('click', () => { const ch=Object.keys(db).find(k=>db[k].info.coords && Math.abs(db[k].info.coords[0]-appSettings.chabadHouseCoords[0])<0.0001); if(ch){currentBldg=ch;openBuildingModal();} });
         }
 
-        let keysToLoop = filteredRes ? [...new Set(filteredRes.map(r=>r.bldg))] : Object.keys(db);
         Object.keys(db).forEach(k => {
             let maxVal=0, showBldg=false;
             db[k].apts.forEach((a,i) => {
