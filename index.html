@@ -24,7 +24,6 @@
     <script src="https://apis.google.com/js/api.js"></script>
 
     <style>
-        /* משתני צבע תומכי מצב בהיר/כהה */
         :root { 
             --primary: #1e293b; --secondary: #334155; --accent: #3b82f6; 
             --success: #10b981; --warning: #f59e0b; --danger: #ef4444; 
@@ -40,11 +39,9 @@
 
         body { margin: 0; padding: 0; font-family: 'Assistant', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--bg-body); color: var(--text-main); transition: background 0.3s; }
         
-        /* מסך התחברות גוגל */
         #auth-overlay { position: fixed; inset: 0; background: var(--primary); z-index: 99999; display: flex; align-items: center; justify-content: center; transition: opacity 0.5s; }
         .auth-card { background: var(--surface); padding: 40px; border-radius: 15px; text-align: center; width: 350px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); color: var(--text-main); }
         
-        /* הדר מובייל */
         .mobile-header { display: none; background: var(--primary); color: white; padding: 15px; justify-content: space-between; align-items: center; z-index: 1001; }
         
         #sidebar { width: 360px; background: var(--surface); padding: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 10; overflow-y: auto; box-shadow: 4px 0 15px rgba(0,0,0,0.1); border-left: 1px solid var(--border-light); transition: 0.3s ease; }
@@ -59,6 +56,7 @@
         .btn-primary { background: var(--accent); }
         .btn-success { background: var(--success); }
         .btn-warning { background: var(--warning); color: #fff; }
+        .btn-danger { background: var(--danger); }
         .btn-settings { background: transparent; color: var(--text-muted); border: 1px solid var(--border-light); }
         .btn-settings:hover { background: var(--bg-body); color: var(--text-main); }
         .btn-outline { background: transparent; border: 1px solid var(--border-light); color: var(--text-main); }
@@ -69,9 +67,7 @@
         
         .form-group { margin-bottom: 12px; }
         .form-group label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 4px; color: var(--text-muted); }
-        .form-group input, .form-group select, .form-group textarea, .inline-input { 
-            width: 100%; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 6px; box-sizing: border-box; font-family: 'Assistant', sans-serif; background: var(--bg-body); color: var(--text-main); transition: 0.2s;
-        }
+        .form-group input, .form-group select, .form-group textarea, .inline-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 6px; box-sizing: border-box; font-family: 'Assistant', sans-serif; background: var(--bg-body); color: var(--text-main); transition: 0.2s; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus, .inline-input:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
         
         .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; background: var(--bg-body); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-light); }
@@ -94,7 +90,48 @@
         .hover-popup .mapboxgl-popup-content { padding: 6px 12px; border-radius: 6px; background: var(--surface); color: var(--text-main); border: 1px solid var(--border-light); }
         .hover-popup .mapboxgl-popup-tip { display: none; }
 
-        /* קוביות מידע - KPI */
+        /* --- סמן בית חב"ד (770) הלבן עם התמונה בתוכו --- */
+        .chabad-pin-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 50px;
+            height: 65px;
+            cursor: pointer;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4));
+            transition: transform 0.2s;
+            z-index: 1000;
+        }
+        .chabad-pin-container:hover { transform: scale(1.1) translateY(-3px); }
+        .chabad-pin-circle {
+            width: 50px;
+            height: 50px;
+            background-color: white;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .chabad-pin-image {
+            width: 100%;
+            height: 100%;
+            background-image: url('770.jpg'); /* מושך את תמונת ה-770 שהעלינו */
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .chabad-pin-arrow {
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 18px solid white;
+            margin-top: -3px;
+        }
+
         .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 5px; }
         .kpi-box { background: var(--bg-body); padding: 15px; border-radius: 8px; border: 1px solid var(--border-light); text-align: center; }
         .kpi-box.urgent { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); }
@@ -267,9 +304,14 @@
             </div>
         </div>
 
-        <h4 style="margin: 0 0 10px 0; color: var(--primary);"><i class="fas fa-map-pin"></i> מיקום פתיחת מפה</h4>
-        <p style="font-size:13px; color:var(--text-muted);">נווט במפה למיקום הרצוי ולחץ על הכפתור כדי לקבע אותו כברירת מחדל לפתיחה.</p>
-        <button class="btn btn-primary" onclick="setDefaultLocation()"><i class="fas fa-crosshairs"></i> שמור מיקום נוכחי</button>
+        <div style="background: var(--bg-body); padding: 15px; border-radius: 8px; border: 1px solid var(--border-light); margin-bottom: 20px;">
+            <h4 style="margin: 0 0 10px 0; color: var(--primary);"><i class="fas fa-map-pin"></i> מיקומים מועדפים</h4>
+            <p style="font-size:13px; color:var(--text-muted);">נווט במפה למיקום הרצוי ולחץ על הכפתור כדי לקבע אותו.</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button class="btn btn-primary" onclick="setDefaultLocation()"><i class="fas fa-crosshairs"></i> שמור כמיקום פתיחה</button>
+                <button class="btn btn-danger" onclick="setChabadHouseLocation()"><i class="fas fa-place-of-worship"></i> קבע כבית חב"ד (770)</button>
+            </div>
+        </div>
         
         <hr style="margin:20px 0; border:0; border-top:1px solid var(--border-light);">
         <button class="btn btn-outline" onclick="closeModals()"><i class="fas fa-times"></i> סגור חלונית</button>
@@ -277,12 +319,10 @@
 </div>
 
 <script>
-    // --- הגדרות גוגל ---
     const CLIENT_ID = '348261974014-242r9b0dvctlka7rj3aetu81v96ere46.apps.googleusercontent.com';
     const SCOPES = 'https://www.googleapis.com/auth/drive.file';
     let accessToken = null, driveFileId = null;
 
-    // --- אתחול סביבה ומפה ---
     mapboxgl.accessToken = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
     mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.3.0/mapbox-gl-rtl-text.js', null, true);
 
@@ -321,7 +361,13 @@
         }, 3000);
     }
 
-    let appSettings = JSON.parse(localStorage.getItem('community_prefs')) || { center: [35.24430, 31.82650], zoom: 17.5, pitch: 60 };
+    let appSettings = JSON.parse(localStorage.getItem('community_prefs')) || { 
+        center: [35.24430, 31.82650], 
+        zoom: 17.5, 
+        pitch: 60,
+        chabadHouseCoords: null 
+    };
+    let chabadHouseMarker = null;
 
     const map = new mapboxgl.Map({
         container: 'map',
@@ -337,7 +383,6 @@
     let currentBldg = null, currentAptIdx = null;
     let tempChildren = []; 
 
-    // --- התחברות לגוגל עם עליית הדף ---
     window.onload = () => {
         const client = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID, scope: SCOPES, callback: handleAuth
@@ -356,7 +401,6 @@
         }, 500);
     }
 
-    // --- מנגנון סנכרון חדש לדרייב ---
     async function syncWithDrive() {
         setSyncStatus('wait', 'שואב נתונים מ-Drive...');
         try {
@@ -372,7 +416,7 @@
                 });
                 const driveDB = await content.json();
                 if(Object.keys(driveDB).length > 0) {
-                    db = driveDB; // דריסת המקומי עם הענן
+                    db = driveDB; 
                     localStorage.setItem('community_data_final', JSON.stringify(db));
                 }
             } else {
@@ -383,7 +427,7 @@
                 });
                 const file = await create.json();
                 driveFileId = file.id;
-                await pushToDrive(); // העלאת המקומי לענן לראשונה
+                await pushToDrive(); 
             }
             setSyncStatus('ok', 'מסונכרן לענן');
             refreshMap();
@@ -416,14 +460,12 @@
         if(status === 'error') { icon.className = 'fas fa-exclamation-triangle'; container.style.color = 'var(--danger)'; }
     }
 
-    // הפונקציה המרכזית לשמירה שדורסת את הקודמת
     function saveDB() { 
         localStorage.setItem('community_data_final', JSON.stringify(db)); 
         refreshMap(); 
-        pushToDrive(); // הקסם: בכל פעם ששומרים, זה דוחף גם לענן!
+        pushToDrive(); 
     }
 
-    // --- מפה וממשק (מהקוד המקורי ללא שינוי) ---
     map.on('load', () => {
         map.addLayer({
             'id': '3d-buildings', 'source': 'composite', 'source-layer': 'building', 'filter': ['==', 'extrude', 'true'], 'type': 'fill-extrusion',
@@ -609,6 +651,18 @@
         localStorage.setItem('community_prefs', JSON.stringify(appSettings));
         showToast("המיקום הנוכחי נשמר כברירת מחדל", "success"); closeModals();
     };
+
+    // הגדרת מיקום בית חב"ד (770)
+    window.setChabadHouseLocation = function() {
+        if(confirm("קבע את מרכז המפה הנוכחי כמיקום הבית חב''ד (770)?")) {
+            const center = map.getCenter();
+            appSettings.chabadHouseCoords = [center.lng, center.lat];
+            localStorage.setItem('community_prefs', JSON.stringify(appSettings));
+            refreshMap();
+            closeModals();
+            showToast("מיקום בית חב''ד עודכן!", "success");
+        }
+    };
     
     function getStatusColor(date) {
         if (!date) return '#94a3b8';
@@ -620,11 +674,41 @@
 
     function refreshMap() {
         activeMarkers.forEach(m => m.remove()); activeMarkers = [];
+        if(chabadHouseMarker) chabadHouseMarker.remove();
+
         const search = document.getElementById('smartSearch').value.toLowerCase();
         let stats = { 'חרדי':0, 'מודרני':0, 'דתי':0, 'מסורתי':0, 'שאינו לעת עתה':0 };
         
         let totalFamilies = 0; let urgentContact = 0; let milestonesCount = 0;
         const today = new Date();
+
+        // יצירת סמן ה-770 אם הוא מוגדר
+        if (appSettings.chabadHouseCoords) {
+            const container = document.createElement('div');
+            container.className = 'chabad-pin-container';
+            container.title = "בית חב''ד (770)";
+
+            const circle = document.createElement('div');
+            circle.className = 'chabad-pin-circle';
+
+            const imageDiv = document.createElement('div');
+            imageDiv.className = 'chabad-pin-image';
+
+            const arrow = document.createElement('div');
+            arrow.className = 'chabad-pin-arrow';
+
+            circle.appendChild(imageDiv);
+            container.appendChild(circle);
+            container.appendChild(arrow);
+
+            chabadHouseMarker = new mapboxgl.Marker({
+                element: container,
+                anchor: 'bottom'
+            })
+            .setLngLat(appSettings.chabadHouseCoords)
+            .setPopup(new mapboxgl.Popup({offset: 35}).setHTML("<h3 style='margin:0; text-align:center;'>בית חב''ד (770)</h3>"))
+            .addTo(map);
+        }
 
         Object.keys(db).forEach(k => {
             let maxStatusVal = 0; let showBldg = false;
