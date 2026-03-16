@@ -53,7 +53,8 @@
         
         .stat-card { background: var(--bg-body); padding: 15px; border-radius: 10px; border: 1px solid var(--border-light); position: relative; }
         
-        /* Search Dropdown */
+        /* Search Overlap Fixes */
+        #geocoder { position: relative; z-index: 3000; }
         #searchDropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 2000; max-height: 300px; overflow-y: auto; margin-top: 5px; }
         .search-item { padding: 12px 15px; border-bottom: 1px solid var(--border-light); cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; gap: 4px; }
         .search-item:hover { background: var(--table-hover); }
@@ -68,7 +69,7 @@
         .btn-danger { background: var(--danger); }
         .btn-outline { background: transparent; border: 1px solid var(--border-light); color: var(--text-main); }
         .btn-outline:hover { background: var(--bg-body); }
-        .btn-icon { width: auto; background: transparent; color: var(--text-muted); padding: 6px 10px; border: 1px solid var(--border-light); }
+        .btn-icon { width: auto; background: transparent; color: var(--text-muted); padding: 6px 10px; border: 1px solid var(--border-light); border-radius: 4px; cursor: pointer; transition: 0.2s;}
         .btn-icon:hover { background: var(--bg-body); color: var(--accent); }
         
         .modal { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); }
@@ -80,7 +81,7 @@
         .form-group input, .form-group select, .form-group textarea, .inline-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 6px; box-sizing: border-box; font-family: 'Assistant', sans-serif; background: var(--bg-body); color: var(--text-main); transition: 0.2s; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus, .inline-input:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
         
-        /* Tabs Styling for CRM Modal */
+        /* Tabs Styling */
         .crm-tabs { display: flex; border-bottom: 2px solid var(--border-light); margin-bottom: 15px; }
         .crm-tab { flex: 1; text-align: center; padding: 10px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: 0.2s; border-bottom: 2px solid transparent; margin-bottom: -2px; }
         .crm-tab:hover { color: var(--text-main); }
@@ -89,14 +90,14 @@
         .crm-tab-content.active { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Tags System */
+        /* Tags */
         .tags-container { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
         .tag-bubble { padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; background: var(--bg-body); border: 1px solid var(--border-light); color: var(--text-muted); cursor: pointer; transition: 0.2s; user-select: none; }
         .tag-bubble:hover { border-color: var(--accent); }
         .tag-bubble.active { background: var(--accent); color: white; border-color: var(--accent); }
         .tag-badge { background: rgba(59,130,246,0.1); color: var(--accent); padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 4px; border: 1px solid rgba(59,130,246,0.2); display: inline-block; }
 
-        /* Interaction & Donation Logs */
+        /* Logs */
         .log-list { max-height: 250px; overflow-y: auto; margin-bottom: 15px; padding-right: 5px; }
         .log-item { background: var(--bg-body); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; margin-bottom: 8px; font-size: 13px; }
         .log-header { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 5px; color: var(--accent); }
@@ -107,8 +108,13 @@
         .apt-item { background: var(--bg-body); border-right: 4px solid var(--border-light); padding: 10px; margin-bottom: 8px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.2s; border: 1px solid var(--border-light); border-right-width: 4px; color: var(--text-main);}
         .apt-item:hover { background: var(--table-hover); transform: translateX(-2px); border-right-width: 6px; }
 
-        /* --- 770 Pin --- */
-        .chabad-pin-container { display: flex; flex-direction: column; align-items: center; width: 50px; height: 65px; cursor: pointer; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4)); transition: transform 0.2s; z-index: 1000; }
+        /* Fix: Hover Popup Styling Restored */
+        .hover-popup .mapboxgl-popup-content { padding: 6px 12px; border-radius: 6px; background: var(--surface); color: var(--text-main); border: 1px solid var(--border-light); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .hover-popup .mapboxgl-popup-tip { display: none; }
+
+        /* Fix: 770 Marker CSS (Separated Mapbox container from Hover container to prevent drifting) */
+        .chabad-pin-wrapper { z-index: 1000; }
+        .chabad-pin-container { display: flex; flex-direction: column; align-items: center; width: 50px; height: 65px; cursor: pointer; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4)); transition: transform 0.2s; }
         .chabad-pin-container:hover { transform: scale(1.1) translateY(-3px); }
         .chabad-pin-circle { width: 50px; height: 50px; background-color: white; border-radius: 50%; border: 3px solid white; box-sizing: border-box; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         .chabad-pin-image { width: 100%; height: 100%; background-image: url('770.jpg'); background-size: cover; background-position: center; background-repeat: no-repeat; }
@@ -126,7 +132,7 @@
         .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 6px; }
         .phone-link { color: var(--accent); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; transition: 0.2s; }
         
-        #contextMenu { display: none; position: absolute; z-index: 2000; background: var(--surface); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); padding: 8px 0; min-width: 180px; font-family: 'Assistant', sans-serif; border: 1px solid var(--border-light); }
+        #contextMenu { display: none; position: absolute; z-index: 4000; background: var(--surface); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); padding: 8px 0; min-width: 180px; font-family: 'Assistant', sans-serif; border: 1px solid var(--border-light); }
         .context-item { padding: 10px 16px; cursor: pointer; color: var(--text-main); font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 12px; transition: 0.2s; }
         .context-item:hover { background: var(--bg-body); color: var(--accent); }
 
@@ -167,9 +173,10 @@
 <div id="sidebar">
     <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--border-light);">
         <h2 style="margin:0; color:var(--text-main); font-size: 20px;"><i class="fas fa-users" style="color:var(--accent); margin-left:5px;"></i>ניהול קהילה</h2>
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; gap: 8px;">
             <button onclick="toggleDarkMode()" class="btn-icon" title="מצב כהה/בהיר"><i class="fas fa-moon" id="darkModeIcon"></i></button>
-            <button class="btn-icon" onclick="openSettings()"><i class="fas fa-cog"></i></button>
+            <button class="btn-icon" onclick="openSettings()" title="הגדרות"><i class="fas fa-cog"></i></button>
+            <button class="btn-icon" onclick="logout()" title="התנתק מהחשבון" style="color: var(--danger);"><i class="fas fa-sign-out-alt"></i></button>
         </div>
     </div>
     
@@ -373,7 +380,6 @@
         styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה']
     };
     
-    // Apply Theme
     document.documentElement.style.setProperty('--accent', appSettings.themeColor);
     let isMapView = appSettings.defaultView === 'map';
 
@@ -395,35 +401,43 @@
     document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
 
     window.onload = () => {
-        if(!isMapView) {
-            document.getElementById('map-container').style.display = 'none';
-            document.getElementById('list-container').style.display = 'block';
-        }
-        if(localStorage.getItem('darkMode') === 'true') {
-            document.body.classList.add('dark-mode');
-            document.getElementById('darkModeIcon').className = 'fas fa-sun';
-        }
+        if(!isMapView) { document.getElementById('map-container').style.display = 'none'; document.getElementById('list-container').style.display = 'block'; }
+        if(localStorage.getItem('darkMode') === 'true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className = 'fas fa-sun'; }
 
-        const client = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleAuth });
-        document.getElementById('google-btn').innerHTML = `<button class="btn btn-primary" style="padding:12px 20px; font-size: 16px;" onclick="window.gClient.requestAccessToken()"><i class="fab fa-google"></i> התחבר לגיבוי ענן</button>`;
-        window.gClient = client;
-        
-        // Timeout to show Auth if drive doesn't load instantly (simulating check)
-        setTimeout(() => {
-            if(!accessToken) {
-                document.getElementById('splash-screen').style.opacity = '0';
-                setTimeout(() => { document.getElementById('splash-screen').style.display = 'none'; document.getElementById('auth-overlay').style.display = 'flex'; }, 800);
-            }
-        }, 1500);
+        // Persistent Login Check
+        const session = JSON.parse(localStorage.getItem('gdrive_session'));
+        const now = new Date().getTime();
+
+        if (session && session.token && session.expiresAt > now) {
+            accessToken = session.token;
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('splash-screen').style.display = 'flex';
+            syncWithDrive();
+        } else {
+            const client = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleAuth });
+            document.getElementById('google-btn').innerHTML = `<button class="btn btn-primary" style="padding:12px 20px; font-size: 16px;" onclick="window.gClient.requestAccessToken()"><i class="fab fa-google"></i> התחבר לגיבוי ענן</button>`;
+            window.gClient = client;
+            setTimeout(() => { document.getElementById('splash-screen').style.opacity = '0'; setTimeout(() => { document.getElementById('splash-screen').style.display = 'none'; document.getElementById('auth-overlay').style.display = 'flex'; }, 800); }, 1500);
+        }
     };
 
     function handleAuth(response) {
         accessToken = response.access_token;
+        const expiresAt = new Date().getTime() + (3500 * 1000); // Token valid for ~1 hour
+        localStorage.setItem('gdrive_session', JSON.stringify({ token: accessToken, expiresAt }));
+        
         document.getElementById('auth-overlay').style.opacity = '0';
-        document.getElementById('splash-screen').style.display = 'flex'; // show splash again while syncing
+        document.getElementById('splash-screen').style.display = 'flex'; 
         document.getElementById('splash-screen').style.opacity = '1';
         setTimeout(() => { document.getElementById('auth-overlay').style.display = 'none'; syncWithDrive(); }, 500);
     }
+
+    window.logout = function() {
+        if(confirm("האם אתה בטוח שברצונך להתנתק? המערכת תדרוש התחברות מחדש לכניסה הבאה.")) {
+            localStorage.removeItem('gdrive_session');
+            location.reload();
+        }
+    };
 
     async function syncWithDrive() {
         setSyncStatus('wait', 'שואב נתונים...');
@@ -439,12 +453,11 @@
                 const create = await fetch('https://www.googleapis.com/drive/v3/files', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'community_data_final.json', mimeType: 'application/json' }) });
                 const file = await create.json(); driveFileId = file.id; await pushToDrive(); 
             }
-            if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] }; // Ensure virtual pool exists
+            if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
             localStorage.setItem('community_data_final', JSON.stringify(db));
             setSyncStatus('ok', 'מסונכרן');
         } catch(e) { setSyncStatus('error', 'שגיאת סנכרון'); }
         
-        // Hide Splash
         document.getElementById('splash-screen').style.opacity = '0';
         setTimeout(() => { document.getElementById('splash-screen').style.display = 'none'; map.resize(); refreshMap(); if(!isMapView) renderListView(); }, 800);
     }
@@ -474,21 +487,40 @@
         c.appendChild(t); setTimeout(() => { t.style.animation = 'fadeOut 0.3s ease-in forwards'; setTimeout(() => t.remove(), 300); }, 3000);
     }
 
-    // --- Map Logic ---
+    // --- Map Logic & Restored 3D/Hover ---
     map.on('load', () => {
-        map.addLayer({ 'id': '3d-buildings', 'source': 'composite', 'source-layer': 'building', 'filter': ['==', 'extrude', 'true'], 'type': 'fill-extrusion', 'paint': { 'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'hover'], false], 'var(--accent)', '#e2e8f0'], 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': 0.8 } });
+        // Restored 3D layer mapping 
+        map.addLayer({ 
+            'id': '3d-buildings', 'source': 'composite', 'source-layer': 'building', 'filter': ['==', 'extrude', 'true'], 'type': 'fill-extrusion', 
+            'minzoom': 15,
+            'paint': { 
+                'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'hover'], false], 'var(--accent)', '#d1d5db'], 
+                'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-base': ['get', 'min_height'], 'fill-extrusion-opacity': 0.8 
+            } 
+        });
+        refreshMap();
     });
 
     let hoveredStateId = null;
-    const hoverPopup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 15 });
+    const hoverPopup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, className: 'hover-popup', offset: 15 });
+    
     map.on('mousemove', '3d-buildings', (e) => {
         if (e.features.length > 0) {
             map.getCanvas().style.cursor = 'pointer';
             if (hoveredStateId !== null) map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: hoveredStateId }, { hover: false });
-            hoveredStateId = e.features[0].id; map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: hoveredStateId }, { hover: true });
+            hoveredStateId = e.features[0].id; 
+            map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: hoveredStateId }, { hover: true });
+            hoverPopup.setLngLat(e.lngLat).setHTML('<div style="font-weight:600; font-size:12px; color:var(--accent);"><i class="fas fa-hand-pointer"></i> לחץ לניהול כתובת</div>').addTo(map);
         }
     });
-    map.on('mouseleave', '3d-buildings', () => { map.getCanvas().style.cursor = ''; if (hoveredStateId !== null) map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: hoveredStateId }, { hover: false }); hoveredStateId = null; });
+    
+    map.on('mouseleave', '3d-buildings', () => { 
+        map.getCanvas().style.cursor = ''; 
+        if (hoveredStateId !== null) map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: hoveredStateId }, { hover: false }); 
+        hoveredStateId = null; 
+        hoverPopup.remove();
+    });
+    
     map.on('click', '3d-buildings', async (e) => handleMapClick(e.lngLat));
 
     async function handleMapClick(lngLat) {
@@ -554,7 +586,6 @@
         currentAptIdx = idx; const a = db[currentBldg].apts[idx];
         document.getElementById('crmFamilyTitle').innerHTML = `<i class="fas fa-id-card"></i> ${a.name} ${currentBldg===NO_ADDRESS_KEY ? '(ללא כתובת)' : ''}`;
         
-        // Tab 1: Details
         document.getElementById('cFamilyName').value = a.name || '';
         document.getElementById('cAptNum').value = a.num || '';
         document.getElementById('cFather').value = a.father || '';
@@ -562,23 +593,19 @@
         document.getElementById('cPhones').value = a.phones || '';
         document.getElementById('cNotes').value = a.notes || '';
         
-        // Build Styles
         const styleSel = document.getElementById('cStyle'); styleSel.innerHTML = '';
         appSettings.styles.forEach(s => styleSel.innerHTML += `<option value="${s}" ${a.style===s?'selected':''}>${s}</option>`);
         if(a.style && !appSettings.styles.includes(a.style)) styleSel.innerHTML += `<option value="${a.style}" selected>${a.style}</option>`;
 
-        // Build Tags
         tempTags = Array.isArray(a.tags) ? [...a.tags] : [];
-        if(a.isRussian && !tempTags.includes('דובר רוסית')) tempTags.push('דובר רוסית'); // migrate old data
+        if(a.isRussian && !tempTags.includes('דובר רוסית')) tempTags.push('דובר רוסית'); 
         renderModalTags();
 
-        // Build Children
         tempChildren = Array.isArray(a.childrenList) ? [...a.childrenList] : [];
         renderModalChildren();
 
-        // Tab 2 & 3: Logs & Donations
         tempLogs = Array.isArray(a.interactions) ? [...a.interactions] : [];
-        if(a.lastContact && tempLogs.length===0) tempLogs.push({date: a.lastContact, type:'ישן', text:'מיובא מגרסה קודמת'}); // migrate old
+        if(a.lastContact && tempLogs.length===0) tempLogs.push({date: a.lastContact, type:'ישן', text:'מיובא מגרסה קודמת'}); 
         renderLogs();
 
         tempDonations = Array.isArray(a.donations) ? [...a.donations] : [];
@@ -597,16 +624,10 @@
 
     function renderModalTags() {
         let html = '';
-        appSettings.tags.forEach(t => {
-            const isActive = tempTags.includes(t);
-            html += `<span class="tag-bubble ${isActive?'active':''}" onclick="toggleTempTag('${t}')">${t}</span>`;
-        });
+        appSettings.tags.forEach(t => { const isActive = tempTags.includes(t); html += `<span class="tag-bubble ${isActive?'active':''}" onclick="toggleTempTag('${t}')">${t}</span>`; });
         document.getElementById('cTagsContainer').innerHTML = html;
     }
-    window.toggleTempTag = function(t) {
-        if(tempTags.includes(t)) tempTags = tempTags.filter(x=>x!==t); else tempTags.push(t);
-        renderModalTags();
-    };
+    window.toggleTempTag = function(t) { if(tempTags.includes(t)) tempTags = tempTags.filter(x=>x!==t); else tempTags.push(t); renderModalTags(); };
 
     window.renderModalChildren = function() {
         document.getElementById('childrenWrapper').innerHTML = tempChildren.map((c, i) => `
@@ -618,7 +639,6 @@
     };
     window.addModalChild = function() { tempChildren.push({name:'', dob:''}); renderModalChildren(); };
 
-    // Logs Logic
     function renderLogs() {
         const list = tempLogs.sort((a,b)=>new Date(b.date)-new Date(a.date));
         document.getElementById('cLogsList').innerHTML = list.length===0 ? '<div style="color:var(--text-muted); text-align:center;">אין היסטוריית קשר.</div>' : list.map((l,i) => `
@@ -631,7 +651,6 @@
         tempLogs.push({date, type, text}); document.getElementById('newLogText').value = ''; renderLogs();
     };
 
-    // Donations Logic
     function renderDonations() {
         const list = tempDonations.sort((a,b)=>new Date(b.date)-new Date(a.date));
         let sum = list.reduce((a,b) => a + Number(b.amount||0), 0);
@@ -658,61 +677,46 @@
         if (!isMapView) renderListView(); else if (document.querySelector('.mapboxgl-popup-content') && currentBldg !== NO_ADDRESS_KEY) renderBuildingPopup(null);
     };
 
-    // --- Address Search Modal (Moving & Adding) ---
+    // --- Address Search Modal ---
     window.openAddressSearch = function(isMove = false) {
-        pendingMoveMode = isMove;
-        document.getElementById('addressSearchInput').value = ''; document.getElementById('addressSearchResults').style.display = 'none';
+        pendingMoveMode = isMove; document.getElementById('addressSearchInput').value = ''; document.getElementById('addressSearchResults').style.display = 'none';
         document.getElementById('addressSearchModal').style.display = 'block';
     };
-
     window.searchAddressAPI = async function() {
-        const q = document.getElementById('addressSearchInput').value;
-        const resDiv = document.getElementById('addressSearchResults');
+        const q = document.getElementById('addressSearchInput').value, resDiv = document.getElementById('addressSearchResults');
         if(q.length < 3) { resDiv.style.display = 'none'; return; }
         try {
-            const center = map.getCenter();
-            const response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=il&language=he&proximity=${center.lng},${center.lat}&access_token=${mapboxgl.accessToken}`);
+            const response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=il&language=he&proximity=${map.getCenter().lng},${map.getCenter().lat}&access_token=${mapboxgl.accessToken}`);
             const data = await response.json();
             if(data.features && data.features.length>0) {
                 resDiv.style.display = 'block';
                 resDiv.innerHTML = data.features.map(f => {
                     const text = f.place_name_he || f.place_name; const bldg = text.split(',')[0].trim();
-                    return `<div class="search-item" onclick="selectAddress('${bldg}', ${f.center[0]}, ${f.center[1]})">
-                        <div class="search-item-title"><i class="fas fa-map-marker-alt"></i> ${bldg}</div>
-                        <div class="search-item-sub">${text}</div></div>`;
+                    return `<div class="search-item" onclick="selectAddress('${bldg}', ${f.center[0]}, ${f.center[1]})"><div class="search-item-title"><i class="fas fa-map-marker-alt"></i> ${bldg}</div><div class="search-item-sub">${text}</div></div>`;
                 }).join('');
             } else { resDiv.innerHTML = '<div style="padding:10px;">לא נמצאו תוצאות.</div>'; }
         } catch(e) {}
     };
 
-    window.selectAddress = function(bldgName, lng, lat) {
-        if(!db[bldgName]) db[bldgName] = { info: {code:'', rep:'', notes:'', coords: [lng,lat]}, apts: [] };
-        processAddressSelection(bldgName);
-    };
+    window.selectAddress = function(bldgName, lng, lat) { if(!db[bldgName]) db[bldgName] = { info: {code:'', rep:'', notes:'', coords: [lng,lat]}, apts: [] }; processAddressSelection(bldgName); };
     window.selectNoAddress = function() { processAddressSelection(NO_ADDRESS_KEY); };
 
     function processAddressSelection(targetBldg) {
-        if(pendingMoveMode) { // Move existing family
-            const client = db[currentBldg].apts.splice(currentAptIdx, 1)[0];
-            db[targetBldg].apts.push(client); showToast('המשפחה הועברה לכתובת החדשה', 'success');
-        } else { // Create new family
-            db[targetBldg].apts.push({ num: '', name: 'משפחה חדשה', style: appSettings.styles[0], tags: [], childrenList: [], interactions: [], donations: [] });
-            currentAptIdx = db[targetBldg].apts.length - 1;
-        }
+        if(pendingMoveMode) { const client = db[currentBldg].apts.splice(currentAptIdx, 1)[0]; db[targetBldg].apts.push(client); showToast('המשפחה הועברה', 'success'); } 
+        else { db[targetBldg].apts.push({ num: '', name: 'משפחה חדשה', style: appSettings.styles[0], tags: [], childrenList: [], interactions: [], donations: [] }); currentAptIdx = db[targetBldg].apts.length - 1; }
         currentBldg = targetBldg; saveDB(); closeModals(); openClientCard(currentAptIdx);
     }
 
     // --- Global Omni-Search ---
     window.handleOmniSearch = function() {
-        const q = document.getElementById('smartSearch').value.toLowerCase();
-        const dd = document.getElementById('searchDropdown');
+        const q = document.getElementById('smartSearch').value.toLowerCase(), dd = document.getElementById('searchDropdown');
         if(q.length < 2) { dd.style.display = 'none'; refreshMap(); if(!isMapView) renderListView(); return; }
         
         let results = [];
         Object.keys(db).forEach(bldg => {
             db[bldg].apts.forEach((apt, i) => {
                 let text = `${bldg} ${apt.name} ${apt.phones||''} ${apt.notes||''} ${(apt.tags||[]).join(' ')} ${apt.father||''} ${apt.mother||''}`;
-                if(apt.childrenList) text += ' ' + apt.childrenList.map(c=>c.name + ' ' + (c.dob||'')).join(' ');
+                if(apt.childrenList) text += ' ' + apt.childrenList.map(c=>c.name).join(' ');
                 if(text.toLowerCase().includes(q)) results.push({bldg, idx: i, apt});
             });
         });
@@ -725,19 +729,12 @@
                     <div class="search-item-sub">${r.apt.phones||'אין טלפון'} | תגיות: ${(r.apt.tags||[]).join(', ')||'-'}</div>
                 </div>
             `).join('');
-        } else {
-            dd.style.display = 'block'; dd.innerHTML = '<div style="padding:10px; text-align:center;">לא נמצאו תוצאות.</div>';
-        }
+        } else { dd.style.display = 'block'; dd.innerHTML = '<div style="padding:10px; text-align:center;">לא נמצאו תוצאות.</div>'; }
         
-        // Also filter map/list if open
         refreshMap(); if(!isMapView) renderListView();
     };
 
-    window.jumpToSearchResult = function(bldgEnc, idx) {
-        document.getElementById('searchDropdown').style.display = 'none';
-        currentBldg = decodeURIComponent(bldgEnc);
-        openClientCard(idx);
-    };
+    window.jumpToSearchResult = function(bldgEnc, idx) { document.getElementById('searchDropdown').style.display = 'none'; currentBldg = decodeURIComponent(bldgEnc); openClientCard(idx); };
     document.addEventListener('click', (e) => { if(e.target.id !== 'smartSearch') document.getElementById('searchDropdown').style.display = 'none'; });
 
     // --- Helpers ---
@@ -757,13 +754,16 @@
         let stats = {}; appSettings.styles.forEach(s => stats[s]=0);
         let total = 0, urgent = 0, milestones = 0; const today = new Date();
 
+        // Fix: Chabad House Marker HTML (Separated translation wrapper from hover container)
         if (appSettings.chabadHouseCoords) {
+            const el = document.createElement('div'); el.className = 'chabad-pin-wrapper';
             const container = document.createElement('div'); container.className = 'chabad-pin-container'; container.title = "בית חב''ד";
             const circle = document.createElement('div'); circle.className = 'chabad-pin-circle';
             const img = document.createElement('div'); img.className = 'chabad-pin-image';
             const arrow = document.createElement('div'); arrow.className = 'chabad-pin-arrow';
             circle.appendChild(img); container.appendChild(circle); container.appendChild(arrow);
-            chabadHouseMarker = new mapboxgl.Marker({element: container, anchor: 'bottom'}).setLngLat(appSettings.chabadHouseCoords).setPopup(new mapboxgl.Popup({offset: 35}).setHTML("<h3 style='margin:0; text-align:center;'>בית חב''ד</h3>")).addTo(map);
+            el.appendChild(container);
+            chabadHouseMarker = new mapboxgl.Marker({element: el, anchor: 'bottom'}).setLngLat(appSettings.chabadHouseCoords).setPopup(new mapboxgl.Popup({offset: 35}).setHTML("<h3 style='margin:0; text-align:center;'>בית חב''ד</h3>")).addTo(map);
         }
 
         Object.keys(db).forEach(k => {
@@ -775,10 +775,6 @@
                 
                 let text = `${k} ${a.name} ${a.phones||''} ${(a.tags||[]).join(' ')}`.toLowerCase();
                 if(text.includes(search)) show = true;
-                
-                (a.childrenList||[]).forEach(ch => {
-                    if(ch.dob) { let age = today.getFullYear()-new Date(ch.dob).getFullYear(); if([11,12,17].includes(age)) milestones++; }
-                });
             });
 
             if(show && db[k].apts.length>0 && k !== NO_ADDRESS_KEY) {
@@ -828,12 +824,7 @@
     };
 
     // --- Settings & UI Logic ---
-    window.toggleDarkMode = function() {
-        document.body.classList.toggle('dark-mode');
-        localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
-        document.getElementById('darkModeIcon').className = document.body.classList.contains('dark-mode') ? 'fas fa-sun' : 'fas fa-moon';
-        if(chart) refreshMap(); 
-    };
+    window.toggleDarkMode = function() { document.body.classList.toggle('dark-mode'); localStorage.setItem('darkMode', document.body.classList.contains('dark-mode')); document.getElementById('darkModeIcon').className = document.body.classList.contains('dark-mode') ? 'fas fa-sun' : 'fas fa-moon'; if(chart) refreshMap();  };
     function toggleMobileMenu() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebarOverlay').classList.toggle('open'); }
     window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
     
@@ -846,47 +837,18 @@
     window.ctxMove = function() { currentBldg = ctxBldg; currentAptIdx = ctxIdx; openAddressSearch(true); };
 
     // Settings Modal Functions
-    window.openSettings = function() {
-        document.getElementById('setThemeColor').value = appSettings.themeColor;
-        document.getElementById('setDefaultView').value = appSettings.defaultView;
-        renderSettingsTags();
-        document.getElementById('settingsModal').style.display = 'block';
-    };
+    window.openSettings = function() { document.getElementById('setThemeColor').value = appSettings.themeColor; document.getElementById('setDefaultView').value = appSettings.defaultView; renderSettingsTags(); document.getElementById('settingsModal').style.display = 'block'; };
     window.updateThemePreview = function() { document.documentElement.style.setProperty('--accent', document.getElementById('setThemeColor').value); };
-    
-    function renderSettingsTags() {
-        document.getElementById('settingsTagsList').innerHTML = appSettings.tags.map((t,i) => `<span class="tag-bubble">${t} <i class="fas fa-times" style="margin-right:5px; color:var(--danger);" onclick="appSettings.tags.splice(${i},1); renderSettingsTags()"></i></span>`).join('');
-    }
+    function renderSettingsTags() { document.getElementById('settingsTagsList').innerHTML = appSettings.tags.map((t,i) => `<span class="tag-bubble">${t} <i class="fas fa-times" style="margin-right:5px; color:var(--danger);" onclick="appSettings.tags.splice(${i},1); renderSettingsTags()"></i></span>`).join(''); }
     window.addNewTag = function() { const v = document.getElementById('newTagInput').value.trim(); if(v && !appSettings.tags.includes(v)) { appSettings.tags.push(v); document.getElementById('newTagInput').value=''; renderSettingsTags(); } };
     
-    window.saveSettingsAndClose = function() {
-        appSettings.themeColor = document.getElementById('setThemeColor').value;
-        appSettings.defaultView = document.getElementById('setDefaultView').value;
-        localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
-        closeModals(); showToast('הגדרות נשמרו', 'success');
-    };
-
-    window.setDefaultLocation = function() {
-        const center = map.getCenter(); appSettings.center = [center.lng, center.lat]; appSettings.zoom = map.getZoom();
-        localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); showToast("מיקום נוכחי נשמר למפה", "success");
-    };
-    window.setChabadHouseLocation = function() {
-        if(confirm("קבע את מרכז המפה כבית חב''ד?")) {
-            appSettings.chabadHouseCoords = [map.getCenter().lng, map.getCenter().lat];
-            localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); refreshMap(); showToast("בית חב''ד ננעץ!", "success");
-        }
-    };
+    window.saveSettingsAndClose = function() { appSettings.themeColor = document.getElementById('setThemeColor').value; appSettings.defaultView = document.getElementById('setDefaultView').value; localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); closeModals(); showToast('הגדרות נשמרו', 'success'); };
+    window.setDefaultLocation = function() { const center = map.getCenter(); appSettings.center = [center.lng, center.lat]; appSettings.zoom = map.getZoom(); localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); showToast("מיקום נוכחי נשמר למפה", "success"); };
+    window.setChabadHouseLocation = function() { if(confirm("קבע את מרכז המפה כבית חב''ד?")) { appSettings.chabadHouseCoords = [map.getCenter().lng, map.getCenter().lat]; localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); refreshMap(); showToast("בית חב''ד ננעץ!", "success"); } };
     
     // Backup & Restore
-    window.exportData = function() {
-        const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
-        a.download = `קהילה_גיבוי_${new Date().toISOString().slice(0,10)}.json`; a.click();
-    };
-    window.importData = function(e) {
-        const reader = new FileReader(); reader.onload = function(ev) {
-            try { db = JSON.parse(ev.target.result); saveDB(); showToast("שוחזר!", "success"); closeModals(); } catch(err) { showToast("קובץ לא תקין", "error"); }
-        }; reader.readAsText(e.target.files[0]); e.target.value = '';
-    };
+    window.exportData = function() { const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db)); a.download = `קהילה_גיבוי_${new Date().toISOString().slice(0,10)}.json`; a.click(); };
+    window.importData = function(e) { const reader = new FileReader(); reader.onload = function(ev) { try { db = JSON.parse(ev.target.result); saveDB(); showToast("שוחזר!", "success"); closeModals(); } catch(err) { showToast("קובץ לא תקין", "error"); } }; reader.readAsText(e.target.files[0]); e.target.value = ''; };
 </script>
 </body>
 </html>
