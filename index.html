@@ -53,8 +53,11 @@
         
         .stat-card { background: var(--bg-body); padding: 15px; border-radius: 10px; border: 1px solid var(--border-light); position: relative; }
         
-        /* Search Overlap Fixes */
+        /* Fix: Search Overlap and z-index issues */
         #geocoder { position: relative; z-index: 3000; }
+        .mapboxgl-ctrl-geocoder { width: 100% !important; max-width: none !important; border-radius: 8px; font-family: 'Assistant', sans-serif; background: var(--surface); }
+        .mapboxgl-ctrl-geocoder--suggestion { text-align: right; }
+        
         #searchDropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 2000; max-height: 300px; overflow-y: auto; margin-top: 5px; }
         .search-item { padding: 12px 15px; border-bottom: 1px solid var(--border-light); cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; gap: 4px; }
         .search-item:hover { background: var(--table-hover); }
@@ -112,10 +115,10 @@
         .hover-popup .mapboxgl-popup-content { padding: 6px 12px; border-radius: 6px; background: var(--surface); color: var(--text-main); border: 1px solid var(--border-light); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         .hover-popup .mapboxgl-popup-tip { display: none; }
 
-        /* Fix: 770 Marker CSS (Separated Mapbox container from Hover container to prevent drifting) */
-        .chabad-pin-wrapper { z-index: 1000; }
-        .chabad-pin-container { display: flex; flex-direction: column; align-items: center; width: 50px; height: 65px; cursor: pointer; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4)); transition: transform 0.2s; }
-        .chabad-pin-container:hover { transform: scale(1.1) translateY(-3px); }
+        /* Fix: 770 Marker CSS (Separating Mapbox DOM from transition DOM) */
+        .chabad-pin-wrapper { width: 50px; height: 65px; z-index: 1000; }
+        .chabad-pin-container { display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; cursor: pointer; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4)); transition: transform 0.2s ease-out; transform-origin: bottom center; }
+        .chabad-pin-container:hover { transform: scale(1.15) translateY(-3px); }
         .chabad-pin-circle { width: 50px; height: 50px; background-color: white; border-radius: 50%; border: 3px solid white; box-sizing: border-box; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         .chabad-pin-image { width: 100%; height: 100%; background-image: url('770.jpg'); background-size: cover; background-position: center; background-repeat: no-repeat; }
         .chabad-pin-arrow { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 18px solid white; margin-top: -3px; }
@@ -396,6 +399,9 @@
         container: 'map', style: 'mapbox://styles/mapbox/streets-v12',
         center: appSettings.center, zoom: appSettings.zoom, pitch: appSettings.pitch
     });
+    
+    // Add Navigation Control (zoom and rotation)
+    map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 
     const geocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'חפש רחוב במפה...', countries: 'il', language: 'he' });
     document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
@@ -404,7 +410,7 @@
         if(!isMapView) { document.getElementById('map-container').style.display = 'none'; document.getElementById('list-container').style.display = 'block'; }
         if(localStorage.getItem('darkMode') === 'true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className = 'fas fa-sun'; }
 
-        // Persistent Login Check
+        // Persistent Login Check Fix
         const session = JSON.parse(localStorage.getItem('gdrive_session'));
         const now = new Date().getTime();
 
@@ -487,14 +493,14 @@
         c.appendChild(t); setTimeout(() => { t.style.animation = 'fadeOut 0.3s ease-in forwards'; setTimeout(() => t.remove(), 300); }, 3000);
     }
 
-    // --- Map Logic & Restored 3D/Hover ---
+    // --- Map Logic & Restored 3D/Hover Fixes ---
     map.on('load', () => {
-        // Restored 3D layer mapping 
+        // Fix: Mapbox needs HEX colors for 3D extrusion, not CSS variables.
         map.addLayer({ 
             'id': '3d-buildings', 'source': 'composite', 'source-layer': 'building', 'filter': ['==', 'extrude', 'true'], 'type': 'fill-extrusion', 
             'minzoom': 15,
             'paint': { 
-                'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'hover'], false], 'var(--accent)', '#d1d5db'], 
+                'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'hover'], false], appSettings.themeColor, '#d1d5db'], 
                 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-base': ['get', 'min_height'], 'fill-extrusion-opacity': 0.8 
             } 
         });
@@ -754,7 +760,7 @@
         let stats = {}; appSettings.styles.forEach(s => stats[s]=0);
         let total = 0, urgent = 0, milestones = 0; const today = new Date();
 
-        // Fix: Chabad House Marker HTML (Separated translation wrapper from hover container)
+        // Fix: Chabad House Marker HTML (Separated wrapper DOM from scale DOM)
         if (appSettings.chabadHouseCoords) {
             const el = document.createElement('div'); el.className = 'chabad-pin-wrapper';
             const container = document.createElement('div'); container.className = 'chabad-pin-container'; container.title = "בית חב''ד";
@@ -838,7 +844,11 @@
 
     // Settings Modal Functions
     window.openSettings = function() { document.getElementById('setThemeColor').value = appSettings.themeColor; document.getElementById('setDefaultView').value = appSettings.defaultView; renderSettingsTags(); document.getElementById('settingsModal').style.display = 'block'; };
-    window.updateThemePreview = function() { document.documentElement.style.setProperty('--accent', document.getElementById('setThemeColor').value); };
+    window.updateThemePreview = function() { 
+        appSettings.themeColor = document.getElementById('setThemeColor').value; // Save immediately for preview
+        document.documentElement.style.setProperty('--accent', appSettings.themeColor); 
+        map.setPaintProperty('3d-buildings', 'fill-extrusion-color', ['case', ['boolean', ['feature-state', 'hover'], false], appSettings.themeColor, '#d1d5db']); // Update 3D colors live
+    };
     function renderSettingsTags() { document.getElementById('settingsTagsList').innerHTML = appSettings.tags.map((t,i) => `<span class="tag-bubble">${t} <i class="fas fa-times" style="margin-right:5px; color:var(--danger);" onclick="appSettings.tags.splice(${i},1); renderSettingsTags()"></i></span>`).join(''); }
     window.addNewTag = function() { const v = document.getElementById('newTagInput').value.trim(); if(v && !appSettings.tags.includes(v)) { appSettings.tags.push(v); document.getElementById('newTagInput').value=''; renderSettingsTags(); } };
     
