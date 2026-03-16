@@ -31,10 +31,7 @@
         .mobile-header { display:none; background:var(--primary); color:white; padding:15px; justify-content:space-between; align-items:center; z-index:1001; }
         #sidebar { width:360px; background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:15px; z-index:10; overflow-y:auto; box-shadow:4px 0 15px rgba(0,0,0,0.1); border-left:1px solid var(--border-light); transition:0.3s ease; }
         
-        /* Main Content Area */
         #main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; }
-        
-        /* Prominent View Switcher */
         .top-nav-bar { background:var(--surface); border-bottom:1px solid var(--border-light); display:flex; justify-content:center; padding:10px; z-index:500; box-shadow:0 2px 10px rgba(0,0,0,0.05); }
         .main-tabs { display:flex; background:var(--bg-body); border-radius:8px; border:1px solid var(--border-light); overflow:hidden; }
         .main-tab { padding:8px 25px; cursor:pointer; font-weight:600; color:var(--text-muted); transition:0.2s; border-left:1px solid var(--border-light); }
@@ -44,8 +41,12 @@
 
         #map-container { flex-grow:1; position:relative; }
         #map { position:absolute; top:0; bottom:0; width:100%; }
-        #list-container { display:none; flex-grow:1; padding:20px; overflow-y:auto; background:var(--bg-body); width:100%; }
-        #kanban-container { display:none; flex-grow:1; padding:20px; overflow-x:auto; background:var(--bg-body); gap:15px; align-items:flex-start; }
+        /* NEW: list-container - removed horizontal padding to allow full table width */
+        #list-container { display:none; flex-grow:1; padding:20px 0 0 0; overflow-y:auto; background:var(--bg-body); width:100%; }
+        
+        #kanban-container { display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; }
+        .kanban-hub-header { padding:15px 20px; border-bottom:1px solid var(--border-light); background:var(--surface); display:flex; justify-content:space-between; align-items:center; z-index:10; box-shadow:0 2px 10px rgba(0,0,0,0.02); }
+        #kanban-board-scroll { flex-grow:1; padding:20px; overflow-x:auto; display:flex; gap:15px; align-items:flex-start; }
 
         .stat-card { background:var(--bg-body); padding:15px; border-radius:10px; border:1px solid var(--border-light); position:relative; }
         
@@ -106,8 +107,7 @@
         .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:5px; }
         .kpi-box { background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); text-align:center; }
         
-        /* Table Styles */
-        .data-table { width:100%; border-collapse:collapse; text-align:right; direction:rtl; background:var(--surface); color:var(--text-main); }
+        .data-table { width:100%; border-collapse:collapse; text-align:right; direction:rtl; background:var(--surface); color:var(--text-main); min-width: 800px; }
         .data-table th, .data-table td { padding:12px; border-bottom:1px solid var(--border-light); font-size:14px; white-space: nowrap;}
         .data-table th { background-color:var(--primary); color:white; position:sticky; top:0; z-index:1; font-weight:600; }
         .data-table tr:hover td { background-color:var(--table-hover); }
@@ -123,12 +123,11 @@
         .kanban-card:active { cursor:grabbing; }
         .kanban-card:hover { transform:translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,0.1); }
         .kanban-card-title { font-weight:bold; font-size:15px; margin-bottom:5px; pointer-events: none;}
-        .kanban-card div { pointer-events: none; } /* Prevents drag issues */
+        .kanban-card div { pointer-events: none; }
 
         .bldg-fam-item { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--border-light); padding:12px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition:0.2s; cursor:pointer;}
         .bldg-fam-item:hover { transform:translateX(-3px); border-right-width:6px; }
 
-        /* Bulk Action Bar */
         #bulkActionBar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--primary); color:white; padding:15px 25px; border-radius:30px; display:none; gap:15px; align-items:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:10000; font-weight:600; }
         .bulk-btn { background:rgba(255,255,255,0.1); border:none; color:white; padding:6px 12px; border-radius:15px; cursor:pointer; transition:0.2s; display:flex; align-items:center; gap:5px;}
         .bulk-btn:hover { background:rgba(255,255,255,0.2); }
@@ -137,8 +136,8 @@
         .context-item { padding:10px 16px; cursor:pointer; color:var(--text-main); font-size:14px; font-weight:600; display:flex; align-items:center; gap:12px; }
         .context-item:hover { background:var(--bg-body); color:var(--accent); }
 
-        #toast-container { position:fixed; bottom:20px; left:20px; z-index:99999; display:flex; flex-direction:column; gap:10px; }
-        .toast { padding:12px 20px; border-radius:8px; color:white; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:'Assistant'; font-weight:600; display:flex; align-items:center; gap:10px; animation:slideIn 0.3s ease-out forwards; opacity:0; transform:translateX(-50px); }
+        #toast-container { position:fixed; bottom:20px; left:20px; z-index:99999; display:flex; flex-direction:column; gap:10px; pointer-events: none; }
+        .toast { padding:12px 20px; border-radius:8px; color:white; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:'Assistant'; font-weight:600; display:flex; align-items:center; gap:10px; animation:slideIn 0.3s ease-out forwards; opacity:0; transform:translateX(-50px); pointer-events: auto; }
         .toast-success { background:var(--success); } .toast-error { background:var(--danger); } .toast-info { background:var(--accent); }
         @keyframes slideIn { to{opacity:1;transform:translateX(0);} }
 
@@ -148,7 +147,7 @@
             #sidebar.open { right:0; box-shadow:-10px 0 20px rgba(0,0,0,0.3); }
             .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:19999; } .sidebar-overlay.open { display:block; }
             .modal-content { width:95% !important; margin:5% auto; padding:15px; }
-            .data-table thead { display:none; } .data-table, .data-table tbody, .data-table tr, .data-table td { display:block; width:100%; box-sizing:border-box; white-space: normal;}
+            .data-table thead { display:none; } .data-table, .data-table tbody, .data-table tr, .data-table td { display:block; width:100%; box-sizing:border-box; white-space: normal; min-width: auto; }
             .data-table tr { margin-bottom:15px; border:1px solid var(--border-light); border-radius:8px; padding:10px; background:var(--surface); }
             .data-table td { text-align:right; padding:8px 5px; border-bottom:none; border-top:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; }
             .data-table td:first-child { border-top:none; } .data-table td::before { content:attr(data-label); font-weight:600; color:var(--text-muted); font-size:13px; }
@@ -178,18 +177,31 @@
         </div>
     </div>
     
-    <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-body); padding:8px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-body); padding:8px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:12px; margin-bottom: 5px;">
         <span style="font-weight:600; color:var(--text-main);">Google Drive:</span>
         <span id="sync-status" style="display:flex; align-items:center; gap:5px; color:var(--warning);"><i id="sync-icon" class="fas fa-spinner fa-spin"></i> <span id="sync-text">ממתין...</span></span>
     </div>
+
+    <div id="welcomeMessage" style="font-weight:600; color:var(--accent); font-size:14px; text-align:center; padding:10px; background:rgba(59,130,246,0.1); border-radius:8px; margin-bottom:10px;"></div>
     
     <div class="kpi-grid">
         <div class="kpi-box"><div style="font-size:26px; font-weight:bold; color:var(--text-main);" id="kpiTotal">0</div><div style="font-size:12px; color:var(--text-muted);">משפחות בקהילה</div></div>
         <div class="kpi-box" style="background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.3);"><div style="font-size:26px; font-weight:bold; color:var(--danger);" id="kpiUrgent">0</div><div style="font-size:12px; color:var(--danger);">לטיפול דחוף</div></div>
     </div>
+
+    <div class="stat-card" style="margin-bottom: 10px; padding: 12px;">
+        <h4 style="margin:0 0 8px 0; color:var(--text-main); display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="fas fa-trophy" style="color:gold;"></i> היעד שלי</span>
+            <button class="btn-icon" style="padding:2px 6px;" onclick="editGoal()" title="ערוך יעד"><i class="fas fa-pen"></i></button>
+        </h4>
+        <div id="goalText" style="font-size:13px; font-weight:600; margin-bottom:8px; color:var(--text-muted);"></div>
+        <div style="background:var(--border-light); border-radius:10px; height:15px; overflow:hidden; position:relative;">
+            <div id="goalProgressBar" style="height:100%; width:0%; background:var(--danger); transition:width 0.5s ease, background 0.5s ease;"></div>
+        </div>
+        <div id="goalStats" style="font-size:12px; font-weight:bold; color:var(--text-main); text-align:center; margin-top:6px;"></div>
+    </div>
     
     <div id="kpiAlerts"></div>
-
     <div id="geocoder"></div>
     
     <div class="stat-card" style="z-index:2000;">
@@ -234,7 +246,7 @@
             <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
                 <h2 style="margin:0;"><i class="fas fa-columns"></i> לוחות פרויקטים</h2>
                 <select id="activeKanbanBoard" onchange="renderKanbanView()" class="inline-input" style="width:250px; font-weight:bold;"></select>
-                <button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות ללוח זה</button>
+                <button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות</button>
             </div>
             <button class="btn btn-primary" style="width:auto; padding:8px 15px;" onclick="createNewBoard()"><i class="fas fa-plus"></i> לוח חדש</button>
         </div>
@@ -413,9 +425,12 @@
 
     let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || { 
         center: [35.24430, 31.82650], zoom: 17.5, pitch: 60, chabadHouseCoords: null, themeColor: '#3b82f6', defaultView: 'map',
-        tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: []
+        tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: [],
+        goal: { text: 'שמואל תמיר', target: 30 } // Default goal
     };
     if(!appSettings.customFields) appSettings.customFields = [];
+    if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי (רחוב/תגית)', target: 50 };
+
     document.documentElement.style.setProperty('--accent', appSettings.themeColor);
     let currentMainView = appSettings.defaultView || 'map';
 
@@ -442,6 +457,9 @@
     let bulkSelection = []; 
     let currentFilters = { tags: '', style: '', status: '' };
 
+    const compliments = ["אלוף! 💪", "פצצה! 🎯", "אין עליך! 🚀", "עבודה מדהימה! 🔥", "הקהילה גדלה! 👑"];
+    function getRandomCompliment() { return compliments[Math.floor(Math.random() * compliments.length)]; }
+
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/streets-v12', center: appSettings.center, zoom: appSettings.zoom, pitch: appSettings.pitch });
     map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
     map.addControl(new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'bottom-right');
@@ -449,6 +467,15 @@
     document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
 
     window.onload = () => {
+        // --- GAMIFICATION: Welcome Message ---
+        let lastLogin = localStorage.getItem('last_login_date');
+        let todayStr = new Date().toISOString().split('T')[0];
+        let welcomeDiv = document.getElementById('welcomeMessage');
+        if(lastLogin === todayStr) { welcomeDiv.innerHTML = "איזה כיף שחזרת! ממשיכים את המומנטום של היום 🚀"; } 
+        else if (lastLogin) { welcomeDiv.innerHTML = "ברוך שובך! פעם קודמת היית אש, בוא נראה מה תעשה היום 🔥"; } 
+        else { welcomeDiv.innerHTML = "ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍"; }
+        localStorage.setItem('last_login_date', todayStr);
+
         switchMainView(currentMainView);
         if(localStorage.getItem('darkMode')==='true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className='fas fa-sun'; }
         populateFilterDropdowns();
@@ -498,7 +525,14 @@
         try { await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, { method:'PATCH', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'}, body:JSON.stringify(db) }); setSyncStatus('ok', 'נשמר'); } catch(e) { setSyncStatus('error', 'שגיאה'); }
     }
     function setSyncStatus(st, txt) { document.getElementById('sync-text').innerText=txt; const ic=document.getElementById('sync-icon'), co=document.getElementById('sync-status'); if(st==='wait'){ic.className='fas fa-spinner fa-spin';co.style.color='var(--warning)';} if(st==='ok'){ic.className='fas fa-cloud-check';co.style.color='var(--success)';} if(st==='error'){ic.className='fas fa-exclamation-triangle';co.style.color='var(--danger)';} }
-    function saveDB() { localStorage.setItem('community_data_final', JSON.stringify(db)); handleOmniSearch(); pushToDrive(); }
+    
+    // Core Save & Update Goal
+    function saveDB() { 
+        localStorage.setItem('community_data_final', JSON.stringify(db)); 
+        handleOmniSearch(); 
+        pushToDrive(); 
+    }
+    
     function showToast(msg, type='info') { const c=document.getElementById('toast-container'), t=document.createElement('div'); t.className=`toast toast-${type}`; t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':type==='error'?'fa-exclamation-triangle':'fa-info-circle'}"></i> ${msg}`; c.appendChild(t); setTimeout(() => { t.style.animation='fadeOut 0.3s ease-in forwards'; setTimeout(()=>t.remove(),300); }, 3000); }
 
     window.switchMainView = function(viewName) {
@@ -538,7 +572,7 @@
     };
     window.switchBldgTab = (tab) => { document.querySelectorAll('#buildingModal .crm-tab, #buildingModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`bldgTabBtn-${tab}`).classList.add('active'); document.getElementById(`bldgTab-${tab}`).classList.add('active'); };
     window.quickAddAptModal = () => { db[currentBldg].apts.push({ num:'', name:'', style:appSettings.styles[0], boards:{}, tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); saveDB(); document.getElementById('buildingModal').style.display='none'; openClientCard(db[currentBldg].apts.length-1); };
-    window.saveBldgModalInfo = () => ensureAuthAndExecute(() => { db[currentBldg].info.code=document.getElementById('bModalCode').value; db[currentBldg].info.rep=document.getElementById('bModalRep').value; db[currentBldg].info.notes=document.getElementById('bModalNotes').value; saveDB(); showToast("נשמר","success"); });
+    window.saveBldgModalInfo = () => ensureAuthAndExecute(() => { db[currentBldg].info.code=document.getElementById('bModalCode').value; db[currentBldg].info.rep=document.getElementById('bModalRep').value; db[currentBldg].info.notes=document.getElementById('bModalNotes').value; saveDB(); showToast("נשמר " + getRandomCompliment(),"success"); });
     window.setThisBuildingAsChabad = () => { if(confirm("לקבוע כבית חב''ד?")) { const c = db[currentBldg].info.coords; if(c) { appSettings.chabadHouseCoords=c; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); handleOmniSearch(); showToast("ננעץ!","success"); } } };
 
     window.markDirty = () => { isDirty = true; };
@@ -564,7 +598,7 @@
         document.getElementById('newLogDate').valueAsDate=new Date(); document.getElementById('newDonDate').valueAsDate=new Date(); document.getElementById('newTaskDate').valueAsDate=new Date();
         switchCrmTab('details'); document.getElementById('clientModal').style.display='flex';
     };
-    window.switchCrmTab = (tab) => { document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`tabBtn-${tab}`).classList.add('active'); document.getElementById(`crm-${tab}`).classList.add('active'); };
+    window.switchCrmTab = (tab) => { document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content').forEach=e=>e.classList.remove('active')); document.getElementById(`tabBtn-${tab}`).classList.add('active'); document.getElementById(`crm-${tab}`).classList.add('active'); };
 
     window.renderModalBoards = () => {
         const c = document.getElementById('cBoardsList'); c.innerHTML = '';
@@ -584,7 +618,7 @@
     };
     window.addModalBoard = () => {
         let unjoined = db.__BOARDS__.filter(b => !tempBoards[b.id]);
-        if(unjoined.length === 0) { showToast("המשפחה כבר חברה בכל הפרויקטים הקיימים", "warning"); return; }
+        if(unjoined.length === 0) { showToast("המשפחה כבר חברה בכל הפרויקטים", "warning"); return; }
         let opts = unjoined.map((b, i) => `${i+1}. ${b.name}`).join('\n');
         let num = prompt(`לאיזה לוח לצרף את המשפחה?\nהקש את המספר:\n${opts}`);
         if(num && !isNaN(num) && num > 0 && num <= unjoined.length) {
@@ -621,7 +655,7 @@
         const d=document.getElementById('newDonDate').value, a=document.getElementById('newDonAmount').value, r=document.getElementById('newDonReason').value; 
         if(!d||!a)return; markDirty(); 
         tempDonations.push({date:d,amount:a,reason:r||'כללי'}); 
-        if(Number(a) >= 500) { addTask(`להתקשר להגיד תודה אישית על התרומה (${a} ש"ח)`, d); showToast('נוצרה משימה אוטומטית להכרת הטוב!', 'info'); switchCrmTab('tasks'); }
+        if(Number(a) >= 500) { addTask(`להתקשר להגיד תודה אישית על התרומה (${a} ש"ח)`, d); showToast('נוצרה משימה להכרת הטוב! ' + getRandomCompliment(), 'info'); switchCrmTab('tasks'); }
         document.getElementById('newDonAmount').value=''; document.getElementById('newDonReason').value=''; renderDonations(); 
     };
 
@@ -629,7 +663,7 @@
         const a = db[currentBldg].apts[currentAptIdx];
         a.name=document.getElementById('cFamilyName').value; a.num=document.getElementById('cAptNum').value; a.father=document.getElementById('cFather').value; a.mother=document.getElementById('cMother').value; a.phones=document.getElementById('cPhones').value; a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
         a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customFields={...tempCustom};
-        isDirty=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה", "success");
+        isDirty=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
         if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
     });
 
@@ -637,7 +671,7 @@
     window.searchAddressAPI = async () => { const q=document.getElementById('addressSearchInput').value, d=document.getElementById('addressSearchResults'); if(q.length<3){d.style.display='none';return;} try{ const r=await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=il&language=he&proximity=${map.getCenter().lng},${map.getCenter().lat}&access_token=${mapboxgl.accessToken}`); const j=await r.json(); if(j.features&&j.features.length>0){d.style.display='block';d.innerHTML=j.features.map(f=>`<div class="search-item" onclick="selectAddress('${(f.place_name_he||f.place_name).split(',')[0].trim()}',${f.center[0]},${f.center[1]})"><div class="search-item-title"><i class="fas fa-map-marker-alt"></i> ${(f.place_name_he||f.place_name).split(',')[0].trim()}</div></div>`).join('');}else d.innerHTML='<div style="padding:10px;">לא נמצאו תוצאות.</div>'; }catch(e){} };
     window.selectAddress = (b,lng,lat) => { if(!db[b]) db[b]={info:{code:'',rep:'',notes:'',coords:[lng,lat]},apts:[]}; processAddressSelection(b); };
     window.selectNoAddress = () => processAddressSelection(NO_ADDRESS_KEY);
-    function processAddressSelection(t) { if(pendingMoveMode) { db[t].apts.push(db[currentBldg].apts.splice(currentAptIdx,1)[0]); showToast('הועבר','success'); } else { db[t].apts.push({num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}}); currentAptIdx=db[t].apts.length-1; } currentBldg=t; saveDB(); document.getElementById('addressSearchModal').style.display='none'; openClientCard(currentAptIdx); }
+    function processAddressSelection(t) { if(pendingMoveMode) { db[t].apts.push(db[currentBldg].apts.splice(currentAptIdx,1)[0]); showToast('הועבר! ' + getRandomCompliment(),'success'); } else { db[t].apts.push({num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}}); currentAptIdx=db[t].apts.length-1; } currentBldg=t; saveDB(); document.getElementById('addressSearchModal').style.display='none'; openClientCard(currentAptIdx); }
 
     window.toggleAdvFilters = () => { const el=document.getElementById('advFilters'); el.style.display = el.style.display==='block'?'none':'block'; };
     function populateFilterDropdowns() {
@@ -678,7 +712,7 @@
         if(!name) return;
         const newId = 'b_' + Date.now();
         db.__BOARDS__.push({ id: newId, name: name, columns: ['חדש', 'בטיפול', 'הושלם'] });
-        saveDB(); showToast("פרויקט נפתח בהצלחה!", "success"); renderKanbanView();
+        saveDB(); showToast("פרויקט נפתח בהצלחה! " + getRandomCompliment(), "success"); renderKanbanView();
     };
     window.editCurrentBoard = () => {
         const sel = document.getElementById('activeKanbanBoard'); const bId = sel.value;
@@ -729,7 +763,7 @@
     window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
     window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); const sa=document.getElementById('bulkSelectAll'); if(sa) sa.checked=false; updateBulkBar(); };
     window.bulkWhatsApp = () => { let p=[]; bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let apt=db[b].apts[i]; if(apt.phones) p.push(apt.phones.split(',')[0].trim().replace(/\D/g,'')); }); if(p.length>0) { window.open(`https://wa.me/972${p[0]}`, '_blank'); showToast(`נפתח חלון לשליחה לנמען הראשון (${p.length} נבחרו)`, 'info'); } clearBulkSelection(); };
-    window.bulkAddTagPrompt = () => { const t=prompt("הקלד תגית להוספה:"); if(t) { ensureAuthAndExecute(()=>{ bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let a=db[b].apts[i]; if(!a.tags)a.tags=[]; if(!a.tags.includes(t))a.tags.push(t); }); if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns();} saveDB(); clearBulkSelection(); showToast("תגית נוספה","success"); }); } };
+    window.bulkAddTagPrompt = () => { const t=prompt("הקלד תגית להוספה:"); if(t) { ensureAuthAndExecute(()=>{ bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let a=db[b].apts[i]; if(!a.tags)a.tags=[]; if(!a.tags.includes(t))a.tags.push(t); }); if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns();} saveDB(); clearBulkSelection(); showToast("תגית נוספה! " + getRandomCompliment(),"success"); }); } };
     window.bulkDelete = () => { if(confirm(`למחוק ${bulkSelection.length} משפחות? פעולה בלתי הפיכה!`)) { ensureAuthAndExecute(()=>{ bulkSelection.sort((x,y)=>y.split('|')[1]-x.split('|')[1]).forEach(v=>{let [b,i]=v.split('|'); db[b].apts.splice(i,1);}); saveDB(); clearBulkSelection(); showToast("נמחקו","success"); }); } };
     
     window.bulkAddToBoardPrompt = () => {
@@ -743,7 +777,7 @@
                     if(!a.boards) a.boards = {};
                     a.boards[chosen.id] = chosen.columns[0]; 
                 });
-                saveDB(); clearBulkSelection(); showToast(`צורפו בהצלחה ללוח ${chosen.name}`, "success");
+                saveDB(); clearBulkSelection(); showToast(`צורפו בהצלחה ללוח ${chosen.name}! ${getRandomCompliment()}`, "success");
             });
         }
     };
@@ -763,18 +797,18 @@
         clearBulkSelection();
     };
 
-    // --- NEW: FIXED TABLE VIEW ---
+    // --- NEW: FIXED TABLE VIEW (Preventing clipping on the left) ---
     window.renderListView = (filteredRes = null) => {
         const c=document.getElementById('list-container');
-        let html=`<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
+        let html=`<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%; padding: 0 20px; box-sizing: border-box;">
             <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
                 <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
                 <button class="btn btn-primary" style="width:auto; padding:8px 15px;" onclick="openAddressSearch()"><i class="fas fa-plus"></i> הוסף משפחה</button>
             </div>
         </div>
-        <div style="width:100%; overflow-x:auto; padding-bottom:80px;">
-        <table class="data-table" style="min-width: 800px;"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים</th></tr></thead><tbody>`;
+        <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 20px; padding-right: 20px; box-sizing: border-box;">
+        <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים</th></tr></thead><tbody>`;
         
         let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__')db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
         arr.forEach(r => {
@@ -801,6 +835,41 @@
         c.innerHTML = html + `</tbody></table></div>`;
     };
 
+    // --- GAMIFICATION: GOAL TRACKER LOGIC ---
+    window.editGoal = () => {
+        let targetText = prompt("מה המטרה שלך? (למשל שם רחוב, או תגית מסוימת)", appSettings.goal.text);
+        if(!targetText) return;
+        let targetNum = prompt("לכמה משפחות תרצה להגיע ביעד הזה?", appSettings.goal.target);
+        if(targetNum && !isNaN(targetNum) && Number(targetNum) > 0) {
+            appSettings.goal = { text: targetText, target: Number(targetNum) };
+            localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+            updateGoalTracker();
+            showToast("היעד עודכן! יוצאים לדרך 🚀", "success");
+        }
+    };
+
+    window.updateGoalTracker = () => {
+        let count = 0;
+        let q = appSettings.goal.text.toLowerCase();
+        Object.keys(db).forEach(b => {
+            if(b === '__BOARDS__') return;
+            db[b].apts.forEach(a => {
+                let txt=`${b} ${a.name} ${(a.tags||[]).join(' ')}`.toLowerCase();
+                if(txt.includes(q)) count++;
+            });
+        });
+        
+        let pct = Math.min(100, Math.round((count / appSettings.goal.target) * 100));
+        document.getElementById('goalText').innerText = `יעד: ${appSettings.goal.target} משפחות (${appSettings.goal.text})`;
+        document.getElementById('goalStats').innerText = `${count} מתוך ${appSettings.goal.target} (${pct}%)`;
+        
+        let bar = document.getElementById('goalProgressBar');
+        bar.style.width = pct + '%';
+        if(pct < 30) { bar.style.background = 'var(--danger)'; bar.style.boxShadow = 'none'; }
+        else if(pct < 100) { bar.style.background = 'var(--warning)'; bar.style.boxShadow = 'none'; }
+        else { bar.style.background = '#ffd700'; bar.style.boxShadow = '0 0 10px rgba(255,215,0,0.8)'; }
+    };
+
     function refreshMap(filteredRes = null) {
         activeMarkers.forEach(m=>m.remove()); activeMarkers=[]; if(chabadHouseMarker) chabadHouseMarker.remove();
         let stats={}, total=0, urgent=0, alerts=[]; const today=new Date(), cMonth=today.getMonth();
@@ -821,8 +890,10 @@
                 if(!filteredRes || filteredRes.find(r=>r.bldg===k && r.idx===i)) showBldg=true;
 
                 (a.childrenList||[]).forEach(ch => { if(ch.dob && new Date(ch.dob).getMonth()===cMonth) alerts.push(`<div style="padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);"><i class="fas fa-birthday-cake" style="color:var(--warning);"></i> ${ch.name} (משפ' ${a.name||''}) חוגג/ת</div>`); });
+                
+                // Tasks with "Done" button
                 (a.tasks||[]).forEach((t, tIdx) => { 
-                    if(!t.done) alerts.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);"><span><i class="fas fa-tasks" style="color:var(--accent);"></i> משפ' ${a.name||''}: ${t.text}</span></div>`); 
+                    if(!t.done) alerts.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);"><span><i class="fas fa-tasks" style="color:var(--accent);"></i> משפ' ${a.name||''}: ${t.text}</span> <button title="סמן כבוצע" onclick="markTaskDoneFromDash('${encodeURIComponent(k)}', ${i}, ${tIdx})" style="background:var(--success); color:white; border:none; border-radius:4px; cursor:pointer; padding:2px 6px; transition:0.2s;"><i class="fas fa-check"></i></button></div>`); 
                 });
             });
             if(showBldg && db[k].apts.length>0 && k!==NO_ADDRESS_KEY) {
@@ -836,7 +907,16 @@
         const alDiv = document.getElementById('kpiAlerts'); alDiv.innerHTML='';
         if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding:0; list-style:none; font-weight:normal;">${alerts.slice(0,6).join('')}${alerts.length>6?'<li style="padding-top:5px; color:var(--text-muted);">ועוד...</li>':''}</ul></div>`;
         if(chart) chart.destroy(); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#64748b']}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
+        
+        updateGoalTracker(); // Update gamification goal on map refresh
     }
+
+    window.markTaskDoneFromDash = (bldgEnc, aptIdx, taskIdx) => { 
+        const bldg = decodeURIComponent(bldgEnc); 
+        db[bldg].apts[aptIdx].tasks[taskIdx].done = true; 
+        saveDB(); 
+        showToast("המשימה הושלמה! " + getRandomCompliment(), "success"); 
+    };
 
     window.toggleDarkMode=() => {document.body.classList.toggle('dark-mode');localStorage.setItem('darkMode',document.body.classList.contains('dark-mode'));document.getElementById('darkModeIcon').className=document.body.classList.contains('dark-mode')?'fas fa-sun':'fas fa-moon';if(chart)refreshMap();};
     function toggleMobileMenu(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open');}
