@@ -74,7 +74,9 @@
 
         @keyframes slideUpModal { from{transform:translateY(30px);opacity:0;} to{transform:translateY(0);opacity:1;} }
         .modal { display:none; position:fixed; z-index:10000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(2px); align-items:center; justify-content:center; }
-        .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:90vh; overflow-y:visible; border:1px solid var(--border-light); animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        
+        /* FIXED: Modal Content overflow restored to auto to prevent bleeding */
+        .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:85vh; overflow-y:auto; border:1px solid var(--border-light); animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .modal-small { width:400px; }
 
         #customDialogModal .modal-content { width: 420px; text-align: center; border-radius: 20px; padding: 30px; }
@@ -292,7 +294,8 @@
 
 <div id="bulkActionBar">
     <span id="bulkCount">0 סומנו</span>
-    <button class="bulk-btn" onclick="bulkWhatsApp()"><i class="fab fa-whatsapp"></i> הודעה</button>
+    <button class="bulk-btn" onclick="bulkWhatsApp()"><i class="fab fa-whatsapp"></i> וואטסאפ</button>
+    <button class="bulk-btn" style="background:#ea4335;" onclick="bulkEmail()"><i class="fas fa-envelope"></i> מייל</button>
     <button class="bulk-btn" style="background:var(--success); color:white;" onclick="bulkRoute()"><i class="fas fa-route"></i> נווט מסלול</button>
     <button class="bulk-btn" onclick="bulkAddTagPrompt()"><i class="fas fa-tag"></i> תגית</button>
     <button class="bulk-btn" onclick="bulkAddToBoardPrompt()"><i class="fas fa-project-diagram"></i> צרף לפרויקט</button>
@@ -362,12 +365,20 @@
             
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group">
-                    <label>שם האב</label><input type="text" id="cFather" placeholder="הקלד..." oninput="markDirty()">
-                    <input type="text" id="cFatherPhone" placeholder="טלפון אבא" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right; margin-top:5px;">
+                    <label>פרטי האב</label>
+                    <input type="text" id="cFather" placeholder="שם פרטי..." oninput="markDirty()">
+                    <div style="display:flex; gap:5px; margin-top:5px;">
+                        <input type="text" id="cFatherPhone" placeholder="טלפון" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
+                        <input type="email" id="cFatherEmail" placeholder="מייל" oninput="markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>שם האם</label><input type="text" id="cMother" placeholder="הקלד..." oninput="markDirty()">
-                    <input type="text" id="cMotherPhone" placeholder="טלפון אמא" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right; margin-top:5px;">
+                    <label>פרטי האם</label>
+                    <input type="text" id="cMother" placeholder="שם פרטי..." oninput="markDirty()">
+                    <div style="display:flex; gap:5px; margin-top:5px;">
+                        <input type="text" id="cMotherPhone" placeholder="טלפון" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
+                        <input type="email" id="cMotherEmail" placeholder="מייל" oninput="markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
+                    </div>
                 </div>
             </div>
 
@@ -534,7 +545,6 @@
         });
     }
 
-    // NEW: Undo Toast Logic
     function showUndoToast(msg, undoCallback) {
         const c = document.getElementById('toast-container');
         const t = document.createElement('div');
@@ -565,16 +575,14 @@
     document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
 
     window.onload = () => {
-        // Welcome Message
         let lastLogin = localStorage.getItem('last_login_date');
         let todayStr = new Date().toISOString().split('T')[0];
         let welcomeDiv = document.getElementById('welcomeMessage');
-        if(lastLogin === todayStr) { welcomeDiv.innerHTML = "איזה כיף שחזרת! ממשיכים את המומנטום 🚀"; } 
+        if(lastLogin === todayStr) { welcomeDiv.innerHTML = "איזה כיף שחזרת! ממשיכים את המומנטום של היום 🚀"; } 
         else if (lastLogin) { welcomeDiv.innerHTML = "ברוך שובך! פעם קודמת היית אש, בוא נראה מה תעשה היום 🔥"; } 
         else { welcomeDiv.innerHTML = "ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍"; }
         localStorage.setItem('last_login_date', todayStr);
 
-        // Mapbox Modal Geocoder Setup
         modalGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'הקלד כתובת לחיפוש...', countries: 'il', language: 'he', marker: false, flyTo: false });
         document.getElementById('modalGeocoderContainer').appendChild(modalGeocoder.onAdd(map));
         modalGeocoder.on('result', (e) => {
@@ -629,7 +637,6 @@
             if(!db['__BOARDS__']) db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'], archived: false }];
             localStorage.setItem('community_data_final', JSON.stringify(db)); setSyncStatus('ok', 'מסונכרן');
             
-            // NEW: Onboarding Check
             let totalFamilies = 0; Object.keys(db).forEach(k => { if(k!=='__BOARDS__') totalFamilies += db[k].apts.length; });
             if(totalFamilies === 0 && !appSettings.chabadHouseCoords) {
                 showCustomDialog({ title: 'ברוך הבא למערכת! 🎉', message: 'איזה כיף שהצטרפת.\n\nהצעד הראשון שלך לכיבוש השכונה הוא לקבוע את מיקום הבית חב"ד. סגור את החלון הזה, חפש את הבניין במפה, לחץ עליו, ובחר "קבע כ-770"!', showCancel: false });
@@ -669,6 +676,7 @@
     map.on('click', '3d-buildings', async (e) => { hoverPopup.remove(); try { const r=await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${e.lngLat.lng},${e.lngLat.lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`); const d=await r.json(); let addr=`מיקום (${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)})`; if(d.features&&d.features.length>0) addr=(d.features[0].place_name_he||d.features[0].place_name).split(',')[0].trim(); currentBldg=addr; if(!db[currentBldg]) db[currentBldg]={info:{code:'',rep:'',notes:'',coords:[e.lngLat.lng,e.lngLat.lat]},apts:[]}; openBuildingModal(); } catch(err){showToast("שגיאת כתובת","warning");} });
 
     function getAllPhones(a) { return [a.fatherPhone, a.motherPhone, ...(a.childrenList||[]).map(c=>c.phone)].filter(Boolean); }
+    function getAllEmails(a) { return [a.fatherEmail, a.motherEmail, ...(a.childrenList||[]).map(c=>c.email)].filter(Boolean); }
 
     window.openBuildingModal = function() {
         const b = db[currentBldg]; document.getElementById('bModalTitle').innerHTML = `<i class="fas fa-building" style="color:var(--accent);"></i> ${currentBldg}`;
@@ -715,7 +723,6 @@
     };
     window.formatPhone = (el) => { let v=el.value.replace(/\D/g,''); if(v.length>3&&v.length<=6) v=v.slice(0,3)+'-'+v.slice(3); else if(v.length>6) v=v.slice(0,3)+'-'+v.slice(3,6)+'-'+v.slice(6,10); el.value=v; };
 
-    // NEW: Direct Add Family bypassing map
     window.quickAddFamily = () => {
         currentBldg = NO_ADDRESS_KEY;
         db[currentBldg].apts.push({num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}});
@@ -730,7 +737,7 @@
         if(btn) { btn.classList.remove('btn-warning'); btn.classList.add('btn-primary'); btn.innerHTML = '<i class="fas fa-save"></i> שמור פרטים'; }
         
         document.getElementById('buildingModal').style.display='none'; currentAptIdx = idx; const a = db[currentBldg].apts[idx];
-        document.getElementById('crmFamilyTitle').innerHTML = `<i class="fas fa-id-card"></i> ${a.name||'משפחה חדשה'}`;
+        document.getElementById('crmFamilyTitle').innerHTML = `<i class="fas fa-id-card"></i> ${a.name||'משפחה חדשה'} <span style="font-size:12px;">${currentBldg===NO_ADDRESS_KEY?'(ללא כתובת)':''}</span>`;
         document.getElementById('cAddressDisplay').value = currentBldg === NO_ADDRESS_KEY ? 'ללא כתובת (לחץ לעריכה)' : currentBldg;
         
         document.getElementById('cFamilyName').value=a.name||''; document.getElementById('cAptNum').value=a.num||''; document.getElementById('cFather').value=a.father||''; document.getElementById('cMother').value=a.mother||''; document.getElementById('cNotes').value=a.notes||'';
@@ -742,6 +749,8 @@
         }
         document.getElementById('cFatherPhone').value = a.fatherPhone || '';
         document.getElementById('cMotherPhone').value = a.motherPhone || '';
+        document.getElementById('cFatherEmail').value = a.fatherEmail || '';
+        document.getElementById('cMotherEmail').value = a.motherEmail || '';
 
         const sSel = document.getElementById('cStyle'); sSel.innerHTML = ''; appSettings.styles.forEach(s => sSel.innerHTML += `<option value="${s}" ${a.style===s?'selected':''}>${s}</option>`); if(a.style&&!appSettings.styles.includes(a.style)) sSel.innerHTML+=`<option selected>${a.style}</option>`;
 
@@ -801,15 +810,18 @@
                 <div style="display:flex; gap:5px; align-items:center;">
                     <input type="text" placeholder="שם הילד/ה" value="${c.name||''}" oninput="tempChildren[${i}].name=this.value;markDirty()" class="inline-input" style="flex:1;">
                     <input type="date" value="${c.dob||''}" onchange="tempChildren[${i}].dob=this.value;markDirty()" class="inline-input" style="flex:1;">
-                    <button onclick="toggleChildPhone(${i})" class="btn-icon" title="הוסף טלפון" style="color:var(--accent);border:none;"><i class="fas fa-phone"></i></button>
+                    <button onclick="toggleChildPhone(${i})" class="btn-icon" title="הוסף פרטי קשר" style="color:var(--accent);border:none;"><i class="fas fa-phone"></i></button>
                     <button onclick="tempChildren.splice(${i},1);markDirty();renderModalChildren()" class="btn-icon" style="color:var(--danger);border:none;"><i class="fas fa-trash"></i></button>
                 </div>
-                ${c.showPhone || c.phone ? `<input type="text" placeholder="טלפון של הילד" value="${c.phone||''}" oninput="tempChildren[${i}].phone=this.value; formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">` : ''}
+                ${c.showPhone || c.phone || c.email ? `<div style="display:flex; gap:5px;">
+                    <input type="text" placeholder="טלפון של הילד" value="${c.phone||''}" oninput="tempChildren[${i}].phone=this.value; formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
+                    <input type="email" placeholder="מייל הילד" value="${c.email||''}" oninput="tempChildren[${i}].email=this.value; markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
+                </div>` : ''}
             </div>
         `).join(''); 
     };
     window.toggleChildPhone = (i) => { tempChildren[i].showPhone = !tempChildren[i].showPhone; renderModalChildren(); };
-    window.addModalChild = () => { markDirty(); tempChildren.push({name:'',dob:'', phone:'', showPhone: false}); renderModalChildren(); };
+    window.addModalChild = () => { markDirty(); tempChildren.push({name:'',dob:'', phone:'', email:'', showPhone: false}); renderModalChildren(); };
 
     function renderCustomFields() {
         const c = document.getElementById('cCustomFieldsContainer'); c.innerHTML = '';
@@ -840,6 +852,7 @@
         const a = db[currentBldg].apts[currentAptIdx];
         a.name=document.getElementById('cFamilyName').value; a.num=document.getElementById('cAptNum').value; a.father=document.getElementById('cFather').value; a.mother=document.getElementById('cMother').value; 
         a.fatherPhone=document.getElementById('cFatherPhone').value; a.motherPhone=document.getElementById('cMotherPhone').value; a.phones = '';
+        a.fatherEmail=document.getElementById('cFatherEmail').value; a.motherEmail=document.getElementById('cMotherEmail').value;
         a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
         a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customFields={...tempCustom};
         isDirty=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
@@ -876,7 +889,7 @@
         Object.keys(db).forEach(b => { 
             if(b === '__BOARDS__') return;
             db[b].apts.forEach((a,i) => {
-            let txt=`${b} ${a.name} ${getAllPhones(a).join(' ')} ${a.notes||''} ${(a.tags||[]).join(' ')} ${a.father||''} ${a.mother||''}`.toLowerCase();
+            let txt=`${b} ${a.name} ${getAllPhones(a).join(' ')} ${getAllEmails(a).join(' ')} ${a.notes||''} ${(a.tags||[]).join(' ')} ${a.father||''} ${a.mother||''}`.toLowerCase();
             let matchQ = q.length<2 || txt.includes(q);
             let matchStyle = !currentFilters.style || a.style===currentFilters.style;
             let matchTag = !currentFilters.tags || (a.tags||[]).includes(currentFilters.tags);
@@ -892,7 +905,6 @@
     };
     window.jumpToSearchResult = (b,i) => { document.getElementById('searchDropdown').style.display='none'; currentBldg=decodeURIComponent(b); openClientCard(i); };
 
-    // --- CONTEXT MENU LOGIC & UNDO ---
     let ctxBldg = null, ctxIdx = null;
     window.showContextMenu = (e, b, i) => {
         e.preventDefault();
@@ -931,7 +943,6 @@
     function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
     window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
-    /* --- KANBAN HUB ARCHIVE & MANAGEMENT --- */
     window.createNewBoard = async () => {
         const name = await showCustomDialog({ title: 'פרויקט חדש', message: 'הכנס שם לפרויקט החדש (למשל: רישום לקייטנה):', showInput: true });
         if(!name) return;
@@ -1035,15 +1046,49 @@
     window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
     window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); const sa=document.getElementById('bulkSelectAll'); if(sa) sa.checked=false; updateBulkBar(); };
     
-    window.bulkWhatsApp = () => { 
+    // NEW: WhatsApp Personalization
+    window.bulkWhatsApp = async () => { 
+        const template = await showCustomDialog({ title: 'הודעת וואטסאפ', message: 'הקלד הודעה:\n(השתמש במילה [שם] כדי לשתול את שם המשפחה אוטומטית)', showInput: true, defaultValue: 'שלום משפחת [שם], ' });
+        if(!template) return;
+        
         let p=[]; 
         bulkSelection.forEach(v=>{
             let [b,i]=v.split('|'); let a=db[b].apts[i]; 
             let phones = getAllPhones(a);
-            if(phones.length > 0) p.push(phones[0].replace(/\D/g,'')); 
+            if(phones.length > 0) {
+                let personalizedText = template.replace(/\[שם\]/g, a.name || '');
+                p.push({phone: phones[0].replace(/\D/g,''), text: encodeURIComponent(personalizedText)});
+            }
         }); 
-        if(p.length>0) { window.open(`https://wa.me/972${p[0]}`, '_blank'); showToast(`נפתח חלון לשליחה לנמען הראשון (${p.length} נבחרו)`, 'info'); } 
+        if(p.length>0) { 
+            window.open(`https://wa.me/972${p[0].phone}?text=${p[0].text}`, '_blank'); 
+            if(p.length > 1) showToast(`נפתח חלון לנמען הראשון. לוואטסאפ המוני עדיף להשתמש ברשימת תפוצה.`, 'warning');
+            else showToast(`נפתח וואטסאפ`, 'success');
+        } else {
+            showToast(`לא נמצאו מספרים למשפחות שסומנו`, 'error');
+        }
         clearBulkSelection(); 
+    };
+
+    // NEW: Email Personalization (BCC)
+    window.bulkEmail = async () => {
+        const template = await showCustomDialog({ title: 'שליחת מייל', message: 'הקלד הודעה:\n(הערה: בשליחה המונית במייל לא ניתן לשתול את ה-[שם] אישית לכל אחד)', showInput: true, defaultValue: 'שלום רב,\n\n' });
+        if(!template) return;
+        
+        let emails=[];
+        bulkSelection.forEach(v=>{
+            let [b,i]=v.split('|'); let a=db[b].apts[i]; 
+            let ems = getAllEmails(a);
+            emails = emails.concat(ems);
+        });
+        
+        if(emails.length>0) {
+            window.open(`mailto:?bcc=${emails.join(',')}&subject=הודעה מבית חב"ד&body=${encodeURIComponent(template)}`, '_blank');
+            showToast(`נפתחה תוכנת המייל (${emails.length} נמענים)`, 'success');
+        } else {
+            showToast(`לא נמצאו כתובות מייל למשפחות שסומנו`, 'error');
+        }
+        clearBulkSelection();
     };
     
     window.bulkAddTagPrompt = async () => { 
@@ -1084,6 +1129,7 @@
         }
     };
 
+    // FIXED: Google Maps Routing URL API
     window.bulkRoute = () => {
         let waypoints = [];
         bulkSelection.forEach(v => {
@@ -1091,15 +1137,16 @@
             if(b !== NO_ADDRESS_KEY && db[b].info.coords) { waypoints.push(`${db[b].info.coords[1]},${db[b].info.coords[0]}`); }
         });
         if(waypoints.length === 0) { showToast("לא נבחרו משפחות עם מיקום על המפה!", "error"); return; }
-        if(waypoints.length > 9) { showToast("מגבלת גוגל מפות היא 10 יעדים. נלקחו ה-9 הראשונים.", "warning"); waypoints = waypoints.slice(0,9); }
-        let origin = '';
-        if(appSettings.chabadHouseCoords) { origin = `${appSettings.chabadHouseCoords[1]},${appSettings.chabadHouseCoords[0]}`; } 
-        else { origin = waypoints.shift(); } 
-        window.open(`http://googleusercontent.com/maps.google.com/maps?dirflg=d&saddr=${origin}&daddr=${waypoints.join('+to:')}`, '_blank');
+        if(waypoints.length > 10) { showToast("מגבלת גוגל מפות היא 10 יעדים. ניקח את ה-10 הראשונים.", "warning"); waypoints = waypoints.slice(0,10); }
+        
+        let origin = appSettings.chabadHouseCoords ? `${appSettings.chabadHouseCoords[1]},${appSettings.chabadHouseCoords[0]}` : waypoints.shift();
+        let destination = waypoints.pop(); 
+        let wpStr = waypoints.length > 0 ? `&waypoints=${waypoints.join('|')}` : '';
+        
+        window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${wpStr}`, '_blank');
         clearBulkSelection();
     };
 
-    // --- TABLE VIEW ---
     window.renderListView = (filteredRes = null) => {
         const inner = document.getElementById('list-inner');
         let html=`<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
@@ -1109,7 +1156,7 @@
             </div>
         </div>
         <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
-        <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים</th></tr></thead><tbody>`;
+        <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים ומייל</th></tr></thead><tbody>`;
         
         let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__')db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
         arr.forEach(r => {
@@ -1123,6 +1170,10 @@
                     return bObj ? `<span class="board-badge">${bObj.name}: ${status}</span>` : '';
                 }).join(' ');
             }
+            
+            let contactIcons = '';
+            if(getAllPhones(a).length > 0) contactIcons += `<i class="fas fa-phone" style="color:var(--success); margin-left:5px;"></i>`;
+            if(getAllEmails(a).length > 0) contactIcons += `<i class="fas fa-envelope" style="color:#ea4335;"></i>`;
 
             html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
                 <td data-label="בחר" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" value="${r.bldg}|${r.idx}" onchange="updateBulkBar()"></td>
@@ -1130,45 +1181,10 @@
                 <td data-label="משפחה"><b>${a.name||'(ללא שם)'}</b></td><td data-label="פרויקטים">${boardsHtml}</td>
                 <td data-label="תגיות">${(a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('')}</td>
                 <td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>
-                <td data-label="טלפונים" onclick="event.stopPropagation()">${getAllPhones(a).map(p=>`<a class="phone-link" href="https://wa.me/972${p.replace(/\D/g,'').replace(/^0/,'')}?text=שלום" target="_blank"><i class="fab fa-whatsapp"></i> ${p}</a>`).join(' ')}</td>
+                <td data-label="פרטי קשר" style="font-size:16px;">${contactIcons}</td>
             </tr>`;
         });
         inner.innerHTML = html + `</tbody></table></div>`;
-    };
-
-    // --- GAMIFICATION: GOAL TRACKER LOGIC ---
-    window.editGoal = async () => {
-        let targetText = await showCustomDialog({ title: 'הגדרת יעד', message: 'מה המטרה שלך? (למשל שם רחוב, או תגית)', showInput: true, defaultValue: appSettings.goal.text });
-        if(!targetText) return;
-        let targetNum = await showCustomDialog({ title: 'הגדרת יעד', message: 'לכמה משפחות תרצה להגיע ביעד הזה?', showInput: true, defaultValue: appSettings.goal.target.toString() });
-        if(targetNum && !isNaN(targetNum) && Number(targetNum) > 0) {
-            appSettings.goal = { text: targetText, target: Number(targetNum) };
-            localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
-            updateGoalTracker();
-            showToast("היעד עודכן! יוצאים לדרך 🚀", "success");
-        }
-    };
-
-    window.updateGoalTracker = () => {
-        let count = 0;
-        let q = appSettings.goal.text.toLowerCase();
-        Object.keys(db).forEach(b => {
-            if(b === '__BOARDS__') return;
-            db[b].apts.forEach(a => {
-                let txt=`${b} ${a.name} ${(a.tags||[]).join(' ')}`.toLowerCase();
-                if(txt.includes(q)) count++;
-            });
-        });
-        
-        let pct = Math.min(100, Math.round((count / appSettings.goal.target) * 100));
-        document.getElementById('goalText').innerText = `יעד: ${appSettings.goal.target} משפחות (${appSettings.goal.text})`;
-        document.getElementById('goalStats').innerText = `${count} מתוך ${appSettings.goal.target} (${pct}%)`;
-        
-        let bar = document.getElementById('goalProgressBar');
-        bar.style.width = pct + '%';
-        if(pct < 30) { bar.style.background = 'var(--danger)'; bar.style.boxShadow = 'none'; }
-        else if(pct < 100) { bar.style.background = 'var(--warning)'; bar.style.boxShadow = 'none'; }
-        else { bar.style.background = '#ffd700'; bar.style.boxShadow = '0 0 10px rgba(255,215,0,0.8)'; }
     };
 
     function refreshMap(filteredRes = null) {
@@ -1233,7 +1249,7 @@
     window.saveSettingsAndClose=()=>{appSettings.defaultView=document.getElementById('setDefaultView').value; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns(); document.getElementById('settingsModal').style.display='none'; showToast('הגדרות נשמרו','success');};
     window.setDefaultLocation=()=>{appSettings.center=[map.getCenter().lng,map.getCenter().lat]; appSettings.zoom=map.getZoom(); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); showToast("נשמר מיקום מפה","success");};
     
-    window.exportTableToCSV = () => { let csv = "\uFEFFכתובת/בניין,שם משפחה,דירה,סגנון,פרויקטים,תגיות,קשר אחרון,טלפונים,הערות\n"; Object.keys(db).forEach(b=>{ if(b==='__BOARDS__')return; db[b].apts.forEach(a=>{ let tags=(a.tags||[]).join(' - '), phones=getAllPhones(a).join(' - '), notes=(a.notes||'').replace(/,/g,' ').replace(/\n/g,' '); let last='-'; if(a.interactions&&a.interactions.length>0) last=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; let boardsStr = a.boards ? Object.entries(a.boards).map(([bid, st]) => `${db.__BOARDS__.find(x=>x.id===bid)?.name||''}:${st}`).join(' | ') : ''; csv += `${b===NO_ADDRESS_KEY?'ללא כתובת':b.replace(/,/g,'')},${(a.name||'').replace(/,/g,'')},${a.num||''},${a.style||''},${boardsStr},${tags},${last},${phones},${notes}\n`; })}); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = `קהילה_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("ייצוא הושלם!","success"); };
+    window.exportTableToCSV = () => { let csv = "\uFEFFכתובת/בניין,שם משפחה,דירה,סגנון,פרויקטים,תגיות,קשר אחרון,טלפונים,מיילים,הערות\n"; Object.keys(db).forEach(b=>{ if(b==='__BOARDS__')return; db[b].apts.forEach(a=>{ let tags=(a.tags||[]).join(' - '), phones=getAllPhones(a).join(' - '), emails=getAllEmails(a).join(' - '), notes=(a.notes||'').replace(/,/g,' ').replace(/\n/g,' '); let last='-'; if(a.interactions&&a.interactions.length>0) last=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; let boardsStr = a.boards ? Object.entries(a.boards).map(([bid, st]) => `${db.__BOARDS__.find(x=>x.id===bid)?.name||''}:${st}`).join(' | ') : ''; csv += `${b===NO_ADDRESS_KEY?'ללא כתובת':b.replace(/,/g,'')},${(a.name||'').replace(/,/g,'')},${a.num||''},${a.style||''},${boardsStr},${tags},${last},${phones},${emails},${notes}\n`; })}); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = `קהילה_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("ייצוא הושלם!","success"); };
     window.exportData = () => { const a=document.createElement('a'); a.href="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)); a.download=`גיבוי_מלא_${new Date().toISOString().slice(0,10)}.json`; a.click(); };
     window.importData = (e) => { const r=new FileReader(); r.onload=(ev)=>{try{db=JSON.parse(ev.target.result);saveDB();showToast("שוחזר!","success");closeModals();}catch(err){showToast("קובץ שגוי","error");}}; r.readAsText(e.target.files[0]); e.target.value=''; };
 </script>
