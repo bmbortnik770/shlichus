@@ -29,9 +29,10 @@
         .auth-card { background:var(--surface); padding:40px; border-radius:15px; text-align:center; width:350px; box-shadow:0 10px 30px rgba(0,0,0,0.5); color:var(--text-main); max-width:90%; }
         
         .mobile-header { display:none; background:var(--primary); color:white; padding:15px; justify-content:space-between; align-items:center; z-index:1001; }
-        #sidebar { width:360px; background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:15px; z-index:10; overflow-y:auto; box-shadow:4px 0 15px rgba(0,0,0,0.1); border-left:1px solid var(--border-light); transition:0.3s ease; }
+        #sidebar { width:360px; min-width:360px; background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:15px; z-index:10; overflow-y:auto; box-shadow:4px 0 15px rgba(0,0,0,0.1); border-left:1px solid var(--border-light); transition:0.3s ease; }
         
-        #main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; min-width: 0; }
+        /* FIXED: main-content bounds to prevent table bleeding */
+        #main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; min-width:0; }
         .top-nav-bar { background:var(--surface); border-bottom:1px solid var(--border-light); display:flex; justify-content:center; padding:10px; z-index:500; box-shadow:0 2px 10px rgba(0,0,0,0.05); }
         .main-tabs { display:flex; background:var(--bg-body); border-radius:8px; border:1px solid var(--border-light); overflow:hidden; }
         .main-tab { padding:8px 25px; cursor:pointer; font-weight:600; color:var(--text-muted); transition:0.2s; border-left:1px solid var(--border-light); }
@@ -42,7 +43,7 @@
         #map-container { flex-grow:1; position:relative; }
         #map { position:absolute; top:0; bottom:0; width:100%; }
         
-        #list-container { display:none; flex-grow:1; padding:20px 0 0 0; overflow-y:auto; background:var(--bg-body); width:100%; box-sizing: border-box; }
+        #list-container { display:none; flex-grow:1; padding:20px; overflow-y:auto; background:var(--bg-body); width:100%; box-sizing: border-box; }
         
         #kanban-container { display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; }
         .kanban-hub-header { padding:15px 20px; border-bottom:1px solid var(--border-light); background:var(--surface); display:flex; justify-content:space-between; align-items:center; z-index:10; box-shadow:0 2px 10px rgba(0,0,0,0.02); }
@@ -69,7 +70,6 @@
         .btn-outline { background:transparent; border:1px solid var(--border-light); color:var(--text-main); }
         .btn-icon { width:auto; background:transparent; color:var(--text-muted); padding:6px 10px; border:1px solid var(--border-light); border-radius:4px; cursor:pointer;}
         
-        /* Floating Action Button (FAB) */
         .fab-add { position:fixed; bottom:30px; right:30px; width:60px; height:60px; background:var(--accent); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 4px 15px rgba(59,130,246,0.4); cursor:pointer; z-index:1000; border:none; transition:0.3s; }
         .fab-add:hover { transform:scale(1.1); background:#2563eb; }
 
@@ -77,6 +77,14 @@
         .modal { display:none; position:fixed; z-index:10000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(2px); align-items:center; justify-content:center; }
         .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:90vh; overflow-y:auto; border:1px solid var(--border-light); animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .modal-small { width:400px; }
+
+        /* NEW: Custom Dialog Styling */
+        #customDialogModal .modal-content { width: 420px; text-align: center; border-radius: 20px; padding: 30px; }
+        #cdTitle { color: var(--accent); margin-top: 0; font-size: 22px; }
+        #cdMessage { color: var(--text-main); font-size: 16px; margin-bottom: 25px; line-height: 1.5; }
+        #cdInput { margin-bottom: 25px; text-align: center; font-size: 16px; padding: 12px; border-radius: 8px; border: 2px solid var(--border-light); width: 90%; }
+        #cdInput:focus { border-color: var(--accent); outline: none; }
+        .dialog-btns { display: flex; gap: 15px; justify-content: center; }
 
         .form-group { margin-bottom:12px; }
         .form-group label { display:block; font-weight:600; font-size:13px; margin-bottom:4px; color:var(--text-muted); }
@@ -244,7 +252,9 @@
         </div>
     </div>
     
-    <div id="list-container"></div>
+    <div id="list-container">
+        <div id="list-inner" style="padding: 20px; box-sizing: border-box;"></div>
+    </div>
     
     <div id="kanban-container">
         <div class="kanban-hub-header">
@@ -260,6 +270,18 @@
 </div>
 
 <button class="fab-add" onclick="openAddressSearch()" title="הוסף משפחה חדשה"><i class="fas fa-plus"></i></button>
+
+<div id="customDialogModal" class="modal" style="z-index: 100000;">
+    <div class="modal-content">
+        <h3 id="cdTitle">כותרת הודעה</h3>
+        <p id="cdMessage">תוכן ההודעה יופיע כאן</p>
+        <input type="text" id="cdInput" style="display:none;" placeholder="הקלד כאן...">
+        <div class="dialog-btns">
+            <button id="cdBtnCancel" class="btn btn-outline" style="width:auto; padding:8px 20px;">ביטול</button>
+            <button id="cdBtnOk" class="btn btn-success" style="width:auto; padding:8px 20px;">אישור</button>
+        </div>
+    </div>
+</div>
 
 <div id="contextMenu">
     <div class="context-item" onclick="ctxEdit()"><i class="fas fa-pen"></i> ערוך פרטים</div>
@@ -329,17 +351,25 @@
             </div>
 
             <div class="form-group"><label><i class="fas fa-tags"></i> תגיות</label><div class="tags-container" id="cTagsContainer"></div></div>
+            
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <div class="form-group"><label>שם האב</label><input type="text" id="cFather" placeholder="הקלד..." oninput="markDirty()"></div>
-                <div class="form-group"><label>שם האם</label><input type="text" id="cMother" placeholder="הקלד..." oninput="markDirty()"></div>
+                <div class="form-group">
+                    <label>שם האב</label><input type="text" id="cFather" placeholder="הקלד..." oninput="markDirty()">
+                    <input type="text" id="cFatherPhone" placeholder="טלפון אבא" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right; margin-top:5px;">
+                </div>
+                <div class="form-group">
+                    <label>שם האם</label><input type="text" id="cMother" placeholder="הקלד..." oninput="markDirty()">
+                    <input type="text" id="cMotherPhone" placeholder="טלפון אמא" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right; margin-top:5px;">
+                </div>
             </div>
+
             <div class="form-group" style="background:var(--bg-body); padding:10px; border-radius:8px; border:1px solid var(--border-light);">
                 <label style="color:var(--accent);"><i class="fas fa-child"></i> ילדים</label>
                 <div id="childrenWrapper" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
                 <button class="btn btn-outline" style="font-size:12px; padding:6px; border-style:dashed;" onclick="addModalChild()"><i class="fas fa-plus"></i> הוסף ילד/ה</button>
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <div class="form-group"><label>טלפונים</label><input type="text" id="cPhones" placeholder="05X-XXX-XXXX" oninput="formatPhone(this); markDirty()" dir="ltr" style="text-align:right;"></div>
+            
+            <div style="display:grid; grid-template-columns:1fr; gap:10px;">
                 <div class="form-group"><label>סגנון</label><select id="cStyle" onchange="markDirty()"></select></div>
             </div>
             <div id="cCustomFieldsContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
@@ -469,6 +499,31 @@
     const compliments = ["אלוף! 💪", "פצצה! 🎯", "אין עליך! 🚀", "עבודה מדהימה! 🔥", "הקהילה גדלה! 👑"];
     function getRandomCompliment() { return compliments[Math.floor(Math.random() * compliments.length)]; }
 
+    // --- NEW: Custom Dialog Function ---
+    function showCustomDialog(opts) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('customDialogModal');
+            document.getElementById('cdTitle').innerText = opts.title || 'הודעה';
+            document.getElementById('cdMessage').innerText = opts.message || '';
+            const input = document.getElementById('cdInput');
+            if(opts.showInput) {
+                input.style.display = 'block'; input.value = opts.defaultValue || ''; input.focus();
+            } else { input.style.display = 'none'; }
+
+            document.getElementById('cdBtnOk').onclick = () => {
+                modal.style.display = 'none'; resolve(opts.showInput ? input.value : true);
+            };
+            
+            const btnCancel = document.getElementById('cdBtnCancel');
+            if(opts.showCancel) {
+                btnCancel.style.display = 'inline-block';
+                btnCancel.onclick = () => { modal.style.display = 'none'; resolve(opts.showInput ? null : false); };
+            } else { btnCancel.style.display = 'none'; }
+            
+            modal.style.display = 'flex';
+        });
+    }
+
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/streets-v12', center: appSettings.center, zoom: appSettings.zoom, pitch: appSettings.pitch });
     map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
     map.addControl(new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'bottom-right');
@@ -503,7 +558,10 @@
         document.getElementById('auth-overlay').style.opacity='0'; document.getElementById('splash-screen').style.display='flex'; document.getElementById('splash-screen').style.opacity='1';
         setTimeout(() => { document.getElementById('auth-overlay').style.display='none'; syncWithDrive(); }, 500);
     }
-    window.logout = function() { if(confirm("התנתק מהחשבון?")) { localStorage.removeItem('gdrive_session'); location.reload(); } };
+    window.logout = async function() { 
+        const proceed = await showCustomDialog({ title: 'התנתקות', message: 'האם אתה בטוח שברצונך להתנתק מהחשבון?', showCancel: true });
+        if(proceed) { localStorage.removeItem('gdrive_session'); location.reload(); } 
+    };
     async function ensureAuthAndExecute(cb) {
         const session = JSON.parse(localStorage.getItem('gdrive_session'));
         if (!session || session.expiresAt < new Date().getTime() + 60000) { showToast("מחדש חיבור...", "warning"); window.gClient.callback = (r)=>{ handleAuth(r); setTimeout(cb, 1000); }; window.gClient.requestAccessToken({prompt: ''}); } else { cb(); }
@@ -559,13 +617,18 @@
     map.on('mouseleave', '3d-buildings', () => { map.getCanvas().style.cursor=''; if(hoveredStateId!==null) map.setFeatureState({source:'composite',sourceLayer:'building',id:hoveredStateId},{hover:false}); hoveredStateId=null; hoverPopup.remove(); });
     map.on('click', '3d-buildings', async (e) => { hoverPopup.remove(); try { const r=await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${e.lngLat.lng},${e.lngLat.lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`); const d=await r.json(); let addr=`מיקום (${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)})`; if(d.features&&d.features.length>0) addr=(d.features[0].place_name_he||d.features[0].place_name).split(',')[0].trim(); currentBldg=addr; if(!db[currentBldg]) db[currentBldg]={info:{code:'',rep:'',notes:'',coords:[e.lngLat.lng,e.lngLat.lat]},apts:[]}; openBuildingModal(); } catch(err){showToast("שגיאת כתובת","warning");} });
 
+    // Helper: Collect all phones for an apt
+    function getAllPhones(a) { return [a.fatherPhone, a.motherPhone, ...(a.childrenList||[]).map(c=>c.phone)].filter(Boolean); }
+
     window.openBuildingModal = function() {
         const b = db[currentBldg]; document.getElementById('bModalTitle').innerHTML = `<i class="fas fa-building" style="color:var(--accent);"></i> ${currentBldg}`;
         let c = b.info.coords || (currentBldg !== NO_ADDRESS_KEY ? currentBldg.split(',').map(Number) : null);
         document.getElementById('bModalNavBtn').innerHTML = (c&&!isNaN(c[0])) ? `<a href="https://waze.com/ul?ll=${c[1]},${c[0]}&navigate=yes" target="_blank" class="btn btn-outline" style="padding:4px 10px; font-size:12px; border-radius:15px; width:auto; border-color:#33ccff; color:#33ccff;"><i class="fab fa-waze"></i> נווט</a>` : '';
         
         let aptList = b.apts.map((a, i) => {
-            let col = getStatusColor(a), bdg = (a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join(''), ph = (a.phones||'').split(',')[0].trim().replace(/\D/g, '');
+            let col = getStatusColor(a), bdg = (a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('');
+            let phones = getAllPhones(a);
+            let ph = phones.length > 0 ? phones[0].replace(/\D/g, '') : '';
             return `<div class="bldg-fam-item" style="border-right-color:${col}" onclick="openClientCard(${i})"><div><div style="font-weight:700;font-size:16px;">${a.name||'(ללא שם)'} <span style="font-size:12px;font-weight:normal;color:var(--text-muted);">(דירה ${a.num||'-'})</span></div><div style="margin-top:4px;">${bdg}</div></div><div style="display:flex;gap:8px;">${ph?`<a href="tel:${ph}" class="btn-icon" style="color:var(--success);border-color:var(--success);" onclick="event.stopPropagation()"><i class="fas fa-phone"></i></a>`:''}<button class="btn-icon" style="color:var(--accent);"><i class="fas fa-pen"></i></button></div></div>`;
         }).join('');
         document.getElementById('bldgModalAptsList').innerHTML = aptList || '<div class="empty-state"><i class="fas fa-door-open"></i><div>אין משפחות רשומות בבניין.</div></div>';
@@ -575,7 +638,10 @@
     window.switchBldgTab = (tab) => { document.querySelectorAll('#buildingModal .crm-tab, #buildingModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`bldgTabBtn-${tab}`).classList.add('active'); document.getElementById(`bldgTab-${tab}`).classList.add('active'); };
     window.quickAddAptModal = () => { db[currentBldg].apts.push({ num:'', name:'', style:appSettings.styles[0], boards:{}, tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); saveDB(); document.getElementById('buildingModal').style.display='none'; openClientCard(db[currentBldg].apts.length-1); };
     window.saveBldgModalInfo = () => ensureAuthAndExecute(() => { db[currentBldg].info.code=document.getElementById('bModalCode').value; db[currentBldg].info.rep=document.getElementById('bModalRep').value; db[currentBldg].info.notes=document.getElementById('bModalNotes').value; saveDB(); showToast("נשמר " + getRandomCompliment(),"success"); });
-    window.setThisBuildingAsChabad = () => { if(confirm("לקבוע כבית חב''ד?")) { const c = db[currentBldg].info.coords; if(c) { appSettings.chabadHouseCoords=c; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); handleOmniSearch(); showToast("ננעץ!","success"); } } };
+    window.setThisBuildingAsChabad = async () => { 
+        const proceed = await showCustomDialog({ title: 'נעיצת 770', message: 'לקבוע את הבניין הזה כבית חב"ד במפה?', showCancel: true });
+        if(proceed) { const c = db[currentBldg].info.coords; if(c) { appSettings.chabadHouseCoords=c; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); handleOmniSearch(); showToast("ננעץ!","success"); } } 
+    };
 
     window.markDirty = () => { 
         isDirty = true; 
@@ -588,7 +654,16 @@
     };
     
     window.closeModals = () => { isDirty = false; document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); };
-    window.attemptCloseCrmModal = () => { if(isDirty && !confirm("לצאת ללא שמירה?")) return; isDirty=false; document.getElementById('clientModal').style.display='none'; if(currentBldg!==NO_ADDRESS_KEY && currentMainView==='map') openBuildingModal(); };
+    
+    window.attemptCloseCrmModal = async () => { 
+        if(isDirty) {
+            const proceed = await showCustomDialog({ title: 'שינויים לא שמורים', message: 'יש שינויים שלא שמרת. האם אתה בטוח שברצונך לצאת?', showCancel: true });
+            if(!proceed) return;
+        }
+        isDirty=false; 
+        document.getElementById('clientModal').style.display='none'; 
+        if(currentBldg!==NO_ADDRESS_KEY && currentMainView==='map') openBuildingModal(); 
+    };
     window.formatPhone = (el) => { let v=el.value.replace(/\D/g,''); if(v.length>3&&v.length<=6) v=v.slice(0,3)+'-'+v.slice(3); else if(v.length>6) v=v.slice(0,3)+'-'+v.slice(3,6)+'-'+v.slice(6,10); el.value=v; };
 
     window.openClientCard = function(idx) {
@@ -602,12 +677,21 @@
         
         document.getElementById('buildingModal').style.display='none'; currentAptIdx = idx; const a = db[currentBldg].apts[idx];
         document.getElementById('crmFamilyTitle').innerHTML = `<i class="fas fa-id-card"></i> ${a.name||'משפחה חדשה'} ${currentBldg===NO_ADDRESS_KEY?'(ללא כתובת)':''}`;
-        document.getElementById('cFamilyName').value=a.name||''; document.getElementById('cAptNum').value=a.num||''; document.getElementById('cFather').value=a.father||''; document.getElementById('cMother').value=a.mother||''; document.getElementById('cPhones').value=a.phones||''; document.getElementById('cNotes').value=a.notes||'';
+        document.getElementById('cFamilyName').value=a.name||''; document.getElementById('cAptNum').value=a.num||''; document.getElementById('cFather').value=a.father||''; document.getElementById('cMother').value=a.mother||''; document.getElementById('cNotes').value=a.notes||'';
         
+        // Auto-migrate old phones
+        if(a.phones && !a.fatherPhone && !a.motherPhone) {
+             let pArr = a.phones.split(',');
+             if(pArr.length > 0) a.fatherPhone = pArr[0].trim();
+             if(pArr.length > 1) a.motherPhone = pArr[1].trim();
+        }
+        document.getElementById('cFatherPhone').value = a.fatherPhone || '';
+        document.getElementById('cMotherPhone').value = a.motherPhone || '';
+
         const sSel = document.getElementById('cStyle'); sSel.innerHTML = ''; appSettings.styles.forEach(s => sSel.innerHTML += `<option value="${s}" ${a.style===s?'selected':''}>${s}</option>`); if(a.style&&!appSettings.styles.includes(a.style)) sSel.innerHTML+=`<option selected>${a.style}</option>`;
 
         tempTags=[...(a.tags||[])]; renderModalTags();
-        tempChildren=[...(a.childrenList||[])]; renderModalChildren();
+        tempChildren=JSON.parse(JSON.stringify(a.childrenList||[])); renderModalChildren();
         tempLogs=[...(a.interactions||[])]; renderLogs();
         tempDonations=[...(a.donations||[])]; renderDonations();
         tempTasks=[...(a.tasks||[])]; renderTasks();
@@ -640,11 +724,12 @@
                 </div></div>`;
         });
     };
-    window.addModalBoard = () => {
+    window.addModalBoard = async () => {
         let unjoined = db.__BOARDS__.filter(b => !tempBoards[b.id]);
         if(unjoined.length === 0) { showToast("המשפחה כבר חברה בכל הפרויקטים", "warning"); return; }
         let opts = unjoined.map((b, i) => `${i+1}. ${b.name}`).join('\n');
-        let num = prompt(`לאיזה לוח לצרף את המשפחה?\nהקש את המספר:\n${opts}`);
+        
+        const num = await showCustomDialog({ title: 'צירוף לפרויקט', message: `לאיזה פרויקט לצרף?\nהקש מספר:\n${opts}`, showInput: true });
         if(num && !isNaN(num) && num > 0 && num <= unjoined.length) {
             const chosen = unjoined[num-1];
             tempBoards[chosen.id] = chosen.columns[0]; 
@@ -655,8 +740,21 @@
     function renderModalTags() { document.getElementById('cTagsContainer').innerHTML = appSettings.tags.map(t => `<span class="tag-bubble ${tempTags.includes(t)?'active':''}" onclick="toggleTempTag('${t}')">${t}</span>`).join(''); }
     window.toggleTempTag = (t) => { markDirty(); if(tempTags.includes(t)) tempTags=tempTags.filter(x=>x!==t); else tempTags.push(t); renderModalTags(); };
 
-    window.renderModalChildren = () => { document.getElementById('childrenWrapper').innerHTML = tempChildren.map((c,i) => `<div style="display:flex;gap:5px;"><input type="text" placeholder="שם הילד/ה" value="${c.name||''}" oninput="tempChildren[${i}].name=this.value;markDirty()" class="inline-input" style="flex:1;"><input type="date" value="${c.dob||''}" onchange="tempChildren[${i}].dob=this.value;markDirty()" class="inline-input" style="flex:1;"><button onclick="tempChildren.splice(${i},1);markDirty();renderModalChildren()" class="btn-icon" style="color:var(--danger);border:none;"><i class="fas fa-trash"></i></button></div>`).join(''); };
-    window.addModalChild = () => { markDirty(); tempChildren.push({name:'',dob:''}); renderModalChildren(); };
+    window.renderModalChildren = () => { 
+        document.getElementById('childrenWrapper').innerHTML = tempChildren.map((c,i) => `
+            <div style="display:flex; flex-direction:column; gap:5px; padding:8px; background:var(--surface); border:1px solid var(--border-light); border-radius:6px;">
+                <div style="display:flex; gap:5px; align-items:center;">
+                    <input type="text" placeholder="שם הילד/ה" value="${c.name||''}" oninput="tempChildren[${i}].name=this.value;markDirty()" class="inline-input" style="flex:1;">
+                    <input type="date" value="${c.dob||''}" onchange="tempChildren[${i}].dob=this.value;markDirty()" class="inline-input" style="flex:1;">
+                    <button onclick="toggleChildPhone(${i})" class="btn-icon" title="הוסף טלפון" style="color:var(--accent);border:none;"><i class="fas fa-phone"></i></button>
+                    <button onclick="tempChildren.splice(${i},1);markDirty();renderModalChildren()" class="btn-icon" style="color:var(--danger);border:none;"><i class="fas fa-trash"></i></button>
+                </div>
+                ${c.showPhone || c.phone ? `<input type="text" placeholder="טלפון של הילד" value="${c.phone||''}" oninput="tempChildren[${i}].phone=this.value; formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">` : ''}
+            </div>
+        `).join(''); 
+    };
+    window.toggleChildPhone = (i) => { tempChildren[i].showPhone = !tempChildren[i].showPhone; renderModalChildren(); };
+    window.addModalChild = () => { markDirty(); tempChildren.push({name:'',dob:'', phone:'', showPhone: false}); renderModalChildren(); };
 
     function renderCustomFields() {
         const c = document.getElementById('cCustomFieldsContainer'); c.innerHTML = '';
@@ -685,7 +783,9 @@
 
     window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
         const a = db[currentBldg].apts[currentAptIdx];
-        a.name=document.getElementById('cFamilyName').value; a.num=document.getElementById('cAptNum').value; a.father=document.getElementById('cFather').value; a.mother=document.getElementById('cMother').value; a.phones=document.getElementById('cPhones').value; a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
+        a.name=document.getElementById('cFamilyName').value; a.num=document.getElementById('cAptNum').value; a.father=document.getElementById('cFather').value; a.mother=document.getElementById('cMother').value; 
+        a.fatherPhone=document.getElementById('cFatherPhone').value; a.motherPhone=document.getElementById('cMotherPhone').value; a.phones = ''; // Clear old field
+        a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
         a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customFields={...tempCustom};
         isDirty=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
         if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
@@ -709,7 +809,7 @@
         Object.keys(db).forEach(b => { 
             if(b === '__BOARDS__') return;
             db[b].apts.forEach((a,i) => {
-            let txt=`${b} ${a.name} ${a.phones||''} ${a.notes||''} ${(a.tags||[]).join(' ')} ${a.father||''} ${a.mother||''}`.toLowerCase();
+            let txt=`${b} ${a.name} ${getAllPhones(a).join(' ')} ${a.notes||''} ${(a.tags||[]).join(' ')} ${a.father||''} ${a.mother||''}`.toLowerCase();
             let matchQ = q.length<2 || txt.includes(q);
             let matchStyle = !currentFilters.style || a.style===currentFilters.style;
             let matchTag = !currentFilters.tags || (a.tags||[]).includes(currentFilters.tags);
@@ -738,9 +838,10 @@
     };
     window.ctxEdit = () => { currentBldg = ctxBldg; document.getElementById('contextMenu').style.display='none'; openClientCard(ctxIdx); };
     window.ctxMove = () => { currentBldg = ctxBldg; currentAptIdx = ctxIdx; document.getElementById('contextMenu').style.display='none'; openAddressSearch(true); };
-    window.ctxDelete = () => { 
+    window.ctxDelete = async () => { 
         document.getElementById('contextMenu').style.display='none'; 
-        if(confirm("בטוח שתרצה למחוק משפחה זו?")) { 
+        const proceed = await showCustomDialog({ title: 'מחיקת משפחה', message: 'בטוח שתרצה למחוק משפחה זו?', showCancel: true });
+        if(proceed) { 
             ensureAuthAndExecute(() => { 
                 db[ctxBldg].apts.splice(ctxIdx, 1); 
                 saveDB(); 
@@ -753,25 +854,25 @@
         if(e.target.id!=='smartSearch') document.getElementById('searchDropdown').style.display='none'; 
         const ctx = document.getElementById('contextMenu');
         if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) { ctx.style.display = 'none'; }
-        if(e.target.classList.contains('modal')){if(e.target.id==='clientModal')attemptCloseCrmModal();else e.target.style.display='none';} 
+        if(e.target.classList.contains('modal')){if(e.target.id==='clientModal')attemptCloseCrmModal();else if(e.target.id!=='customDialogModal') e.target.style.display='none';} 
     });
 
     function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
     window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
     /* --- KANBAN HUB --- */
-    window.createNewBoard = () => {
-        const name = prompt("הכנס שם לפרויקט החדש (למשל: רישום לקייטנה):");
+    window.createNewBoard = async () => {
+        const name = await showCustomDialog({ title: 'פרויקט חדש', message: 'הכנס שם לפרויקט החדש (למשל: רישום לקייטנה):', showInput: true });
         if(!name) return;
         const newId = 'b_' + Date.now();
         db.__BOARDS__.push({ id: newId, name: name, columns: ['חדש', 'בטיפול', 'הושלם'] });
         saveDB(); showToast("פרויקט נפתח בהצלחה! " + getRandomCompliment(), "success"); renderKanbanView();
     };
-    window.editCurrentBoard = () => {
+    window.editCurrentBoard = async () => {
         const sel = document.getElementById('activeKanbanBoard'); const bId = sel.value;
         const board = db.__BOARDS__.find(b => b.id === bId);
         if(!board) return;
-        const cols = prompt(`ערוך עמודות לפרויקט "${board.name}" (הפרד בפסיק):`, board.columns.join(', '));
+        const cols = await showCustomDialog({ title: 'עריכת עמודות', message: `ערוך עמודות לפרויקט "${board.name}" (הפרד בפסיק):`, showInput: true, defaultValue: board.columns.join(', ') });
         if(cols) { board.columns = cols.split(',').map(c => c.trim()); saveDB(); renderKanbanView(); showToast("עמודות עודכנו", "success"); }
     };
     window.renderKanbanView = (filteredRes = null) => {
@@ -815,13 +916,42 @@
     window.toggleAllBulk = (cb) => { const cbs=document.querySelectorAll('.bulk-cb'); cbs.forEach(c=>c.checked=cb.checked); updateBulkBar(); };
     window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
     window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); const sa=document.getElementById('bulkSelectAll'); if(sa) sa.checked=false; updateBulkBar(); };
-    window.bulkWhatsApp = () => { let p=[]; bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let apt=db[b].apts[i]; if(apt.phones) p.push(apt.phones.split(',')[0].trim().replace(/\D/g,'')); }); if(p.length>0) { window.open(`https://wa.me/972${p[0]}`, '_blank'); showToast(`נפתח חלון לשליחה לנמען הראשון (${p.length} נבחרו)`, 'info'); } clearBulkSelection(); };
-    window.bulkAddTagPrompt = () => { const t=prompt("הקלד תגית להוספה:"); if(t) { ensureAuthAndExecute(()=>{ bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let a=db[b].apts[i]; if(!a.tags)a.tags=[]; if(!a.tags.includes(t))a.tags.push(t); }); if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns();} saveDB(); clearBulkSelection(); showToast("תגית נוספה! " + getRandomCompliment(),"success"); }); } };
-    window.bulkDelete = () => { if(confirm(`למחוק ${bulkSelection.length} משפחות? פעולה בלתי הפיכה!`)) { ensureAuthAndExecute(()=>{ bulkSelection.sort((x,y)=>y.split('|')[1]-x.split('|')[1]).forEach(v=>{let [b,i]=v.split('|'); db[b].apts.splice(i,1);}); saveDB(); clearBulkSelection(); showToast("נמחקו","success"); }); } };
     
-    window.bulkAddToBoardPrompt = () => {
+    window.bulkWhatsApp = () => { 
+        let p=[]; 
+        bulkSelection.forEach(v=>{
+            let [b,i]=v.split('|'); let a=db[b].apts[i]; 
+            let phones = getAllPhones(a);
+            if(phones.length > 0) p.push(phones[0].replace(/\D/g,'')); 
+        }); 
+        if(p.length>0) { window.open(`https://wa.me/972${p[0]}`, '_blank'); showToast(`נפתח חלון לשליחה לנמען הראשון (${p.length} נבחרו)`, 'info'); } 
+        clearBulkSelection(); 
+    };
+    
+    window.bulkAddTagPrompt = async () => { 
+        const t = await showCustomDialog({ title: 'תגית המונית', message: 'הקלד תגית להוספה למשפחות:', showInput: true });
+        if(t) { 
+            ensureAuthAndExecute(()=>{ 
+                bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let a=db[b].apts[i]; if(!a.tags)a.tags=[]; if(!a.tags.includes(t))a.tags.push(t); }); 
+                if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns();} 
+                saveDB(); clearBulkSelection(); showToast("תגית נוספה! " + getRandomCompliment(),"success"); 
+            }); 
+        } 
+    };
+    
+    window.bulkDelete = async () => { 
+        const proceed = await showCustomDialog({ title: 'מחיקה המונית', message: `למחוק ${bulkSelection.length} משפחות? פעולה בלתי הפיכה!`, showCancel: true });
+        if(proceed) { 
+            ensureAuthAndExecute(()=>{ 
+                bulkSelection.sort((x,y)=>y.split('|')[1]-x.split('|')[1]).forEach(v=>{let [b,i]=v.split('|'); db[b].apts.splice(i,1);}); 
+                saveDB(); clearBulkSelection(); showToast("נמחקו","success"); 
+            }); 
+        } 
+    };
+    
+    window.bulkAddToBoardPrompt = async () => {
         let opts = db.__BOARDS__.map((b, i) => `${i+1}. ${b.name}`).join('\n');
-        let num = prompt(`לאיזה פרויקט לצרף את המשפחות המסומנות?\nהקש מספר:\n${opts}`);
+        const num = await showCustomDialog({ title: 'צירוף פרויקט המוני', message: `לאיזה פרויקט לצרף את המשפחות?\nהקש מספר:\n${opts}`, showInput: true });
         if(num && !isNaN(num) && num > 0 && num <= db.__BOARDS__.length) {
             ensureAuthAndExecute(() => {
                 const chosen = db.__BOARDS__[num-1];
@@ -852,14 +982,14 @@
 
     // --- TABLE VIEW ---
     window.renderListView = (filteredRes = null) => {
-        const c=document.getElementById('list-container');
-        let html=`<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%; padding: 0 20px; box-sizing: border-box;">
+        const inner = document.getElementById('list-inner');
+        let html=`<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
             <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
                 <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
             </div>
         </div>
-        <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 20px; padding-right: 20px; box-sizing: border-box;">
+        <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
         <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים</th></tr></thead><tbody>`;
         
         let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__')db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
@@ -881,17 +1011,17 @@
                 <td data-label="משפחה"><b>${a.name||'(ללא שם)'}</b></td><td data-label="פרויקטים">${boardsHtml}</td>
                 <td data-label="תגיות">${(a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('')}</td>
                 <td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>
-                <td data-label="טלפונים" onclick="event.stopPropagation()">${(a.phones||'').split(',').map(p=>`<a class="phone-link" href="https://wa.me/972${p.replace(/\D/g,'').replace(/^0/,'')}?text=שלום" target="_blank"><i class="fab fa-whatsapp"></i> ${p}</a>`).join(' ')}</td>
+                <td data-label="טלפונים" onclick="event.stopPropagation()">${getAllPhones(a).map(p=>`<a class="phone-link" href="https://wa.me/972${p.replace(/\D/g,'').replace(/^0/,'')}?text=שלום" target="_blank"><i class="fab fa-whatsapp"></i> ${p}</a>`).join(' ')}</td>
             </tr>`;
         });
-        c.innerHTML = html + `</tbody></table></div>`;
+        inner.innerHTML = html + `</tbody></table></div>`;
     };
 
     // --- GAMIFICATION: GOAL TRACKER LOGIC ---
-    window.editGoal = () => {
-        let targetText = prompt("מה המטרה שלך? (למשל שם רחוב, או תגית מסוימת)", appSettings.goal.text);
+    window.editGoal = async () => {
+        let targetText = await showCustomDialog({ title: 'הגדרת יעד', message: 'מה המטרה שלך? (למשל שם רחוב, או תגית)', showInput: true, defaultValue: appSettings.goal.text });
         if(!targetText) return;
-        let targetNum = prompt("לכמה משפחות תרצה להגיע ביעד הזה?", appSettings.goal.target);
+        let targetNum = await showCustomDialog({ title: 'הגדרת יעד', message: 'לכמה משפחות תרצה להגיע ביעד הזה?', showInput: true, defaultValue: appSettings.goal.target.toString() });
         if(targetNum && !isNaN(targetNum) && Number(targetNum) > 0) {
             appSettings.goal = { text: targetText, target: Number(targetNum) };
             localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
@@ -979,12 +1109,12 @@
         document.getElementById('settingsModal').style.display='flex';
     };
     window.updateThemePreview=()=>{appSettings.themeColor=document.getElementById('setThemeColor').value; document.documentElement.style.setProperty('--accent',appSettings.themeColor); if(map.getLayer('3d-buildings'))map.setPaintProperty('3d-buildings','fill-extrusion-color',['case',['boolean',['feature-state','hover'],false],appSettings.themeColor,'#d1d5db']);};
-    window.addNewTag=()=>{const v=document.getElementById('newTagInput').value.trim();if(v&&!appSettings.tags.includes(v)){appSettings.tags.push(v);openSettings();}};
-    window.addNewCustomField=()=>{const v=document.getElementById('newFieldInput').value.trim();if(v&&!appSettings.customFields.includes(v)){appSettings.customFields.push(v);openSettings();}};
+    window.addNewTag=async ()=>{const v=await showCustomDialog({title:'תגית חדשה', message:'שם התגית:', showInput:true}); if(v&&!appSettings.tags.includes(v)){appSettings.tags.push(v);openSettings();}};
+    window.addNewCustomField=async ()=>{const v=await showCustomDialog({title:'שדה מותאם', message:'שם השדה:', showInput:true}); if(v&&!appSettings.customFields.includes(v)){appSettings.customFields.push(v);openSettings();}};
     window.saveSettingsAndClose=()=>{appSettings.defaultView=document.getElementById('setDefaultView').value; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns(); document.getElementById('settingsModal').style.display='none'; showToast('הגדרות נשמרו','success');};
     window.setDefaultLocation=()=>{appSettings.center=[map.getCenter().lng,map.getCenter().lat]; appSettings.zoom=map.getZoom(); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); showToast("נשמר מיקום מפה","success");};
     
-    window.exportTableToCSV = () => { let csv = "\uFEFFכתובת/בניין,שם משפחה,דירה,סגנון,פרויקטים,תגיות,קשר אחרון,טלפונים,הערות\n"; Object.keys(db).forEach(b=>{ if(b==='__BOARDS__')return; db[b].apts.forEach(a=>{ let tags=(a.tags||[]).join(' - '), phones=(a.phones||'').replace(/,/g,' - '), notes=(a.notes||'').replace(/,/g,' ').replace(/\n/g,' '); let last='-'; if(a.interactions&&a.interactions.length>0) last=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; let boardsStr = a.boards ? Object.entries(a.boards).map(([bid, st]) => `${db.__BOARDS__.find(x=>x.id===bid)?.name||''}:${st}`).join(' | ') : ''; csv += `${b===NO_ADDRESS_KEY?'ללא כתובת':b.replace(/,/g,'')},${(a.name||'').replace(/,/g,'')},${a.num||''},${a.style||''},${boardsStr},${tags},${last},${phones},${notes}\n`; })}); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = `קהילה_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("ייצוא הושלם!","success"); };
+    window.exportTableToCSV = () => { let csv = "\uFEFFכתובת/בניין,שם משפחה,דירה,סגנון,פרויקטים,תגיות,קשר אחרון,טלפונים,הערות\n"; Object.keys(db).forEach(b=>{ if(b==='__BOARDS__')return; db[b].apts.forEach(a=>{ let tags=(a.tags||[]).join(' - '), phones=getAllPhones(a).join(' - '), notes=(a.notes||'').replace(/,/g,' ').replace(/\n/g,' '); let last='-'; if(a.interactions&&a.interactions.length>0) last=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; let boardsStr = a.boards ? Object.entries(a.boards).map(([bid, st]) => `${db.__BOARDS__.find(x=>x.id===bid)?.name||''}:${st}`).join(' | ') : ''; csv += `${b===NO_ADDRESS_KEY?'ללא כתובת':b.replace(/,/g,'')},${(a.name||'').replace(/,/g,'')},${a.num||''},${a.style||''},${boardsStr},${tags},${last},${phones},${notes}\n`; })}); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = `קהילה_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("ייצוא הושלם!","success"); };
     window.exportData = () => { const a=document.createElement('a'); a.href="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)); a.download=`גיבוי_מלא_${new Date().toISOString().slice(0,10)}.json`; a.click(); };
     window.importData = (e) => { const r=new FileReader(); r.onload=(ev)=>{try{db=JSON.parse(ev.target.result);saveDB();showToast("שוחזר!","success");closeModals();}catch(err){showToast("קובץ שגוי","error");}}; r.readAsText(e.target.files[0]); e.target.value=''; };
 </script>
