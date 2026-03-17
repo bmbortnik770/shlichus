@@ -19,7 +19,6 @@ body { margin:0; padding:0; font-family:'Assistant',sans-serif; display:flex; he
 .main-tab.active { background:var(--accent); color:white; }
 .main-tab:hover:not(.active) { background:var(--table-hover); color:var(--text-main); }
 
-/* --- Quick Filters Toolbar --- */
 .quick-filters-bar { background: var(--surface); padding: 12px 20px; display: flex; gap: 15px; border-bottom: 1px solid var(--border-light); z-index: 400; align-items: center; flex-wrap: wrap; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
 .search-wrapper { position: relative; flex: 2; min-width: 250px; display: flex; align-items: center; background: var(--bg-body); border-radius: 8px; padding: 0 15px; border: 1px solid var(--accent); transition: 0.2s; }
 .search-wrapper:focus-within { box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
@@ -80,7 +79,6 @@ body { margin:0; padding:0; font-family:'Assistant',sans-serif; display:flex; he
 .crm-tab.active { color:var(--accent); border-color:var(--accent); }
 .crm-tab-content { display:none; } .crm-tab-content.active { display:block; animation:fadeIn 0.3s; } @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
 
-/* --- Communication Hub Specific Styles --- */
 .comm-tab-content { display:none; } 
 .comm-tab-content.active { display:block; animation:fadeIn 0.3s; }
 .template-card { background: var(--bg-body); border: 1px solid var(--border-light); border-right: 4px solid var(--accent); padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; cursor: pointer; }
@@ -135,8 +133,17 @@ body { margin:0; padding:0; font-family:'Assistant',sans-serif; display:flex; he
 .bldg-fam-item { background:var(--bg-body); border:1px solid var(--border-light); border-right:4px solid var(--border-light); padding:12px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition:0.2s; cursor:pointer;}
 .bldg-fam-item:hover { transform:translateX(-3px); border-right-width:6px; }
 
-#bulkActionBar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--primary); color:white; padding:15px 25px; border-radius:30px; display:none; gap:15px; align-items:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:10000; font-weight:600; }
-.bulk-btn { background:rgba(255,255,255,0.1); border:none; color:white; padding:6px 12px; border-radius:15px; cursor:pointer; transition:0.2s; display:flex; align-items:center; gap:5px;}
+#bulkActionBar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--primary); color:white; padding:15px 25px; border-radius:30px; display:none; gap:15px; align-items:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:10000; font-weight:600; flex-wrap: wrap; justify-content: center; }
+
+/* FIX: Force bulk buttons to be equal height and single-line */
+.bulk-btn { 
+    background:rgba(255,255,255,0.1); border:none; color:white; 
+    padding:6px 12px; border-radius:15px; cursor:pointer; transition:0.2s; 
+    display:flex; align-items:center; gap:5px;
+    white-space: nowrap; /* מונע גלישת שורות */
+    height: 36px; /* גובה אחיד לכולם */
+    box-sizing: border-box;
+}
 .bulk-btn:hover { background:rgba(255,255,255,0.2); }
 
 #contextMenu { display:none; position:absolute; z-index:4000; background:var(--surface); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.3); padding:8px 0; min-width:180px; border:1px solid var(--border-light); }
