@@ -20,6 +20,7 @@ let currentMainView = appSettings.defaultView || 'map';
 let db = JSON.parse(localStorage.getItem('community_data_final')) || {};
 if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
 
+// Migrate Boards
 if(!db['__BOARDS__']) {
     db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'], archived: false }];
     Object.keys(db).forEach(b => {
@@ -100,7 +101,7 @@ window.onload = () => {
     let lastLogin = localStorage.getItem('last_login_date');
     let todayStr = new Date().toISOString().split('T')[0];
     let welcomeDiv = document.getElementById('welcomeMessage');
-    if(lastLogin === todayStr) { welcomeDiv.innerHTML = "איזה כיף שחזרת! ממשיכים את המומנטום של היום 🚀"; } 
+    if(lastLogin === todayStr) { welcomeDiv.innerHTML = "איזה כיף שחזרת! ממשיכים את המומנטום 🚀"; } 
     else if (lastLogin) { welcomeDiv.innerHTML = "ברוך שובך! פעם קודמת היית אש, בוא נראה מה תעשה היום 🔥"; } 
     else { welcomeDiv.innerHTML = "ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍"; }
     localStorage.setItem('last_login_date', todayStr);
@@ -592,7 +593,7 @@ window.bulkWhatsApp = async () => {
     clearBulkSelection(); 
 };
 
-// FIXED: Email logic and limits
+// FIXED: Email logic using window.location.href
 window.bulkEmail = async () => {
     let emails=[];
     bulkSelection.forEach(v=>{
@@ -606,11 +607,13 @@ window.bulkEmail = async () => {
     const template = await showCustomDialog({ title: 'שליחת מייל', message: `נמצאו ${emails.length} כתובות מייל.\nהקלד הודעה:\n(בגלל שזו שליחה המונית במייל, המערכת תעתיק את הכתובות ללוח לגיבוי)`, showInput: true, defaultValue: 'שלום רב,\n\n' });
     if(!template) return;
     
-    let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=הודעה מבית חב"ד&body=${encodeURIComponent(template)}`;
+    let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent('הודעה מבית חב"ד')}&body=${encodeURIComponent(template)}`;
     
-    // Copy to clipboard as fallback because browsers block very long mailto links
+    // Copy to clipboard as fallback
     navigator.clipboard.writeText(emails.join(', '));
-    window.open(mailtoLink, '_blank');
+    
+    // Bypass popup blockers
+    window.location.href = mailtoLink;
     
     showToast(`נפתחה תוכנת המייל (הכתובות גם הועתקו ללוח)`, 'success');
     clearBulkSelection();
@@ -654,21 +657,33 @@ window.bulkAddToBoardPrompt = async () => {
     }
 };
 
-// FIXED: Google Maps Directions URL Format
+// FIXED: Google Maps Directions URL (using actual building strings instead of lat/lng)
 window.bulkRoute = () => {
     let waypoints = [];
     bulkSelection.forEach(v => {
         let [b, i] = v.split('|');
-        if(b !== NO_ADDRESS_KEY && db[b].info.coords) { waypoints.push(`${db[b].info.coords[1]},${db[b].info.coords[0]}`); }
+        if(b !== NO_ADDRESS_KEY) { waypoints.push(encodeURIComponent(b)); }
     });
-    if(waypoints.length === 0) { showToast("לא נבחרו משפחות עם מיקום על המפה!", "error"); return; }
+    if(waypoints.length === 0) { showToast("לא נבחרו משפחות עם כתובת תקינה!", "error"); return; }
+    
+    waypoints = [...new Set(waypoints)]; // Remove duplicates
+    
     if(waypoints.length > 10) { showToast("מגבלת גוגל מפות היא 10 יעדים. ניקח את ה-10 הראשונים.", "warning"); waypoints = waypoints.slice(0,10); }
     
-    let origin = appSettings.chabadHouseCoords ? `${appSettings.chabadHouseCoords[1]},${appSettings.chabadHouseCoords[0]}` : waypoints.shift();
-    let destination = waypoints.pop(); 
+    let origin = '';
+    let chabadHouseBldg = Object.keys(db).find(k => db[k].info && db[k].info.coords && appSettings.chabadHouseCoords && Math.abs(db[k].info.coords[0]-appSettings.chabadHouseCoords[0])<0.001);
+    
+    if(chabadHouseBldg) {
+        origin = encodeURIComponent(chabadHouseBldg);
+    } else {
+        origin = waypoints.shift();
+    }
+    
+    let destination = waypoints.length > 0 ? waypoints.pop() : origin; 
     let wpStr = waypoints.length > 0 ? `&waypoints=${waypoints.join('|')}` : '';
     
-    window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${wpStr}`, '_blank');
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${wpStr}`;
+    window.open(url, '_blank');
     clearBulkSelection();
 };
 
