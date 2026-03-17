@@ -122,7 +122,6 @@ window.onload = () => {
     else { welcomeDiv.innerHTML = "ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍"; }
     localStorage.setItem('last_login_date', todayStr);
 
-    // הגנה מקריסות אם חסר HTML
     const obContainer = document.getElementById('onboardingGeocoderContainer');
     if(obContainer) obContainer.appendChild(obGeocoder.onAdd(map));
     
@@ -155,7 +154,6 @@ window.onload = () => {
     }
 };
 
-// תיקון: אייקון 770 מעוצב לכפתור הבית
 function updateHomeButton() {
     const btn = document.getElementById('btnGoHome');
     if(btn && appSettings.homeLocation && appSettings.homeLocation.coords) {
@@ -376,7 +374,6 @@ window.openClientCard = function(idx) {
     document.getElementById('cMotherEmail').value = a.motherEmail || '';
 
     const sSel = document.getElementById('cStyle'); sSel.innerHTML = ''; 
-    // נשתמש בסגנונות ללא כפילויות שיצרנו
     appSettings.styles.forEach(s => sSel.innerHTML += `<option value="${s}" ${a.style===s?'selected':''}>${s}</option>`); 
     if(a.style&&!appSettings.styles.includes(a.style)) sSel.innerHTML+=`<option selected>${a.style}</option>`;
 
@@ -524,7 +521,6 @@ window.toggleAdvFilters = () => {
     if(el) el.style.display = (el.style.display==='flex' || el.style.display==='block') ? 'none' : 'flex'; 
 };
 
-// תיקון כפילויות סגנונות לפני בניית הרשימה הנפתחת
 function populateFilterDropdowns() {
     appSettings.styles = [...new Set(appSettings.styles)];
     document.getElementById('fStyle').innerHTML='<option value="">כל הסגנונות</option>'+appSettings.styles.map(x=>`<option value="${x}">${x}</option>`).join('');
@@ -554,7 +550,7 @@ window.handleOmniSearch = () => {
         dd.style.display='block'; 
         dd.innerHTML=res.slice(0,15).map(r=>`<div class="search-item" onclick="jumpToSearchResult('${encodeURIComponent(r.bldg)}',${r.idx})"><div class="search-item-title">${r.apt.name||'ללא שם'} <span style="font-size:12px;">(${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg})</span></div></div>`).join(''); 
     } else { 
-        dd.style.display='none'; 
+        if(dd) dd.style.display='none'; 
     }
     
     refreshMap(res); 
@@ -562,6 +558,7 @@ window.handleOmniSearch = () => {
     if(currentMainView==='kanban') renderKanbanView(res);
 };
 
+// תיקון באג החיפוש! איפוס וקפיצה חלקה למשפחה
 window.jumpToSearchResult = (b,i) => { 
     document.getElementById('searchDropdown').style.display='none'; 
     document.getElementById('smartSearch').value=''; 
@@ -575,6 +572,8 @@ window.jumpToSearchResult = (b,i) => {
     } else if (currentBldg !== NO_ADDRESS_KEY) {
         coords = currentBldg.split(',').map(Number); 
     }
+    
+    handleOmniSearch(); // מנקה את הסינונים מהמפה כדי שהכל יחזור להופיע!
     
     if(coords && !isNaN(coords[0])) {
         map.flyTo({ center: coords, zoom: 19, pitch: 60 });
@@ -612,14 +611,22 @@ window.ctxDelete = () => {
     }); 
 };
 
+// תיקון באג קליק מחוץ לרשימה שסגר אותה מוקדם מדי
 document.addEventListener('mousedown', (e) => { 
-    if(e.target.id!=='smartSearch') {
-        const dd = document.getElementById('searchDropdown');
-        if(dd) dd.style.display='none'; 
+    const searchBox = document.getElementById('smartSearch');
+    const dropDown = document.getElementById('searchDropdown');
+    
+    if (searchBox && dropDown && !searchBox.contains(e.target) && !dropDown.contains(e.target)) {
+        dropDown.style.display = 'none';
     }
+    
     const ctx = document.getElementById('contextMenu');
     if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) { ctx.style.display = 'none'; }
-    if(e.target.classList.contains('modal')){if(e.target.id==='clientModal')attemptCloseCrmModal();else if(e.target.id!=='customDialogModal' && e.target.id!=='onboardingModal') e.target.style.display='none';} 
+    
+    if(e.target.classList.contains('modal')){
+        if(e.target.id==='clientModal') attemptCloseCrmModal();
+        else if(e.target.id!=='customDialogModal' && e.target.id!=='onboardingModal') e.target.style.display='none';
+    } 
 });
 
 function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
@@ -832,23 +839,6 @@ window.bulkDelete = async () => {
     } 
 };
 
-window.bulkAddToBoardPrompt = async () => {
-    let activeBoards = db.__BOARDS__.filter(b=>!b.archived);
-    let opts = activeBoards.map((b, i) => `${i+1}. ${b.name}`).join('\n');
-    const num = await showCustomDialog({ title: 'צירוף פרויקט המוני', message: `לאיזה פרויקט פעיל לצרף את המשפחות?\nהקש מספר:\n${opts}`, showInput: true });
-    if(num && !isNaN(num) && num > 0 && num <= activeBoards.length) {
-        ensureAuthAndExecute(() => {
-            const chosen = activeBoards[num-1];
-            bulkSelection.forEach(v => {
-                let [b, i] = v.split('|'); let a = db[b].apts[i];
-                if(!a.boards) a.boards = {};
-                a.boards[chosen.id] = chosen.columns[0]; 
-            });
-            saveDB(); clearBulkSelection(); showToast(`צורפו בהצלחה ללוח ${chosen.name}! ${getRandomCompliment()}`, "success");
-        });
-    }
-};
-
 window.bulkRoute = () => {
     let waypoints = [];
     bulkSelection.forEach(v => {
@@ -956,7 +946,6 @@ function refreshMap(filteredRes = null) {
     activeMarkers.forEach(m=>m.remove()); activeMarkers=[]; if(chabadHouseMarker) chabadHouseMarker.remove();
     let stats={}, total=0, urgent=0, alerts=[]; const today=new Date(), cMonth=today.getMonth();
     
-    // החזרת ה-770 למפה!
     if (appSettings.homeLocation && appSettings.homeLocation.coords && appSettings.homeLocation.isChabad) {
         const el=document.createElement('div'); el.className='chabad-pin-wrapper';
         el.innerHTML=`<div class="chabad-pin-container"><div class="chabad-pin-circle"><div class="chabad-pin-image"></div></div><div class="chabad-pin-arrow"></div></div>`;
@@ -1061,7 +1050,7 @@ window.saveSettingsAndClose=()=>{
     populateFilterDropdowns(); 
     document.getElementById('settingsModal').style.display='none'; 
     updateHomeButton();
-    refreshMap(); // כדי שסמל ה-770 יתעדכן מיד
+    refreshMap(); 
     showToast('הגדרות נשמרו','success');
 };
 
