@@ -7,12 +7,20 @@ mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl
 const NO_ADDRESS_KEY = "__NO_ADDRESS__";
 
 let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || { 
-    center: [35.24430, 31.82650], zoom: 17.5, pitch: 60, chabadHouseCoords: null, themeColor: '#3b82f6', defaultView: 'map',
+    center: [35.24430, 31.82650], zoom: 17.5, pitch: 60, themeColor: '#3b82f6', defaultView: 'map',
     tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: [],
-    goal: { text: 'שמואל תמיר', target: 30 }
+    goal: { text: 'חיפוש חופשי', target: 30 }
 };
+
+// מיגרציה (העברה) של הגדרות הבית הישנות למבנה החדש והנקי שלנו
+if(!appSettings.homeLocation) {
+    if(appSettings.chabadHouseCoords) {
+        appSettings.homeLocation = { coords: appSettings.chabadHouseCoords, address: 'מיקום קודם', isChabad: true };
+    }
+}
+
 if(!appSettings.customFields) appSettings.customFields = [];
-if(!appSettings.goal) appSettings.goal = { text: 'שמואל תמיר', target: 30 };
+if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי', target: 30 };
 
 document.documentElement.style.setProperty('--accent', appSettings.themeColor);
 let currentMainView = appSettings.defaultView || 'map';
@@ -20,7 +28,6 @@ let currentMainView = appSettings.defaultView || 'map';
 let db = JSON.parse(localStorage.getItem('community_data_final')) || {};
 if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
 
-// Migrate Boards
 if(!db['__BOARDS__']) {
     db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'], archived: false }];
     Object.keys(db).forEach(b => {
@@ -37,11 +44,9 @@ if(!db['__BOARDS__']) {
 let activeMarkers = [], chart = null, chabadHouseMarker = null, modalGeocoder = null;
 let currentBldg = null, currentAptIdx = null;
 let tempChildren=[], tempTags=[], tempLogs=[], tempDonations=[], tempTasks=[], tempCustom={}, tempBoards={}; 
-let pendingMoveMode = false, isDirty = false;
+let pendingMoveMode = false, isDirty = false, isCreatingNew = false;
 let bulkSelection = []; 
 let currentFilters = { tags: '', style: '', status: '' };
-
-// NEW: Temporary memory for explicit address saving
 let tempSelectedAddress = null;
 
 const compliments = ["אלוף! 💪", "פצצה! 🎯", "אין עליך! 🚀", "עבודה מדהימה! 🔥", "הקהילה גדלה! 👑"];
@@ -101,6 +106,16 @@ map.addControl(new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccu
 const geocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: '📍 חפש אזור/כתובת במפה...', countries: 'il', language: 'he' });
 document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
 
+// Geocoder for Onboarding
+let obGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'הקלד כתובת בית חב"ד...', countries: 'il', language: 'he' });
+let tempObLoc = null;
+obGeocoder.on('result', (e) => { tempObLoc = { coords: e.result.center, address: e.result.place_name_he || e.result.place_name }; });
+
+// Geocoder for Settings
+let setHomeGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'עדכן מיקום חדש...', countries: 'il', language: 'he' });
+let tempSetHomeLoc = null;
+setHomeGeocoder.on('result', (e) => { tempSetHomeLoc = { coords: e.result.center, address: e.result.place_name_he || e.result.place_name }; });
+
 window.onload = () => {
     let lastLogin = localStorage.getItem('last_login_date');
     let todayStr = new Date().toISOString().split('T')[0];
@@ -110,19 +125,17 @@ window.onload = () => {
     else { welcomeDiv.innerHTML = "ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍"; }
     localStorage.setItem('last_login_date', todayStr);
 
+    document.getElementById('onboardingGeocoderContainer').appendChild(obGeocoder.onAdd(map));
+    document.getElementById('settingsHomeGeocoderContainer').appendChild(setHomeGeocoder.onAdd(map));
+
     modalGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'הקלד כתובת לחיפוש...', countries: 'il', language: 'he', marker: false, flyTo: false });
     document.getElementById('modalGeocoderContainer').appendChild(modalGeocoder.onAdd(map));
-    
-    // UPDATED: Store the result temporarily instead of saving immediately
     modalGeocoder.on('result', (e) => {
         const f = e.result;
         const placeName = (f.place_name_he || f.place_name).split(',')[0].trim();
         tempSelectedAddress = { name: placeName, lng: f.center[0], lat: f.center[1] };
     });
-    // Clear temp memory if user clears the search box
-    modalGeocoder.on('clear', () => {
-        tempSelectedAddress = null;
-    });
+    modalGeocoder.on('clear', () => { tempSelectedAddress = null; });
 
     switchMainView(currentMainView);
     if(localStorage.getItem('darkMode')==='true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className='fas fa-sun'; }
@@ -138,6 +151,33 @@ window.onload = () => {
     }
 };
 
+function updateHomeButton() {
+    const btn = document.getElementById('btnGoHome');
+    const icon = document.getElementById('homeIconBtn');
+    if(appSettings.homeLocation) {
+        btn.style.display = 'flex';
+        icon.className = appSettings.homeLocation.isChabad ? 'fas fa-synagogue' : 'fas fa-home';
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+window.flyToHome = () => {
+    if(appSettings.homeLocation && appSettings.homeLocation.coords) {
+        map.flyTo({ center: appSettings.homeLocation.coords, zoom: 19, pitch: 60 });
+    }
+};
+
+window.saveOnboardingLocation = () => {
+    if(!tempObLoc) { showToast('יש לחפש ולבחור כתובת', 'warning'); return; }
+    appSettings.homeLocation = { coords: tempObLoc.coords, address: tempObLoc.address, isChabad: document.getElementById('onboardingIsChabad').checked };
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    document.getElementById('onboardingModal').style.display = 'none';
+    updateHomeButton();
+    refreshMap();
+    showToast('ברוך הבא! מיקום נשמר.', 'success');
+};
+
 function handleAuth(resp) {
     accessToken = resp.access_token; localStorage.setItem('gdrive_session', JSON.stringify({ token: accessToken, expiresAt: new Date().getTime() + 3500000 }));
     document.getElementById('auth-overlay').style.opacity='0'; document.getElementById('splash-screen').style.display='flex'; document.getElementById('splash-screen').style.opacity='1';
@@ -150,6 +190,23 @@ window.logout = async function() {
 async function ensureAuthAndExecute(cb) {
     const session = JSON.parse(localStorage.getItem('gdrive_session'));
     if (!session || session.expiresAt < new Date().getTime() + 60000) { showToast("מחדש חיבור...", "warning"); window.gClient.callback = (r)=>{ handleAuth(r); setTimeout(cb, 1000); }; window.gClient.requestAccessToken({prompt: ''}); } else { cb(); }
+}
+
+// Background Geocoding - השלמת פערים למשפחות ישנות
+async function geocodeMissingAddresses() {
+    const bldgs = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== NO_ADDRESS_KEY && (!db[k].info.coords || isNaN(db[k].info.coords[0])));
+    if(bldgs.length > 0) showToast("מתבצע עדכון מיקומים ברקע...", "info");
+    for(let b of bldgs) {
+        try {
+            const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(b)}.json?country=il&language=he&access_token=${mapboxgl.accessToken}`);
+            const d = await r.json();
+            if(d.features && d.features.length > 0) {
+                db[b].info.coords = d.features[0].center;
+                saveDB(); refreshMap();
+            }
+        } catch(e) {}
+        await new Promise(res => setTimeout(res, 1000)); 
+    }
 }
 
 async function syncWithDrive() {
@@ -169,13 +226,27 @@ async function syncWithDrive() {
         if(!db['__BOARDS__']) db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'], archived: false }];
         localStorage.setItem('community_data_final', JSON.stringify(db)); setSyncStatus('ok', 'מסונכרן');
         
-        let totalFamilies = 0; Object.keys(db).forEach(k => { if(k!=='__BOARDS__') totalFamilies += db[k].apts.length; });
-        if(totalFamilies === 0 && !appSettings.chabadHouseCoords) {
-            showCustomDialog({ title: 'ברוך הבא למערכת! 🎉', message: 'איזה כיף שהצטרפת.\n\nהצעד הראשון שלך לכיבוש השכונה הוא לקבוע את מיקום הבית חב"ד. סגור את החלון הזה, חפש את הבניין במפה, לחץ עליו, ובחר "קבע כ-770"!', showCancel: false });
-        }
+        // מחיקת כפילויות סגנונות (תיקון באג)
+        appSettings.styles = [...new Set(appSettings.styles)];
+        localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+
     } catch(e) { setSyncStatus('error', 'שגיאה'); }
-    document.getElementById('splash-screen').style.opacity='0'; setTimeout(() => { document.getElementById('splash-screen').style.display='none'; map.resize(); handleOmniSearch(); }, 800);
+    
+    document.getElementById('splash-screen').style.opacity='0'; 
+    setTimeout(() => { 
+        document.getElementById('splash-screen').style.display='none'; 
+        map.resize(); 
+        handleOmniSearch(); 
+        updateHomeButton();
+        
+        if(!appSettings.homeLocation) {
+            document.getElementById('onboardingModal').style.display = 'flex';
+        }
+        
+        geocodeMissingAddresses(); // השלמת הפערים מופעלת!
+    }, 800);
 }
+
 async function pushToDrive() {
     if(!driveFileId || !accessToken) return; setSyncStatus('wait', 'שומר...');
     try { await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, { method:'PATCH', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'}, body:JSON.stringify(db) }); setSyncStatus('ok', 'נשמר'); } catch(e) { setSyncStatus('error', 'שגיאה'); }
@@ -231,12 +302,15 @@ window.openBuildingModal = function() {
     switchBldgTab('apts'); document.getElementById('buildingModal').style.display='flex';
 };
 window.switchBldgTab = (tab) => { document.querySelectorAll('#buildingModal .crm-tab, #buildingModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`bldgTabBtn-${tab}`).classList.add('active'); document.getElementById(`bldgTab-${tab}`).classList.add('active'); };
-window.quickAddAptModal = () => { db[currentBldg].apts.push({ num:'', name:'', style:appSettings.styles[0], boards:{}, tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); saveDB(); document.getElementById('buildingModal').style.display='none'; openClientCard(db[currentBldg].apts.length-1); };
-window.saveBldgModalInfo = () => ensureAuthAndExecute(() => { db[currentBldg].info.code=document.getElementById('bModalCode').value; db[currentBldg].info.rep=document.getElementById('bModalRep').value; db[currentBldg].info.notes=document.getElementById('bModalNotes').value; saveDB(); showToast("נשמר " + getRandomCompliment(),"success"); });
-window.setThisBuildingAsChabad = async () => { 
-    const proceed = await showCustomDialog({ title: 'נעיצת 770', message: 'לקבוע את הבניין הזה כבית חב"ד במפה?', showCancel: true });
-    if(proceed) { const c = db[currentBldg].info.coords; if(c) { appSettings.chabadHouseCoords=c; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); handleOmniSearch(); showToast("ננעץ!","success"); } } 
+
+// FIXED GHOST FAMILIES
+window.quickAddAptModal = () => { 
+    db[currentBldg].apts.push({ num:'', name:'', style:appSettings.styles[0], boards:{}, tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); 
+    isCreatingNew = true;
+    document.getElementById('buildingModal').style.display='none'; 
+    openClientCard(db[currentBldg].apts.length-1); 
 };
+window.saveBldgModalInfo = () => ensureAuthAndExecute(() => { db[currentBldg].info.code=document.getElementById('bModalCode').value; db[currentBldg].info.rep=document.getElementById('bModalRep').value; db[currentBldg].info.notes=document.getElementById('bModalNotes').value; saveDB(); showToast("נשמר " + getRandomCompliment(),"success"); });
 
 window.markDirty = () => { 
     isDirty = true; 
@@ -250,7 +324,7 @@ window.markDirty = () => {
 
 window.closeModals = () => { 
     isDirty = false; 
-    tempSelectedAddress = null; // NEW: reset temp address on close
+    tempSelectedAddress = null;
     if(modalGeocoder) modalGeocoder.clear();
     document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); 
 };
@@ -260,7 +334,12 @@ window.attemptCloseCrmModal = async () => {
         const proceed = await showCustomDialog({ title: 'שינויים לא שמורים', message: 'יש שינויים שלא שמרת. האם אתה בטוח שברצונך לצאת?', showCancel: true });
         if(!proceed) return;
     }
+    // GHOST FAMILY CLEANUP
+    if(isCreatingNew) {
+        db[currentBldg].apts.splice(currentAptIdx, 1);
+    }
     isDirty=false; 
+    isCreatingNew=false;
     document.getElementById('clientModal').style.display='none'; 
     if(currentBldg!==NO_ADDRESS_KEY && currentMainView==='map') openBuildingModal(); 
 };
@@ -270,7 +349,7 @@ window.quickAddFamily = () => {
     currentBldg = NO_ADDRESS_KEY;
     db[currentBldg].apts.push({num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}});
     currentAptIdx = db[currentBldg].apts.length - 1;
-    saveDB(); 
+    isCreatingNew = true;
     openClientCard(currentAptIdx);
 };
 
@@ -305,7 +384,12 @@ window.openClientCard = function(idx) {
     tempCustom={...(a.customFields||{})}; renderCustomFields();
     tempBoards={...(a.boards||{})}; renderModalBoards();
     
-    document.getElementById('newLogDate').valueAsDate=new Date(); document.getElementById('newDonDate').valueAsDate=new Date(); document.getElementById('newTaskDate').valueAsDate=new Date();
+    // FIXED DATES BUG
+    const tStr = new Date().toISOString().split('T')[0];
+    document.getElementById('newLogDate').value = tStr; 
+    document.getElementById('newDonDate').value = tStr; 
+    document.getElementById('newTaskDate').value = tStr;
+    
     switchCrmTab('details'); document.getElementById('clientModal').style.display='flex';
 };
 
@@ -398,18 +482,14 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.fatherEmail=document.getElementById('cFatherEmail').value; a.motherEmail=document.getElementById('cMotherEmail').value;
     a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
     a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customFields={...tempCustom};
-    isDirty=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
+    isDirty=false; isCreatingNew=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
     if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
 });
 
 window.openAddressSearch = (isMove=false) => { pendingMoveMode=isMove; document.getElementById('addressSearchModal').style.display='flex'; };
 
-// NEW: Logic for the explicit Save Address button
 window.confirmAddressSelection = () => {
-    if (!tempSelectedAddress) {
-        showToast("אנא חפש ובחר כתובת מהרשימה תחילה", "warning");
-        return;
-    }
+    if (!tempSelectedAddress) { showToast("אנא חפש ובחר כתובת מהרשימה תחילה", "warning"); return; }
     selectAddress(tempSelectedAddress.name, tempSelectedAddress.lng, tempSelectedAddress.lat);
     tempSelectedAddress = null;
     setTimeout(() => { modalGeocoder.clear(); }, 500);
@@ -438,7 +518,7 @@ function processAddressSelection(t) {
 
 window.toggleAdvFilters = () => { 
     const el=document.getElementById('advFilters'); 
-    el.style.display = (el.style.display==='flex' || el.style.display==='block') ? 'none' : 'flex'; 
+    if(el) el.style.display = (el.style.display==='flex' || el.style.display==='block') ? 'none' : 'flex'; 
 };
 
 function populateFilterDropdowns() {
@@ -473,11 +553,27 @@ window.handleOmniSearch = () => {
     if(currentMainView==='kanban') renderKanbanView(res);
 };
 
+// FIXED SEARCH & FLY-TO
 window.jumpToSearchResult = (b,i) => { 
     document.getElementById('searchDropdown').style.display='none'; 
     document.getElementById('smartSearch').value=''; 
-    currentBldg=decodeURIComponent(b); 
-    openClientCard(i); 
+    currentBldg = decodeURIComponent(b); 
+    
+    if(currentMainView !== 'map') { switchMainView('map'); }
+    
+    let coords = null;
+    if(currentBldg !== NO_ADDRESS_KEY && db[currentBldg].info && db[currentBldg].info.coords) {
+        coords = db[currentBldg].info.coords;
+    } else if (currentBldg !== NO_ADDRESS_KEY) {
+        coords = currentBldg.split(',').map(Number); 
+    }
+    
+    if(coords && !isNaN(coords[0])) {
+        map.flyTo({ center: coords, zoom: 19, pitch: 60 });
+        setTimeout(() => { openClientCard(i); }, 1200);
+    } else {
+        openClientCard(i); 
+    }
 };
 
 let ctxBldg = null, ctxIdx = null;
@@ -512,7 +608,7 @@ document.addEventListener('mousedown', (e) => {
     if(e.target.id!=='smartSearch') document.getElementById('searchDropdown').style.display='none'; 
     const ctx = document.getElementById('contextMenu');
     if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) { ctx.style.display = 'none'; }
-    if(e.target.classList.contains('modal')){if(e.target.id==='clientModal')attemptCloseCrmModal();else if(e.target.id!=='customDialogModal') e.target.style.display='none';} 
+    if(e.target.classList.contains('modal')){if(e.target.id==='clientModal')attemptCloseCrmModal();else if(e.target.id!=='customDialogModal' && e.target.id!=='onboardingModal') e.target.style.display='none';} 
 });
 
 function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
@@ -742,6 +838,7 @@ window.bulkAddToBoardPrompt = async () => {
     }
 };
 
+// FIXED: Google Maps Routing Bug
 window.bulkRoute = () => {
     let waypoints = [];
     bulkSelection.forEach(v => {
@@ -751,22 +848,22 @@ window.bulkRoute = () => {
     if(waypoints.length === 0) { showToast("לא נבחרו משפחות עם כתובת תקינה!", "error"); return; }
     
     waypoints = [...new Set(waypoints)]; 
-    
     if(waypoints.length > 10) { showToast("מגבלת גוגל מפות היא 10 יעדים. ניקח את ה-10 הראשונים.", "warning"); waypoints = waypoints.slice(0,10); }
     
     let origin = '';
-    let chabadHouseBldg = Object.keys(db).find(k => db[k].info && db[k].info.coords && appSettings.chabadHouseCoords && Math.abs(db[k].info.coords[0]-appSettings.chabadHouseCoords[0])<0.001);
-    
-    if(chabadHouseBldg) {
-        origin = encodeURIComponent(chabadHouseBldg);
+    if(appSettings.homeLocation && appSettings.homeLocation.address) {
+        origin = encodeURIComponent(appSettings.homeLocation.address);
     } else {
         origin = waypoints.shift();
     }
     
     let destination = waypoints.length > 0 ? waypoints.pop() : origin; 
-    let wpStr = waypoints.length > 0 ? `&waypoints=${waypoints.join('|')}` : '';
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
     
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${wpStr}`;
+    if(waypoints.length > 0) {
+        url += `&waypoints=${waypoints.join('|')}`;
+    }
+    
     window.open(url, '_blank');
     clearBulkSelection();
 };
@@ -849,13 +946,6 @@ function refreshMap(filteredRes = null) {
     activeMarkers.forEach(m=>m.remove()); activeMarkers=[]; if(chabadHouseMarker) chabadHouseMarker.remove();
     let stats={}, total=0, urgent=0, alerts=[]; const today=new Date(), cMonth=today.getMonth();
     
-    if (appSettings.chabadHouseCoords) {
-        const el=document.createElement('div'); el.className='chabad-pin-wrapper';
-        el.innerHTML=`<div class="chabad-pin-container"><div class="chabad-pin-circle"><div class="chabad-pin-image"></div></div><div class="chabad-pin-arrow"></div></div>`;
-        chabadHouseMarker = new mapboxgl.Marker({element:el, anchor:'bottom'}).setLngLat(appSettings.chabadHouseCoords).addTo(map);
-        el.addEventListener('click', () => { const ch=Object.keys(db).find(k=>db[k].info && db[k].info.coords && Math.abs(db[k].info.coords[0]-appSettings.chabadHouseCoords[0])<0.001); if(ch){currentBldg=ch;openBuildingModal();} });
-    }
-
     Object.keys(db).forEach(k => {
         if(k === '__BOARDS__') return;
         let maxVal=0, showBldg=false;
@@ -872,11 +962,9 @@ function refreshMap(filteredRes = null) {
             });
         });
 
-        // CUSTOM MARKER LOGIC
         if(showBldg && db[k].apts.length>0 && k!==NO_ADDRESS_KEY) {
             let coords=db[k].info.coords||k.split(',').map(Number);
-            if(!isNaN(coords[0]) && !(appSettings.chabadHouseCoords && Math.abs(coords[0]-appSettings.chabadHouseCoords[0])<0.001 && Math.abs(coords[1]-appSettings.chabadHouseCoords[1])<0.001)) {
-                
+            if(!isNaN(coords[0])) {
                 const markerColors = ['#94a3b8','#10b981','#f59e0b','#ef4444'];
                 const bgColor = markerColors[maxVal];
                 
@@ -929,6 +1017,7 @@ function toggleMobileMenu(){document.getElementById('sidebar').classList.toggle(
 
 window.openSettings=()=>{
     document.getElementById('setThemeColor').value=appSettings.themeColor; document.getElementById('setDefaultView').value=appSettings.defaultView;
+    document.getElementById('setHomeIsChabad').checked = appSettings.homeLocation ? appSettings.homeLocation.isChabad : false;
     document.getElementById('settingsTagsList').innerHTML=appSettings.tags.map((t,i)=>`<span class="tag-bubble">${t} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.tags.splice(${i},1);openSettings()"></i></span>`).join('');
     document.getElementById('settingsCustomFieldsList').innerHTML=appSettings.customFields.map((f,i)=>`<span class="tag-bubble">${f} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.customFields.splice(${i},1);openSettings()"></i></span>`).join('');
     document.getElementById('settingsModal').style.display='flex';
@@ -936,7 +1025,23 @@ window.openSettings=()=>{
 window.updateThemePreview=()=>{appSettings.themeColor=document.getElementById('setThemeColor').value; document.documentElement.style.setProperty('--accent',appSettings.themeColor); if(map.getLayer('3d-buildings'))map.setPaintProperty('3d-buildings','fill-extrusion-color',['case',['boolean',['feature-state','hover'],false],appSettings.themeColor,'#d1d5db']);};
 window.addNewTag=async ()=>{const v=await showCustomDialog({title:'תגית חדשה', message:'שם התגית:', showInput:true}); if(v&&!appSettings.tags.includes(v)){appSettings.tags.push(v);openSettings();}};
 window.addNewCustomField=async ()=>{const v=await showCustomDialog({title:'שדה מותאם', message:'שם השדה:', showInput:true}); if(v&&!appSettings.customFields.includes(v)){appSettings.customFields.push(v);openSettings();}};
-window.saveSettingsAndClose=()=>{appSettings.defaultView=document.getElementById('setDefaultView').value; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns(); document.getElementById('settingsModal').style.display='none'; showToast('הגדרות נשמרו','success');};
+
+window.saveSettingsAndClose=()=>{
+    appSettings.defaultView=document.getElementById('setDefaultView').value; 
+    
+    if(tempSetHomeLoc) {
+        appSettings.homeLocation = { coords: tempSetHomeLoc.coords, address: tempSetHomeLoc.address, isChabad: document.getElementById('setHomeIsChabad').checked };
+    } else if(appSettings.homeLocation) {
+        appSettings.homeLocation.isChabad = document.getElementById('setHomeIsChabad').checked;
+    }
+    
+    localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); 
+    populateFilterDropdowns(); 
+    document.getElementById('settingsModal').style.display='none'; 
+    updateHomeButton();
+    showToast('הגדרות נשמרו','success');
+};
+
 window.setDefaultLocation=()=>{appSettings.center=[map.getCenter().lng,map.getCenter().lat]; appSettings.zoom=map.getZoom(); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); showToast("נשמר מיקום מפה","success");};
 
 window.exportTableToCSV = () => { let csv = "\uFEFFכתובת/בניין,שם משפחה,דירה,סגנון,פרויקטים,תגיות,קשר אחרון,טלפונים,מיילים,הערות\n"; Object.keys(db).forEach(b=>{ if(b==='__BOARDS__')return; db[b].apts.forEach(a=>{ let tags=(a.tags||[]).join(' - '), phones=getAllPhones(a).join(' - '), emails=getAllEmails(a).join(' - '), notes=(a.notes||'').replace(/,/g,' ').replace(/\n/g,' '); let last='-'; if(a.interactions&&a.interactions.length>0) last=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; let boardsStr = a.boards ? Object.entries(a.boards).map(([bid, st]) => `${db.__BOARDS__.find(x=>x.id===bid)?.name||''}:${st}`).join(' | ') : ''; csv += `${b===NO_ADDRESS_KEY?'ללא כתובת':b.replace(/,/g,'')},${(a.name||'').replace(/,/g,'')},${a.num||''},${a.style||''},${boardsStr},${tags},${last},${phones},${emails},${notes}\n`; })}); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = `קהילה_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("ייצוא הושלם!","success"); };

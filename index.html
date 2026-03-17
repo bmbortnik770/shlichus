@@ -19,7 +19,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -89,7 +89,7 @@
     <div class="quick-filters-bar">
         <div class="search-wrapper">
             <i class="fas fa-search"></i>
-            <input type="text" id="smartSearch" placeholder="חיפוש מהיר (שם, טלפון, רחוב)..." oninput="handleOmniSearch()" autocomplete="off">
+            <input type="text" id="smartSearch" placeholder="חיפוש מהיר (שם, טלפון, רחוב)..." autocomplete="off">
             <div id="searchDropdown"></div>
         </div>
         <select class="filter-select" id="fStyle" onchange="applyAdvFilters()"><option value="">כל הסגנונות</option></select>
@@ -101,6 +101,7 @@
         <div id="map"></div>
         <div class="map-custom-controls">
             <button class="map-ctrl-btn" onclick="toggleMapStyle()" title="החלף תצוגת לוויין/רחוב"><i class="fas fa-layer-group"></i></button>
+            <button class="map-ctrl-btn" id="btnGoHome" onclick="flyToHome()" title="חזור למיקום המרכזי" style="display:none; color:var(--accent); margin-top:8px;"><i class="fas fa-home" id="homeIconBtn"></i></button>
         </div>
     </div>
     
@@ -137,37 +138,29 @@
         </div>
 
         <div id="comm-content-area" style="flex-grow: 1; padding: 20px; overflow-y: auto; background: var(--surface); margin: 0 20px 20px 20px; border-radius: 0 0 8px 8px; border: 1px solid var(--border-light); box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-            
-            <div id="comm-whatsapp" class="comm-tab-content active">
-                <h3 style="margin-top:0;">שליחת וואטסאפ המוני (תפוצה)</h3>
-                <p style="color:var(--text-muted);">טוען נתונים...</p>
-            </div>
-            
-            <div id="comm-email" class="comm-tab-content">
-                <h3 style="margin-top:0;">מערך דיוור במייל</h3>
-                <p style="color:var(--text-muted);">טוען נתונים...</p>
-            </div>
-            
-            <div id="comm-phone" class="comm-tab-content">
-                <h3 style="margin-top:0;">רשימות חיוג (Call Center)</h3>
-                <p style="color:var(--text-muted);">טוען נתונים...</p>
-            </div>
-            
-            <div id="comm-templates" class="comm-tab-content">
-                <h3 style="margin-top:0;">ניהול תבניות</h3>
-                <p style="color:var(--text-muted);">טוען נתונים...</p>
-            </div>
-            
-            <div id="comm-logs" class="comm-tab-content">
-                <h3 style="margin-top:0;">היסטוריית תקשורת</h3>
-                <p style="color:var(--text-muted);">טוען נתונים...</p>
-            </div>
-
+            <div id="comm-whatsapp" class="comm-tab-content active"><h3 style="margin-top:0;">שליחת וואטסאפ המוני (תפוצה)</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
+            <div id="comm-email" class="comm-tab-content"><h3 style="margin-top:0;">מערך דיוור במייל</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
+            <div id="comm-phone" class="comm-tab-content"><h3 style="margin-top:0;">רשימות חיוג (Call Center)</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
+            <div id="comm-templates" class="comm-tab-content"><h3 style="margin-top:0;">ניהול תבניות</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
+            <div id="comm-logs" class="comm-tab-content"><h3 style="margin-top:0;">היסטוריית תקשורת</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
         </div>
     </div>
 </div>
 
 <button class="fab-add" onclick="quickAddFamily()" title="הוסף משפחה חדשה מהר"><i class="fas fa-plus"></i></button>
+
+<div id="onboardingModal" class="modal" style="z-index: 100000;">
+    <div class="modal-content modal-small" style="text-align:center;">
+        <h2 style="color:var(--accent); margin-top:0;"><i class="fas fa-hand-sparkles"></i> ברוך הבא למערכת!</h2>
+        <p style="margin-bottom: 20px; color:var(--text-muted);">כדי שנוכל להתחיל, מהו המיקום המרכזי (או בית החב"ד) שלך?</p>
+        <div id="onboardingGeocoderContainer" style="margin-bottom:15px; position:relative; z-index:3002; text-align:right;"></div>
+        <div style="display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom: 25px;">
+            <input type="checkbox" id="onboardingIsChabad" checked>
+            <label for="onboardingIsChabad" style="font-weight:600;">זהו בית חב"ד (הצג סמל 770)</label>
+        </div>
+        <button class="btn btn-primary" onclick="saveOnboardingLocation()" style="font-size:16px;">התחל לעבוד 🚀</button>
+    </div>
+</div>
 
 <div id="customDialogModal" class="modal" style="z-index: 100000;">
     <div class="modal-content">
@@ -218,7 +211,7 @@
             <div class="form-group"><label>קוד כניסה</label><input type="text" id="bModalCode"></div>
             <div class="form-group"><label>איש קשר בבניין</label><input type="text" id="bModalRep"></div>
             <div class="form-group"><label>הערות</label><textarea id="bModalNotes" rows="3"></textarea></div>
-            <div style="display:flex; gap:10px;"><button class="btn btn-primary" onclick="saveBldgModalInfo()"><i class="fas fa-save"></i> שמור</button><button class="btn btn-danger" style="width:auto; padding:10px 15px;" onclick="setThisBuildingAsChabad()"><i class="fas fa-place-of-worship"></i> קבע כ-770</button></div>
+            <div style="display:flex; gap:10px;"><button class="btn btn-primary" onclick="saveBldgModalInfo()"><i class="fas fa-save"></i> שמור</button></div>
         </div>
     </div>
 </div>
@@ -346,13 +339,22 @@
             <h2 style="margin:0; color:var(--primary);"><i class="fas fa-sliders-h"></i> הגדרות מערכת</h2>
             <button class="btn-icon" onclick="closeModals()" style="border:none; font-size:18px;"><i class="fas fa-times"></i></button>
         </div>
+        
+        <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
+            <h4 style="margin:0 0 10px 0;"><i class="fas fa-map-marker-alt"></i> מיקום מרכזי במפה (בית חב"ד)</h4>
+            <div id="settingsHomeGeocoderContainer" style="margin-bottom:10px; position:relative; z-index:3001; text-align:right;"></div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" id="setHomeIsChabad">
+                <label for="setHomeIsChabad" style="font-weight:600;">הצג אייקון של 770 על המפה</label>
+            </div>
+        </div>
+
         <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
             <h4 style="margin:0 0 10px 0;"><i class="fas fa-palette"></i> מראה ותצוגה</h4>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group"><label>צבע נושא</label><input type="color" id="setThemeColor" style="height:40px; padding:2px;" onchange="updateThemePreview()"></div>
                 <div class="form-group"><label>מסך פתיחה</label><select id="setDefaultView"><option value="map">מפה</option><option value="table">טבלה</option><option value="kanban">פרויקטים</option></select></div>
             </div>
-            <button class="btn btn-primary" style="padding:6px; font-size:13px;" onclick="setDefaultLocation()"><i class="fas fa-crosshairs"></i> שמור מיקום נוכחי במפה</button>
         </div>
         <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
             <h4 style="margin:0 0 10px 0;"><i class="fas fa-tags"></i> ניהול תגיות</h4>
@@ -372,6 +374,6 @@
     </div>
 </div>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
