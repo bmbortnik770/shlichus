@@ -95,6 +95,10 @@ const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/
 map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 map.addControl(new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'bottom-right');
 
+// FIXED: Clearer placeholder for map geocoder
+const geocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: '📍 חפש אזור/כתובת במפה...', countries: 'il', language: 'he' });
+document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
+
 window.onload = () => {
     let lastLogin = localStorage.getItem('last_login_date');
     let todayStr = new Date().toISOString().split('T')[0];
@@ -188,7 +192,6 @@ window.switchMainView = function(viewName) {
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
 };
 
-// NEW: Switch function for the Communication Hub sub-tabs
 window.switchCommTab = function(tabName) {
     document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
     document.getElementById('commTabBtn-' + tabName).classList.add('active');
@@ -487,6 +490,7 @@ document.addEventListener('mousedown', (e) => {
 function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
 window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
+/* --- CUSTOM MARKERS (BADGES) LOGIC --- */
 window.createNewBoard = async () => {
     const name = await showCustomDialog({ title: 'פרויקט חדש', message: 'הכנס שם לפרויקט החדש (למשל: רישום לקייטנה):', showInput: true });
     if(!name) return;
@@ -828,6 +832,8 @@ function refreshMap(filteredRes = null) {
     Object.keys(db).forEach(k => {
         if(k === '__BOARDS__') return;
         let maxVal=0, showBldg=false;
+        
+        // NEW CUSTOM MARKER LOGIC
         db[k].apts.forEach((a,i) => {
             total++; if(stats[a.style]!==undefined) stats[a.style]++; else {stats[a.style]=1; appSettings.styles.push(a.style);}
             const c=getStatusColor(a); if(c==='#ef4444'||c==='#94a3b8') urgent++; const v=c==='#10b981'?1:(c==='#f59e0b'?2:3); if(v>maxVal) maxVal=v;
@@ -839,13 +845,44 @@ function refreshMap(filteredRes = null) {
                 if(!t.done) alerts.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);"><span><i class="fas fa-tasks" style="color:var(--accent);"></i> משפ' ${a.name||''}: ${t.text}</span> <button title="סמן כבוצע" onclick="markTaskDoneFromDash('${encodeURIComponent(k)}', ${i}, ${tIdx})" style="background:var(--success); color:white; border:none; border-radius:4px; cursor:pointer; padding:2px 6px; transition:0.2s;"><i class="fas fa-check"></i></button></div>`); 
             });
         });
+
+        // Add Numbered Marker
         if(showBldg && db[k].apts.length>0 && k!==NO_ADDRESS_KEY) {
             let coords=db[k].info.coords||k.split(',').map(Number);
             if(!isNaN(coords[0]) && !(appSettings.chabadHouseCoords && Math.abs(coords[0]-appSettings.chabadHouseCoords[0])<0.001 && Math.abs(coords[1]-appSettings.chabadHouseCoords[1])<0.001)) {
-                activeMarkers.push(new mapboxgl.Marker({color:['#94a3b8','#10b981','#f59e0b','#ef4444'][maxVal]}).setLngLat(coords).addTo(map));
+                
+                const markerColors = ['#94a3b8','#10b981','#f59e0b','#ef4444'];
+                const bgColor = markerColors[maxVal];
+                
+                const el = document.createElement('div');
+                el.style.backgroundColor = bgColor;
+                el.style.width = '28px';
+                el.style.height = '28px';
+                el.style.borderRadius = '50%';
+                el.style.display = 'flex';
+                el.style.alignItems = 'center';
+                el.style.justifyContent = 'center';
+                el.style.color = 'white';
+                el.style.fontWeight = 'bold';
+                el.style.fontSize = '14px';
+                el.style.border = '2px solid white';
+                el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+                el.style.cursor = 'pointer';
+                el.innerText = db[k].apts.length; 
+
+                const marker = new mapboxgl.Marker({element: el}).setLngLat(coords).addTo(map);
+                
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation(); 
+                    currentBldg = k;
+                    openBuildingModal();
+                });
+
+                activeMarkers.push(marker);
             }
         }
     });
+    
     document.getElementById('kpiTotal').innerText=total; document.getElementById('kpiUrgent').innerText=urgent;
     const alDiv = document.getElementById('kpiAlerts'); alDiv.innerHTML='';
     if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding:0; list-style:none; font-weight:normal;">${alerts.slice(0,6).join('')}${alerts.length>6?'<li style="padding-top:5px; color:var(--text-muted);">ועוד...</li>':''}</ul></div>`;
