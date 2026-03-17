@@ -9,7 +9,7 @@ const NO_ADDRESS_KEY = "__NO_ADDRESS__";
 let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || { 
     center: [35.24430, 31.82650], zoom: 17.5, pitch: 60, chabadHouseCoords: null, themeColor: '#3b82f6', defaultView: 'map',
     tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: [],
-    goal: { text: 'שמואל תמיר', target: 30 }
+    goal: { text: 'חיפוש חופשי (רחוב/תגית)', target: 50 }
 };
 if(!appSettings.customFields) appSettings.customFields = [];
 if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי (רחוב/תגית)', target: 50 };
@@ -399,7 +399,11 @@ function processAddressSelection(t) {
     openClientCard(currentAptIdx); 
 }
 
-window.toggleAdvFilters = () => { const el=document.getElementById('advFilters'); el.style.display = el.style.display==='block'?'none':'block'; };
+window.toggleAdvFilters = () => { 
+    const el=document.getElementById('advFilters'); 
+    el.style.display = (el.style.display==='flex' || el.style.display==='block') ? 'none' : 'flex'; 
+};
+
 function populateFilterDropdowns() {
     document.getElementById('fStyle').innerHTML='<option value="">כל הסגנונות</option>'+appSettings.styles.map(x=>`<option value="${x}">${x}</option>`).join('');
     document.getElementById('fTag').innerHTML='<option value="">כל התגיות</option>'+appSettings.tags.map(x=>`<option value="${x}">${x}</option>`).join('');
@@ -419,13 +423,25 @@ window.handleOmniSearch = () => {
         let matchStat = !currentFilters.status || (currentFilters.status==='green'&&col==='#10b981') || (currentFilters.status==='orange'&&col==='#f59e0b') || (currentFilters.status==='red'&&(col==='#ef4444'||col==='#94a3b8'));
         if(matchQ && matchStyle && matchTag && matchStat) res.push({bldg:b, idx:i, apt:a});
     });});
-    if(q.length>=2 && res.length>0) { dd.style.display='block'; dd.innerHTML=res.slice(0,15).map(r=>`<div class="search-item" onclick="jumpToSearchResult('${encodeURIComponent(r.bldg)}',${r.idx})"><div class="search-item-title">${r.apt.name||'ללא שם'} <span style="font-size:12px;">(${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg})</span></div></div>`).join(''); } else { dd.style.display='none'; }
+    
+    if(q.length>=2 && res.length>0) { 
+        dd.style.display='block'; 
+        dd.innerHTML=res.slice(0,15).map(r=>`<div class="search-item" onclick="jumpToSearchResult('${encodeURIComponent(r.bldg)}',${r.idx})"><div class="search-item-title">${r.apt.name||'ללא שם'} <span style="font-size:12px;">(${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg})</span></div></div>`).join(''); 
+    } else { 
+        dd.style.display='none'; 
+    }
     
     refreshMap(res); 
     if(currentMainView==='table') renderListView(res);
     if(currentMainView==='kanban') renderKanbanView(res);
 };
-window.jumpToSearchResult = (b,i) => { document.getElementById('searchDropdown').style.display='none'; currentBldg=decodeURIComponent(b); openClientCard(i); };
+
+window.jumpToSearchResult = (b,i) => { 
+    document.getElementById('searchDropdown').style.display='none'; 
+    document.getElementById('smartSearch').value=''; 
+    currentBldg=decodeURIComponent(b); 
+    openClientCard(i); 
+};
 
 let ctxBldg = null, ctxIdx = null;
 window.showContextMenu = (e, b, i) => {
@@ -465,7 +481,6 @@ document.addEventListener('mousedown', (e) => {
 function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
 window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
-/* --- KANBAN HUB ARCHIVE & MANAGEMENT --- */
 window.createNewBoard = async () => {
     const name = await showCustomDialog({ title: 'פרויקט חדש', message: 'הכנס שם לפרויקט החדש (למשל: רישום לקייטנה):', showInput: true });
     if(!name) return;
@@ -565,7 +580,6 @@ window.dropCard = (e, stage) => {
     }
 };
 
-/* Bulk Actions */
 window.toggleAllBulk = (cb) => { const cbs=document.querySelectorAll('.bulk-cb'); cbs.forEach(c=>c.checked=cb.checked); updateBulkBar(); };
 window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
 window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); const sa=document.getElementById('bulkSelectAll'); if(sa) sa.checked=false; updateBulkBar(); };
@@ -593,7 +607,6 @@ window.bulkWhatsApp = async () => {
     clearBulkSelection(); 
 };
 
-// FIXED: Robust Email Bypass logic
 window.bulkEmail = async () => {
     let emails=[];
     bulkSelection.forEach(v=>{
@@ -605,28 +618,54 @@ window.bulkEmail = async () => {
     if(emails.length === 0) return showToast(`לא נמצאו כתובות מייל למשפחות שסומנו`, 'error');
 
     const template = await showCustomDialog({ title: 'שליחת מייל', message: `נמצאו ${emails.length} כתובות מייל.\nהקלד הודעה:\n(הערה: בשליחה המונית במייל יועתקו הכתובות ללוח לגיבוי)`, showInput: true, defaultValue: 'שלום רב,\n\n' });
-    if(template === null) return; // User canceled
+    if(template === null) return; 
     
     let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent('הודעה מבית חב"ד')}&body=${encodeURIComponent(template)}`;
     
-    // Safe clipboard fallback
+    let copied = false;
     try {
         if(navigator.clipboard) {
             await navigator.clipboard.writeText(emails.join(', '));
+            copied = true;
         }
-    } catch(e) {
-        console.log('Clipboard access denied, proceeding to mail client.');
-    }
+    } catch(e) { console.log('Clipboard blocked'); }
     
-    // Robust trigger to bypass popup blockers
     const link = document.createElement('a');
     link.href = mailtoLink;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
-    showToast(`תוכנת המייל אמורה להיפתח כעת`, 'success');
+    if(copied) {
+        showToast(`נפתחה תוכנת המייל (הכתובות הועתקו ללוח)`, 'success');
+    } else {
+        showCustomDialog({
+            title: 'גיבוי כתובות מייל',
+            message: 'הדפדפן חסם העתקה אוטומטית. אם תוכנת המייל לא נפתחה, הנה הכתובות להעתקה ידנית:',
+            showInput: true,
+            defaultValue: emails.join(', '),
+            showCancel: false
+        });
+    }
     clearBulkSelection();
+};
+
+// NEW: Phone bulk action function
+window.bulkPhone = () => {
+    let p=[]; 
+    bulkSelection.forEach(v=>{
+        let [b,i]=v.split('|'); let a=db[b].apts[i]; 
+        let phones = getAllPhones(a);
+        if(phones.length > 0) p.push(phones[0].replace(/\D/g,'')); 
+    }); 
+    if(p.length>0) { 
+        window.open(`tel:${p[0]}`, '_self'); 
+        if(p.length > 1) showToast(`נפתח חייגן לנמען הראשון. רשימת החיוג תנוהל במרכז התקשורת בקרוב.`, 'warning');
+        else showToast(`מחייג...`, 'success');
+    } else {
+        showToast(`לא נמצאו מספרים למשפחות שסומנו`, 'error');
+    }
+    clearBulkSelection(); 
 };
 
 window.bulkAddTagPrompt = async () => { 

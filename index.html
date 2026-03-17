@@ -19,7 +19,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=1">
+    <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
@@ -69,19 +69,6 @@
     
     <div id="kpiAlerts"></div>
     <div id="geocoder"></div>
-    
-    <div class="stat-card" style="z-index:2000;">
-        <div style="display:flex; gap:5px;">
-            <input type="text" class="inline-input" id="smartSearch" style="border:none; box-shadow:none; background:var(--surface);" placeholder="חיפוש גלובאלי..." oninput="handleOmniSearch()">
-            <button class="btn-icon" onclick="toggleAdvFilters()" title="סינון מתקדם"><i class="fas fa-filter"></i></button>
-        </div>
-        <div id="searchDropdown"></div>
-        <div id="advFilters">
-            <select class="filter-select" id="fStyle" onchange="applyAdvFilters()"><option value="">כל הסגנונות</option></select>
-            <select class="filter-select" id="fTag" onchange="applyAdvFilters()"><option value="">כל התגיות</option></select>
-            <select class="filter-select" id="fStatus" onchange="applyAdvFilters()"><option value="">כל הסטטוסים</option><option value="green">קשר טרי (ירוק)</option><option value="orange">קשר בינוני (כתום)</option><option value="red">לטיפול (אדום/אפור)</option></select>
-        </div>
-    </div>
 
     <div class="stat-card">
         <h4 style="margin:0 0 10px 0; color:var(--text-main);"><i class="fas fa-chart-pie" style="margin-left:5px;"></i> התפלגות קהילה</h4>
@@ -96,6 +83,17 @@
             <div class="main-tab" onclick="switchMainView('table')" id="tab-table"><i class="fas fa-list"></i> רשימה</div>
             <div class="main-tab" onclick="switchMainView('kanban')" id="tab-kanban"><i class="fas fa-project-diagram"></i> פרויקטים</div>
         </div>
+    </div>
+
+    <div class="quick-filters-bar">
+        <div class="search-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" id="smartSearch" placeholder="חיפוש מהיר (שם, טלפון, רחוב)..." oninput="handleOmniSearch()" autocomplete="off">
+            <div id="searchDropdown"></div>
+        </div>
+        <select class="filter-select" id="fStyle" onchange="applyAdvFilters()"><option value="">כל הסגנונות</option></select>
+        <select class="filter-select" id="fTag" onchange="applyAdvFilters()"><option value="">כל התגיות</option></select>
+        <select class="filter-select" id="fStatus" onchange="applyAdvFilters()"><option value="">כל הסטטוסים</option><option value="green">קשר טרי (ירוק)</option><option value="orange">קשר בינוני (כתום)</option><option value="red">לטיפול (אדום/אפור)</option></select>
     </div>
 
     <div id="map-container">
@@ -147,6 +145,7 @@
     <span id="bulkCount">0 סומנו</span>
     <button class="bulk-btn" onclick="bulkWhatsApp()"><i class="fab fa-whatsapp"></i> וואטסאפ</button>
     <button class="bulk-btn" style="background:#ea4335;" onclick="bulkEmail()"><i class="fas fa-envelope"></i> מייל</button>
+    <button class="bulk-btn" style="background:#10b981;" onclick="bulkPhone()"><i class="fas fa-phone"></i> טלפון</button>
     <button class="bulk-btn" style="background:var(--success); color:white;" onclick="bulkRoute()"><i class="fas fa-route"></i> נווט מסלול</button>
     <button class="bulk-btn" onclick="bulkAddTagPrompt()"><i class="fas fa-tag"></i> תגית</button>
     <button class="bulk-btn" onclick="bulkAddToBoardPrompt()"><i class="fas fa-project-diagram"></i> צרף לפרויקט</button>
@@ -325,6 +324,6 @@
     </div>
 </div>
 
-<script src="app.js?v=1"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
