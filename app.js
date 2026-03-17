@@ -1,3 +1,13 @@
+function getStoredJSON(key, defaultVal) {
+    try {
+        let val = localStorage.getItem(key);
+        return val ? JSON.parse(val) : defaultVal;
+    } catch (e) {
+        console.error("Storage parse error:", e);
+        return defaultVal;
+    }
+}
+
 const CLIENT_ID = '348261974014-242r9b0dvctlka7rj3aetu81v96ere46.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 let accessToken = null, driveFileId = null;
@@ -24,7 +34,7 @@ if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי', target
 document.documentElement.style.setProperty('--accent', appSettings.themeColor);
 let currentMainView = appSettings.defaultView || 'map';
 
-let db = JSON.parse(localStorage.getItem('community_data_final')) || {};
+let db = getStoredJSON('community_data_final', {});
 if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
 
 if(!db['__BOARDS__']) {
@@ -379,11 +389,11 @@ window.openClientCard = function(idx) {
 
     tempTags=[...(a.tags||[])]; renderModalTags();
     tempChildren=JSON.parse(JSON.stringify(a.childrenList||[])); renderModalChildren();
-    tempLogs=[...(a.interactions||[])]; renderLogs();
-    tempDonations=[...(a.donations||[])]; renderDonations();
-    tempTasks=[...(a.tasks||[])]; renderTasks();
-    tempCustom={...(a.customFields||{})}; renderCustomFields();
-    tempBoards={...(a.boards||{})}; renderModalBoards();
+    tempLogs=JSON.parse(JSON.stringify(a.interactions||[])); renderLogs();
+    tempDonations=JSON.parse(JSON.stringify(a.donations||[])); renderDonations();
+    tempTasks=JSON.parse(JSON.stringify(a.tasks||[])); renderTasks();
+    tempCustom=JSON.parse(JSON.stringify(a.customFields||{})); renderCustomFields();
+    tempBoards=JSON.parse(JSON.stringify(a.boards||{})); renderModalBoards();
     
     const tStr = new Date().toISOString().split('T')[0];
     document.getElementById('newLogDate').value = tStr; 
@@ -612,7 +622,7 @@ window.ctxDelete = () => {
 };
 
 // תיקון באג קליק מחוץ לרשימה שסגר אותה מוקדם מדי
-document.addEventListener('mousedown', (e) => { 
+document.addEventListener('click', (e) => { 
     const searchBox = document.getElementById('smartSearch');
     const dropDown = document.getElementById('searchDropdown');
     
@@ -744,8 +754,10 @@ window.bulkWhatsApp = async () => {
         let [b,i]=v.split('|'); let a=db[b].apts[i]; 
         let phones = getAllPhones(a);
         if(phones.length > 0) {
+            let cleanPhone = phones[0].replace(/\D/g,'');
+            if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
             let personalizedText = template.replace(/\[שם\]/g, a.name || '');
-            p.push({phone: phones[0].replace(/\D/g,''), text: encodeURIComponent(personalizedText)});
+            p.push({phone: cleanPhone, text: encodeURIComponent(personalizedText)});
         }
     }); 
     if(p.length>0) { 
