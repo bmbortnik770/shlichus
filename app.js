@@ -572,7 +572,7 @@ window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEac
 
 window.bulkWhatsApp = async () => { 
     const template = await showCustomDialog({ title: 'הודעת וואטסאפ', message: 'הקלד הודעה:\n(השתמש במילה [שם] כדי לשתול את שם המשפחה אוטומטית)', showInput: true, defaultValue: 'שלום משפחת [שם], ' });
-    if(!template) return;
+    if(template === null) return;
     
     let p=[]; 
     bulkSelection.forEach(v=>{
@@ -593,7 +593,7 @@ window.bulkWhatsApp = async () => {
     clearBulkSelection(); 
 };
 
-// FIXED: Email logic using window.location.href
+// FIXED: Robust Email Bypass logic
 window.bulkEmail = async () => {
     let emails=[];
     bulkSelection.forEach(v=>{
@@ -604,18 +604,28 @@ window.bulkEmail = async () => {
     
     if(emails.length === 0) return showToast(`לא נמצאו כתובות מייל למשפחות שסומנו`, 'error');
 
-    const template = await showCustomDialog({ title: 'שליחת מייל', message: `נמצאו ${emails.length} כתובות מייל.\nהקלד הודעה:\n(בגלל שזו שליחה המונית במייל, המערכת תעתיק את הכתובות ללוח לגיבוי)`, showInput: true, defaultValue: 'שלום רב,\n\n' });
-    if(!template) return;
+    const template = await showCustomDialog({ title: 'שליחת מייל', message: `נמצאו ${emails.length} כתובות מייל.\nהקלד הודעה:\n(הערה: בשליחה המונית במייל יועתקו הכתובות ללוח לגיבוי)`, showInput: true, defaultValue: 'שלום רב,\n\n' });
+    if(template === null) return; // User canceled
     
     let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent('הודעה מבית חב"ד')}&body=${encodeURIComponent(template)}`;
     
-    // Copy to clipboard as fallback
-    navigator.clipboard.writeText(emails.join(', '));
+    // Safe clipboard fallback
+    try {
+        if(navigator.clipboard) {
+            await navigator.clipboard.writeText(emails.join(', '));
+        }
+    } catch(e) {
+        console.log('Clipboard access denied, proceeding to mail client.');
+    }
     
-    // Bypass popup blockers
-    window.location.href = mailtoLink;
+    // Robust trigger to bypass popup blockers
+    const link = document.createElement('a');
+    link.href = mailtoLink;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     
-    showToast(`נפתחה תוכנת המייל (הכתובות גם הועתקו ללוח)`, 'success');
+    showToast(`תוכנת המייל אמורה להיפתח כעת`, 'success');
     clearBulkSelection();
 };
 
@@ -657,7 +667,6 @@ window.bulkAddToBoardPrompt = async () => {
     }
 };
 
-// FIXED: Google Maps Directions URL (using actual building strings instead of lat/lng)
 window.bulkRoute = () => {
     let waypoints = [];
     bulkSelection.forEach(v => {
@@ -666,7 +675,7 @@ window.bulkRoute = () => {
     });
     if(waypoints.length === 0) { showToast("לא נבחרו משפחות עם כתובת תקינה!", "error"); return; }
     
-    waypoints = [...new Set(waypoints)]; // Remove duplicates
+    waypoints = [...new Set(waypoints)]; 
     
     if(waypoints.length > 10) { showToast("מגבלת גוגל מפות היא 10 יעדים. ניקח את ה-10 הראשונים.", "warning"); waypoints = waypoints.slice(0,10); }
     
