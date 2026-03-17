@@ -114,7 +114,6 @@
         .data-table { width:100%; border-collapse:collapse; text-align:right; direction:rtl; background:var(--surface); color:var(--text-main); min-width: 800px; }
         .data-table th, .data-table td { padding:12px; border-bottom:1px solid var(--border-light); font-size:14px; white-space: nowrap;}
         .data-table th { background-color:var(--primary); color:white; position:sticky; top:0; z-index:1; font-weight:600; }
-        /* NEW: Added cursor pointer to rows to indicate clickability */
         .data-table tr { cursor: pointer; transition: background 0.2s; }
         .data-table tr:hover td { background-color:var(--table-hover); }
         .status-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-left:6px; }
@@ -578,7 +577,6 @@
     window.saveBldgModalInfo = () => ensureAuthAndExecute(() => { db[currentBldg].info.code=document.getElementById('bModalCode').value; db[currentBldg].info.rep=document.getElementById('bModalRep').value; db[currentBldg].info.notes=document.getElementById('bModalNotes').value; saveDB(); showToast("נשמר " + getRandomCompliment(),"success"); });
     window.setThisBuildingAsChabad = () => { if(confirm("לקבוע כבית חב''ד?")) { const c = db[currentBldg].info.coords; if(c) { appSettings.chabadHouseCoords=c; localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); handleOmniSearch(); showToast("ננעץ!","success"); } } };
 
-    // --- NEW: Smart Save Button UI ---
     window.markDirty = () => { 
         isDirty = true; 
         const btn = document.getElementById('saveClientBtn');
@@ -619,7 +617,12 @@
         document.getElementById('newLogDate').valueAsDate=new Date(); document.getElementById('newDonDate').valueAsDate=new Date(); document.getElementById('newTaskDate').valueAsDate=new Date();
         switchCrmTab('details'); document.getElementById('clientModal').style.display='flex';
     };
-    window.switchCrmTab = (tab) => { document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`tabBtn-${tab}`).classList.add('active'); document.getElementById(`crm-${tab}`).classList.add('active'); };
+    
+    window.switchCrmTab = (tab) => { 
+        document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content').forEach(e=>e.classList.remove('active')); 
+        document.getElementById(`tabBtn-${tab}`).classList.add('active'); 
+        document.getElementById(`crm-${tab}`).classList.add('active'); 
+    };
 
     window.renderModalBoards = () => {
         const c = document.getElementById('cBoardsList'); c.innerHTML = '';
@@ -721,16 +724,35 @@
         if(currentMainView==='kanban') renderKanbanView(res);
     };
     window.jumpToSearchResult = (b,i) => { document.getElementById('searchDropdown').style.display='none'; currentBldg=decodeURIComponent(b); openClientCard(i); };
-    
-    // --- FIXED: Context Menu Close Logic ---
+
+    // --- CONTEXT MENU LOGIC ---
+    let ctxBldg = null, ctxIdx = null;
+    window.showContextMenu = (e, b, i) => {
+        e.preventDefault();
+        ctxBldg = decodeURIComponent(b);
+        ctxIdx = i;
+        const m = document.getElementById('contextMenu');
+        m.style.display = 'block';
+        m.style.left = e.pageX + 'px';
+        m.style.top = e.pageY + 'px';
+    };
+    window.ctxEdit = () => { currentBldg = ctxBldg; document.getElementById('contextMenu').style.display='none'; openClientCard(ctxIdx); };
+    window.ctxMove = () => { currentBldg = ctxBldg; currentAptIdx = ctxIdx; document.getElementById('contextMenu').style.display='none'; openAddressSearch(true); };
+    window.ctxDelete = () => { 
+        document.getElementById('contextMenu').style.display='none'; 
+        if(confirm("בטוח שתרצה למחוק משפחה זו?")) { 
+            ensureAuthAndExecute(() => { 
+                db[ctxBldg].apts.splice(ctxIdx, 1); 
+                saveDB(); 
+                showToast("המשפחה נמחקה בהצלחה", "success"); 
+            }); 
+        } 
+    };
+
     document.addEventListener('mousedown', (e) => { 
         if(e.target.id!=='smartSearch') document.getElementById('searchDropdown').style.display='none'; 
-        
         const ctx = document.getElementById('contextMenu');
-        if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) {
-            ctx.style.display = 'none';
-        }
-
+        if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) { ctx.style.display = 'none'; }
         if(e.target.classList.contains('modal')){if(e.target.id==='clientModal')attemptCloseCrmModal();else e.target.style.display='none';} 
     });
 
@@ -828,28 +850,41 @@
         clearBulkSelection();
     };
 
-    // --- CONTEXT MENU LOGIC (RESTORED) ---
-    let ctxBldg = null, ctxIdx = null;
-    window.showContextMenu = (e, b, i) => {
-        e.preventDefault();
-        ctxBldg = decodeURIComponent(b);
-        ctxIdx = i;
-        const m = document.getElementById('contextMenu');
-        m.style.display = 'block';
-        m.style.left = e.pageX + 'px';
-        m.style.top = e.pageY + 'px';
-    };
-    window.ctxEdit = () => { currentBldg = ctxBldg; document.getElementById('contextMenu').style.display='none'; openClientCard(ctxIdx); };
-    window.ctxMove = () => { currentBldg = ctxBldg; currentAptIdx = ctxIdx; document.getElementById('contextMenu').style.display='none'; openAddressSearch(true); };
-    window.ctxDelete = () => { 
-        document.getElementById('contextMenu').style.display='none'; 
-        if(confirm("בטוח שתרצה למחוק משפחה זו?")) { 
-            ensureAuthAndExecute(() => { 
-                db[ctxBldg].apts.splice(ctxIdx, 1); 
-                saveDB(); 
-                showToast("המשפחה נמחקה בהצלחה", "success"); 
-            }); 
-        } 
+    // --- TABLE VIEW ---
+    window.renderListView = (filteredRes = null) => {
+        const c=document.getElementById('list-container');
+        let html=`<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%; padding: 0 20px; box-sizing: border-box;">
+            <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
+            </div>
+        </div>
+        <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 20px; padding-right: 20px; box-sizing: border-box;">
+        <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים</th></tr></thead><tbody>`;
+        
+        let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__')db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
+        arr.forEach(r => {
+            const enc=encodeURIComponent(r.bldg), bName=r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg, a=r.apt;
+            let lastDate='-'; if(a.interactions&&a.interactions.length>0) lastDate=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date;
+            
+            let boardsHtml = '-';
+            if(a.boards && Object.keys(a.boards).length > 0) {
+                boardsHtml = Object.entries(a.boards).map(([bid, status]) => {
+                    const bObj = db.__BOARDS__.find(x => x.id === bid);
+                    return bObj ? `<span class="board-badge">${bObj.name}: ${status}</span>` : '';
+                }).join(' ');
+            }
+
+            html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
+                <td data-label="בחר" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" value="${r.bldg}|${r.idx}" onchange="updateBulkBar()"></td>
+                <td data-label="כתובת" onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${bName}</td>
+                <td data-label="משפחה"><b>${a.name||'(ללא שם)'}</b></td><td data-label="פרויקטים">${boardsHtml}</td>
+                <td data-label="תגיות">${(a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('')}</td>
+                <td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>
+                <td data-label="טלפונים" onclick="event.stopPropagation()">${(a.phones||'').split(',').map(p=>`<a class="phone-link" href="https://wa.me/972${p.replace(/\D/g,'').replace(/^0/,'')}?text=שלום" target="_blank"><i class="fab fa-whatsapp"></i> ${p}</a>`).join(' ')}</td>
+            </tr>`;
+        });
+        c.innerHTML = html + `</tbody></table></div>`;
     };
 
     // --- GAMIFICATION: GOAL TRACKER LOGIC ---
@@ -926,6 +961,13 @@
         
         updateGoalTracker(); 
     }
+
+    window.markTaskDoneFromDash = (bldgEnc, aptIdx, taskIdx) => { 
+        const bldg = decodeURIComponent(bldgEnc); 
+        db[bldg].apts[aptIdx].tasks[taskIdx].done = true; 
+        saveDB(); 
+        showToast("המשימה הושלמה! " + getRandomCompliment(), "success"); 
+    };
 
     window.toggleDarkMode=() => {document.body.classList.toggle('dark-mode');localStorage.setItem('darkMode',document.body.classList.contains('dark-mode'));document.getElementById('darkModeIcon').className=document.body.classList.contains('dark-mode')?'fas fa-sun':'fas fa-moon';if(chart)refreshMap();};
     function toggleMobileMenu(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open');}
