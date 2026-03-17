@@ -75,11 +75,11 @@
         @keyframes slideUpModal { from{transform:translateY(30px);opacity:0;} to{transform:translateY(0);opacity:1;} }
         .modal { display:none; position:fixed; z-index:10000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(2px); align-items:center; justify-content:center; }
         
-        /* FIXED: Modal Content overflow restored to auto to prevent bleeding */
-        .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:85vh; overflow-y:auto; border:1px solid var(--border-light); animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        /* FIXED: Changed overflow-y back to auto so the family card doesn't bleed out */
+        .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:90vh; overflow-y:auto; border:1px solid var(--border-light); animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .modal-small { width:400px; }
 
-        #customDialogModal .modal-content { width: 420px; text-align: center; border-radius: 20px; padding: 30px; }
+        #customDialogModal .modal-content { width: 420px; text-align: center; border-radius: 20px; padding: 30px; overflow-y:visible; }
         #cdTitle { color: var(--accent); margin-top: 0; font-size: 22px; }
         #cdMessage { color: var(--text-main); font-size: 16px; margin-bottom: 25px; line-height: 1.5; white-space: pre-wrap;}
         #cdInput { margin-bottom: 25px; text-align: center; font-size: 16px; padding: 12px; border-radius: 8px; border: 2px solid var(--border-light); width: 90%; }
@@ -943,6 +943,7 @@
     function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
     window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
+    /* --- KANBAN HUB ARCHIVE & MANAGEMENT --- */
     window.createNewBoard = async () => {
         const name = await showCustomDialog({ title: 'פרויקט חדש', message: 'הכנס שם לפרויקט החדש (למשל: רישום לקייטנה):', showInput: true });
         if(!name) return;
@@ -998,9 +999,11 @@
                  <button class="btn-icon" onclick="toggleBoardArchive('${activeBoard.id}')" title="שחזר פרויקט"><i class="fas fa-unlock"></i> שחזר</button> 
                  <button class="btn-icon" style="color:var(--danger);" onclick="deleteBoard('${activeBoard.id}')" title="מחק פרויקט"><i class="fas fa-trash"></i></button>`;
         } else {
+             // FIXED: Delete button available on active boards too
              actionsSpan.innerHTML = `
                  <button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות</button> 
-                 <button class="btn-icon" onclick="toggleBoardArchive('${activeBoard.id}')" title="נעל והעבר לארכיון"><i class="fas fa-archive"></i> לארכיון</button>`;
+                 <button class="btn-icon" onclick="toggleBoardArchive('${activeBoard.id}')" title="נעל והעבר לארכיון"><i class="fas fa-archive"></i> לארכיון</button>
+                 <button class="btn-icon" style="color:var(--danger);" onclick="deleteBoard('${activeBoard.id}')" title="מחק פרויקט"><i class="fas fa-trash"></i></button>`;
         }
 
         const c = document.getElementById('kanban-board-scroll'); c.innerHTML = '';
@@ -1046,7 +1049,6 @@
     window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
     window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); const sa=document.getElementById('bulkSelectAll'); if(sa) sa.checked=false; updateBulkBar(); };
     
-    // NEW: WhatsApp Personalization
     window.bulkWhatsApp = async () => { 
         const template = await showCustomDialog({ title: 'הודעת וואטסאפ', message: 'הקלד הודעה:\n(השתמש במילה [שם] כדי לשתול את שם המשפחה אוטומטית)', showInput: true, defaultValue: 'שלום משפחת [שם], ' });
         if(!template) return;
@@ -1070,7 +1072,6 @@
         clearBulkSelection(); 
     };
 
-    // NEW: Email Personalization (BCC)
     window.bulkEmail = async () => {
         const template = await showCustomDialog({ title: 'שליחת מייל', message: 'הקלד הודעה:\n(הערה: בשליחה המונית במייל לא ניתן לשתול את ה-[שם] אישית לכל אחד)', showInput: true, defaultValue: 'שלום רב,\n\n' });
         if(!template) return;
@@ -1129,7 +1130,6 @@
         }
     };
 
-    // FIXED: Google Maps Routing URL API
     window.bulkRoute = () => {
         let waypoints = [];
         bulkSelection.forEach(v => {
@@ -1143,7 +1143,7 @@
         let destination = waypoints.pop(); 
         let wpStr = waypoints.length > 0 ? `&waypoints=${waypoints.join('|')}` : '';
         
-        window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${wpStr}`, '_blank');
+        window.open(`http://googleusercontent.com/maps.google.com/maps?dirflg=d&saddr=${origin}&daddr=${destination}${wpStr}`, '_blank');
         clearBulkSelection();
     };
 
@@ -1185,6 +1185,40 @@
             </tr>`;
         });
         inner.innerHTML = html + `</tbody></table></div>`;
+    };
+
+    window.editGoal = async () => {
+        let targetText = await showCustomDialog({ title: 'הגדרת יעד', message: 'מה המטרה שלך? (למשל שם רחוב, או תגית)', showInput: true, defaultValue: appSettings.goal.text });
+        if(!targetText) return;
+        let targetNum = await showCustomDialog({ title: 'הגדרת יעד', message: 'לכמה משפחות תרצה להגיע ביעד הזה?', showInput: true, defaultValue: appSettings.goal.target.toString() });
+        if(targetNum && !isNaN(targetNum) && Number(targetNum) > 0) {
+            appSettings.goal = { text: targetText, target: Number(targetNum) };
+            localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+            updateGoalTracker();
+            showToast("היעד עודכן! יוצאים לדרך 🚀", "success");
+        }
+    };
+
+    window.updateGoalTracker = () => {
+        let count = 0;
+        let q = appSettings.goal.text.toLowerCase();
+        Object.keys(db).forEach(b => {
+            if(b === '__BOARDS__') return;
+            db[b].apts.forEach(a => {
+                let txt=`${b} ${a.name} ${(a.tags||[]).join(' ')}`.toLowerCase();
+                if(txt.includes(q)) count++;
+            });
+        });
+        
+        let pct = Math.min(100, Math.round((count / appSettings.goal.target) * 100));
+        document.getElementById('goalText').innerText = `יעד: ${appSettings.goal.target} משפחות (${appSettings.goal.text})`;
+        document.getElementById('goalStats').innerText = `${count} מתוך ${appSettings.goal.target} (${pct}%)`;
+        
+        let bar = document.getElementById('goalProgressBar');
+        bar.style.width = pct + '%';
+        if(pct < 30) { bar.style.background = 'var(--danger)'; bar.style.boxShadow = 'none'; }
+        else if(pct < 100) { bar.style.background = 'var(--warning)'; bar.style.boxShadow = 'none'; }
+        else { bar.style.background = '#ffd700'; bar.style.boxShadow = '0 0 10px rgba(255,215,0,0.8)'; }
     };
 
     function refreshMap(filteredRes = null) {
