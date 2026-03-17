@@ -79,7 +79,7 @@
 
         #customDialogModal .modal-content { width: 420px; text-align: center; border-radius: 20px; padding: 30px; }
         #cdTitle { color: var(--accent); margin-top: 0; font-size: 22px; }
-        #cdMessage { color: var(--text-main); font-size: 16px; margin-bottom: 25px; line-height: 1.5; }
+        #cdMessage { color: var(--text-main); font-size: 16px; margin-bottom: 25px; line-height: 1.5; white-space: pre-wrap;}
         #cdInput { margin-bottom: 25px; text-align: center; font-size: 16px; padding: 12px; border-radius: 8px; border: 2px solid var(--border-light); width: 90%; }
         #cdInput:focus { border-color: var(--accent); outline: none; }
         .dialog-btns { display: flex; gap: 15px; justify-content: center; }
@@ -149,6 +149,8 @@
         #toast-container { position:fixed; bottom:20px; left:20px; z-index:99999; display:flex; flex-direction:column; gap:10px; pointer-events: none; }
         .toast { padding:12px 20px; border-radius:8px; color:white; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:'Assistant'; font-weight:600; display:flex; align-items:center; gap:10px; animation:slideIn 0.3s ease-out forwards; opacity:0; transform:translateX(-50px); pointer-events: auto; }
         .toast-success { background:var(--success); } .toast-error { background:var(--danger); } .toast-info { background:var(--accent); }
+        .undo-btn { background:rgba(255,255,255,0.2); border:1px solid white; color:white; border-radius:4px; cursor:pointer; padding:2px 8px; margin-right:15px; font-family:'Assistant'; font-weight:bold; transition:0.2s;}
+        .undo-btn:hover { background:rgba(255,255,255,0.4); }
         @keyframes slideIn { to{opacity:1;transform:translateX(0);} }
 
         @media (max-width: 768px) {
@@ -259,7 +261,7 @@
             <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
                 <h2 style="margin:0;"><i class="fas fa-columns"></i> לוחות פרויקטים</h2>
                 <select id="activeKanbanBoard" onchange="renderKanbanView()" class="inline-input" style="width:250px; font-weight:bold;"></select>
-                <span id="kanbanBoardActions" style="display:flex; gap:5px;"></span>
+                <span id="kanbanBoardActions" style="display:flex; gap:5px; align-items:center;"></span>
             </div>
             <button class="btn btn-primary" style="width:auto; padding:8px 15px;" onclick="createNewBoard()"><i class="fas fa-plus"></i> לוח חדש</button>
         </div>
@@ -267,7 +269,7 @@
     </div>
 </div>
 
-<button class="fab-add" onclick="openAddressSearch()" title="הוסף משפחה חדשה"><i class="fas fa-plus"></i></button>
+<button class="fab-add" onclick="quickAddFamily()" title="הוסף משפחה חדשה מהר"><i class="fas fa-plus"></i></button>
 
 <div id="customDialogModal" class="modal" style="z-index: 100000;">
     <div class="modal-content">
@@ -283,7 +285,7 @@
 
 <div id="contextMenu">
     <div class="context-item" onclick="ctxEdit()"><i class="fas fa-pen"></i> ערוך פרטים</div>
-    <div class="context-item" onclick="ctxMove()"><i class="fas fa-truck"></i> שנה כתובת</div>
+    <div class="context-item" onclick="ctxMove()"><i class="fas fa-map-marker-alt"></i> שנה כתובת</div>
     <div style="height:1px; background:var(--border-light); margin:5px 0;"></div>
     <div class="context-item" style="color:var(--danger);" onclick="ctxDelete()"><i class="fas fa-trash"></i> מחק משפחה</div>
 </div>
@@ -310,7 +312,7 @@
         </div>
         <div id="bldgTab-apts" class="crm-tab-content active">
             <div id="bldgModalAptsList" style="max-height:350px; overflow-y:auto; padding-left:5px; margin-bottom:15px;"></div>
-            <button class="btn btn-success" onclick="quickAddAptModal()"><i class="fas fa-plus"></i> הוסף משפחה חדשה</button>
+            <button class="btn btn-success" onclick="quickAddAptModal()"><i class="fas fa-plus"></i> הוסף משפחה לבניין</button>
         </div>
         <div id="bldgTab-info" class="crm-tab-content">
             <div class="form-group"><label>קוד כניסה</label><input type="text" id="bModalCode"></div>
@@ -335,6 +337,14 @@
         </div>
 
         <div id="crm-details" class="crm-tab-content active">
+            <div class="form-group" style="background:var(--table-hover); padding:10px; border-radius:8px; margin-bottom:15px;">
+                <label style="color:var(--primary);"><i class="fas fa-map-marker-alt"></i> כתובת במפה</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="cAddressDisplay" disabled class="inline-input" style="background:transparent; font-weight:bold; color:var(--text-main);">
+                    <button class="btn btn-outline" style="width:auto; padding:6px 12px; background:white;" onclick="pendingMoveMode=true; document.getElementById('addressSearchModal').style.display='flex';"><i class="fas fa-map-marker-alt"></i> ערוך כתובת</button>
+                </div>
+            </div>
+
             <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
                 <div class="form-group"><label>שם משפחה</label><input type="text" id="cFamilyName" placeholder="הקלד כאן..." oninput="markDirty()"></div>
                 <div class="form-group"><label>מס' דירה</label><input type="text" id="cAptNum" placeholder="הקלד..." oninput="markDirty()"></div>
@@ -410,11 +420,14 @@
 <div id="addressSearchModal" class="modal">
     <div class="modal-content modal-small">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:15px;">
-            <h3 style="margin:0; color:var(--primary);"><i class="fas fa-map-marker-alt"></i> הוספת משפחה</h3>
+            <h3 style="margin:0; color:var(--primary);"><i class="fas fa-map-marker-alt"></i> בחירת כתובת</h3>
             <button class="btn-icon" onclick="closeModals()" style="border:none; font-size:18px;"><i class="fas fa-times"></i></button>
         </div>
         <div id="modalGeocoderContainer" style="margin-bottom:15px; position:relative; z-index:3000; text-align:right;"></div>
-        <div style="display:flex; gap:10px;"><button class="btn btn-warning" onclick="selectNoAddress()"><i class="fas fa-question-circle"></i> ללא כתובת עכשיו</button><button class="btn btn-outline" onclick="closeModals()">ביטול</button></div>
+        <div style="display:flex; gap:10px;">
+            <button class="btn btn-warning" onclick="removeAddress()"><i class="fas fa-eraser"></i> הסר כתובת</button>
+            <button class="btn btn-outline" onclick="closeModals()">ביטול</button>
+        </div>
     </div>
 </div>
 
@@ -521,6 +534,30 @@
         });
     }
 
+    // NEW: Undo Toast Logic
+    function showUndoToast(msg, undoCallback) {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = `toast toast-info`;
+        t.innerHTML = `<span><i class="fas fa-info-circle"></i> ${msg}</span> <button class="undo-btn">בטל (Undo)</button>`;
+        
+        let undoClicked = false;
+        t.querySelector('button').onclick = () => {
+            undoClicked = true;
+            undoCallback();
+            t.style.animation = 'fadeOut 0.3s ease-in forwards';
+            setTimeout(()=>t.remove(), 300);
+        };
+        
+        c.appendChild(t);
+        setTimeout(() => {
+            if(!undoClicked) {
+                t.style.animation = 'fadeOut 0.3s ease-in forwards';
+                setTimeout(()=>t.remove(), 300);
+            }
+        }, 6000); 
+    }
+
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/streets-v12', center: appSettings.center, zoom: appSettings.zoom, pitch: appSettings.pitch });
     map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
     map.addControl(new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'bottom-right');
@@ -528,16 +565,17 @@
     document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
 
     window.onload = () => {
+        // Welcome Message
         let lastLogin = localStorage.getItem('last_login_date');
         let todayStr = new Date().toISOString().split('T')[0];
         let welcomeDiv = document.getElementById('welcomeMessage');
-        if(lastLogin === todayStr) { welcomeDiv.innerHTML = "איזה כיף שחזרת! ממשיכים את המומנטום של היום 🚀"; } 
+        if(lastLogin === todayStr) { welcomeDiv.innerHTML = "איזה כיף שחזרת! ממשיכים את המומנטום 🚀"; } 
         else if (lastLogin) { welcomeDiv.innerHTML = "ברוך שובך! פעם קודמת היית אש, בוא נראה מה תעשה היום 🔥"; } 
         else { welcomeDiv.innerHTML = "ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍"; }
         localStorage.setItem('last_login_date', todayStr);
 
         // Mapbox Modal Geocoder Setup
-        modalGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'הקלד כתובת למשפחה...', countries: 'il', language: 'he', marker: false, flyTo: false });
+        modalGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'הקלד כתובת לחיפוש...', countries: 'il', language: 'he', marker: false, flyTo: false });
         document.getElementById('modalGeocoderContainer').appendChild(modalGeocoder.onAdd(map));
         modalGeocoder.on('result', (e) => {
             const f = e.result;
@@ -590,6 +628,13 @@
             if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: {code:'',rep:'',notes:'',coords:null}, apts:[] };
             if(!db['__BOARDS__']) db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'], archived: false }];
             localStorage.setItem('community_data_final', JSON.stringify(db)); setSyncStatus('ok', 'מסונכרן');
+            
+            // NEW: Onboarding Check
+            let totalFamilies = 0; Object.keys(db).forEach(k => { if(k!=='__BOARDS__') totalFamilies += db[k].apts.length; });
+            if(totalFamilies === 0 && !appSettings.chabadHouseCoords) {
+                showCustomDialog({ title: 'ברוך הבא למערכת! 🎉', message: 'איזה כיף שהצטרפת.\n\nהצעד הראשון שלך לכיבוש השכונה הוא לקבוע את מיקום הבית חב"ד. סגור את החלון הזה, חפש את הבניין במפה, לחץ עליו, ובחר "קבע כ-770"!', showCancel: false });
+            }
+
         } catch(e) { setSyncStatus('error', 'שגיאה'); }
         document.getElementById('splash-screen').style.opacity='0'; setTimeout(() => { document.getElementById('splash-screen').style.display='none'; map.resize(); handleOmniSearch(); }, 800);
     }
@@ -600,7 +645,6 @@
     function setSyncStatus(st, txt) { document.getElementById('sync-text').innerText=txt; const ic=document.getElementById('sync-icon'), co=document.getElementById('sync-status'); if(st==='wait'){ic.className='fas fa-spinner fa-spin';co.style.color='var(--warning)';} if(st==='ok'){ic.className='fas fa-cloud-check';co.style.color='var(--success)';} if(st==='error'){ic.className='fas fa-exclamation-triangle';co.style.color='var(--danger)';} }
     
     function saveDB() { localStorage.setItem('community_data_final', JSON.stringify(db)); handleOmniSearch(); pushToDrive(); }
-    function showToast(msg, type='info') { const c=document.getElementById('toast-container'), t=document.createElement('div'); t.className=`toast toast-${type}`; t.innerHTML=`<i class="fas ${type==='success'?'fa-check-circle':type==='error'?'fa-exclamation-triangle':'fa-info-circle'}"></i> ${msg}`; c.appendChild(t); setTimeout(() => { t.style.animation='fadeOut 0.3s ease-in forwards'; setTimeout(()=>t.remove(),300); }, 3000); }
 
     window.switchMainView = function(viewName) {
         currentMainView = viewName;
@@ -671,13 +715,24 @@
     };
     window.formatPhone = (el) => { let v=el.value.replace(/\D/g,''); if(v.length>3&&v.length<=6) v=v.slice(0,3)+'-'+v.slice(3); else if(v.length>6) v=v.slice(0,3)+'-'+v.slice(3,6)+'-'+v.slice(6,10); el.value=v; };
 
+    // NEW: Direct Add Family bypassing map
+    window.quickAddFamily = () => {
+        currentBldg = NO_ADDRESS_KEY;
+        db[currentBldg].apts.push({num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}});
+        currentAptIdx = db[currentBldg].apts.length - 1;
+        saveDB(); 
+        openClientCard(currentAptIdx);
+    };
+
     window.openClientCard = function(idx) {
         isDirty = false; 
         const btn = document.getElementById('saveClientBtn');
         if(btn) { btn.classList.remove('btn-warning'); btn.classList.add('btn-primary'); btn.innerHTML = '<i class="fas fa-save"></i> שמור פרטים'; }
         
         document.getElementById('buildingModal').style.display='none'; currentAptIdx = idx; const a = db[currentBldg].apts[idx];
-        document.getElementById('crmFamilyTitle').innerHTML = `<i class="fas fa-id-card"></i> ${a.name||'משפחה חדשה'} <span style="font-size:12px;">${currentBldg===NO_ADDRESS_KEY?'(ללא כתובת)':''}</span>`;
+        document.getElementById('crmFamilyTitle').innerHTML = `<i class="fas fa-id-card"></i> ${a.name||'משפחה חדשה'}`;
+        document.getElementById('cAddressDisplay').value = currentBldg === NO_ADDRESS_KEY ? 'ללא כתובת (לחץ לעריכה)' : currentBldg;
+        
         document.getElementById('cFamilyName').value=a.name||''; document.getElementById('cAptNum').value=a.num||''; document.getElementById('cFather').value=a.father||''; document.getElementById('cMother').value=a.mother||''; document.getElementById('cNotes').value=a.notes||'';
         
         if(a.phones && !a.fatherPhone && !a.motherPhone) {
@@ -792,10 +847,22 @@
     });
 
     window.openAddressSearch = (isMove=false) => { pendingMoveMode=isMove; document.getElementById('addressSearchModal').style.display='flex'; };
+    window.removeAddress = () => { processAddressSelection(NO_ADDRESS_KEY); };
     
     window.selectAddress = (b,lng,lat) => { if(!db[b]) db[b]={info:{code:'',rep:'',notes:'',coords:[lng,lat]},apts:[]}; processAddressSelection(b); };
-    window.selectNoAddress = () => processAddressSelection(NO_ADDRESS_KEY);
-    function processAddressSelection(t) { if(pendingMoveMode) { db[t].apts.push(db[currentBldg].apts.splice(currentAptIdx,1)[0]); showToast('הועבר! ' + getRandomCompliment(),'success'); } else { db[t].apts.push({num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}}); currentAptIdx=db[t].apts.length-1; } currentBldg=t; saveDB(); document.getElementById('addressSearchModal').style.display='none'; openClientCard(currentAptIdx); }
+    
+    function processAddressSelection(t) { 
+        if(pendingMoveMode) { 
+            let apt = db[currentBldg].apts.splice(currentAptIdx,1)[0]; 
+            db[t].apts.push(apt);
+            currentBldg = t;
+            currentAptIdx = db[t].apts.length - 1;
+            showToast('הכתובת עודכנה! ' + getRandomCompliment(),'success'); 
+        } 
+        saveDB(); 
+        document.getElementById('addressSearchModal').style.display='none'; 
+        openClientCard(currentAptIdx); 
+    }
 
     window.toggleAdvFilters = () => { const el=document.getElementById('advFilters'); el.style.display = el.style.display==='block'?'none':'block'; };
     function populateFilterDropdowns() {
@@ -825,7 +892,7 @@
     };
     window.jumpToSearchResult = (b,i) => { document.getElementById('searchDropdown').style.display='none'; currentBldg=decodeURIComponent(b); openClientCard(i); };
 
-    // --- CONTEXT MENU LOGIC (RESTORED) ---
+    // --- CONTEXT MENU LOGIC & UNDO ---
     let ctxBldg = null, ctxIdx = null;
     window.showContextMenu = (e, b, i) => {
         e.preventDefault();
@@ -837,27 +904,27 @@
         m.style.top = e.pageY + 'px';
     };
     window.ctxEdit = () => { currentBldg = ctxBldg; document.getElementById('contextMenu').style.display='none'; openClientCard(ctxIdx); };
-    window.ctxMove = () => { currentBldg = ctxBldg; currentAptIdx = ctxIdx; document.getElementById('contextMenu').style.display='none'; openAddressSearch(true); };
-    window.ctxDelete = async () => { 
+    window.ctxMove = () => { currentBldg = ctxBldg; currentAptIdx = ctxIdx; document.getElementById('contextMenu').style.display='none'; pendingMoveMode=true; document.getElementById('addressSearchModal').style.display='flex'; };
+    
+    window.ctxDelete = () => { 
         document.getElementById('contextMenu').style.display='none'; 
-        const proceed = await showCustomDialog({ title: 'מחיקת משפחה', message: 'בטוח שתרצה למחוק משפחה זו?', showCancel: true });
-        if(proceed) { 
-            ensureAuthAndExecute(() => { 
-                db[ctxBldg].apts.splice(ctxIdx, 1); 
-                saveDB(); 
-                showToast("המשפחה נמחקה בהצלחה", "success"); 
+        ensureAuthAndExecute(() => { 
+            let deletedData = db[ctxBldg].apts.splice(ctxIdx, 1)[0]; 
+            let deletedBldg = ctxBldg;
+            let deletedIdx = ctxIdx;
+            saveDB(); 
+            showUndoToast("המשפחה נמחקה", () => {
+                db[deletedBldg].apts.splice(deletedIdx, 0, deletedData);
+                saveDB();
+                showToast("המחיקה בוטלה, המשפחה שוחזרה!", "success");
             }); 
-        } 
+        }); 
     };
 
     document.addEventListener('mousedown', (e) => { 
         if(e.target.id!=='smartSearch') document.getElementById('searchDropdown').style.display='none'; 
-        
         const ctx = document.getElementById('contextMenu');
-        if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) {
-            ctx.style.display = 'none';
-        }
-
+        if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) { ctx.style.display = 'none'; }
         if(e.target.classList.contains('modal')){if(e.target.id==='clientModal')attemptCloseCrmModal();else if(e.target.id!=='customDialogModal') e.target.style.display='none';} 
     });
 
@@ -909,10 +976,11 @@
         
         const activeBoard = db.__BOARDS__.find(b => b.id === currentBoardId);
         
-        // Setup Header Actions based on Archive status
         const actionsSpan = document.getElementById('kanbanBoardActions');
         if(activeBoard.id === 'b_default') {
-             actionsSpan.innerHTML = `<span class="tag-badge" style="background:#e2e8f0; color:#64748b; border:none;"><i class="fas fa-lock"></i> לוח ראשי (נעול)</span>`;
+             actionsSpan.innerHTML = `
+                 <button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות</button> 
+                 <span class="tag-badge" style="background:#e2e8f0; color:#64748b; border:none; margin-right:10px;"><i class="fas fa-lock"></i> מוגן</span>`;
         } else if(activeBoard.archived) {
              actionsSpan.innerHTML = `
                  <span class="tag-badge" style="background:rgba(239,68,68,0.1); color:var(--danger); border:none; margin-left:10px;"><i class="fas fa-archive"></i> בארכיון</span>
@@ -942,13 +1010,13 @@
     
     window.allowDrop = (e) => { 
         const activeBoard = db.__BOARDS__.find(b => b.id === document.getElementById('activeKanbanBoard').value);
-        if(activeBoard && activeBoard.archived) return; // Prevent drop if archived
+        if(activeBoard && activeBoard.archived) return; 
         e.preventDefault(); e.currentTarget.classList.add('drag-over'); 
     };
     window.dragLeave = (e) => { e.currentTarget.classList.remove('drag-over'); };
     window.dragCard = (e, encBldg, idx) => { 
         const activeBoard = db.__BOARDS__.find(b => b.id === document.getElementById('activeKanbanBoard').value);
-        if(activeBoard && activeBoard.archived) { e.preventDefault(); return; } // Prevent drag if archived
+        if(activeBoard && activeBoard.archived) { e.preventDefault(); return; } 
         e.dataTransfer.setData("text/plain", `${encBldg}|${idx}`); e.dataTransfer.effectAllowed = "move"; 
     };
     window.dropCard = (e, stage) => {
