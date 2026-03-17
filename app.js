@@ -9,10 +9,10 @@ const NO_ADDRESS_KEY = "__NO_ADDRESS__";
 let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || { 
     center: [35.24430, 31.82650], zoom: 17.5, pitch: 60, chabadHouseCoords: null, themeColor: '#3b82f6', defaultView: 'map',
     tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: [],
-    goal: { text: 'חיפוש חופשי (רחוב/תגית)', target: 50 }
+    goal: { text: 'שמואל תמיר', target: 30 }
 };
 if(!appSettings.customFields) appSettings.customFields = [];
-if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי (רחוב/תגית)', target: 50 };
+if(!appSettings.goal) appSettings.goal = { text: 'שמואל תמיר', target: 30 };
 
 document.documentElement.style.setProperty('--accent', appSettings.themeColor);
 let currentMainView = appSettings.defaultView || 'map';
@@ -94,8 +94,6 @@ function showUndoToast(msg, undoCallback) {
 const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/streets-v12', center: appSettings.center, zoom: appSettings.zoom, pitch: appSettings.pitch });
 map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 map.addControl(new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'bottom-right');
-const geocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'חפש רחוב במפה...', countries: 'il', language: 'he' });
-document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
 
 window.onload = () => {
     let lastLogin = localStorage.getItem('last_login_date');
@@ -183,10 +181,18 @@ window.switchMainView = function(viewName) {
     document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
     document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
     document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
+    document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
     
     if(viewName==='map') map.resize();
     handleOmniSearch(); 
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
+};
+
+// NEW: Switch function for the Communication Hub sub-tabs
+window.switchCommTab = function(tabName) {
+    document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
+    document.getElementById('commTabBtn-' + tabName).classList.add('active');
+    document.getElementById('comm-' + tabName).classList.add('active');
 };
 
 window.toggleMapStyle = () => { const s = map.getStyle().name.includes('Satellite'); map.setStyle(s ? 'mapbox://styles/mapbox/streets-v12' : 'mapbox://styles/mapbox/satellite-streets-v12'); showToast(s ? 'מפת רחובות' : 'מפת לוויין', 'info'); };
@@ -650,7 +656,6 @@ window.bulkEmail = async () => {
     clearBulkSelection();
 };
 
-// NEW: Phone bulk action function
 window.bulkPhone = () => {
     let p=[]; 
     bulkSelection.forEach(v=>{

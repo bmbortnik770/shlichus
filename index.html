@@ -19,7 +19,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -82,6 +82,7 @@
             <div class="main-tab active" onclick="switchMainView('map')" id="tab-map"><i class="fas fa-map-marker-alt"></i> מפה</div>
             <div class="main-tab" onclick="switchMainView('table')" id="tab-table"><i class="fas fa-list"></i> רשימה</div>
             <div class="main-tab" onclick="switchMainView('kanban')" id="tab-kanban"><i class="fas fa-project-diagram"></i> פרויקטים</div>
+            <div class="main-tab" onclick="switchMainView('comm')" id="tab-comm"><i class="fas fa-bullhorn"></i> תקשורת</div>
         </div>
     </div>
 
@@ -117,6 +118,52 @@
             <button class="btn btn-primary" style="width:auto; padding:8px 15px;" onclick="createNewBoard()"><i class="fas fa-plus"></i> לוח חדש</button>
         </div>
         <div id="kanban-board-scroll"></div>
+    </div>
+
+    <div id="comm-container" style="display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden;">
+        <div class="kanban-hub-header">
+            <h2 style="margin:0; color:var(--primary);"><i class="fas fa-satellite-dish" style="color:var(--accent);"></i> מרכז תקשורת קהילתי</h2>
+            <div style="display:flex; gap:10px;">
+                <span class="tag-badge" style="font-size:14px; padding:6px 10px;"><i class="fas fa-paper-plane"></i> 0 הודעות נשלחו החודש</span>
+            </div>
+        </div>
+        
+        <div class="crm-tabs" style="margin: 20px 20px 0 20px; background: var(--surface); border-radius: 8px 8px 0 0; padding-top: 10px; border: 1px solid var(--border-light); border-bottom: none;">
+            <div class="crm-tab active" onclick="switchCommTab('whatsapp')" id="commTabBtn-whatsapp"><i class="fab fa-whatsapp" style="color:#25D366;"></i> וואטסאפ</div>
+            <div class="crm-tab" onclick="switchCommTab('email')" id="commTabBtn-email"><i class="fas fa-envelope" style="color:#ea4335;"></i> אימייל</div>
+            <div class="crm-tab" onclick="switchCommTab('phone')" id="commTabBtn-phone"><i class="fas fa-phone" style="color:var(--success);"></i> רשימות חיוג</div>
+            <div class="crm-tab" onclick="switchCommTab('templates')" id="commTabBtn-templates"><i class="fas fa-file-alt"></i> תבניות הודעה</div>
+            <div class="crm-tab" onclick="switchCommTab('logs')" id="commTabBtn-logs"><i class="fas fa-history"></i> היסטוריה</div>
+        </div>
+
+        <div id="comm-content-area" style="flex-grow: 1; padding: 20px; overflow-y: auto; background: var(--surface); margin: 0 20px 20px 20px; border-radius: 0 0 8px 8px; border: 1px solid var(--border-light); box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+            
+            <div id="comm-whatsapp" class="comm-tab-content active">
+                <h3 style="margin-top:0;">שליחת וואטסאפ המוני (תפוצה)</h3>
+                <p style="color:var(--text-muted);">טוען נתונים...</p>
+            </div>
+            
+            <div id="comm-email" class="comm-tab-content">
+                <h3 style="margin-top:0;">מערך דיוור במייל</h3>
+                <p style="color:var(--text-muted);">טוען נתונים...</p>
+            </div>
+            
+            <div id="comm-phone" class="comm-tab-content">
+                <h3 style="margin-top:0;">רשימות חיוג (Call Center)</h3>
+                <p style="color:var(--text-muted);">טוען נתונים...</p>
+            </div>
+            
+            <div id="comm-templates" class="comm-tab-content">
+                <h3 style="margin-top:0;">ניהול תבניות</h3>
+                <p style="color:var(--text-muted);">טוען נתונים...</p>
+            </div>
+            
+            <div id="comm-logs" class="comm-tab-content">
+                <h3 style="margin-top:0;">היסטוריית תקשורת</h3>
+                <p style="color:var(--text-muted);">טוען נתונים...</p>
+            </div>
+
+        </div>
     </div>
 </div>
 
@@ -324,6 +371,6 @@
     </div>
 </div>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
