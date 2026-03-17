@@ -41,6 +41,9 @@ let pendingMoveMode = false, isDirty = false;
 let bulkSelection = []; 
 let currentFilters = { tags: '', style: '', status: '' };
 
+// NEW: Temporary memory for explicit address saving
+let tempSelectedAddress = null;
+
 const compliments = ["אלוף! 💪", "פצצה! 🎯", "אין עליך! 🚀", "עבודה מדהימה! 🔥", "הקהילה גדלה! 👑"];
 function getRandomCompliment() { return compliments[Math.floor(Math.random() * compliments.length)]; }
 
@@ -95,7 +98,6 @@ const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/
 map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 map.addControl(new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'bottom-right');
 
-// FIXED: Clearer placeholder for map geocoder
 const geocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: '📍 חפש אזור/כתובת במפה...', countries: 'il', language: 'he' });
 document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
 
@@ -110,11 +112,16 @@ window.onload = () => {
 
     modalGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'הקלד כתובת לחיפוש...', countries: 'il', language: 'he', marker: false, flyTo: false });
     document.getElementById('modalGeocoderContainer').appendChild(modalGeocoder.onAdd(map));
+    
+    // UPDATED: Store the result temporarily instead of saving immediately
     modalGeocoder.on('result', (e) => {
         const f = e.result;
         const placeName = (f.place_name_he || f.place_name).split(',')[0].trim();
-        selectAddress(placeName, f.center[0], f.center[1]);
-        setTimeout(() => { modalGeocoder.clear(); }, 500);
+        tempSelectedAddress = { name: placeName, lng: f.center[0], lat: f.center[1] };
+    });
+    // Clear temp memory if user clears the search box
+    modalGeocoder.on('clear', () => {
+        tempSelectedAddress = null;
     });
 
     switchMainView(currentMainView);
@@ -241,7 +248,12 @@ window.markDirty = () => {
     }
 };
 
-window.closeModals = () => { isDirty = false; document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); };
+window.closeModals = () => { 
+    isDirty = false; 
+    tempSelectedAddress = null; // NEW: reset temp address on close
+    if(modalGeocoder) modalGeocoder.clear();
+    document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); 
+};
 
 window.attemptCloseCrmModal = async () => { 
     if(isDirty) {
@@ -391,7 +403,23 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
 });
 
 window.openAddressSearch = (isMove=false) => { pendingMoveMode=isMove; document.getElementById('addressSearchModal').style.display='flex'; };
-window.removeAddress = () => { processAddressSelection(NO_ADDRESS_KEY); };
+
+// NEW: Logic for the explicit Save Address button
+window.confirmAddressSelection = () => {
+    if (!tempSelectedAddress) {
+        showToast("אנא חפש ובחר כתובת מהרשימה תחילה", "warning");
+        return;
+    }
+    selectAddress(tempSelectedAddress.name, tempSelectedAddress.lng, tempSelectedAddress.lat);
+    tempSelectedAddress = null;
+    setTimeout(() => { modalGeocoder.clear(); }, 500);
+};
+
+window.removeAddress = () => { 
+    tempSelectedAddress = null;
+    if(modalGeocoder) modalGeocoder.clear();
+    processAddressSelection(NO_ADDRESS_KEY); 
+};
 
 window.selectAddress = (b,lng,lat) => { if(!db[b]) db[b]={info:{code:'',rep:'',notes:'',coords:[lng,lat]},apts:[]}; processAddressSelection(b); };
 
@@ -490,7 +518,6 @@ document.addEventListener('mousedown', (e) => {
 function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
 window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
-/* --- CUSTOM MARKERS (BADGES) LOGIC --- */
 window.createNewBoard = async () => {
     const name = await showCustomDialog({ title: 'פרויקט חדש', message: 'הכנס שם לפרויקט החדש (למשל: רישום לקייטנה):', showInput: true });
     if(!name) return;
@@ -833,7 +860,6 @@ function refreshMap(filteredRes = null) {
         if(k === '__BOARDS__') return;
         let maxVal=0, showBldg=false;
         
-        // NEW CUSTOM MARKER LOGIC
         db[k].apts.forEach((a,i) => {
             total++; if(stats[a.style]!==undefined) stats[a.style]++; else {stats[a.style]=1; appSettings.styles.push(a.style);}
             const c=getStatusColor(a); if(c==='#ef4444'||c==='#94a3b8') urgent++; const v=c==='#10b981'?1:(c==='#f59e0b'?2:3); if(v>maxVal) maxVal=v;
@@ -846,7 +872,7 @@ function refreshMap(filteredRes = null) {
             });
         });
 
-        // Add Numbered Marker
+        // CUSTOM MARKER LOGIC
         if(showBldg && db[k].apts.length>0 && k!==NO_ADDRESS_KEY) {
             let coords=db[k].info.coords||k.split(',').map(Number);
             if(!isNaN(coords[0]) && !(appSettings.chabadHouseCoords && Math.abs(coords[0]-appSettings.chabadHouseCoords[0])<0.001 && Math.abs(coords[1]-appSettings.chabadHouseCoords[1])<0.001)) {
