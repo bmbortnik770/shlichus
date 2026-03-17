@@ -31,8 +31,7 @@
         .mobile-header { display:none; background:var(--primary); color:white; padding:15px; justify-content:space-between; align-items:center; z-index:1001; }
         #sidebar { width:360px; min-width:360px; background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:15px; z-index:10; overflow-y:auto; box-shadow:4px 0 15px rgba(0,0,0,0.1); border-left:1px solid var(--border-light); transition:0.3s ease; }
         
-        /* FIXED: main-content bounds to prevent table bleeding */
-        #main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; min-width:0; }
+        #main-content { flex-grow:1; display:flex; flex-direction:column; position:relative; overflow:hidden; min-width: 0; }
         .top-nav-bar { background:var(--surface); border-bottom:1px solid var(--border-light); display:flex; justify-content:center; padding:10px; z-index:500; box-shadow:0 2px 10px rgba(0,0,0,0.05); }
         .main-tabs { display:flex; background:var(--bg-body); border-radius:8px; border:1px solid var(--border-light); overflow:hidden; }
         .main-tab { padding:8px 25px; cursor:pointer; font-weight:600; color:var(--text-muted); transition:0.2s; border-left:1px solid var(--border-light); }
@@ -43,7 +42,7 @@
         #map-container { flex-grow:1; position:relative; }
         #map { position:absolute; top:0; bottom:0; width:100%; }
         
-        #list-container { display:none; flex-grow:1; padding:20px; overflow-y:auto; background:var(--bg-body); width:100%; box-sizing: border-box; }
+        #list-container { display:none; flex-grow:1; padding:20px 0 0 0; overflow-y:auto; background:var(--bg-body); width:100%; box-sizing: border-box; }
         
         #kanban-container { display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; }
         .kanban-hub-header { padding:15px 20px; border-bottom:1px solid var(--border-light); background:var(--surface); display:flex; justify-content:space-between; align-items:center; z-index:10; box-shadow:0 2px 10px rgba(0,0,0,0.02); }
@@ -75,10 +74,9 @@
 
         @keyframes slideUpModal { from{transform:translateY(30px);opacity:0;} to{transform:translateY(0);opacity:1;} }
         .modal { display:none; position:fixed; z-index:10000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(2px); align-items:center; justify-content:center; }
-        .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:90vh; overflow-y:auto; border:1px solid var(--border-light); animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .modal-content { background:var(--surface); padding:25px; border-radius:12px; width:600px; color:var(--text-main); max-height:90vh; overflow-y:visible; border:1px solid var(--border-light); animation:slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .modal-small { width:400px; }
 
-        /* NEW: Custom Dialog Styling */
         #customDialogModal .modal-content { width: 420px; text-align: center; border-radius: 20px; padding: 30px; }
         #cdTitle { color: var(--accent); margin-top: 0; font-size: 22px; }
         #cdMessage { color: var(--text-main); font-size: 16px; margin-bottom: 25px; line-height: 1.5; }
@@ -219,7 +217,7 @@
     
     <div class="stat-card" style="z-index:2000;">
         <div style="display:flex; gap:5px;">
-            <input type="text" class="inline-input" id="smartSearch" style="border:none; box-shadow:none; background:var(--surface);" placeholder="חיפוש חכם עולמי..." oninput="handleOmniSearch()">
+            <input type="text" class="inline-input" id="smartSearch" style="border:none; box-shadow:none; background:var(--surface);" placeholder="חיפוש גלובאלי..." oninput="handleOmniSearch()">
             <button class="btn-icon" onclick="toggleAdvFilters()" title="סינון מתקדם"><i class="fas fa-filter"></i></button>
         </div>
         <div id="searchDropdown"></div>
@@ -261,7 +259,7 @@
             <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
                 <h2 style="margin:0;"><i class="fas fa-columns"></i> לוחות פרויקטים</h2>
                 <select id="activeKanbanBoard" onchange="renderKanbanView()" class="inline-input" style="width:250px; font-weight:bold;"></select>
-                <button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות</button>
+                <span id="kanbanBoardActions" style="display:flex; gap:5px;"></span>
             </div>
             <button class="btn btn-primary" style="width:auto; padding:8px 15px;" onclick="createNewBoard()"><i class="fas fa-plus"></i> לוח חדש</button>
         </div>
@@ -415,8 +413,7 @@
             <h3 style="margin:0; color:var(--primary);"><i class="fas fa-map-marker-alt"></i> הוספת משפחה</h3>
             <button class="btn-icon" onclick="closeModals()" style="border:none; font-size:18px;"><i class="fas fa-times"></i></button>
         </div>
-        <div class="form-group"><input type="text" id="addressSearchInput" placeholder="הקלד עיר, רחוב ומספר..." oninput="searchAddressAPI()"></div>
-        <div id="addressSearchResults" style="max-height:200px; overflow-y:auto; margin-bottom:15px; border:1px solid var(--border-light); border-radius:6px; display:none;"></div>
+        <div id="modalGeocoderContainer" style="margin-bottom:15px; position:relative; z-index:3000; text-align:right;"></div>
         <div style="display:flex; gap:10px;"><button class="btn btn-warning" onclick="selectNoAddress()"><i class="fas fa-question-circle"></i> ללא כתובת עכשיו</button><button class="btn btn-outline" onclick="closeModals()">ביטול</button></div>
     </div>
 </div>
@@ -476,8 +473,9 @@
     let db = JSON.parse(localStorage.getItem('community_data_final')) || {};
     if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
 
+    // Migrate Boards
     if(!db['__BOARDS__']) {
-        db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'] }];
+        db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'], archived: false }];
         Object.keys(db).forEach(b => {
             if(b !== '__BOARDS__' && db[b].apts) {
                 db[b].apts.forEach(a => {
@@ -489,7 +487,7 @@
         localStorage.setItem('community_data_final', JSON.stringify(db));
     }
 
-    let activeMarkers = [], chart = null, chabadHouseMarker = null;
+    let activeMarkers = [], chart = null, chabadHouseMarker = null, modalGeocoder = null;
     let currentBldg = null, currentAptIdx = null;
     let tempChildren=[], tempTags=[], tempLogs=[], tempDonations=[], tempTasks=[], tempCustom={}, tempBoards={}; 
     let pendingMoveMode = false, isDirty = false;
@@ -499,7 +497,6 @@
     const compliments = ["אלוף! 💪", "פצצה! 🎯", "אין עליך! 🚀", "עבודה מדהימה! 🔥", "הקהילה גדלה! 👑"];
     function getRandomCompliment() { return compliments[Math.floor(Math.random() * compliments.length)]; }
 
-    // --- NEW: Custom Dialog Function ---
     function showCustomDialog(opts) {
         return new Promise((resolve) => {
             const modal = document.getElementById('customDialogModal');
@@ -538,6 +535,16 @@
         else if (lastLogin) { welcomeDiv.innerHTML = "ברוך שובך! פעם קודמת היית אש, בוא נראה מה תעשה היום 🔥"; } 
         else { welcomeDiv.innerHTML = "ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍"; }
         localStorage.setItem('last_login_date', todayStr);
+
+        // Mapbox Modal Geocoder Setup
+        modalGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'הקלד כתובת למשפחה...', countries: 'il', language: 'he', marker: false, flyTo: false });
+        document.getElementById('modalGeocoderContainer').appendChild(modalGeocoder.onAdd(map));
+        modalGeocoder.on('result', (e) => {
+            const f = e.result;
+            const placeName = (f.place_name_he || f.place_name).split(',')[0].trim();
+            selectAddress(placeName, f.center[0], f.center[1]);
+            setTimeout(() => { modalGeocoder.clear(); }, 500);
+        });
 
         switchMainView(currentMainView);
         if(localStorage.getItem('darkMode')==='true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className='fas fa-sun'; }
@@ -581,7 +588,7 @@
                 driveFileId = (await create.json()).id; await pushToDrive(); 
             }
             if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: {code:'',rep:'',notes:'',coords:null}, apts:[] };
-            if(!db['__BOARDS__']) db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'] }];
+            if(!db['__BOARDS__']) db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'], archived: false }];
             localStorage.setItem('community_data_final', JSON.stringify(db)); setSyncStatus('ok', 'מסונכרן');
         } catch(e) { setSyncStatus('error', 'שגיאה'); }
         document.getElementById('splash-screen').style.opacity='0'; setTimeout(() => { document.getElementById('splash-screen').style.display='none'; map.resize(); handleOmniSearch(); }, 800);
@@ -617,7 +624,6 @@
     map.on('mouseleave', '3d-buildings', () => { map.getCanvas().style.cursor=''; if(hoveredStateId!==null) map.setFeatureState({source:'composite',sourceLayer:'building',id:hoveredStateId},{hover:false}); hoveredStateId=null; hoverPopup.remove(); });
     map.on('click', '3d-buildings', async (e) => { hoverPopup.remove(); try { const r=await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${e.lngLat.lng},${e.lngLat.lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`); const d=await r.json(); let addr=`מיקום (${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)})`; if(d.features&&d.features.length>0) addr=(d.features[0].place_name_he||d.features[0].place_name).split(',')[0].trim(); currentBldg=addr; if(!db[currentBldg]) db[currentBldg]={info:{code:'',rep:'',notes:'',coords:[e.lngLat.lng,e.lngLat.lat]},apts:[]}; openBuildingModal(); } catch(err){showToast("שגיאת כתובת","warning");} });
 
-    // Helper: Collect all phones for an apt
     function getAllPhones(a) { return [a.fatherPhone, a.motherPhone, ...(a.childrenList||[]).map(c=>c.phone)].filter(Boolean); }
 
     window.openBuildingModal = function() {
@@ -627,8 +633,7 @@
         
         let aptList = b.apts.map((a, i) => {
             let col = getStatusColor(a), bdg = (a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('');
-            let phones = getAllPhones(a);
-            let ph = phones.length > 0 ? phones[0].replace(/\D/g, '') : '';
+            let phones = getAllPhones(a); let ph = phones.length > 0 ? phones[0].replace(/\D/g, '') : '';
             return `<div class="bldg-fam-item" style="border-right-color:${col}" onclick="openClientCard(${i})"><div><div style="font-weight:700;font-size:16px;">${a.name||'(ללא שם)'} <span style="font-size:12px;font-weight:normal;color:var(--text-muted);">(דירה ${a.num||'-'})</span></div><div style="margin-top:4px;">${bdg}</div></div><div style="display:flex;gap:8px;">${ph?`<a href="tel:${ph}" class="btn-icon" style="color:var(--success);border-color:var(--success);" onclick="event.stopPropagation()"><i class="fas fa-phone"></i></a>`:''}<button class="btn-icon" style="color:var(--accent);"><i class="fas fa-pen"></i></button></div></div>`;
         }).join('');
         document.getElementById('bldgModalAptsList').innerHTML = aptList || '<div class="empty-state"><i class="fas fa-door-open"></i><div>אין משפחות רשומות בבניין.</div></div>';
@@ -669,17 +674,12 @@
     window.openClientCard = function(idx) {
         isDirty = false; 
         const btn = document.getElementById('saveClientBtn');
-        if(btn) {
-            btn.classList.remove('btn-warning');
-            btn.classList.add('btn-primary');
-            btn.innerHTML = '<i class="fas fa-save"></i> שמור פרטים';
-        }
+        if(btn) { btn.classList.remove('btn-warning'); btn.classList.add('btn-primary'); btn.innerHTML = '<i class="fas fa-save"></i> שמור פרטים'; }
         
         document.getElementById('buildingModal').style.display='none'; currentAptIdx = idx; const a = db[currentBldg].apts[idx];
-        document.getElementById('crmFamilyTitle').innerHTML = `<i class="fas fa-id-card"></i> ${a.name||'משפחה חדשה'} ${currentBldg===NO_ADDRESS_KEY?'(ללא כתובת)':''}`;
+        document.getElementById('crmFamilyTitle').innerHTML = `<i class="fas fa-id-card"></i> ${a.name||'משפחה חדשה'} <span style="font-size:12px;">${currentBldg===NO_ADDRESS_KEY?'(ללא כתובת)':''}</span>`;
         document.getElementById('cFamilyName').value=a.name||''; document.getElementById('cAptNum').value=a.num||''; document.getElementById('cFather').value=a.father||''; document.getElementById('cMother').value=a.mother||''; document.getElementById('cNotes').value=a.notes||'';
         
-        // Auto-migrate old phones
         if(a.phones && !a.fatherPhone && !a.motherPhone) {
              let pArr = a.phones.split(',');
              if(pArr.length > 0) a.fatherPhone = pArr[0].trim();
@@ -725,8 +725,8 @@
         });
     };
     window.addModalBoard = async () => {
-        let unjoined = db.__BOARDS__.filter(b => !tempBoards[b.id]);
-        if(unjoined.length === 0) { showToast("המשפחה כבר חברה בכל הפרויקטים", "warning"); return; }
+        let unjoined = db.__BOARDS__.filter(b => !b.archived && !tempBoards[b.id]);
+        if(unjoined.length === 0) { showToast("המשפחה כבר משויכת לכל הפרויקטים הפעילים", "warning"); return; }
         let opts = unjoined.map((b, i) => `${i+1}. ${b.name}`).join('\n');
         
         const num = await showCustomDialog({ title: 'צירוף לפרויקט', message: `לאיזה פרויקט לצרף?\nהקש מספר:\n${opts}`, showInput: true });
@@ -784,15 +784,15 @@
     window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
         const a = db[currentBldg].apts[currentAptIdx];
         a.name=document.getElementById('cFamilyName').value; a.num=document.getElementById('cAptNum').value; a.father=document.getElementById('cFather').value; a.mother=document.getElementById('cMother').value; 
-        a.fatherPhone=document.getElementById('cFatherPhone').value; a.motherPhone=document.getElementById('cMotherPhone').value; a.phones = ''; // Clear old field
+        a.fatherPhone=document.getElementById('cFatherPhone').value; a.motherPhone=document.getElementById('cMotherPhone').value; a.phones = '';
         a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
         a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customFields={...tempCustom};
         isDirty=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
         if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
     });
 
-    window.openAddressSearch = (isMove=false) => { pendingMoveMode=isMove; document.getElementById('addressSearchInput').value=''; document.getElementById('addressSearchResults').style.display='none'; document.getElementById('addressSearchModal').style.display='flex'; };
-    window.searchAddressAPI = async () => { const q=document.getElementById('addressSearchInput').value, d=document.getElementById('addressSearchResults'); if(q.length<3){d.style.display='none';return;} try{ const r=await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?country=il&language=he&proximity=${map.getCenter().lng},${map.getCenter().lat}&access_token=${mapboxgl.accessToken}`); const j=await r.json(); if(j.features&&j.features.length>0){d.style.display='block';d.innerHTML=j.features.map(f=>`<div class="search-item" onclick="selectAddress('${(f.place_name_he||f.place_name).split(',')[0].trim()}',${f.center[0]},${f.center[1]})"><div class="search-item-title"><i class="fas fa-map-marker-alt"></i> ${(f.place_name_he||f.place_name).split(',')[0].trim()}</div></div>`).join('');}else d.innerHTML='<div style="padding:10px;">לא נמצאו תוצאות.</div>'; }catch(e){} };
+    window.openAddressSearch = (isMove=false) => { pendingMoveMode=isMove; document.getElementById('addressSearchModal').style.display='flex'; };
+    
     window.selectAddress = (b,lng,lat) => { if(!db[b]) db[b]={info:{code:'',rep:'',notes:'',coords:[lng,lat]},apts:[]}; processAddressSelection(b); };
     window.selectNoAddress = () => processAddressSelection(NO_ADDRESS_KEY);
     function processAddressSelection(t) { if(pendingMoveMode) { db[t].apts.push(db[currentBldg].apts.splice(currentAptIdx,1)[0]); showToast('הועבר! ' + getRandomCompliment(),'success'); } else { db[t].apts.push({num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}}); currentAptIdx=db[t].apts.length-1; } currentBldg=t; saveDB(); document.getElementById('addressSearchModal').style.display='none'; openClientCard(currentAptIdx); }
@@ -825,7 +825,7 @@
     };
     window.jumpToSearchResult = (b,i) => { document.getElementById('searchDropdown').style.display='none'; currentBldg=decodeURIComponent(b); openClientCard(i); };
 
-    // --- CONTEXT MENU LOGIC ---
+    // --- CONTEXT MENU LOGIC (RESTORED) ---
     let ctxBldg = null, ctxIdx = null;
     window.showContextMenu = (e, b, i) => {
         e.preventDefault();
@@ -852,20 +852,24 @@
 
     document.addEventListener('mousedown', (e) => { 
         if(e.target.id!=='smartSearch') document.getElementById('searchDropdown').style.display='none'; 
+        
         const ctx = document.getElementById('contextMenu');
-        if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) { ctx.style.display = 'none'; }
+        if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) {
+            ctx.style.display = 'none';
+        }
+
         if(e.target.classList.contains('modal')){if(e.target.id==='clientModal')attemptCloseCrmModal();else if(e.target.id!=='customDialogModal') e.target.style.display='none';} 
     });
 
     function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
     window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
-    /* --- KANBAN HUB --- */
+    /* --- KANBAN HUB ARCHIVE & MANAGEMENT --- */
     window.createNewBoard = async () => {
         const name = await showCustomDialog({ title: 'פרויקט חדש', message: 'הכנס שם לפרויקט החדש (למשל: רישום לקייטנה):', showInput: true });
         if(!name) return;
         const newId = 'b_' + Date.now();
-        db.__BOARDS__.push({ id: newId, name: name, columns: ['חדש', 'בטיפול', 'הושלם'] });
+        db.__BOARDS__.push({ id: newId, name: name, columns: ['חדש', 'בטיפול', 'הושלם'], archived: false });
         saveDB(); showToast("פרויקט נפתח בהצלחה! " + getRandomCompliment(), "success"); renderKanbanView();
     };
     window.editCurrentBoard = async () => {
@@ -875,15 +879,52 @@
         const cols = await showCustomDialog({ title: 'עריכת עמודות', message: `ערוך עמודות לפרויקט "${board.name}" (הפרד בפסיק):`, showInput: true, defaultValue: board.columns.join(', ') });
         if(cols) { board.columns = cols.split(',').map(c => c.trim()); saveDB(); renderKanbanView(); showToast("עמודות עודכנו", "success"); }
     };
+    window.toggleBoardArchive = (id) => {
+        let b = db.__BOARDS__.find(x => x.id === id);
+        b.archived = !b.archived;
+        saveDB(); renderKanbanView();
+        showToast(b.archived ? "הפרויקט ננעל והועבר לארכיון" : "הפרויקט שוחזר לפעילות", "success");
+    };
+    window.deleteBoard = async (id) => {
+        const proceed = await showCustomDialog({ title: 'מחיקת פרויקט', message: 'האם למחוק את הפרויקט לחלוטין? (הפעולה לא תמחק את המשפחות, אלא רק את הלוח)', showCancel: true });
+        if(proceed) {
+            db.__BOARDS__ = db.__BOARDS__.filter(x => x.id !== id);
+            Object.keys(db).forEach(bldg => {
+               if(bldg !== '__BOARDS__') { db[bldg].apts.forEach(a => { if(a.boards && a.boards[id]) delete a.boards[id]; }); }
+            });
+            saveDB(); renderKanbanView(); showToast("הפרויקט נמחק לצמיתות", "success");
+        }
+    };
+
     window.renderKanbanView = (filteredRes = null) => {
         const sel = document.getElementById('activeKanbanBoard');
         let currentBoardId = sel.value;
-        sel.innerHTML = db.__BOARDS__.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        
+        let activeOptions = db.__BOARDS__.filter(b=>!b.archived).map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        let archivedOptions = db.__BOARDS__.filter(b=>b.archived).map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        sel.innerHTML = `<optgroup label="פרויקטים פעילים">${activeOptions}</optgroup><optgroup label="ארכיון (סגורים)">${archivedOptions}</optgroup>`;
+        
         if(currentBoardId && db.__BOARDS__.find(b=>b.id===currentBoardId)) sel.value = currentBoardId;
         else currentBoardId = db.__BOARDS__[0].id;
         
-        const c = document.getElementById('kanban-board-scroll'); c.innerHTML = '';
         const activeBoard = db.__BOARDS__.find(b => b.id === currentBoardId);
+        
+        // Setup Header Actions based on Archive status
+        const actionsSpan = document.getElementById('kanbanBoardActions');
+        if(activeBoard.id === 'b_default') {
+             actionsSpan.innerHTML = `<span class="tag-badge" style="background:#e2e8f0; color:#64748b; border:none;"><i class="fas fa-lock"></i> לוח ראשי (נעול)</span>`;
+        } else if(activeBoard.archived) {
+             actionsSpan.innerHTML = `
+                 <span class="tag-badge" style="background:rgba(239,68,68,0.1); color:var(--danger); border:none; margin-left:10px;"><i class="fas fa-archive"></i> בארכיון</span>
+                 <button class="btn-icon" onclick="toggleBoardArchive('${activeBoard.id}')" title="שחזר פרויקט"><i class="fas fa-unlock"></i> שחזר</button> 
+                 <button class="btn-icon" style="color:var(--danger);" onclick="deleteBoard('${activeBoard.id}')" title="מחק פרויקט"><i class="fas fa-trash"></i></button>`;
+        } else {
+             actionsSpan.innerHTML = `
+                 <button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות</button> 
+                 <button class="btn-icon" onclick="toggleBoardArchive('${activeBoard.id}')" title="נעל והעבר לארכיון"><i class="fas fa-archive"></i> לארכיון</button>`;
+        }
+
+        const c = document.getElementById('kanban-board-scroll'); c.innerHTML = '';
         if(!activeBoard) return;
 
         let arr = filteredRes || []; 
@@ -898,9 +939,18 @@
             c.innerHTML += colHtml + `</div></div>`;
         });
     };
-    window.allowDrop = (e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); };
+    
+    window.allowDrop = (e) => { 
+        const activeBoard = db.__BOARDS__.find(b => b.id === document.getElementById('activeKanbanBoard').value);
+        if(activeBoard && activeBoard.archived) return; // Prevent drop if archived
+        e.preventDefault(); e.currentTarget.classList.add('drag-over'); 
+    };
     window.dragLeave = (e) => { e.currentTarget.classList.remove('drag-over'); };
-    window.dragCard = (e, encBldg, idx) => { e.dataTransfer.setData("text/plain", `${encBldg}|${idx}`); e.dataTransfer.effectAllowed = "move"; };
+    window.dragCard = (e, encBldg, idx) => { 
+        const activeBoard = db.__BOARDS__.find(b => b.id === document.getElementById('activeKanbanBoard').value);
+        if(activeBoard && activeBoard.archived) { e.preventDefault(); return; } // Prevent drag if archived
+        e.dataTransfer.setData("text/plain", `${encBldg}|${idx}`); e.dataTransfer.effectAllowed = "move"; 
+    };
     window.dropCard = (e, stage) => {
         e.preventDefault(); e.currentTarget.classList.remove('drag-over');
         const data = e.dataTransfer.getData("text/plain");
@@ -950,11 +1000,12 @@
     };
     
     window.bulkAddToBoardPrompt = async () => {
-        let opts = db.__BOARDS__.map((b, i) => `${i+1}. ${b.name}`).join('\n');
-        const num = await showCustomDialog({ title: 'צירוף פרויקט המוני', message: `לאיזה פרויקט לצרף את המשפחות?\nהקש מספר:\n${opts}`, showInput: true });
-        if(num && !isNaN(num) && num > 0 && num <= db.__BOARDS__.length) {
+        let activeBoards = db.__BOARDS__.filter(b=>!b.archived);
+        let opts = activeBoards.map((b, i) => `${i+1}. ${b.name}`).join('\n');
+        const num = await showCustomDialog({ title: 'צירוף פרויקט המוני', message: `לאיזה פרויקט פעיל לצרף את המשפחות?\nהקש מספר:\n${opts}`, showInput: true });
+        if(num && !isNaN(num) && num > 0 && num <= activeBoards.length) {
             ensureAuthAndExecute(() => {
-                const chosen = db.__BOARDS__[num-1];
+                const chosen = activeBoards[num-1];
                 bulkSelection.forEach(v => {
                     let [b, i] = v.split('|'); let a = db[b].apts[i];
                     if(!a.boards) a.boards = {};
