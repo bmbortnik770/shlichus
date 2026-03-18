@@ -1413,22 +1413,22 @@ window.sendCommEmail = () => {
 
     let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
     
+    // פותח את המייל קודם כל
     const a = document.createElement('a');
     a.href = mailtoLink;
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    setTimeout(() => document.body.removeChild(a), 500);
+    document.body.removeChild(a);
     
-    if(navigator.clipboard) { 
-        navigator.clipboard.writeText(emails.join(', ')).then(() => {
-            showToast('נפתחה תוכנת המייל (הכתובות הועתקו ללוח לגיבוי)', 'success');
-        }).catch(() => {
-            showCustomDialog({ title: 'גיבוי', message: 'הנה הכתובות להעתקה ידנית:', showInput: true, defaultValue: emails.join(', '), showCancel: false });
-        });
-    } else {
-        showToast('נפתחה תוכנת המייל', 'success');
-    }
+    showToast('נפתחה תוכנת המייל', 'success');
+    
+    // clipboard ברקע בלי לחסום כלום
+    setTimeout(() => {
+        if(navigator.clipboard) {
+            navigator.clipboard.writeText(emails.join(', ')).catch(() => {});
+        }
+    }, 1000);
     
     commRecipients = [];
     renderRecipientsList('email');
