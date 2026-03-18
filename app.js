@@ -47,6 +47,9 @@ let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || {
 
 if(!appSettings.styleColors) appSettings.styleColors = {};
 if(!appSettings.tagColors) appSettings.tagColors = {};
+// נקה כפילויות שנשמרו בעבר
+appSettings.styles = [...new Set(appSettings.styles)];
+appSettings.tags = [...new Set(appSettings.tags)];
 
 if(!appSettings.homeLocation) {
     if(appSettings.chabadHouseCoords) {
@@ -1040,7 +1043,7 @@ function refreshMap(filteredRes = null) {
         let maxVal=0, showBldg=false;
         
         db[k].apts.forEach((a,i) => {
-            total++; if(stats[a.style]!==undefined) stats[a.style]++; else {stats[a.style]=1; appSettings.styles.push(a.style);}
+            total++; if(stats[a.style]!==undefined) stats[a.style]++; else {stats[a.style]=1; if(a.style && !appSettings.styles.includes(a.style)) appSettings.styles.push(a.style);}
             const c = getStatusColor(a); if (c === '#ef4444' || c === '#94a3b8') urgent++; const v = c === '#94a3b8' ? 0 : (c === '#10b981' ? 1 : (c === '#f59e0b' ? 2 : 3)); if (v > maxVal) maxVal = v;
             if(!filteredRes || filteredRes.find(r=>r.bldg===k && r.idx===i)) showBldg=true;
 
@@ -1158,7 +1161,7 @@ window.setItemColor = (type, name, color) => {
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
     openSettings();
     refreshMap();
-};;
+};
 
 window.saveSettingsAndClose=()=>{
     appSettings.defaultView=document.getElementById('setDefaultView').value; 
