@@ -646,7 +646,7 @@ window.handleOmniSearch = () => {
     
     const q=el.value.toLowerCase(), dd=document.getElementById('searchDropdown'); let res=[];
     Object.keys(db).forEach(b => { 
-        if(b === '__BOARDS__') return;
+        if(b === '__BOARDS__' || b === '__SETTINGS__') return;
         db[b].apts.forEach((a,i) => {
         let txt=`${b} ${a.name} ${getAllPhones(a).join(' ')} ${getAllEmails(a).join(' ')} ${a.notes||''} ${(a.tags||[]).join(' ')} ${a.father||''} ${a.mother||''}`.toLowerCase();
         let matchQ = q.length<2 || txt.includes(q);
@@ -772,7 +772,7 @@ window.deleteBoard = async (id) => {
     if(proceed) {
         db.__BOARDS__ = db.__BOARDS__.filter(x => x.id !== id);
         Object.keys(db).forEach(bldg => {
-           if(bldg !== '__BOARDS__') { db[bldg].apts.forEach(a => { if(a.boards && a.boards[id]) delete a.boards[id]; }); }
+           if(bldg !== '__BOARDS__' && bldg !== '__SETTINGS__') { db[bldg].apts.forEach(a => { if(a.boards && a.boards[id]) delete a.boards[id]; }); }
         });
         saveDB(); renderKanbanView(); showToast("הפרויקט נמחק לצמיתות", "success");
     }
@@ -817,7 +817,7 @@ window.renderKanbanView = (filteredRes = null) => {
     if(!activeBoard) return;
 
     let arr = filteredRes || []; 
-    if(!filteredRes) Object.keys(db).forEach(b=>{ if(b!=='__BOARDS__') db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})) });
+    if(!filteredRes) Object.keys(db).forEach(b=>{ if(b!=='__BOARDS__' && b!=='__SETTINGS__') db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})) });
     
     activeBoard.columns.forEach(stage => {
         let colCards = arr.filter(r => r.apt.boards && r.apt.boards[currentBoardId] === stage);
@@ -953,7 +953,7 @@ window.renderListView = (filteredRes = null) => {
     <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
     <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים ומייל</th></tr></thead><tbody>`;
     
-    let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__')db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
+    let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__' && b!=='__SETTINGS__')db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
     arr.forEach(r => {
         const enc=encodeURIComponent(r.bldg), bName=r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg, a=r.apt;
         let lastDate='-'; if(a.interactions&&a.interactions.length>0) lastDate=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date;
@@ -999,7 +999,7 @@ window.updateGoalTracker = () => {
     let count = 0;
     let q = appSettings.goal.text.toLowerCase();
     Object.keys(db).forEach(b => {
-        if(b === '__BOARDS__') return;
+        if(b === '__BOARDS__' || b === '__SETTINGS__') return;
         db[b].apts.forEach(a => {
             let txt=`${b} ${a.name} ${(a.tags||[]).join(' ')}`.toLowerCase();
             if(txt.includes(q)) count++;
@@ -1032,7 +1032,7 @@ function refreshMap(filteredRes = null) {
     }
 
     Object.keys(db).forEach(k => {
-        if(k === '__BOARDS__') return;
+        if(k === '__BOARDS__' || k === '__SETTINGS__') return;
         let maxVal=0, showBldg=false;
         
         db[k].apts.forEach((a,i) => {
