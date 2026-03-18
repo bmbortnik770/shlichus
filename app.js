@@ -59,6 +59,12 @@ if(!appSettings.homeLocation) {
 
 if(!appSettings.customFields) appSettings.customFields = [];
 if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי', target: 30 };
+if(!appSettings.templates) {
+    appSettings.templates = [
+        { title: 'הודעת פתיחה', text: 'שלום משפחת [שם], שמחים לעדכן אתכם ש...' },
+        { title: 'תזכורת', text: 'שלום משפחת [שם], מזכירים לכם לגבי האירוע הקרוב...' }
+    ];
+}
 
 document.documentElement.style.setProperty('--accent', appSettings.themeColor);
 let currentMainView = appSettings.defaultView || 'map';
@@ -351,6 +357,9 @@ window.switchCommTab = function(tabName) {
     document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
     document.getElementById('commTabBtn-' + tabName).classList.add('active');
     document.getElementById('comm-' + tabName).classList.add('active');
+    
+    if (tabName === 'templates') renderTemplates();
+    if (tabName === 'whatsapp' || tabName === 'email') renderCommSenders(tabName);
 };
 
 window.toggleMapStyle = () => { const s = map.getStyle().name.includes('Satellite'); map.setStyle(s ? 'mapbox://styles/mapbox/streets-v12' : 'mapbox://styles/mapbox/satellite-streets-v12'); showToast(s ? 'מפת רחובות' : 'מפת לוויין', 'info'); };
@@ -815,72 +824,18 @@ window.toggleAllBulk = (cb) => { const cbs=document.querySelectorAll('.bulk-cb')
 window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
 window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEach(c=>c.checked=false); const sa=document.getElementById('bulkSelectAll'); if(sa) sa.checked=false; updateBulkBar(); };
 
-window.bulkWhatsApp = async () => { 
-    const template = await showCustomDialog({ title: 'הודעת וואטסאפ', message: 'הקלד הודעה:\n(השתמש במילה [שם] כדי לשתול את שם המשפחה אוטומטית)', showInput: true, defaultValue: 'שלום משפחת [שם], ' });
-    if(template === null) return;
-    
-    let p=[]; 
-    bulkSelection.forEach(v=>{
-        let [b,i]=v.split('|'); let a=db[b].apts[i]; 
-        let phones = getAllPhones(a);
-        if(phones.length > 0) {
-            let cleanPhone = phones[0].replace(/\D/g,'');
-            if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
-            let personalizedText = template.replace(/\[שם\]/g, a.name || '');
-            p.push({phone: cleanPhone, text: encodeURIComponent(personalizedText)});
-        }
-    }); 
-    if(p.length>0) { 
-        window.open(`https://wa.me/972${p[0].phone}?text=${p[0].text}`, '_blank'); 
-        if(p.length > 1) showToast(`נפתח חלון לנמען הראשון. לוואטסאפ המוני עדיף להשתמש ברשימת תפוצה.`, 'warning');
-        else showToast(`נפתח וואטסאפ`, 'success');
-    } else {
-        showToast(`לא נמצאו מספרים למשפחות שסומנו`, 'error');
-    }
-    clearBulkSelection(); 
+window.bulkWhatsApp = () => { 
+    if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
+    switchMainView('comm');
+    switchCommTab('whatsapp');
+    showToast("בחר תבנית ושלח הודעה לנמענים שסומנו", "info");
 };
 
-window.bulkEmail = async () => {
-    let emails=[];
-    bulkSelection.forEach(v=>{
-        let [b,i]=v.split('|'); let a=db[b].apts[i]; 
-        let ems = getAllEmails(a);
-        emails = emails.concat(ems);
-    });
-    
-    if(emails.length === 0) return showToast(`לא נמצאו כתובות מייל למשפחות שסומנו`, 'error');
-
-    const template = await showCustomDialog({ title: 'שליחת מייל', message: `נמצאו ${emails.length} כתובות מייל.\nהקלד הודעה:\n(הערה: בשליחה המונית במייל יועתקו הכתובות ללוח לגיבוי)`, showInput: true, defaultValue: 'שלום רב,\n\n' });
-    if(template === null) return; 
-    
-    let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent('הודעה מבית חב"ד')}&body=${encodeURIComponent(template)}`;
-    
-    let copied = false;
-    try {
-        if(navigator.clipboard) {
-            await navigator.clipboard.writeText(emails.join(', '));
-            copied = true;
-        }
-    } catch(e) { console.log('Clipboard blocked'); }
-    
-    const link = document.createElement('a');
-    link.href = mailtoLink;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    if(copied) {
-        showToast(`נפתחה תוכנת המייל (הכתובות הועתקו ללוח)`, 'success');
-    } else {
-        showCustomDialog({
-            title: 'גיבוי כתובות מייל',
-            message: 'הדפדפן חסם העתקה אוטומטית. אם תוכנת המייל לא נפתחה, הנה הכתובות להעתקה ידנית:',
-            showInput: true,
-            defaultValue: emails.join(', '),
-            showCancel: false
-        });
-    }
-    clearBulkSelection();
+window.bulkEmail = () => { 
+    if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
+    switchMainView('comm');
+    switchCommTab('email');
+    showToast("הכן את המייל לנמענים שסומנו", "info");
 };
 
 window.bulkPhone = () => {
@@ -1247,3 +1202,124 @@ window.exportTableToCSV = () => {
 };
 window.exportData = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(db)], {type:'application/json;charset=utf-8;'})); a.download = `גיבוי_מלא_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
 window.importData = (e) => { const r=new FileReader(); r.onload=(ev)=>{try{db=JSON.parse(ev.target.result); if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: {code:'',rep:'',notes:'',coords:null}, apts:[] }; if(!db['__BOARDS__']) db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח כללי', columns: ['חדש', 'בטיפול', 'פעיל'], archived: false }]; saveDB(); showToast("שוחזר!","success"); closeModals(); handleOmniSearch(); }catch(err){showToast("קובץ שגוי","error");}}; r.readAsText(e.target.files[0]); e.target.value=''; };
+
+// --- ניהול תבניות ומרכז התקשורת ---
+window.renderTemplates = () => {
+    const container = document.getElementById('templatesListContainer');
+    if(!container) return;
+    if(!appSettings.templates || appSettings.templates.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="fas fa-file-signature"></i><div>אין תבניות שמורות. לחץ על "תבנית חדשה" כדי להתחיל.</div></div>';
+        return;
+    }
+    container.innerHTML = appSettings.templates.map((t, i) => `
+        <div class="template-card" style="display:flex; align-items:flex-start; background:var(--bg-body); border:1px solid var(--border-light); border-radius:8px; padding:12px; margin-bottom:10px;">
+            <div style="flex-grow:1; margin-left:15px;">
+                <div style="font-weight:bold; font-size:15px; color:var(--text-main); margin-bottom:5px;">${t.title}</div>
+                <div style="font-size:13px; color:var(--text-muted); white-space:pre-wrap;">${t.text}</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-shrink:0;">
+                <button class="btn-icon" style="color:var(--accent);" onclick="editTemplate(${i})" title="ערוך"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon" style="color:var(--danger);" onclick="deleteTemplate(${i})" title="מחק"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+    `).join('');
+};
+
+window.createNewTemplate = async () => {
+    const title = await showCustomDialog({ title: 'תבנית חדשה', message: 'תן שם קצר לתבנית:', showInput: true, showCancel: true });
+    if(!title) return;
+    const text = await showCustomDialog({ title: 'תוכן התבנית', message: 'הקלד את תוכן ההודעה.\n(אפשר להשתמש במילה [שם] לטובת שם המשפחה)', showInput: true, showCancel: true });
+    if(!text) return;
+    appSettings.templates.push({ title, text });
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    renderTemplates();
+    showToast("התבנית נשמרה", "success");
+};
+
+window.editTemplate = async (idx) => {
+    const t = appSettings.templates[idx];
+    const title = await showCustomDialog({ title: 'עריכת שם תבנית', message: 'שם התבנית:', showInput: true, defaultValue: t.title, showCancel: true });
+    if(!title) return;
+    const text = await showCustomDialog({ title: 'עריכת תוכן תבנית', message: 'תוכן ההודעה:', showInput: true, defaultValue: t.text, showCancel: true });
+    if(!text) return;
+    appSettings.templates[idx] = { title, text };
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    renderTemplates();
+    showToast("התבנית עודכנה", "success");
+};
+
+window.deleteTemplate = async (idx) => {
+    const proceed = await showCustomDialog({ title: 'מחיקת תבנית', message: 'האם למחוק תבנית זו?', showCancel: true });
+    if(!proceed) return;
+    appSettings.templates.splice(idx, 1);
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    renderTemplates();
+    showToast("התבנית נמחקה", "success");
+};
+
+window.renderCommSenders = (type) => {
+    const sel = document.getElementById(type === 'whatsapp' ? 'waTemplateSelect' : 'emTemplateSelect');
+    if(sel) {
+        sel.innerHTML = '<option value="">-- בחר תבנית או הקלד חופשי --</option>' +
+            (appSettings.templates || []).map((t, i) => `<option value="${i}">${t.title}</option>`).join('');
+    }
+    const countSpan = document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount');
+    if(countSpan) countSpan.innerText = bulkSelection.length;
+};
+
+window.previewWaTemplate = () => {
+    const idx = document.getElementById('waTemplateSelect').value;
+    if(idx !== '') document.getElementById('waMessageText').value = appSettings.templates[idx].text;
+};
+
+window.previewEmTemplate = () => {
+    const idx = document.getElementById('emTemplateSelect').value;
+    if(idx !== '') document.getElementById('emMessageText').value = appSettings.templates[idx].text;
+};
+
+window.sendCommWhatsApp = () => {
+    const text = document.getElementById('waMessageText').value;
+    if(!text) return showToast('יש להזין תוכן להודעה', 'warning');
+    if(bulkSelection.length === 0) return showToast('יש לסמן משפחות קודם!', 'error');
+    let p = [];
+    bulkSelection.forEach(v => {
+        let [b,i] = v.split('|'); let a = db[b].apts[i];
+        let phones = getAllPhones(a);
+        if(phones.length > 0) {
+            let cleanPhone = phones[0].replace(/\D/g,'');
+            if(cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
+            let personalizedText = text.replace(/\[שם\]/g, a.name || '');
+            p.push({ phone: cleanPhone, text: encodeURIComponent(personalizedText) });
+        }
+    });
+    if(p.length > 0) {
+        window.open(`https://wa.me/972${p[0].phone}?text=${p[0].text}`, '_blank');
+        if(p.length > 1) showToast(`נפתח חלון לנמען הראשון. לוואטסאפ המוני עדיף להשתמש ברשימת תפוצה.`, 'warning');
+        clearBulkSelection();
+        renderCommSenders('whatsapp');
+    } else {
+        showToast('לא נמצאו מספרים', 'error');
+    }
+};
+
+window.sendCommEmail = async () => {
+    const subj = document.getElementById('emSubject').value || 'הודעה מהקהילה';
+    const text = document.getElementById('emMessageText').value;
+    if(!text) return showToast('יש להזין תוכן למייל', 'warning');
+    if(bulkSelection.length === 0) return showToast('יש לסמן משפחות קודם!', 'error');
+    let emails = [];
+    bulkSelection.forEach(v => {
+        let [b,i] = v.split('|'); let a = db[b].apts[i];
+        emails = emails.concat(getAllEmails(a));
+    });
+    if(emails.length === 0) return showToast('לא נמצאו כתובות מייל למשפחות שסומנו', 'error');
+    let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
+    let copied = false;
+    try { if(navigator.clipboard) { await navigator.clipboard.writeText(emails.join(', ')); copied = true; } } catch(e) {}
+    const link = document.createElement('a'); link.href = mailtoLink;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    if(copied) showToast('נפתחה תוכנת המייל (הכתובות הועתקו ללוח לגיבוי)', 'success');
+    else showCustomDialog({ title: 'גיבוי', message: 'הדפדפן חסם העתקה. הנה הכתובות להעתקה ידנית:', showInput: true, defaultValue: emails.join(', '), showCancel: false });
+    clearBulkSelection();
+    renderCommSenders('email');
+};

@@ -143,10 +143,55 @@
         </div>
 
         <div id="comm-content-area" style="flex-grow: 1; padding: 20px; overflow-y: auto; background: var(--surface); margin: 0 20px 20px 20px; border-radius: 0 0 8px 8px; border: 1px solid var(--border-light); box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-            <div id="comm-whatsapp" class="comm-tab-content active"><h3 style="margin-top:0;">שליחת וואטסאפ המוני (תפוצה)</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
-            <div id="comm-email" class="comm-tab-content"><h3 style="margin-top:0;">מערך דיוור במייל</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
+            <div id="comm-whatsapp" class="comm-tab-content active">
+                <h3 style="margin-top:0; color:#25D366;"><i class="fab fa-whatsapp"></i> שליחת הודעות וואטסאפ</h3>
+                <div style="background:var(--bg-body); padding:12px; border-radius:8px; margin-bottom:15px; border:1px solid var(--border-light);">
+                    <strong>קהל יעד:</strong> <span id="waRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span> משפחות סומנו מתוך הרשימה/מפה.
+                </div>
+                <div class="form-group">
+                    <label>בחר תבנית הודעה:</label>
+                    <select id="waTemplateSelect" onchange="previewWaTemplate()"><option value="">-- בחר תבנית או הקלד חופשי --</option></select>
+                </div>
+                <div class="form-group">
+                    <label>תוכן ההודעה:</label>
+                    <textarea id="waMessageText" rows="4" placeholder="הקלד את ההודעה כאן... (השתמש ב-[שם] לשילוב אוטומטי של שם המשפחה)" class="inline-input" style="width:100%;"></textarea>
+                </div>
+                <button class="btn btn-success" onclick="sendCommWhatsApp()"><i class="fab fa-whatsapp"></i> פתח וואטסאפ לנמענים</button>
+            </div>
+
+            <div id="comm-email" class="comm-tab-content">
+                <h3 style="margin-top:0; color:#ea4335;"><i class="fas fa-envelope"></i> מערך דיוור במייל</h3>
+                <div style="background:var(--bg-body); padding:12px; border-radius:8px; margin-bottom:15px; border:1px solid var(--border-light);">
+                    <strong>קהל יעד:</strong> <span id="emRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span> משפחות סומנו מתוך הרשימה/מפה.
+                </div>
+                <div class="form-group">
+                    <label>נושא המייל:</label>
+                    <input type="text" id="emSubject" class="inline-input" style="width:100%;" placeholder="הקלד נושא למייל...">
+                </div>
+                <div class="form-group">
+                    <label>בחר תבנית:</label>
+                    <select id="emTemplateSelect" onchange="previewEmTemplate()"><option value="">-- בחר תבנית או הקלד חופשי --</option></select>
+                </div>
+                <div class="form-group">
+                    <label>תוכן המייל:</label>
+                    <textarea id="emMessageText" rows="5" placeholder="הקלד את תוכן המייל..." class="inline-input" style="width:100%;"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="sendCommEmail()" style="background:#ea4335; border-color:#ea4335;"><i class="fas fa-paper-plane"></i> פתח תוכנת מייל לשליחה</button>
+            </div>
+
             <div id="comm-phone" class="comm-tab-content"><h3 style="margin-top:0;">רשימות חיוג (Call Center)</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
-            <div id="comm-templates" class="comm-tab-content"><h3 style="margin-top:0;">ניהול תבניות</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
+
+            <div id="comm-templates" class="comm-tab-content">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="margin:0;"><i class="fas fa-file-alt" style="color:var(--accent);"></i> ניהול תבניות הודעה</h3>
+                    <button class="btn btn-primary" style="width:auto; padding:6px 15px;" onclick="createNewTemplate()"><i class="fas fa-plus"></i> תבנית חדשה</button>
+                </div>
+                <div style="background:var(--bg-body); padding:10px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px; font-size:13px; color:var(--text-muted);">
+                    <i class="fas fa-lightbulb" style="color:var(--warning);"></i> <strong>טיפ:</strong> השתמש במילה <strong>[שם]</strong> בתוך התבנית כדי שהמערכת תשתול אוטומטית את שם המשפחה בשליחה המונית.
+                </div>
+                <div id="templatesListContainer"></div>
+            </div>
+
             <div id="comm-logs" class="comm-tab-content"><h3 style="margin-top:0;">היסטוריית תקשורת</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
         </div>
     </div>
