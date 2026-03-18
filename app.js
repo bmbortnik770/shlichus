@@ -654,7 +654,12 @@ window.handleOmniSearch = () => {
         let matchTag = !currentFilters.tags || (a.tags||[]).includes(currentFilters.tags);
         let col = getStatusColor(a);
         let matchStat = !currentFilters.status || (currentFilters.status==='green'&&col==='#10b981') || (currentFilters.status==='orange'&&col==='#f59e0b') || (currentFilters.status==='red'&&(col==='#ef4444'||col==='#94a3b8'));
-        if(matchQ && matchStyle && matchTag && matchStat) res.push({bldg:b, idx:i, apt:a});
+            
+        // בדיקת נתונים חסרים
+        let hasMissing = (getAllPhones(a).length === 0) || (b === NO_ADDRESS_KEY);
+        let matchMissing = !window.missingDataMode || hasMissing;
+
+        if(matchQ && matchStyle && matchTag && matchStat && matchMissing) res.push({bldg:b, idx:i, apt:a});
     });});
     
     if(q.length>=2 && res.length>0) { 
@@ -1178,6 +1183,8 @@ window.deleteStyle = async (idx) => {
     delete appSettings.styleColors[name];
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); saveDB(); populateFilterDropdowns(); openSettings(); refreshMap();
 };
+
+window.addNewStyle = () => {
     const v = document.getElementById('newStyleInput').value.trim();
     if(!v) return;
     if(appSettings.styles.includes(v)) { showToast('סגנון זה כבר קיים', 'warning'); return; }
@@ -1565,3 +1572,19 @@ function executeQueueAction(name, phone, email, text) {
     window.currentQueueIdx++;
     setTimeout(processNextInQueue, 600);
 }
+
+window.missingDataMode = false;
+window.toggleMissingDataFilter = () => {
+    window.missingDataMode = !window.missingDataMode;
+    const btn = document.getElementById('missingDataBtn');
+    
+    if (window.missingDataMode) {
+        btn.style.background = 'var(--danger)';
+        btn.style.color = 'white';
+        showToast('מציג משפחות ללא טלפון או ללא כתובת מוגדרת', 'info');
+    } else {
+        btn.style.background = 'var(--bg-body)';
+        btn.style.color = 'var(--text-main)';
+    }
+    handleOmniSearch(); 
+};

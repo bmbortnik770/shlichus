@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js"></script>
 
     <link rel="stylesheet" href="style.css?v=5">
@@ -92,6 +92,7 @@
             <input type="text" id="smartSearch" placeholder="חיפוש מהיר (שם, טלפון, רחוב)..." autocomplete="off">
             <div id="searchDropdown"></div>
         </div>
+        <button class="filter-select" id="missingDataBtn" onclick="toggleMissingDataFilter()" style="width:auto; background:var(--bg-body);"><i class="fas fa-clipboard-check"></i> חסר מידע</button>
         <select class="filter-select" id="fStyle" onchange="applyAdvFilters()"><option value="">כל הסגנונות</option></select>
         <select class="filter-select" id="fTag" onchange="applyAdvFilters()"><option value="">כל התגיות</option></select>
         <select class="filter-select" id="fStatus" onchange="applyAdvFilters()"><option value="">כל הסטטוסים</option><option value="green">קשר טרי (ירוק)</option><option value="orange">קשר בינוני (כתום)</option><option value="red">לטיפול (אדום/אפור)</option></select>
