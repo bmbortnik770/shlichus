@@ -100,6 +100,11 @@
     <div id="map-container">
         <div id="map"></div>
         <div class="map-custom-controls">
+            <select id="markerColorMode" onchange="changeMarkerColorMode()" class="map-ctrl-btn" style="width:auto; padding:0 10px; font-size:13px; font-weight:bold; height:36px; border-radius:18px; border:2px solid var(--accent); background:var(--surface); margin-bottom:8px;">
+                <option value="status">צבע: לפי קשר</option>
+                <option value="style">צבע: לפי סגנון</option>
+                <option value="tag">צבע: לפי תגית</option>
+            </select>
             <button class="map-ctrl-btn" onclick="toggleMapStyle()" title="החלף תצוגת לוויין/רחוב"><i class="fas fa-layer-group"></i></button>
             <button class="map-ctrl-btn" id="btnGoHome" onclick="flyToHome()" title="חזור למיקום המרכזי" style="display:none; color:var(--accent); margin-top:8px;"><i class="fas fa-home" id="homeIconBtn"></i></button>
         </div>

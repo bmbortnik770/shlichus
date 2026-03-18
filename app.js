@@ -16,6 +16,21 @@ mapboxgl.accessToken = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhb
 mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.3.0/mapbox-gl-rtl-text.js', null, true);
 const NO_ADDRESS_KEY = "__NO_ADDRESS__";
 
+let markerColorMode = 'status';
+const markerPalette = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#14b8a6', '#f43f5e', '#84cc16', '#0ea5e9', '#d946ef'];
+
+function getColorForString(str, type) {
+    if(!str) return '#94a3b8';
+    let arr = type === 'style' ? appSettings.styles : appSettings.tags;
+    let idx = arr.indexOf(str);
+    return idx === -1 ? '#94a3b8' : markerPalette[idx % markerPalette.length];
+}
+
+window.changeMarkerColorMode = () => { 
+    markerColorMode = document.getElementById('markerColorMode').value; 
+    refreshMap(); 
+};
+
 let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || { 
     center: [35.24430, 31.82650], zoom: 17.5, pitch: 60, themeColor: '#3b82f6', defaultView: 'map',
     tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: [],
@@ -153,6 +168,7 @@ window.onload = () => {
     switchMainView(currentMainView);
     if(localStorage.getItem('darkMode')==='true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className='fas fa-sun'; }
     populateFilterDropdowns();
+    document.getElementById('smartSearch').addEventListener('input', handleOmniSearch);
 
     const session = JSON.parse(localStorage.getItem('gdrive_session'));
     if (session && session.token && session.expiresAt > new Date().getTime()) {
@@ -568,26 +584,24 @@ window.handleOmniSearch = () => {
     if(currentMainView==='kanban') renderKanbanView(res);
 };
 
-// תיקון באג החיפוש! איפוס וקפיצה חלקה למשפחה
 window.jumpToSearchResult = (b,i) => { 
     document.getElementById('searchDropdown').style.display='none'; 
-    document.getElementById('smartSearch').value=''; 
     currentBldg = decodeURIComponent(b); 
-    
-    if(currentMainView !== 'map') { switchMainView('map'); }
-    
-    let coords = null;
-    if(currentBldg !== NO_ADDRESS_KEY && db[currentBldg].info && db[currentBldg].info.coords) {
-        coords = db[currentBldg].info.coords;
-    } else if (currentBldg !== NO_ADDRESS_KEY) {
-        coords = currentBldg.split(',').map(Number); 
-    }
-    
-    handleOmniSearch(); // מנקה את הסינונים מהמפה כדי שהכל יחזור להופיע!
-    
-    if(coords && !isNaN(coords[0])) {
-        map.flyTo({ center: coords, zoom: 19, pitch: 60 });
-        setTimeout(() => { openClientCard(i); }, 1200);
+    document.getElementById('smartSearch').value=''; 
+    handleOmniSearch(); 
+    if(currentMainView === 'map') {
+        let coords = null;
+        if(currentBldg !== NO_ADDRESS_KEY && db[currentBldg].info && db[currentBldg].info.coords) {
+            coords = db[currentBldg].info.coords;
+        } else if (currentBldg !== NO_ADDRESS_KEY) {
+            coords = currentBldg.split(',').map(Number); 
+        }
+        if(coords && !isNaN(coords[0])) {
+            map.flyTo({ center: coords, zoom: 19, pitch: 60 });
+            setTimeout(() => { openClientCard(i); }, 1200);
+        } else {
+            openClientCard(i); 
+        }
     } else {
         openClientCard(i); 
     }
@@ -613,6 +627,7 @@ window.ctxDelete = () => {
         let deletedBldg = ctxBldg;
         let deletedIdx = ctxIdx;
         saveDB(); 
+        handleOmniSearch();
         showUndoToast("המשפחה נמחקה", () => {
             db[deletedBldg].apts.splice(deletedIdx, 0, deletedData);
             saveDB();
@@ -685,6 +700,11 @@ window.renderKanbanView = (filteredRes = null) => {
     else currentBoardId = db.__BOARDS__[0].id;
     
     const activeBoard = db.__BOARDS__.find(b => b.id === currentBoardId);
+    
+    if (!activeBoard) {
+        document.getElementById('activeKanbanBoard').value = 'b_default';
+        return renderKanbanView(filteredRes);
+    }
     
     const actionsSpan = document.getElementById('kanbanBoardActions');
     if(activeBoard.id === 'b_default') {
@@ -870,7 +890,7 @@ window.bulkRoute = () => {
     }
     
     let destination = waypoints.length > 0 ? waypoints.pop() : origin; 
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+    let url = `http://googleusercontent.com/maps.google.com/maps?saddr=${origin}&daddr=${destination}`;
     
     if(waypoints.length > 0) {
         url += `&waypoints=${waypoints.join('|')}`;
@@ -974,7 +994,7 @@ function refreshMap(filteredRes = null) {
         
         db[k].apts.forEach((a,i) => {
             total++; if(stats[a.style]!==undefined) stats[a.style]++; else {stats[a.style]=1; appSettings.styles.push(a.style);}
-            const c=getStatusColor(a); if(c==='#ef4444'||c==='#94a3b8') urgent++; const v=c==='#10b981'?1:(c==='#f59e0b'?2:3); if(v>maxVal) maxVal=v;
+            const c=getStatusColor(a); if(c==='#ef4444'||c==='#94a3b8') urgent++; const v = c === '#94a3b8' ? 0 : (c === '#10b981' ? 1 : (c === '#f59e0b' ? 2 : 3)); if(v>maxVal) maxVal=v;
             if(!filteredRes || filteredRes.find(r=>r.bldg===k && r.idx===i)) showBldg=true;
 
             (a.childrenList||[]).forEach(ch => { if(ch.dob && new Date(ch.dob).getMonth()===cMonth) alerts.push(`<div style="padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);"><i class="fas fa-birthday-cake" style="color:var(--warning);"></i> ${ch.name} (משפ' ${a.name||''}) חוגג/ת</div>`); });
@@ -989,7 +1009,13 @@ function refreshMap(filteredRes = null) {
             if(!isNaN(coords[0]) && !(appSettings.homeLocation && appSettings.homeLocation.isChabad && Math.abs(coords[0]-appSettings.homeLocation.coords[0])<0.001 && Math.abs(coords[1]-appSettings.homeLocation.coords[1])<0.001)) {
                 
                 const markerColors = ['#94a3b8','#10b981','#f59e0b','#ef4444'];
-                const bgColor = markerColors[maxVal];
+                let bgColor = markerColors[maxVal];
+                if (markerColorMode === 'style') {
+                    bgColor = getColorForString(db[k].apts[0].style, 'style');
+                } else if (markerColorMode === 'tag') {
+                    let firstTag = (db[k].apts[0].tags && db[k].apts[0].tags.length > 0) ? db[k].apts[0].tags[0] : null;
+                    bgColor = getColorForString(firstTag, 'tag');
+                }
                 
                 const el = document.createElement('div');
                 el.style.backgroundColor = bgColor;
@@ -1068,6 +1094,20 @@ window.saveSettingsAndClose=()=>{
 
 window.setDefaultLocation=()=>{appSettings.center=[map.getCenter().lng,map.getCenter().lat]; appSettings.zoom=map.getZoom(); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); showToast("נשמר מיקום מפה","success");};
 
-window.exportTableToCSV = () => { let csv = "\uFEFFכתובת/בניין,שם משפחה,דירה,סגנון,פרויקטים,תגיות,קשר אחרון,טלפונים,מיילים,הערות\n"; Object.keys(db).forEach(b=>{ if(b==='__BOARDS__')return; db[b].apts.forEach(a=>{ let tags=(a.tags||[]).join(' - '), phones=getAllPhones(a).join(' - '), emails=getAllEmails(a).join(' - '), notes=(a.notes||'').replace(/,/g,' ').replace(/\n/g,' '); let last='-'; if(a.interactions&&a.interactions.length>0) last=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; let boardsStr = a.boards ? Object.entries(a.boards).map(([bid, st]) => `${db.__BOARDS__.find(x=>x.id===bid)?.name||''}:${st}`).join(' | ') : ''; csv += `${b===NO_ADDRESS_KEY?'ללא כתובת':b.replace(/,/g,'')},${(a.name||'').replace(/,/g,'')},${a.num||''},${a.style||''},${boardsStr},${tags},${last},${phones},${emails},${notes}\n`; })}); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = `קהילה_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("ייצוא הושלם!","success"); };
-window.exportData = () => { const a=document.createElement('a'); a.href="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)); a.download=`גיבוי_מלא_${new Date().toISOString().slice(0,10)}.json`; a.click(); };
-window.importData = (e) => { const r=new FileReader(); r.onload=(ev)=>{try{db=JSON.parse(ev.target.result);saveDB();showToast("שוחזר!","success");closeModals();}catch(err){showToast("קובץ שגוי","error");}}; r.readAsText(e.target.files[0]); e.target.value=''; };
+window.exportTableToCSV = () => { 
+    let customHeaders = appSettings.customFields.join(',');
+    let csv = `\uFEFFכתובת/בניין,שם משפחה,דירה,סגנון,פרויקטים,תגיות,קשר אחרון,טלפונים,מיילים,הערות${customHeaders ? ',' + customHeaders : ''}\n`; 
+    Object.keys(db).forEach(b=>{ 
+        if(b==='__BOARDS__')return; 
+        db[b].apts.forEach(a=>{ 
+            let tags=(a.tags||[]).join(' - '), phones=getAllPhones(a).join(' - '), emails=getAllEmails(a).join(' - '), notes=(a.notes||'').replace(/,/g,' ').replace(/\n/g,' '); 
+            let last='-'; if(a.interactions&&a.interactions.length>0) last=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; 
+            let boardsStr = a.boards ? Object.entries(a.boards).map(([bid, st]) => `${db.__BOARDS__.find(x=>x.id===bid)?.name||''}:${st}`).join(' | ') : ''; 
+            let customVals = appSettings.customFields.map(f => (a.customFields && a.customFields[f] ? a.customFields[f].replace(/,/g,' ') : '')).join(',');
+            csv += `${b===NO_ADDRESS_KEY?'ללא כתובת':b.replace(/,/g,'')},${(a.name||'').replace(/,/g,'')},${a.num||''},${a.style||''},${boardsStr},${tags},${last},${phones},${emails},${notes}${customVals ? ',' + customVals : ''}\n`; 
+        })
+    }); 
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); a.download = `קהילה_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("ייצוא הושלם!","success"); 
+};
+window.exportData = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(db)], {type:'application/json;charset=utf-8;'})); a.download = `גיבוי_מלא_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); };
+window.importData = (e) => { const r=new FileReader(); r.onload=(ev)=>{try{db=JSON.parse(ev.target.result); if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: {code:'',rep:'',notes:'',coords:null}, apts:[] }; if(!db['__BOARDS__']) db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח כללי', columns: ['חדש', 'בטיפול', 'פעיל'], archived: false }]; saveDB(); showToast("שוחזר!","success"); closeModals(); handleOmniSearch(); }catch(err){showToast("קובץ שגוי","error");}}; r.readAsText(e.target.files[0]); e.target.value=''; };
