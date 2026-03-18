@@ -1037,7 +1037,7 @@ function refreshMap(filteredRes = null) {
 
         if(showBldg && db[k].apts.length>0 && k!==NO_ADDRESS_KEY) {
             let coords=db[k].info.coords||k.split(',').map(Number);
-            if(!isNaN(coords[0]) && !(appSettings.homeLocation && appSettings.homeLocation.isChabad && Math.abs(coords[0]-appSettings.homeLocation.coords[0])<0.0001 && Math.abs(coords[1]-appSettings.homeLocation.coords[1])<0.0001)) {
+            if(!isNaN(coords[0])) {
                 
                 const markerColors = ['#94a3b8','#10b981','#f59e0b','#ef4444'];
                 let bgColor = markerColors[maxVal];
@@ -1064,7 +1064,10 @@ function refreshMap(filteredRes = null) {
                 el.style.cursor = 'pointer';
                 el.innerText = db[k].apts.length; 
 
-                const marker = new mapboxgl.Marker({element: el}).setLngLat(coords).addTo(map);
+                const isChabadBldg = appSettings.homeLocation && appSettings.homeLocation.isChabad && appSettings.homeLocation.coords &&
+                    Math.abs(coords[0]-appSettings.homeLocation.coords[0])<0.0002 && Math.abs(coords[1]-appSettings.homeLocation.coords[1])<0.0002;
+                const markerOffset = isChabadBldg ? [22, -10] : [0, 0];
+                const marker = new mapboxgl.Marker({element: el, offset: markerOffset}).setLngLat(coords).addTo(map);
                 
                 el.addEventListener('click', (e) => {
                     e.stopPropagation(); 
@@ -1080,7 +1083,7 @@ function refreshMap(filteredRes = null) {
     document.getElementById('kpiTotal').innerText=total; document.getElementById('kpiUrgent').innerText=urgent;
     const alDiv = document.getElementById('kpiAlerts'); alDiv.innerHTML='';
     if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding:0; list-style:none; font-weight:normal;">${alerts.slice(0,6).join('')}${alerts.length>6?'<li style="padding-top:5px; color:var(--text-muted);">ועוד...</li>':''}</ul></div>`;
-    if(chart) chart.destroy(); const chartColors = Object.keys(stats).map((_,i) => markerPalette[i % markerPalette.length]); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
+    if(chart) chart.destroy(); const chartColors = Object.keys(stats).map(s => getColorForString(s, 'style')); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
     
     updateGoalTracker();
     updateHomeButton();
@@ -1098,7 +1101,12 @@ function toggleMobileMenu(){document.getElementById('sidebar').classList.toggle(
 
 window.openSettings=()=>{
     document.getElementById('setThemeColor').value=appSettings.themeColor; document.getElementById('setDefaultView').value=appSettings.defaultView;
-    document.getElementById('currentPrimaryAddress').innerText = (appSettings.primaryLocation && appSettings.primaryLocation.address) ? appSettings.primaryLocation.address : 'לא הוגדר';
+    const chabadAddr = (appSettings.primaryLocation && appSettings.primaryLocation.address) 
+        ? appSettings.primaryLocation.address 
+        : (appSettings.homeLocation && appSettings.homeLocation.isChabad && appSettings.homeLocation.address) 
+            ? appSettings.homeLocation.address 
+            : 'לא הוגדר';
+    document.getElementById('currentPrimaryAddress').innerText = chabadAddr;
     if(appSettings.homeLocation && !appSettings.homeLocation.isChabad) {
         document.getElementById('locTypeOther').checked = true;
     } else {
