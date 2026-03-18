@@ -1380,7 +1380,7 @@ window.previewEmTemplate = () => {
     if(idx !== '') document.getElementById('emMessageText').value = appSettings.templates[idx].text;
 };
 
-window.sendCommWhatsApp = () => {
+window.sendCommWhatsApp = async () => {
     let text = document.getElementById('waMessageText').value;
     if(!text) return showToast('יש להזין תוכן להודעה', 'warning');
     if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
@@ -1391,46 +1391,109 @@ window.sendCommWhatsApp = () => {
         return { phone: cleanPhone, text: encodeURIComponent(text.replace(/\[שם\]/g, r.name||'')) };
     });
 
-    if(p.length > 0) { 
-        window.open(`https://wa.me/972${p[0].phone}?text=${p[0].text}`, '_blank'); 
-        if(p.length > 1) showToast(`נפתח חלון לנמען הראשון בלבד (מגבלת וואטסאפ)`, 'warning');
-        commRecipients = [];
-        renderRecipientsList('whatsapp');
-        document.getElementById('waRecipientCount').innerText = 0;
-    } else {
-        showToast('לא נמצאו מספרי טלפון בנמענים', 'error');
+    if(p.length === 0) return showToast('לא נמצאו מספרי טלפון בנמענים', 'error');
+
+    // בדיקה האם המשתמש גולש דרך טלפון נייד
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    let choice = '1'; 
+
+    // אם אנחנו לא בטלפון נייד (כלומר במחשב), נשאל באיזו תוכנה לפתוח
+    if (!isMobile) {
+        choice = await showChoiceDialog(
+            'פתיחת וואטסאפ',
+            'זיהינו שאתה ממחשב. איך תרצה לפתוח את ההודעה?',
+            '<i class="fab fa-whatsapp"></i> בדפדפן (Web)',
+            '<i class="fas fa-desktop"></i> באפליקציה במחשב'
+        );
+        if(!choice) return; // המשתמש לחץ ביטול
     }
+
+    let targetPhone = `972${p[0].phone}`;
+    let targetText = p[0].text;
+    let link = '';
+
+    // הרכבת הקישור המתאים לפי המכשיר או הבחירה
+    if (isMobile) {
+        link = `https://wa.me/${targetPhone}?text=${targetText}`; // בטלפון יפתח ישירות את האפליקציה
+    } else if (choice === '1') {
+        link = `https://web.whatsapp.com/send?phone=${targetPhone}&text=${targetText}`; // במחשב - דפדפן
+    } else if (choice === '2') {
+        link = `whatsapp://send?phone=${targetPhone}&text=${targetText}`; // במחשב - תוכנה מותקנת
+    }
+
+    window.open(link, '_blank');
+
+    if(p.length > 1) showToast('נפתח חלון לנמען הראשון בלבד (מגבלת וואטסאפ)', 'warning');
+    else showToast('פותח וואטסאפ...', 'success');
+
+    // איפוס הרשימה
+    commRecipients = [];
+    renderRecipientsList('whatsapp');
+    document.getElementById('waRecipientCount').innerText = 0;
 };
 
-window.sendCommEmail = () => {
+window.sendCommEmail = async () => {
     let subj = document.getElementById('emSubject').value || 'הודעה מהקהילה';
     let text = document.getElementById('emMessageText').value;
+    
     if(!text) return showToast('יש להזין תוכן למייל', 'warning');
     if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
 
     let emails = commRecipients.filter(r => r.email).map(r => r.email);
     if(emails.length === 0) return showToast('לא נמצאו כתובות מייל בנמענים', 'error');
 
-    let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
-    
-    // פותח את המייל קודם כל
-    const a = document.createElement('a');
-    a.href = mailtoLink;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    showToast('נפתחה תוכנת המייל', 'success');
-    
-    // clipboard ברקע בלי לחסום כלום
-    setTimeout(() => {
-        if(navigator.clipboard) {
-            navigator.clipboard.writeText(emails.join(', ')).catch(() => {});
-        }
-    }, 1000);
-    
+    // קריאה לחלונית היפה שבנינו עם כפתורים מותאמים
+    const choice = await showChoiceDialog(
+        'בחירת פלטפורמת דואר',
+        'באיזו תוכנה תרצה להשתמש כדי לשלוח את המייל?',
+        '<i class="fab fa-google"></i> ג\'ימייל בדפדפן',
+        '<i class="fas fa-desktop"></i> תוכנה במחשב (Outlook)'
+    );
+
+    if(!choice) return; // המשתמש לחץ על ביטול
+
+    // העתקת הכתובות ללוח לגיבוי
+    if(navigator.clipboard) {
+        navigator.clipboard.writeText(emails.join(', ')).catch(() => {});
+    }
+
+    if (choice === '1') {
+        let gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&bcc=${emails.join(',')}&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
+        window.open(gmailLink, '_blank');
+        showToast('ג\'ימייל נפתח בחלונית חדשה', 'success');
+    } else if (choice === '2') {
+        let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
+        window.location.href = mailtoLink;
+        showToast('נפתחה תוכנת המייל שבמחשב', 'success');
+    }
+
+    // איפוס הרשימה
     commRecipients = [];
     renderRecipientsList('email');
     document.getElementById('emRecipientCount').innerText = 0;
 };
+// פונקציה ליצירת חלונית בחירה מעוצבת עם כפתורים
+function showChoiceDialog(title, message, btn1Text, btn2Text) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal';
+        overlay.style.display = 'flex';
+        overlay.style.zIndex = '100001';
+        overlay.innerHTML = `
+            <div class="modal-content modal-small" style="text-align:center;">
+                <h3 style="color:var(--primary); margin-top:0;">${title}</h3>
+                <p style="margin-bottom:20px; color:var(--text-main); font-size:15px;">${message}</p>
+                <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                    <button id="btnChoice1" class="btn btn-primary" style="width:auto; padding:8px 15px;">${btn1Text}</button>
+                    <button id="btnChoice2" class="btn btn-success" style="width:auto; padding:8px 15px;">${btn2Text}</button>
+                    <button id="btnChoiceCancel" class="btn btn-outline" style="width:auto; padding:8px 15px;">ביטול</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('#btnChoice1').onclick = () => { overlay.remove(); resolve('1'); };
+        overlay.querySelector('#btnChoice2').onclick = () => { overlay.remove(); resolve('2'); };
+        overlay.querySelector('#btnChoiceCancel').onclick = () => { overlay.remove(); resolve(null); };
+    });
+}
