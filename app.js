@@ -1397,6 +1397,12 @@ window.sendCommWhatsApp = async () => {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     let choice = '1'; 
 
+    let targetPhone = `972${p[0].phone}`;
+    let targetText = p[0].text;
+
+    // פותחים חלון מיד (לפני כל await) כדי למנוע חסימת popup
+    const newWin = isMobile ? null : window.open('about:blank', '_blank');
+
     // אם אנחנו לא בטלפון נייד (כלומר במחשב), נשאל באיזו תוכנה לפתוח
     if (!isMobile) {
         choice = await showChoiceDialog(
@@ -1405,23 +1411,17 @@ window.sendCommWhatsApp = async () => {
             '<i class="fab fa-whatsapp"></i> בדפדפן (Web)',
             '<i class="fas fa-desktop"></i> באפליקציה במחשב'
         );
-        if(!choice) return; // המשתמש לחץ ביטול
+        if(!choice) { if(newWin) newWin.close(); return; }
     }
-
-    let targetPhone = `972${p[0].phone}`;
-    let targetText = p[0].text;
-    let link = '';
 
     // הרכבת הקישור המתאים לפי המכשיר או הבחירה
     if (isMobile) {
-        link = `https://wa.me/${targetPhone}?text=${targetText}`; // בטלפון יפתח ישירות את האפליקציה
+        window.open(`https://wa.me/${targetPhone}?text=${targetText}`, '_blank');
     } else if (choice === '1') {
-        link = `https://web.whatsapp.com/send?phone=${targetPhone}&text=${targetText}`; // במחשב - דפדפן
+        newWin.location.href = `https://web.whatsapp.com/send?phone=${targetPhone}&text=${targetText}`;
     } else if (choice === '2') {
-        link = `whatsapp://send?phone=${targetPhone}&text=${targetText}`; // במחשב - תוכנה מותקנת
+        newWin.location.href = `whatsapp://send?phone=${targetPhone}&text=${targetText}`;
     }
-
-    window.open(link, '_blank');
 
     if(p.length > 1) showToast('נפתח חלון לנמען הראשון בלבד (מגבלת וואטסאפ)', 'warning');
     else showToast('פותח וואטסאפ...', 'success');
@@ -1442,6 +1442,9 @@ window.sendCommEmail = async () => {
     let emails = commRecipients.filter(r => r.email).map(r => r.email);
     if(emails.length === 0) return showToast('לא נמצאו כתובות מייל בנמענים', 'error');
 
+    // פותחים חלון מיד (לפני כל await) כדי למנוע חסימת popup
+    const newWin = window.open('about:blank', '_blank');
+
     // קריאה לחלונית היפה שבנינו עם כפתורים מותאמים
     const choice = await showChoiceDialog(
         'בחירת פלטפורמת דואר',
@@ -1450,7 +1453,7 @@ window.sendCommEmail = async () => {
         '<i class="fas fa-desktop"></i> תוכנה במחשב (Outlook)'
     );
 
-    if(!choice) return; // המשתמש לחץ על ביטול
+    if(!choice) { newWin.close(); return; }
 
     // העתקת הכתובות ללוח לגיבוי
     if(navigator.clipboard) {
@@ -1459,9 +1462,10 @@ window.sendCommEmail = async () => {
 
     if (choice === '1') {
         let gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&bcc=${emails.join(',')}&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
-        window.open(gmailLink, '_blank');
+        newWin.location.href = gmailLink;
         showToast('ג\'ימייל נפתח בחלונית חדשה', 'success');
     } else if (choice === '2') {
+        newWin.close();
         let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
         window.location.href = mailtoLink;
         showToast('נפתחה תוכנת המייל שבמחשב', 'success');
