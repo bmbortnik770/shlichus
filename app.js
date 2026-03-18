@@ -826,14 +826,18 @@ window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEac
 
 window.bulkWhatsApp = () => { 
     if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
+    const saved = [...bulkSelection];
     switchMainView('comm');
+    bulkSelection = saved;
     switchCommTab('whatsapp');
     showToast("בחר תבנית ושלח הודעה לנמענים שסומנו", "info");
 };
 
 window.bulkEmail = () => { 
     if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
+    const saved = [...bulkSelection];
     switchMainView('comm');
+    bulkSelection = saved;
     switchCommTab('email');
     showToast("הכן את המייל לנמענים שסומנו", "info");
 };
@@ -1278,48 +1282,59 @@ window.previewEmTemplate = () => {
 };
 
 window.sendCommWhatsApp = () => {
-    const text = document.getElementById('waMessageText').value;
+    let text = document.getElementById('waMessageText').value;
     if(!text) return showToast('יש להזין תוכן להודעה', 'warning');
     if(bulkSelection.length === 0) return showToast('יש לסמן משפחות קודם!', 'error');
-    let p = [];
-    bulkSelection.forEach(v => {
-        let [b,i] = v.split('|'); let a = db[b].apts[i];
+    
+    let p=[]; 
+    bulkSelection.forEach(v=>{
+        let [b,i]=v.split('|'); let a=db[b].apts[i]; 
         let phones = getAllPhones(a);
         if(phones.length > 0) {
-            let cleanPhone = phones[0].replace(/\D/g,'');
-            if(cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
+            let cleanPhone = String(phones[0]).replace(/\D/g,'');
+            if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
             let personalizedText = text.replace(/\[שם\]/g, a.name || '');
-            p.push({ phone: cleanPhone, text: encodeURIComponent(personalizedText) });
+            p.push({phone: cleanPhone, text: encodeURIComponent(personalizedText)});
         }
-    });
-    if(p.length > 0) {
-        window.open(`https://wa.me/972${p[0].phone}?text=${p[0].text}`, '_blank');
-        if(p.length > 1) showToast(`נפתח חלון לנמען הראשון. לוואטסאפ המוני עדיף להשתמש ברשימת תפוצה.`, 'warning');
+    }); 
+    if(p.length>0) { 
+        window.open(`https://wa.me/972${p[0].phone}?text=${p[0].text}`, '_blank'); 
+        if(p.length > 1) showToast(`נפתח חלון לנמען הראשון בלבד (מגבלת וואטסאפ)`, 'warning');
         clearBulkSelection();
         renderCommSenders('whatsapp');
     } else {
-        showToast('לא נמצאו מספרים', 'error');
+        showToast(`לא נמצאו מספרים למשפחות שסומנו`, 'error');
     }
 };
 
-window.sendCommEmail = async () => {
-    const subj = document.getElementById('emSubject').value || 'הודעה מהקהילה';
-    const text = document.getElementById('emMessageText').value;
+window.sendCommEmail = () => {
+    let subj = document.getElementById('emSubject').value || 'הודעה מהקהילה';
+    let text = document.getElementById('emMessageText').value;
     if(!text) return showToast('יש להזין תוכן למייל', 'warning');
     if(bulkSelection.length === 0) return showToast('יש לסמן משפחות קודם!', 'error');
-    let emails = [];
-    bulkSelection.forEach(v => {
-        let [b,i] = v.split('|'); let a = db[b].apts[i];
+
+    let emails=[];
+    bulkSelection.forEach(v=>{
+        let [b,i]=v.split('|'); let a=db[b].apts[i]; 
         emails = emails.concat(getAllEmails(a));
     });
-    if(emails.length === 0) return showToast('לא נמצאו כתובות מייל למשפחות שסומנו', 'error');
+    
+    if(emails.length === 0) return showToast(`לא נמצאו כתובות מייל למשפחות שסומנו`, 'error');
+
     let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
-    let copied = false;
-    try { if(navigator.clipboard) { await navigator.clipboard.writeText(emails.join(', ')); copied = true; } } catch(e) {}
-    const link = document.createElement('a'); link.href = mailtoLink;
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    if(copied) showToast('נפתחה תוכנת המייל (הכתובות הועתקו ללוח לגיבוי)', 'success');
-    else showCustomDialog({ title: 'גיבוי', message: 'הדפדפן חסם העתקה. הנה הכתובות להעתקה ידנית:', showInput: true, defaultValue: emails.join(', '), showCancel: false });
+    
+    window.location.href = mailtoLink;
+    
+    if(navigator.clipboard) { 
+        navigator.clipboard.writeText(emails.join(', ')).then(() => {
+            showToast(`נפתחה תוכנת המייל (הכתובות הועתקו ללוח לגיבוי)`, 'success');
+        }).catch(() => {
+            showCustomDialog({ title: 'גיבוי', message: 'הדפדפן חסם העתקה. הנה הכתובות להעתקה ידנית:', showInput: true, defaultValue: emails.join(', '), showCancel: false });
+        });
+    } else {
+        showToast(`נפתחה תוכנת המייל`, 'success');
+    }
+    
     clearBulkSelection();
     renderCommSenders('email');
 };
