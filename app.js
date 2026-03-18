@@ -18,12 +18,19 @@ const NO_ADDRESS_KEY = "__NO_ADDRESS__";
 
 let markerColorMode = 'status';
 const markerPalette = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b', '#14b8a6', '#f43f5e', '#84cc16', '#0ea5e9'];
+const chartStyleColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#64748b'];
 
 function getColorForString(str, type) {
     if(!str) return '#94a3b8';
-    let arr = type === 'style' ? appSettings.styles : appSettings.tags;
-    let idx = arr.indexOf(str);
-    return idx === -1 ? '#94a3b8' : markerPalette[idx % markerPalette.length];
+    if(type === 'style') {
+        if(appSettings.styleColors && appSettings.styleColors[str]) return appSettings.styleColors[str];
+        let idx = appSettings.styles.indexOf(str);
+        return idx === -1 ? '#94a3b8' : chartStyleColors[idx % chartStyleColors.length];
+    } else {
+        if(appSettings.tagColors && appSettings.tagColors[str]) return appSettings.tagColors[str];
+        let idx = appSettings.tags.indexOf(str);
+        return idx === -1 ? '#94a3b8' : markerPalette[idx % markerPalette.length];
+    }
 }
 
 window.changeMarkerColorMode = () => { 
@@ -34,8 +41,12 @@ window.changeMarkerColorMode = () => {
 let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || { 
     center: [35.24430, 31.82650], zoom: 17.5, pitch: 60, themeColor: '#3b82f6', defaultView: 'map',
     tags: ['דובר רוסית', 'חבר קהילה', 'תורם קבוע', 'מקורב'], styles: ['חרדי', 'מודרני', 'דתי', 'מסורתי', 'שאינו לעת עתה'], customFields: [],
+    styleColors: {}, tagColors: {},
     goal: { text: 'חיפוש חופשי', target: 30 }
 };
+
+if(!appSettings.styleColors) appSettings.styleColors = {};
+if(!appSettings.tagColors) appSettings.tagColors = {};
 
 if(!appSettings.homeLocation) {
     if(appSettings.chabadHouseCoords) {
@@ -152,7 +163,12 @@ window.toggleHomeLocUI = () => {
     document.getElementById('otherLocUI').style.display = isPrimary ? 'none' : 'block';
     document.getElementById('primaryGeocoderWrapper').style.display = 'none';
     if(isPrimary) {
-        document.getElementById('currentPrimaryAddress').innerText = (appSettings.primaryLocation && appSettings.primaryLocation.address) ? appSettings.primaryLocation.address : 'לא הוגדר';
+        const addr = (appSettings.primaryLocation && appSettings.primaryLocation.address)
+            ? appSettings.primaryLocation.address
+            : (appSettings.homeLocation && appSettings.homeLocation.isChabad && appSettings.homeLocation.address)
+                ? appSettings.homeLocation.address
+                : 'לא הוגדר';
+        document.getElementById('currentPrimaryAddress').innerText = addr;
     }
 };
 
@@ -1083,7 +1099,7 @@ function refreshMap(filteredRes = null) {
     document.getElementById('kpiTotal').innerText=total; document.getElementById('kpiUrgent').innerText=urgent;
     const alDiv = document.getElementById('kpiAlerts'); alDiv.innerHTML='';
     if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding:0; list-style:none; font-weight:normal;">${alerts.slice(0,6).join('')}${alerts.length>6?'<li style="padding-top:5px; color:var(--text-muted);">ועוד...</li>':''}</ul></div>`;
-    if(chart) chart.destroy(); const chartColors = Object.keys(stats).map(s => getColorForString(s, 'style')); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
+    if(chart) chart.destroy(); const chartColors = Object.keys(stats).map(s => { let i = appSettings.styles.indexOf(s); return i === -1 ? '#94a3b8' : chartStyleColors[i % chartStyleColors.length]; }); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
     
     updateGoalTracker();
     updateHomeButton();
@@ -1113,13 +1129,36 @@ window.openSettings=()=>{
         document.getElementById('locTypePrimary').checked = true;
     }
     toggleHomeLocUI();
-    document.getElementById('settingsTagsList').innerHTML=appSettings.tags.map((t,i)=>`<span class="tag-bubble">${t} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.tags.splice(${i},1);openSettings()"></i></span>`).join('');
+    const presetColors = ['#ef4444','#f97316','#f59e0b','#84cc16','#10b981','#14b8a6','#3b82f6','#8b5cf6','#ec4899','#64748b'];
+    const colorSwatches = (name, type) => {
+        const cur = type==='style' ? (appSettings.styleColors[name]||'') : (appSettings.tagColors[name]||'');
+        return presetColors.map(c=>`<span onclick="setItemColor('${type}','${name}','${c}')" title="${c}" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${cur===c?'#000':'transparent'};margin:1px;"></span>`).join('');
+    };
+    document.getElementById('settingsTagsList').innerHTML = appSettings.tags.map((t,i) =>
+        `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <span class="tag-bubble" style="background:${getColorForString(t,'tag')};color:white;border-color:${getColorForString(t,'tag')};">${t}</span>
+            <div style="display:flex;align-items:center;gap:2px;">${colorSwatches(t,'tag')}</div>
+            <i class="fas fa-times" style="color:var(--danger);cursor:pointer;margin-right:4px;" onclick="appSettings.tags.splice(${i},1);delete appSettings.tagColors['${t}'];openSettings()"></i>
+        </div>`).join('');
     document.getElementById('settingsCustomFieldsList').innerHTML=appSettings.customFields.map((f,i)=>`<span class="tag-bubble">${f} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.customFields.splice(${i},1);openSettings()"></i></span>`).join('');
+    document.getElementById('settingsStylesList').innerHTML = appSettings.styles.map((s,i) =>
+        `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <span class="tag-bubble" style="background:${getColorForString(s,'style')};color:white;border-color:${getColorForString(s,'style')};">${s}</span>
+            <div style="display:flex;align-items:center;gap:2px;">${colorSwatches(s,'style')}</div>
+        </div>`).join('');
     document.getElementById('settingsModal').style.display='flex';
 };
 window.updateThemePreview=()=>{appSettings.themeColor=document.getElementById('setThemeColor').value; document.documentElement.style.setProperty('--accent',appSettings.themeColor); if(map.getLayer('3d-buildings'))map.setPaintProperty('3d-buildings','fill-extrusion-color',['case',['boolean',['feature-state','hover'],false],appSettings.themeColor,'#d1d5db']);};
 window.addNewTag=async ()=>{const v=await showCustomDialog({title:'תגית חדשה', message:'שם התגית:', showInput:true}); if(v&&!appSettings.tags.includes(v)){appSettings.tags.push(v);openSettings();}};
 window.addNewCustomField=async ()=>{const v=await showCustomDialog({title:'שדה מותאם', message:'שם השדה:', showInput:true}); if(v&&!appSettings.customFields.includes(v)){appSettings.customFields.push(v);openSettings();}};
+
+window.setItemColor = (type, name, color) => {
+    if(type === 'style') appSettings.styleColors[name] = color;
+    else appSettings.tagColors[name] = color;
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    openSettings();
+    refreshMap();
+};;
 
 window.saveSettingsAndClose=()=>{
     appSettings.defaultView=document.getElementById('setDefaultView').value; 
@@ -1128,8 +1167,11 @@ window.saveSettingsAndClose=()=>{
     if(isPrimary) {
         if(appSettings.primaryLocation) {
             appSettings.homeLocation = { coords: appSettings.primaryLocation.coords, address: appSettings.primaryLocation.address, isChabad: true };
+        } else if(appSettings.homeLocation) {
+            // אין primaryLocation – שמור את homeLocation הקיים כ-isChabad
+            appSettings.homeLocation.isChabad = true;
+            appSettings.primaryLocation = { coords: appSettings.homeLocation.coords, address: appSettings.homeLocation.address };
         }
-        // נקה את המיקום האחר
         tempOtherLoc = null;
         otherGeocoder.clear();
     } else {
