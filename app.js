@@ -1420,13 +1420,6 @@ window.sendCommWhatsApp = async () => {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     let choice = '1'; 
 
-    let targetPhone = `972${p[0].phone}`;
-    let targetText = p[0].text;
-
-    // פותחים חלון מיד (לפני כל await) כדי למנוע חסימת popup
-    const newWin = isMobile ? null : window.open('about:blank', '_blank');
-    if(newWin) newWin.document.write(`<html dir="rtl"><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f0f4f8;"><div style="text-align:center;color:#555;"><div style="font-size:48px;margin-bottom:16px;">⏳</div><div style="font-size:20px;">בוחר פלטפורמה, רגע...</div></div></body></html>`);
-
     // אם אנחנו לא בטלפון נייד (כלומר במחשב), נשאל באיזו תוכנה לפתוח
     if (!isMobile) {
         choice = await showChoiceDialog(
@@ -1435,18 +1428,30 @@ window.sendCommWhatsApp = async () => {
             '<i class="fab fa-whatsapp"></i> בדפדפן (Web)',
             '<i class="fas fa-desktop"></i> באפליקציה במחשב'
         );
-        if(!choice) { if(newWin) newWin.close(); return; }
+        if(!choice) return;
     }
 
-    // הרכבת הקישור המתאים לפי המכשיר או הבחירה
+    let link = '';
+    const targetPhone = `972${p[0].phone}`;
+    const targetText = p[0].text;
     if (isMobile) {
-        window.open(`https://wa.me/${targetPhone}?text=${targetText}`, '_blank');
+        link = `https://wa.me/${targetPhone}?text=${targetText}`;
     } else if (choice === '1') {
-        newWin.location.href = `https://web.whatsapp.com/send?phone=${targetPhone}&text=${targetText}`;
+        link = `https://web.whatsapp.com/send?phone=${targetPhone}&text=${targetText}`;
     } else if (choice === '2') {
-        newWin.location.href = `whatsapp://send?phone=${targetPhone}&text=${targetText}`;
+        link = `whatsapp://send?phone=${targetPhone}&text=${targetText}`;
     }
-    window.focus();
+
+    let newWin = window.open(link, '_blank');
+
+    if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
+        showCustomDialog({
+            title: 'שגיאת דפדפן',
+            message: 'הדפדפן שלך חוסם פתיחת חלונות קופצים (Pop-ups).\nאנא לחץ על סמל החסימה בשורת הכתובת למעלה ואשר פתיחת חלונות מהאתר הזה.',
+            showCancel: false
+        });
+        return;
+    }
 
     if(p.length > 1) showToast('נפתח חלון לנמען הראשון בלבד (מגבלת וואטסאפ)', 'warning');
     else showToast('פותח וואטסאפ...', 'success');
@@ -1467,10 +1472,6 @@ window.sendCommEmail = async () => {
     let emails = commRecipients.filter(r => r.email).map(r => r.email);
     if(emails.length === 0) return showToast('לא נמצאו כתובות מייל בנמענים', 'error');
 
-    // פותחים חלון מיד (לפני כל await) כדי למנוע חסימת popup
-    const newWin = window.open('about:blank', '_blank');
-    if(newWin) newWin.document.write(`<html dir="rtl"><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f0f4f8;"><div style="text-align:center;color:#555;"><div style="font-size:48px;margin-bottom:16px;">⏳</div><div style="font-size:20px;">בוחר פלטפורמה, רגע...</div></div></body></html>`);
-
     // קריאה לחלונית היפה שבנינו עם כפתורים מותאמים
     const choice = await showChoiceDialog(
         'בחירת פלטפורמת דואר',
@@ -1479,7 +1480,7 @@ window.sendCommEmail = async () => {
         '<i class="fas fa-desktop"></i> תוכנה במחשב (Outlook)'
     );
 
-    if(!choice) { newWin.close(); return; }
+    if(!choice) return;
 
     // העתקת הכתובות ללוח לגיבוי
     if(navigator.clipboard) {
@@ -1488,15 +1489,21 @@ window.sendCommEmail = async () => {
 
     if (choice === '1') {
         let gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&bcc=${emails.join(',')}&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
-        newWin.location.href = gmailLink;
+        let newWin = window.open(gmailLink, '_blank');
+        if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
+            showCustomDialog({
+                title: 'שגיאת דפדפן',
+                message: 'הדפדפן חוסם פתיחת כרטיסיות חדשות (Pop-ups).\nאנא לחץ על סמל החסימה בשורת הכתובת למעלה ואשר פתיחה.',
+                showCancel: false
+            });
+            return;
+        }
         showToast('ג\'ימייל נפתח בחלונית חדשה', 'success');
     } else if (choice === '2') {
-        newWin.close();
         let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
         window.location.href = mailtoLink;
         showToast('נפתחה תוכנת המייל שבמחשב', 'success');
     }
-    window.focus();
 
     // איפוס הרשימה
     commRecipients = [];
