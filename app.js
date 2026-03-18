@@ -1102,7 +1102,7 @@ function refreshMap(filteredRes = null) {
     document.getElementById('kpiTotal').innerText=total; document.getElementById('kpiUrgent').innerText=urgent;
     const alDiv = document.getElementById('kpiAlerts'); alDiv.innerHTML='';
     if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding:0; list-style:none; font-weight:normal;">${alerts.slice(0,6).join('')}${alerts.length>6?'<li style="padding-top:5px; color:var(--text-muted);">ועוד...</li>':''}</ul></div>`;
-    if(chart) chart.destroy(); const chartColors = Object.keys(stats).map(s => { let i = appSettings.styles.indexOf(s); return i === -1 ? '#94a3b8' : chartStyleColors[i % chartStyleColors.length]; }); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
+    if(chart) chart.destroy(); const chartColors = Object.keys(stats).map(s => getColorForString(s, 'style')); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
     
     updateGoalTracker();
     updateHomeButton();
@@ -1144,11 +1144,17 @@ window.openSettings=()=>{
             <i class="fas fa-times" style="color:var(--danger);cursor:pointer;margin-right:4px;" onclick="appSettings.tags.splice(${i},1);delete appSettings.tagColors['${t}'];openSettings()"></i>
         </div>`).join('');
     document.getElementById('settingsCustomFieldsList').innerHTML=appSettings.customFields.map((f,i)=>`<span class="tag-bubble">${f} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.customFields.splice(${i},1);openSettings()"></i></span>`).join('');
-    document.getElementById('settingsStylesList').innerHTML = appSettings.styles.map((s,i) =>
-        `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-            <span class="tag-bubble" style="background:${getColorForString(s,'style')};color:white;border-color:${getColorForString(s,'style')};">${s}</span>
-            <div style="display:flex;align-items:center;gap:2px;">${colorSwatches(s,'style')}</div>
-        </div>`).join('');
+    document.getElementById('settingsStylesList').innerHTML = appSettings.styles.map((s,i) => {
+        const col = getColorForString(s, 'style');
+        const swatches = presetColors.map(c=>`<span onclick="setItemColor('style','${s}','${c}')" title="${c}" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${col===c?'#1e293b':'transparent'};margin:1px;flex-shrink:0;"></span>`).join('');
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+            <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${col};flex-shrink:0;border:1px solid rgba(0,0,0,0.15);"></span>
+            <span style="font-weight:600;font-size:13px;min-width:80px;">${s}</span>
+            <div style="display:flex;align-items:center;gap:2px;flex-wrap:wrap;">${swatches}</div>
+            <button class="btn-icon" style="padding:2px 6px;font-size:11px;" onclick="renameStyle(${i})" title="שנה שם"><i class="fas fa-pen"></i></button>
+            <button class="btn-icon" style="padding:2px 6px;font-size:11px;color:var(--danger);" onclick="deleteStyle(${i})" title="מחק סגנון"><i class="fas fa-times"></i></button>
+        </div>`;
+    }).join('') + `<div style="display:flex;gap:8px;margin-top:8px;"><input type="text" id="newStyleInput" class="inline-input" placeholder="שם סגנון חדש..."><button class="btn btn-success" style="width:auto;" onclick="addNewStyle()">הוסף</button></div>`;
     document.getElementById('settingsModal').style.display='flex';
 };
 window.updateThemePreview=()=>{appSettings.themeColor=document.getElementById('setThemeColor').value; document.documentElement.style.setProperty('--accent',appSettings.themeColor); if(map.getLayer('3d-buildings'))map.setPaintProperty('3d-buildings','fill-extrusion-color',['case',['boolean',['feature-state','hover'],false],appSettings.themeColor,'#d1d5db']);};
@@ -1161,6 +1167,35 @@ window.setItemColor = (type, name, color) => {
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
     openSettings();
     refreshMap();
+};
+
+window.renameStyle = async (idx) => {
+    const oldName = appSettings.styles[idx];
+    const newName = await showCustomDialog({ title: 'שינוי שם סגנון', message: 'שם חדש:', showInput: true, defaultValue: oldName, showCancel: true });
+    if(!newName || newName === oldName) return;
+    appSettings.styles[idx] = newName;
+    // העבר צבע לשם החדש
+    if(appSettings.styleColors[oldName]) { appSettings.styleColors[newName] = appSettings.styleColors[oldName]; delete appSettings.styleColors[oldName]; }
+    // עדכן את כל המשפחות
+    Object.keys(db).forEach(k => { if(k==='__BOARDS__') return; db[k].apts.forEach(a => { if(a.style===oldName) a.style=newName; }); });
+    saveDB(); localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); populateFilterDropdowns(); openSettings(); refreshMap();
+};
+
+window.deleteStyle = async (idx) => {
+    const name = appSettings.styles[idx];
+    const ok = await showCustomDialog({ title: 'מחיקת סגנון', message: `למחוק את הסגנון "${name}"? משפחות עם סגנון זה יישארו ללא סגנון.`, showCancel: true });
+    if(!ok) return;
+    appSettings.styles.splice(idx, 1);
+    delete appSettings.styleColors[name];
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); populateFilterDropdowns(); openSettings(); refreshMap();
+};
+
+window.addNewStyle = async () => {
+    const v = document.getElementById('newStyleInput').value.trim();
+    if(!v) return;
+    if(appSettings.styles.includes(v)) { showToast('סגנון זה כבר קיים', 'warning'); return; }
+    appSettings.styles.push(v);
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); populateFilterDropdowns(); openSettings(); refreshMap();
 };
 
 window.saveSettingsAndClose=()=>{
