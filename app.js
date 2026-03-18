@@ -17,7 +17,7 @@ mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl
 const NO_ADDRESS_KEY = "__NO_ADDRESS__";
 
 let markerColorMode = 'status';
-const markerPalette = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#14b8a6', '#f43f5e', '#84cc16', '#0ea5e9', '#d946ef'];
+const markerPalette = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b', '#14b8a6', '#f43f5e', '#84cc16', '#0ea5e9'];
 
 function getColorForString(str, type) {
     if(!str) return '#94a3b8';
@@ -39,7 +39,7 @@ let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || {
 
 if(!appSettings.homeLocation) {
     if(appSettings.chabadHouseCoords) {
-        appSettings.homeLocation = { coords: appSettings.chabadHouseCoords, address: 'מיקום קודם', isChabad: true };
+        appSettings.homeLocation = { coords: appSettings.chabadHouseCoords, address: appSettings.chabadHouseAddress || 'כתובת לא ידועה', isChabad: true };
     }
 }
 
@@ -142,7 +142,7 @@ let primaryGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, ma
 let tempPrimaryLoc = null;
 primaryGeocoder.on('result', (e) => { tempPrimaryLoc = { coords: e.result.center, address: e.result.place_name_he || e.result.place_name }; });
 
-let otherGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'חפש מיקום זמני אחר...', countries: 'il', language: 'he' });
+let otherGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'בחר מיקום...', countries: 'il', language: 'he' });
 let tempOtherLoc = null;
 otherGeocoder.on('result', (e) => { tempOtherLoc = { coords: e.result.center, address: e.result.place_name_he || e.result.place_name }; });
 
@@ -1037,7 +1037,7 @@ function refreshMap(filteredRes = null) {
 
         if(showBldg && db[k].apts.length>0 && k!==NO_ADDRESS_KEY) {
             let coords=db[k].info.coords||k.split(',').map(Number);
-            if(!isNaN(coords[0]) && !(appSettings.homeLocation && appSettings.homeLocation.isChabad && Math.abs(coords[0]-appSettings.homeLocation.coords[0])<0.001 && Math.abs(coords[1]-appSettings.homeLocation.coords[1])<0.001)) {
+            if(!isNaN(coords[0]) && !(appSettings.homeLocation && appSettings.homeLocation.isChabad && Math.abs(coords[0]-appSettings.homeLocation.coords[0])<0.0001 && Math.abs(coords[1]-appSettings.homeLocation.coords[1])<0.0001)) {
                 
                 const markerColors = ['#94a3b8','#10b981','#f59e0b','#ef4444'];
                 let bgColor = markerColors[maxVal];
@@ -1080,7 +1080,7 @@ function refreshMap(filteredRes = null) {
     document.getElementById('kpiTotal').innerText=total; document.getElementById('kpiUrgent').innerText=urgent;
     const alDiv = document.getElementById('kpiAlerts'); alDiv.innerHTML='';
     if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding:0; list-style:none; font-weight:normal;">${alerts.slice(0,6).join('')}${alerts.length>6?'<li style="padding-top:5px; color:var(--text-muted);">ועוד...</li>':''}</ul></div>`;
-    if(chart) chart.destroy(); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#64748b']}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
+    if(chart) chart.destroy(); const chartColors = Object.keys(stats).map((_,i) => markerPalette[i % markerPalette.length]); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
     
     updateGoalTracker();
     updateHomeButton();
@@ -1121,6 +1121,9 @@ window.saveSettingsAndClose=()=>{
         if(appSettings.primaryLocation) {
             appSettings.homeLocation = { coords: appSettings.primaryLocation.coords, address: appSettings.primaryLocation.address, isChabad: true };
         }
+        // נקה את המיקום האחר
+        tempOtherLoc = null;
+        otherGeocoder.clear();
     } else {
         if(tempOtherLoc) {
             appSettings.homeLocation = { coords: tempOtherLoc.coords, address: tempOtherLoc.address, isChabad: false };
