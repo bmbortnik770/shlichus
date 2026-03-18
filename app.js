@@ -134,9 +134,35 @@ let obGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxg
 let tempObLoc = null;
 obGeocoder.on('result', (e) => { tempObLoc = { coords: e.result.center, address: e.result.place_name_he || e.result.place_name }; });
 
-let setHomeGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'עדכן מיקום חדש...', countries: 'il', language: 'he' });
-let tempSetHomeLoc = null;
-setHomeGeocoder.on('result', (e) => { tempSetHomeLoc = { coords: e.result.center, address: e.result.place_name_he || e.result.place_name }; });
+if(appSettings.homeLocation && appSettings.homeLocation.isChabad && !appSettings.primaryLocation) {
+    appSettings.primaryLocation = { coords: appSettings.homeLocation.coords, address: appSettings.homeLocation.address };
+}
+
+let primaryGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'חפש את הכתובת הקבועה...', countries: 'il', language: 'he' });
+let tempPrimaryLoc = null;
+primaryGeocoder.on('result', (e) => { tempPrimaryLoc = { coords: e.result.center, address: e.result.place_name_he || e.result.place_name }; });
+
+let otherGeocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, placeholder: 'חפש מיקום זמני אחר...', countries: 'il', language: 'he' });
+let tempOtherLoc = null;
+otherGeocoder.on('result', (e) => { tempOtherLoc = { coords: e.result.center, address: e.result.place_name_he || e.result.place_name }; });
+
+window.toggleHomeLocUI = () => {
+    const isPrimary = document.getElementById('locTypePrimary').checked;
+    document.getElementById('primaryLocUI').style.display = isPrimary ? 'block' : 'none';
+    document.getElementById('otherLocUI').style.display = isPrimary ? 'none' : 'block';
+    document.getElementById('primaryGeocoderWrapper').style.display = 'none'; 
+};
+
+window.openPrimaryChangeUI = () => { document.getElementById('primaryGeocoderWrapper').style.display = 'block'; };
+
+window.confirmPrimaryChange = () => {
+    if(!tempPrimaryLoc) { showToast('יש לחפש ולבחור כתובת מהרשימה', 'warning'); return; }
+    appSettings.primaryLocation = { coords: tempPrimaryLoc.coords, address: tempPrimaryLoc.address };
+    document.getElementById('currentPrimaryAddress').innerText = tempPrimaryLoc.address;
+    document.getElementById('primaryGeocoderWrapper').style.display = 'none';
+    primaryGeocoder.clear();
+    showToast('המיקום הקבוע עודכן ונשמר במערכת!', 'success');
+};
 
 window.onload = () => {
     let lastLogin = localStorage.getItem('last_login_date');
@@ -150,8 +176,10 @@ window.onload = () => {
     const obContainer = document.getElementById('onboardingGeocoderContainer');
     if(obContainer) obContainer.appendChild(obGeocoder.onAdd(map));
     
-    const setContainer = document.getElementById('settingsHomeGeocoderContainer');
-    if(setContainer) setContainer.appendChild(setHomeGeocoder.onAdd(map));
+    const pContainer = document.getElementById('settingsPrimaryGeocoderContainer');
+    if(pContainer) pContainer.appendChild(primaryGeocoder.onAdd(map));
+    const oContainer = document.getElementById('settingsOtherGeocoderContainer');
+    if(oContainer) oContainer.appendChild(otherGeocoder.onAdd(map));
 
     const modContainer = document.getElementById('modalGeocoderContainer');
     if(modContainer) {
@@ -994,7 +1022,7 @@ function refreshMap(filteredRes = null) {
         
         db[k].apts.forEach((a,i) => {
             total++; if(stats[a.style]!==undefined) stats[a.style]++; else {stats[a.style]=1; appSettings.styles.push(a.style);}
-            const c=getStatusColor(a); if(c==='#ef4444'||c==='#94a3b8') urgent++; const v = c === '#94a3b8' ? 0 : (c === '#10b981' ? 1 : (c === '#f59e0b' ? 2 : 3)); if(v>maxVal) maxVal=v;
+            const c = getStatusColor(a); if (c === '#ef4444' || c === '#94a3b8') urgent++; const v = c === '#94a3b8' ? 0 : (c === '#10b981' ? 1 : (c === '#f59e0b' ? 2 : 3)); if (v > maxVal) maxVal = v;
             if(!filteredRes || filteredRes.find(r=>r.bldg===k && r.idx===i)) showBldg=true;
 
             (a.childrenList||[]).forEach(ch => { if(ch.dob && new Date(ch.dob).getMonth()===cMonth) alerts.push(`<div style="padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);"><i class="fas fa-birthday-cake" style="color:var(--warning);"></i> ${ch.name} (משפ' ${a.name||''}) חוגג/ת</div>`); });
@@ -1066,7 +1094,13 @@ function toggleMobileMenu(){document.getElementById('sidebar').classList.toggle(
 
 window.openSettings=()=>{
     document.getElementById('setThemeColor').value=appSettings.themeColor; document.getElementById('setDefaultView').value=appSettings.defaultView;
-    document.getElementById('setHomeIsChabad').checked = appSettings.homeLocation ? appSettings.homeLocation.isChabad : false;
+    document.getElementById('currentPrimaryAddress').innerText = (appSettings.primaryLocation && appSettings.primaryLocation.address) ? appSettings.primaryLocation.address : 'לא הוגדר';
+    if(appSettings.homeLocation && !appSettings.homeLocation.isChabad) {
+        document.getElementById('locTypeOther').checked = true;
+    } else {
+        document.getElementById('locTypePrimary').checked = true;
+    }
+    toggleHomeLocUI();
     document.getElementById('settingsTagsList').innerHTML=appSettings.tags.map((t,i)=>`<span class="tag-bubble">${t} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.tags.splice(${i},1);openSettings()"></i></span>`).join('');
     document.getElementById('settingsCustomFieldsList').innerHTML=appSettings.customFields.map((f,i)=>`<span class="tag-bubble">${f} <i class="fas fa-times" style="color:var(--danger);" onclick="appSettings.customFields.splice(${i},1);openSettings()"></i></span>`).join('');
     document.getElementById('settingsModal').style.display='flex';
@@ -1078,10 +1112,17 @@ window.addNewCustomField=async ()=>{const v=await showCustomDialog({title:'שד�
 window.saveSettingsAndClose=()=>{
     appSettings.defaultView=document.getElementById('setDefaultView').value; 
     
-    if(tempSetHomeLoc) {
-        appSettings.homeLocation = { coords: tempSetHomeLoc.coords, address: tempSetHomeLoc.address, isChabad: document.getElementById('setHomeIsChabad').checked };
-    } else if(appSettings.homeLocation) {
-        appSettings.homeLocation.isChabad = document.getElementById('setHomeIsChabad').checked;
+    const isPrimary = document.getElementById('locTypePrimary').checked;
+    if(isPrimary) {
+        if(appSettings.primaryLocation) {
+            appSettings.homeLocation = { coords: appSettings.primaryLocation.coords, address: appSettings.primaryLocation.address, isChabad: true };
+        }
+    } else {
+        if(tempOtherLoc) {
+            appSettings.homeLocation = { coords: tempOtherLoc.coords, address: tempOtherLoc.address, isChabad: false };
+        } else if(appSettings.homeLocation) {
+            appSettings.homeLocation.isChabad = false; 
+        }
     }
     
     localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); 
