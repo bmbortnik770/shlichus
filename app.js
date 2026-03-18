@@ -1402,6 +1402,7 @@ window.sendCommWhatsApp = async () => {
 
     // פותחים חלון מיד (לפני כל await) כדי למנוע חסימת popup
     const newWin = isMobile ? null : window.open('about:blank', '_blank');
+    if(newWin) newWin.document.write(`<html dir="rtl"><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f0f4f8;"><div style="text-align:center;color:#555;"><div style="font-size:48px;margin-bottom:16px;">⏳</div><div style="font-size:20px;">בוחר פלטפורמה, רגע...</div></div></body></html>`);
 
     // אם אנחנו לא בטלפון נייד (כלומר במחשב), נשאל באיזו תוכנה לפתוח
     if (!isMobile) {
@@ -1444,6 +1445,7 @@ window.sendCommEmail = async () => {
 
     // פותחים חלון מיד (לפני כל await) כדי למנוע חסימת popup
     const newWin = window.open('about:blank', '_blank');
+    if(newWin) newWin.document.write(`<html dir="rtl"><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f0f4f8;"><div style="text-align:center;color:#555;"><div style="font-size:48px;margin-bottom:16px;">⏳</div><div style="font-size:20px;">בוחר פלטפורמה, רגע...</div></div></body></html>`);
 
     // קריאה לחלונית היפה שבנינו עם כפתורים מותאמים
     const choice = await showChoiceDialog(
