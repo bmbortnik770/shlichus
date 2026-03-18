@@ -354,6 +354,11 @@ async function pushToDrive() {
 function setSyncStatus(st, txt) { document.getElementById('sync-text').innerText=txt; const ic=document.getElementById('sync-icon'), co=document.getElementById('sync-status'); if(st==='wait'){ic.className='fas fa-spinner fa-spin';co.style.color='var(--warning)';} if(st==='ok'){ic.className='fas fa-cloud-check';co.style.color='var(--success)';} if(st==='error'){ic.className='fas fa-exclamation-triangle';co.style.color='var(--danger)';} }
 
 function saveDB() { 
+    // בדיקת בטיחות: לא שומרים לדרייב אם אין נתונים אמיתיים
+    const realKeys = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== NO_ADDRESS_KEY);
+    const hasRealData = realKeys.length > 0 || (db[NO_ADDRESS_KEY] && db[NO_ADDRESS_KEY].apts && db[NO_ADDRESS_KEY].apts.length > 0);
+    if(!hasRealData) { console.warn('saveDB: מניעת שמירה של DB ריק'); return; }
+
     // אורזים את כל ההגדרות לתוך קובץ הגיבוי!
     db['__SETTINGS__'] = appSettings; 
     
