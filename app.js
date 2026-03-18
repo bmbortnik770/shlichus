@@ -186,10 +186,13 @@ window.openPrimaryChangeUI = () => { document.getElementById('primaryGeocoderWra
 window.confirmPrimaryChange = () => {
     if(!tempPrimaryLoc) { showToast('יש לחפש ולבחור כתובת מהרשימה', 'warning'); return; }
     appSettings.primaryLocation = { coords: tempPrimaryLoc.coords, address: tempPrimaryLoc.address };
+    appSettings.homeLocation = { coords: tempPrimaryLoc.coords, address: tempPrimaryLoc.address, isChabad: true };
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
     document.getElementById('currentPrimaryAddress').innerText = tempPrimaryLoc.address;
     document.getElementById('primaryGeocoderWrapper').style.display = 'none';
     primaryGeocoder.clear();
-    showToast('המיקום הקבוע עודכן ונשמר במערכת!', 'success');
+    tempPrimaryLoc = null;
+    showToast('כתובת בית חב"ד עודכנה ונשמרה!', 'success');
 };
 
 window.onload = () => {
@@ -283,17 +286,19 @@ async function ensureAuthAndExecute(cb) {
 async function geocodeMissingAddresses() {
     const bldgs = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== NO_ADDRESS_KEY && (!db[k].info.coords || isNaN(db[k].info.coords[0])));
     if(bldgs.length > 0) showToast("מתבצע עדכון מיקומים ברקע...", "info");
+    let updated = false;
     for(let b of bldgs) {
         try {
             const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(b)}.json?country=il&language=he&access_token=${mapboxgl.accessToken}`);
             const d = await r.json();
             if(d.features && d.features.length > 0) {
                 db[b].info.coords = d.features[0].center;
-                saveDB(); refreshMap();
+                updated = true;
             }
         } catch(e) {}
-        await new Promise(res => setTimeout(res, 1000)); 
+        await new Promise(res => setTimeout(res, 1000));
     }
+    if(updated) { saveDB(); refreshMap(); }
 }
 
 async function syncWithDrive() {
@@ -589,6 +594,7 @@ window.removeAddress = () => {
 window.selectAddress = (b,lng,lat) => { if(!db[b]) db[b]={info:{code:'',rep:'',notes:'',coords:[lng,lat]},apts:[]}; processAddressSelection(b); };
 
 function processAddressSelection(t) { 
+    const wasOpen = document.getElementById('clientModal').style.display === 'flex';
     if(pendingMoveMode) { 
         let apt = db[currentBldg].apts.splice(currentAptIdx,1)[0]; 
         db[t].apts.push(apt);
@@ -596,9 +602,10 @@ function processAddressSelection(t) {
         currentAptIdx = db[t].apts.length - 1;
         showToast('הכתובת עודכנה! ' + getRandomCompliment(),'success'); 
     } 
+    pendingMoveMode = false;
     saveDB(); 
     document.getElementById('addressSearchModal').style.display='none'; 
-    openClientCard(currentAptIdx); 
+    if(wasOpen) openClientCard(currentAptIdx); 
 }
 
 window.toggleAdvFilters = () => { 
@@ -713,7 +720,7 @@ document.addEventListener('click', (e) => {
     } 
 });
 
-function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=logs.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
+function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=[...logs].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
 window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
 window.createNewBoard = async () => {
@@ -827,19 +834,21 @@ window.clearBulkSelection = () => { document.querySelectorAll('.bulk-cb').forEac
 window.bulkWhatsApp = () => { 
     if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
     const saved = [...bulkSelection];
+    clearBulkSelection();
+    document.getElementById('bulkActionBar').style.display = 'none';
     switchMainView('comm');
     bulkSelection = saved;
     switchCommTab('whatsapp');
-    showToast("בחר תבנית ושלח הודעה לנמענים שסומנו", "info");
 };
 
 window.bulkEmail = () => { 
     if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
     const saved = [...bulkSelection];
+    clearBulkSelection();
+    document.getElementById('bulkActionBar').style.display = 'none';
     switchMainView('comm');
     bulkSelection = saved;
     switchCommTab('email');
-    showToast("הכן את המייל לנמענים שסומנו", "info");
 };
 
 window.bulkPhone = () => {
@@ -874,7 +883,7 @@ window.bulkDelete = async () => {
     const proceed = await showCustomDialog({ title: 'מחיקה המונית', message: `למחוק ${bulkSelection.length} משפחות? פעולה בלתי הפיכה!`, showCancel: true });
     if(proceed) { 
         ensureAuthAndExecute(()=>{ 
-            bulkSelection.sort((x,y)=>y.split('|')[1]-x.split('|')[1]).forEach(v=>{let [b,i]=v.split('|'); db[b].apts.splice(i,1);}); 
+            bulkSelection.sort((x,y)=>Number(y.split('|')[1])-Number(x.split('|')[1])).forEach(v=>{let [b,i]=v.split('|'); db[b].apts.splice(i,1);}); 
             saveDB(); clearBulkSelection(); showToast("נמחקו","success"); 
         }); 
     } 
@@ -899,7 +908,7 @@ window.bulkRoute = () => {
     }
     
     let destination = waypoints.length > 0 ? waypoints.pop() : origin; 
-    let url = `http://googleusercontent.com/maps.google.com/maps?saddr=${origin}&daddr=${destination}`;
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
     
     if(waypoints.length > 0) {
         url += `&waypoints=${waypoints.join('|')}`;
@@ -1261,14 +1270,104 @@ window.deleteTemplate = async (idx) => {
     showToast("התבנית נמחקה", "success");
 };
 
+// רשימת נמענים לניהול עצמאי
+let commRecipients = []; // [{name, phone, email, key}]
+
 window.renderCommSenders = (type) => {
+    // בנה רשימה מה-bulkSelection הנוכחי
+    if(bulkSelection.length > 0) {
+        commRecipients = [];
+        bulkSelection.forEach(v => {
+            let [b,i] = v.split('|'); let a = db[b].apts[i];
+            commRecipients.push({ name: a.name||'ללא שם', phone: getAllPhones(a)[0]||'', email: getAllEmails(a)[0]||'', key: v });
+        });
+        bulkSelection = [];
+    }
+
     const sel = document.getElementById(type === 'whatsapp' ? 'waTemplateSelect' : 'emTemplateSelect');
     if(sel) {
         sel.innerHTML = '<option value="">-- בחר תבנית או הקלד חופשי --</option>' +
             (appSettings.templates || []).map((t, i) => `<option value="${i}">${t.title}</option>`).join('');
     }
-    const countSpan = document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount');
-    if(countSpan) countSpan.innerText = bulkSelection.length;
+    renderRecipientsList(type);
+};
+
+window.renderRecipientsList = (type) => {
+    const containerId = type === 'whatsapp' ? 'waRecipientsList' : 'emRecipientsList';
+    const countId = type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount';
+    const container = document.getElementById(containerId);
+    const countEl = document.getElementById(countId);
+    if(countEl) countEl.innerText = commRecipients.length;
+    if(!container) return;
+
+    if(commRecipients.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">אין נמענים. הוסף ידנית או סמן משפחות ברשימה/מפה.</div>`;
+        return;
+    }
+    const field = type === 'whatsapp' ? 'phone' : 'email';
+    container.innerHTML = commRecipients.map((r,i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-body);border:1px solid var(--border-light);border-radius:6px;margin-bottom:4px;">
+            <span style="flex:1;font-weight:600;font-size:13px;">${r.name}</span>
+            <span style="font-size:12px;color:var(--text-muted);direction:ltr;">${r[field]||'<span style="color:var(--danger);">חסר</span>'}</span>
+            <button class="btn-icon" style="color:var(--danger);padding:2px 6px;" onclick="removeRecipient(${i},'${type}')"><i class="fas fa-times"></i></button>
+        </div>`).join('');
+};
+
+window.removeRecipient = (idx, type) => {
+    commRecipients.splice(idx, 1);
+    renderRecipientsList(type);
+    document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount').innerText = commRecipients.length;
+};
+
+window.addRecipientManually = async (type) => {
+    const name = await showCustomDialog({ title: 'הוסף נמען', message: 'שם המשפחה:', showInput: true, showCancel: true });
+    if(!name) return;
+    const contact = await showCustomDialog({ title: 'הוסף נמען', message: type === 'whatsapp' ? 'מספר טלפון:' : 'כתובת מייל:', showInput: true, showCancel: true });
+    if(!contact) return;
+    commRecipients.push({ name, phone: type === 'whatsapp' ? contact : '', email: type === 'email' ? contact : '', key: '' });
+    renderRecipientsList(type);
+    document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount').innerText = commRecipients.length;
+};
+
+window.addRecipientsFromDB = (type) => {
+    const modal = document.getElementById('recipientPickerModal');
+    const list = document.getElementById('recipientPickerList');
+    list.innerHTML = '';
+    Object.keys(db).forEach(b => {
+        if(b === '__BOARDS__') return;
+        db[b].apts.forEach((a, i) => {
+            const contact = type === 'whatsapp' ? getAllPhones(a)[0] : getAllEmails(a)[0];
+            if(!contact) return;
+            const key = `${b}|${i}`;
+            const already = commRecipients.find(r => r.key === key);
+            list.innerHTML += `<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--border-light);">
+                <input type="checkbox" ${already?'checked':''} onchange="togglePickerRecipient(this,'${encodeURIComponent(b)}',${i},'${type}')" style="width:16px;height:16px;">
+                <span style="flex:1;font-weight:600;">${a.name||'ללא שם'}</span>
+                <span style="font-size:12px;color:var(--text-muted);direction:ltr;">${contact}</span>
+            </div>`;
+        });
+    });
+    modal.dataset.type = type;
+    modal.style.display = 'flex';
+};
+
+window.togglePickerRecipient = (cb, encB, i, type) => {
+    const b = decodeURIComponent(encB);
+    const a = db[b].apts[i];
+    const key = `${b}|${i}`;
+    if(cb.checked) {
+        if(!commRecipients.find(r => r.key === key)) {
+            commRecipients.push({ name: a.name||'ללא שם', phone: getAllPhones(a)[0]||'', email: getAllEmails(a)[0]||'', key });
+        }
+    } else {
+        commRecipients = commRecipients.filter(r => r.key !== key);
+    }
+    document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount').innerText = commRecipients.length;
+};
+
+window.closeRecipientPicker = (type) => {
+    document.getElementById('recipientPickerModal').style.display = 'none';
+    renderRecipientsList(type);
 };
 
 window.previewWaTemplate = () => {
@@ -1284,26 +1383,22 @@ window.previewEmTemplate = () => {
 window.sendCommWhatsApp = () => {
     let text = document.getElementById('waMessageText').value;
     if(!text) return showToast('יש להזין תוכן להודעה', 'warning');
-    if(bulkSelection.length === 0) return showToast('יש לסמן משפחות קודם!', 'error');
+    if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
     
-    let p=[]; 
-    bulkSelection.forEach(v=>{
-        let [b,i]=v.split('|'); let a=db[b].apts[i]; 
-        let phones = getAllPhones(a);
-        if(phones.length > 0) {
-            let cleanPhone = String(phones[0]).replace(/\D/g,'');
-            if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
-            let personalizedText = text.replace(/\[שם\]/g, a.name || '');
-            p.push({phone: cleanPhone, text: encodeURIComponent(personalizedText)});
-        }
-    }); 
-    if(p.length>0) { 
+    let p = commRecipients.filter(r => r.phone).map(r => {
+        let cleanPhone = String(r.phone).replace(/\D/g,'');
+        if(cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
+        return { phone: cleanPhone, text: encodeURIComponent(text.replace(/\[שם\]/g, r.name||'')) };
+    });
+
+    if(p.length > 0) { 
         window.open(`https://wa.me/972${p[0].phone}?text=${p[0].text}`, '_blank'); 
         if(p.length > 1) showToast(`נפתח חלון לנמען הראשון בלבד (מגבלת וואטסאפ)`, 'warning');
-        clearBulkSelection();
-        renderCommSenders('whatsapp');
+        commRecipients = [];
+        renderRecipientsList('whatsapp');
+        document.getElementById('waRecipientCount').innerText = 0;
     } else {
-        showToast(`לא נמצאו מספרים למשפחות שסומנו`, 'error');
+        showToast('לא נמצאו מספרי טלפון בנמענים', 'error');
     }
 };
 
@@ -1311,30 +1406,31 @@ window.sendCommEmail = () => {
     let subj = document.getElementById('emSubject').value || 'הודעה מהקהילה';
     let text = document.getElementById('emMessageText').value;
     if(!text) return showToast('יש להזין תוכן למייל', 'warning');
-    if(bulkSelection.length === 0) return showToast('יש לסמן משפחות קודם!', 'error');
+    if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
 
-    let emails=[];
-    bulkSelection.forEach(v=>{
-        let [b,i]=v.split('|'); let a=db[b].apts[i]; 
-        emails = emails.concat(getAllEmails(a));
-    });
-    
-    if(emails.length === 0) return showToast(`לא נמצאו כתובות מייל למשפחות שסומנו`, 'error');
+    let emails = commRecipients.filter(r => r.email).map(r => r.email);
+    if(emails.length === 0) return showToast('לא נמצאו כתובות מייל בנמענים', 'error');
 
     let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
     
-    window.location.href = mailtoLink;
+    const a = document.createElement('a');
+    a.href = mailtoLink;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 500);
     
     if(navigator.clipboard) { 
         navigator.clipboard.writeText(emails.join(', ')).then(() => {
-            showToast(`נפתחה תוכנת המייל (הכתובות הועתקו ללוח לגיבוי)`, 'success');
+            showToast('נפתחה תוכנת המייל (הכתובות הועתקו ללוח לגיבוי)', 'success');
         }).catch(() => {
-            showCustomDialog({ title: 'גיבוי', message: 'הדפדפן חסם העתקה. הנה הכתובות להעתקה ידנית:', showInput: true, defaultValue: emails.join(', '), showCancel: false });
+            showCustomDialog({ title: 'גיבוי', message: 'הנה הכתובות להעתקה ידנית:', showInput: true, defaultValue: emails.join(', '), showCancel: false });
         });
     } else {
-        showToast(`נפתחה תוכנת המייל`, 'success');
+        showToast('נפתחה תוכנת המייל', 'success');
     }
     
-    clearBulkSelection();
-    renderCommSenders('email');
+    commRecipients = [];
+    renderRecipientsList('email');
+    document.getElementById('emRecipientCount').innerText = 0;
 };

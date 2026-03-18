@@ -145,8 +145,15 @@
         <div id="comm-content-area" style="flex-grow: 1; padding: 20px; overflow-y: auto; background: var(--surface); margin: 0 20px 20px 20px; border-radius: 0 0 8px 8px; border: 1px solid var(--border-light); box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
             <div id="comm-whatsapp" class="comm-tab-content active">
                 <h3 style="margin-top:0; color:#25D366;"><i class="fab fa-whatsapp"></i> שליחת הודעות וואטסאפ</h3>
-                <div style="background:var(--bg-body); padding:12px; border-radius:8px; margin-bottom:15px; border:1px solid var(--border-light);">
-                    <strong>קהל יעד:</strong> <span id="waRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span> משפחות סומנו מתוך הרשימה/מפה.
+                <div style="background:var(--bg-body); padding:12px; border-radius:8px; margin-bottom:10px; border:1px solid var(--border-light);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span><strong>נמענים:</strong> <span id="waRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span></span>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientsFromDB('whatsapp')"><i class="fas fa-users"></i> בחר מהרשימה</button>
+                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientManually('whatsapp')"><i class="fas fa-plus"></i> הוסף ידנית</button>
+                        </div>
+                    </div>
+                    <div id="waRecipientsList" style="max-height:140px;overflow-y:auto;"></div>
                 </div>
                 <div class="form-group">
                     <label>בחר תבנית הודעה:</label>
@@ -161,8 +168,15 @@
 
             <div id="comm-email" class="comm-tab-content">
                 <h3 style="margin-top:0; color:#ea4335;"><i class="fas fa-envelope"></i> מערך דיוור במייל</h3>
-                <div style="background:var(--bg-body); padding:12px; border-radius:8px; margin-bottom:15px; border:1px solid var(--border-light);">
-                    <strong>קהל יעד:</strong> <span id="emRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span> משפחות סומנו מתוך הרשימה/מפה.
+                <div style="background:var(--bg-body); padding:12px; border-radius:8px; margin-bottom:10px; border:1px solid var(--border-light);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span><strong>נמענים:</strong> <span id="emRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span></span>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientsFromDB('email')"><i class="fas fa-users"></i> בחר מהרשימה</button>
+                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientManually('email')"><i class="fas fa-plus"></i> הוסף ידנית</button>
+                        </div>
+                    </div>
+                    <div id="emRecipientsList" style="max-height:140px;overflow-y:auto;"></div>
                 </div>
                 <div class="form-group">
                     <label>נושא המייל:</label>
@@ -449,6 +463,19 @@
             <div style="display:flex; gap:10px;"><button class="btn btn-success" onclick="exportData()"><i class="fas fa-download"></i> גיבוי ידני</button><button class="btn btn-warning" onclick="document.getElementById('importFile').click()"><i class="fas fa-upload"></i> שחזור</button><input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)"></div>
         </div>
         <button class="btn btn-outline" onclick="saveSettingsAndClose()">שמור וסגור</button>
+    </div>
+</div>
+
+<div id="recipientPickerModal" class="modal" style="z-index:10001;">
+    <div class="modal-content modal-small">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0;color:var(--primary);"><i class="fas fa-users"></i> בחר נמענים</h3>
+            <button class="btn-icon" onclick="closeRecipientPicker(document.getElementById('recipientPickerModal').dataset.type)" style="font-size:18px;"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="recipientPickerList" style="max-height:350px;overflow-y:auto;"></div>
+        <div style="margin-top:12px;">
+            <button class="btn btn-primary" style="width:auto;padding:8px 20px;" onclick="closeRecipientPicker(document.getElementById('recipientPickerModal').dataset.type)"><i class="fas fa-check"></i> סיום בחירה</button>
+        </div>
     </div>
 </div>
 
