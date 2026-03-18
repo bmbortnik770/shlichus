@@ -1403,114 +1403,98 @@ window.previewEmTemplate = () => {
     if(idx !== '') document.getElementById('emMessageText').value = appSettings.templates[idx].text;
 };
 
+// --- פונקציות תקשורת: וואטסאפ ומייל ---
+
 window.sendCommWhatsApp = async () => {
-    let text = document.getElementById('waMessageText').value;
+    const text = document.getElementById('waMessageText').value;
     if(!text) return showToast('יש להזין תוכן להודעה', 'warning');
     if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
     
-    let p = commRecipients.filter(r => r.phone).map(r => {
-        let cleanPhone = String(r.phone).replace(/\D/g,'');
-        if(cleanPhone.startsWith('0')) cleanPhone = cleanPhone.substring(1);
-        return { phone: cleanPhone, text: encodeURIComponent(text.replace(/\[שם\]/g, r.name||'')) };
-    });
+    const validRecipients = commRecipients.filter(r => r.phone);
+    if(validRecipients.length === 0) return showToast('לא נמצאו טלפונים', 'error');
 
-    if(p.length === 0) return showToast('לא נמצאו מספרי טלפון בנמענים', 'error');
+    // אם יש יותר מנמען אחד או שרוצים פנייה אישית בשם - מפעילים את התור
+    if(validRecipients.length > 1 || text.includes('[שם]')) {
+        startCommQueue('whatsapp', '', text, validRecipients);
+        commRecipients = [];
+        renderRecipientsList('whatsapp');
+        document.getElementById('waRecipientCount').innerText = 0;
+    } else {
+        const r = validRecipients[0];
+        let cp = String(r.phone).replace(/\D/g,'');
+        if(cp.startsWith('0')) cp = cp.substring(1);
+        
+        const link = `https://wa.me/972${cp}?text=${encodeURIComponent(text)}`;
+        const newWin = window.open(link, '_blank');
 
-    // בדיקה האם המשתמש גולש דרך טלפון נייד
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    let choice = '1'; 
-
-    // אם אנחנו לא בטלפון נייד (כלומר במחשב), נשאל באיזו תוכנה לפתוח
-    if (!isMobile) {
-        choice = await showChoiceDialog(
-            'פתיחת וואטסאפ',
-            'זיהינו שאתה ממחשב. איך תרצה לפתוח את ההודעה?',
-            '<i class="fab fa-whatsapp"></i> בדפדפן (Web)',
-            '<i class="fas fa-desktop"></i> באפליקציה במחשב'
-        );
-        if(!choice) return;
-    }
-
-    let link = '';
-    const targetPhone = `972${p[0].phone}`;
-    const targetText = p[0].text;
-    if (isMobile) {
-        link = `https://wa.me/${targetPhone}?text=${targetText}`;
-    } else if (choice === '1') {
-        link = `https://web.whatsapp.com/send?phone=${targetPhone}&text=${targetText}`;
-    } else if (choice === '2') {
-        link = `whatsapp://send?phone=${targetPhone}&text=${targetText}`;
-    }
-
-    let newWin = window.open(link, '_blank');
-
-    if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
-        showCustomDialog({
-            title: 'שגיאת דפדפן',
-            message: 'הדפדפן שלך חוסם פתיחת חלונות קופצים (Pop-ups).\nאנא לחץ על סמל החסימה בשורת הכתובת למעלה ואשר פתיחת חלונות מהאתר הזה.',
-            showCancel: false
-        });
-        return;
-    }
-
-    if(p.length > 1) showToast('נפתח חלון לנמען הראשון בלבד (מגבלת וואטסאפ)', 'warning');
-    else showToast('פותח וואטסאפ...', 'success');
-
-    // איפוס הרשימה
-    commRecipients = [];
-    renderRecipientsList('whatsapp');
-    document.getElementById('waRecipientCount').innerText = 0;
-};
-
-window.sendCommEmail = async () => {
-    let subj = document.getElementById('emSubject').value || 'הודעה מהקהילה';
-    let text = document.getElementById('emMessageText').value;
-    
-    if(!text) return showToast('יש להזין תוכן למייל', 'warning');
-    if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
-
-    let emails = commRecipients.filter(r => r.email).map(r => r.email);
-    if(emails.length === 0) return showToast('לא נמצאו כתובות מייל בנמענים', 'error');
-
-    // קריאה לחלונית היפה שבנינו עם כפתורים מותאמים
-    const choice = await showChoiceDialog(
-        'בחירת פלטפורמת דואר',
-        'באיזו תוכנה תרצה להשתמש כדי לשלוח את המייל?',
-        '<i class="fab fa-google"></i> ג\'ימייל בדפדפן',
-        '<i class="fas fa-desktop"></i> תוכנה במחשב (Outlook)'
-    );
-
-    if(!choice) return;
-
-    // העתקת הכתובות ללוח לגיבוי
-    if(navigator.clipboard) {
-        navigator.clipboard.writeText(emails.join(', ')).catch(() => {});
-    }
-
-    if (choice === '1') {
-        let gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&bcc=${emails.join(',')}&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
-        let newWin = window.open(gmailLink, '_blank');
         if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
             showCustomDialog({
                 title: 'שגיאת דפדפן',
-                message: 'הדפדפן חוסם פתיחת כרטיסיות חדשות (Pop-ups).\nאנא לחץ על סמל החסימה בשורת הכתובת למעלה ואשר פתיחה.',
+                message: 'הדפדפן חוסם חלונות קופצים.\nאנא אשר פתיחת פופ-אפים מהאתר בשורת הכתובת למעלה.',
                 showCancel: false
             });
+        } else {
+            showToast('פותח וואטסאפ...', 'success');
+            commRecipients = [];
+            renderRecipientsList('whatsapp');
+            document.getElementById('waRecipientCount').innerText = 0;
+        }
+    }
+};
+
+window.sendCommEmail = async () => {
+    const subjInput = document.getElementById('emSubject').value || 'הודעה מהקהילה';
+    const textInput = document.getElementById('emMessageText').value;
+    
+    if(!textInput) return showToast('יש להזין תוכן למייל', 'warning');
+    if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
+
+    const validRecipients = commRecipients.filter(r => r.email);
+    if(validRecipients.length === 0) return showToast('לא נמצאו מיילים', 'error');
+
+    // טיפול בפנייה אישית [שם]
+    if(textInput.includes('[שם]') || subjInput.includes('[שם]')) {
+        const proceed = await showChoiceDialog(
+             'שליחה אישית',
+             'האם להפעיל רצף שליחה אישי כדי להשתיל את שם המשפחה?',
+             'כן, התחל רצף', 'לא, שלח המוני (BCC)'
+        );
+        if(!proceed) return;
+        if(proceed === '1') {
+            startCommQueue('email', subjInput, textInput, validRecipients);
+            commRecipients = [];
+            renderRecipientsList('email');
+            document.getElementById('emRecipientCount').innerText = 0;
             return;
         }
-        showToast('ג\'ימייל נפתח בחלונית חדשה', 'success');
-    } else if (choice === '2') {
-        let mailtoLink = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
-        window.location.href = mailtoLink;
-        showToast('נפתחה תוכנת המייל שבמחשב', 'success');
     }
 
-    // איפוס הרשימה
+    const choice = await showChoiceDialog('בחירת פלטפורמה', 'איך תרצה לשלוח?', 'ג\'ימייל בדפדפן', 'תוכנה במחשב');
+    if(!choice) return;
+
+    const emails = validRecipients.map(r => r.email);
+    const finalSubj = subjInput.replace(/\[\s*שם\s*\]/g, '');
+    const finalText = textInput.replace(/\[\s*שם\s*\]/g, 'משפחה יקרה');
+
+    if (choice === '1') {
+        const link = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&bcc=${emails.join(',')}&su=${encodeURIComponent(finalSubj)}&body=${encodeURIComponent(finalText)}`;
+        const newWin = window.open(link, '_blank');
+        if (!newWin) {
+            showCustomDialog({ title: 'שגיאת דפדפן', message: 'אנא אשר חלונות קופצים בדפדפן.', showCancel: false });
+            return;
+        }
+    } else {
+        window.location.href = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(finalSubj)}&body=${encodeURIComponent(finalText)}`;
+    }
+
+    showToast('נפתחה תוכנת המייל', 'success');
     commRecipients = [];
     renderRecipientsList('email');
     document.getElementById('emRecipientCount').innerText = 0;
 };
-// פונקציה ליצירת חלונית בחירה מעוצבת עם כפתורים
+
+// --- מערכת ניהול תור (Queue) ודיאלוגים בחירה ---
+
 function showChoiceDialog(title, message, btn1Text, btn2Text) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
@@ -1519,19 +1503,65 @@ function showChoiceDialog(title, message, btn1Text, btn2Text) {
         overlay.style.zIndex = '100001';
         overlay.innerHTML = `
             <div class="modal-content modal-small" style="text-align:center;">
-                <h3 style="color:var(--primary); margin-top:0;">${title}</h3>
-                <p style="margin-bottom:20px; color:var(--text-main); font-size:15px;">${message}</p>
-                <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-                    <button id="btnChoice1" class="btn btn-primary" style="width:auto; padding:8px 15px;">${btn1Text}</button>
-                    <button id="btnChoice2" class="btn btn-success" style="width:auto; padding:8px 15px;">${btn2Text}</button>
-                    <button id="btnChoiceCancel" class="btn btn-outline" style="width:auto; padding:8px 15px;">ביטול</button>
+                <h3 style="color:var(--accent);">${title}</h3>
+                <p>${message}</p>
+                <div style="display:flex; gap:10px; justify-content:center;">
+                    <button id="btn1" class="btn btn-primary" style="width:auto; padding:8px 15px;">${btn1Text}</button>
+                    <button id="btn2" class="btn btn-success" style="width:auto; padding:8px 15px;">${btn2Text}</button>
+                    <button id="btnC" class="btn btn-outline" style="width:auto; padding:8px 15px;">ביטול</button>
                 </div>
-            </div>
-        `;
+            </div>`;
         document.body.appendChild(overlay);
-
-        overlay.querySelector('#btnChoice1').onclick = () => { overlay.remove(); resolve('1'); };
-        overlay.querySelector('#btnChoice2').onclick = () => { overlay.remove(); resolve('2'); };
-        overlay.querySelector('#btnChoiceCancel').onclick = () => { overlay.remove(); resolve(null); };
+        overlay.querySelector('#btn1').onclick = () => { overlay.remove(); resolve('1'); };
+        overlay.querySelector('#btn2').onclick = () => { overlay.remove(); resolve('2'); };
+        overlay.querySelector('#btnC').onclick = () => { overlay.remove(); resolve(null); };
     });
+}
+
+function startCommQueue(type, subject, text, recipients) {
+    window.commQueue = recipients;
+    window.currentQueueIdx = 0;
+    window.currentQueueType = type;
+    window.currentQueueSubject = subject;
+    window.currentQueueText = text;
+    
+    let qBox = document.getElementById('queueManagerBox');
+    if(!qBox) {
+        qBox = document.createElement('div');
+        qBox.id = 'queueManagerBox';
+        qBox.style.cssText = 'position:fixed; bottom:20px; right:20px; background:var(--surface); border:2px solid var(--accent); padding:15px; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.3); z-index:100000; width:300px;';
+        document.body.appendChild(qBox);
+    }
+    qBox.style.display = 'block';
+    processNextInQueue();
+}
+
+function processNextInQueue() {
+    const qBox = document.getElementById('queueManagerBox');
+    if(window.currentQueueIdx >= window.commQueue.length) {
+        qBox.innerHTML = '<h4 style="color:var(--success); margin:0 0 10px 0;">השליחה הושלמה!</h4><button class="btn btn-outline" onclick="this.parentElement.style.display=\'none\'">סגור</button>';
+        return;
+    }
+    const r = window.commQueue[window.currentQueueIdx];
+    const pText = window.currentQueueText.replace(/\[\s*שם\s*\]/g, r.name || '');
+    qBox.innerHTML = `
+        <h4 style="margin:0 0 10px 0; color:var(--accent);">תור שליחה אישית</h4>
+        <p style="font-size:14px;">נמען ${window.currentQueueIdx + 1} מתוך ${window.commQueue.length}:<br><b>${r.name}</b></p>
+        <div style="display:flex; gap:8px;">
+            <button class="btn btn-success" style="padding:8px;" onclick="executeQueueAction('${r.name}', '${r.phone}', '${r.email}', \`${pText}\`)">פתח הודעה</button>
+            <button class="btn btn-outline" style="padding:8px;" onclick="window.currentQueueIdx++; processNextInQueue()">דלג</button>
+        </div>`;
+}
+
+function executeQueueAction(name, phone, email, text) {
+    if(window.currentQueueType === 'whatsapp') {
+        let cp = String(phone).replace(/\D/g,'');
+        if(cp.startsWith('0')) cp = cp.substring(1);
+        window.open(`https://wa.me/972${cp}?text=${encodeURIComponent(text)}`, '_blank');
+    } else {
+        const s = window.currentQueueSubject.replace(/\[\s*שם\s*\]/g, name);
+        window.location.href = `mailto:${email}?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(text)}`;
+    }
+    window.currentQueueIdx++;
+    setTimeout(processNextInQueue, 600);
 }
