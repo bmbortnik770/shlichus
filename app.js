@@ -188,6 +188,7 @@ window.confirmPrimaryChange = () => {
     appSettings.primaryLocation = { coords: tempPrimaryLoc.coords, address: tempPrimaryLoc.address };
     appSettings.homeLocation = { coords: tempPrimaryLoc.coords, address: tempPrimaryLoc.address, isChabad: true };
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
     document.getElementById('currentPrimaryAddress').innerText = tempPrimaryLoc.address;
     document.getElementById('primaryGeocoderWrapper').style.display = 'none';
     primaryGeocoder.clear();
@@ -263,6 +264,7 @@ window.saveOnboardingLocation = () => {
     if(!tempObLoc) { showToast('יש לחפש ולבחור כתובת', 'warning'); return; }
     appSettings.homeLocation = { coords: tempObLoc.coords, address: tempObLoc.address, isChabad: document.getElementById('onboardingIsChabad').checked };
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
     document.getElementById('onboardingModal').style.display = 'none';
     updateHomeButton();
     refreshMap();
@@ -309,7 +311,17 @@ async function syncWithDrive() {
         if (list.files && list.files.length > 0) {
             driveFileId = list.files[0].id;
             const content = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, { headers: { Authorization: `Bearer ${accessToken}` } });
-            const driveDB = await content.json(); if(Object.keys(driveDB).length > 0) db = driveDB; 
+            const driveDB = await content.json(); 
+            if(Object.keys(driveDB).length > 0) {
+                db = driveDB; 
+                // משיכת ההגדרות מהענן והחלתן על המערכת
+                if(db['__SETTINGS__']) {
+                    appSettings = db['__SETTINGS__'];
+                    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+                    document.documentElement.style.setProperty('--accent', appSettings.themeColor);
+                    populateFilterDropdowns();
+                }
+            }
         } else {
             const create = await fetch('https://www.googleapis.com/drive/v3/files', { method:'POST', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'}, body:JSON.stringify({name:'community_data_final.json',mimeType:'application/json'}) });
             driveFileId = (await create.json()).id; await pushToDrive(); 
@@ -341,7 +353,14 @@ async function pushToDrive() {
 }
 function setSyncStatus(st, txt) { document.getElementById('sync-text').innerText=txt; const ic=document.getElementById('sync-icon'), co=document.getElementById('sync-status'); if(st==='wait'){ic.className='fas fa-spinner fa-spin';co.style.color='var(--warning)';} if(st==='ok'){ic.className='fas fa-cloud-check';co.style.color='var(--success)';} if(st==='error'){ic.className='fas fa-exclamation-triangle';co.style.color='var(--danger)';} }
 
-function saveDB() { localStorage.setItem('community_data_final', JSON.stringify(db)); handleOmniSearch(); pushToDrive(); }
+function saveDB() { 
+    // אורזים את כל ההגדרות לתוך קובץ הגיבוי!
+    db['__SETTINGS__'] = appSettings; 
+    
+    localStorage.setItem('community_data_final', JSON.stringify(db)); 
+    handleOmniSearch(); 
+    pushToDrive(); 
+}
 
 window.switchMainView = function(viewName) {
     currentMainView = viewName;
@@ -873,7 +892,7 @@ window.bulkAddTagPrompt = async () => {
     if(t) { 
         ensureAuthAndExecute(()=>{ 
             bulkSelection.forEach(v=>{let [b,i]=v.split('|'); let a=db[b].apts[i]; if(!a.tags)a.tags=[]; if(!a.tags.includes(t))a.tags.push(t); }); 
-            if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); populateFilterDropdowns();} 
+            if(!appSettings.tags.includes(t)) {appSettings.tags.push(t); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); saveDB(); populateFilterDropdowns();} 
             saveDB(); clearBulkSelection(); showToast("תגית נוספה! " + getRandomCompliment(),"success"); 
         }); 
     } 
@@ -965,6 +984,7 @@ window.editGoal = async () => {
     if(targetNum && !isNaN(targetNum) && Number(targetNum) > 0) {
         appSettings.goal = { text: targetText, target: Number(targetNum) };
         localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+        saveDB();
         updateGoalTracker();
         showToast("היעד עודכן! יוצאים לדרך 🚀", "success");
     }
@@ -1133,6 +1153,7 @@ window.setItemColor = (type, name, color) => {
     if(type === 'style') appSettings.styleColors[name] = color;
     else appSettings.tagColors[name] = color;
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
     openSettings();
     refreshMap();
 };
@@ -1155,15 +1176,13 @@ window.deleteStyle = async (idx) => {
     if(!ok) return;
     appSettings.styles.splice(idx, 1);
     delete appSettings.styleColors[name];
-    localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); populateFilterDropdowns(); openSettings(); refreshMap();
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); saveDB(); populateFilterDropdowns(); openSettings(); refreshMap();
 };
-
-window.addNewStyle = async () => {
     const v = document.getElementById('newStyleInput').value.trim();
     if(!v) return;
     if(appSettings.styles.includes(v)) { showToast('סגנון זה כבר קיים', 'warning'); return; }
     appSettings.styles.push(v);
-    localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); populateFilterDropdowns(); openSettings(); refreshMap();
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); saveDB(); populateFilterDropdowns(); openSettings(); refreshMap();
 };
 
 window.saveSettingsAndClose=()=>{
@@ -1189,6 +1208,7 @@ window.saveSettingsAndClose=()=>{
     }
     
     localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); 
+    saveDB();
     populateFilterDropdowns(); 
     document.getElementById('settingsModal').style.display='none'; 
     updateHomeButton();
@@ -1196,7 +1216,7 @@ window.saveSettingsAndClose=()=>{
     showToast('הגדרות נשמרו','success');
 };
 
-window.setDefaultLocation=()=>{appSettings.center=[map.getCenter().lng,map.getCenter().lat]; appSettings.zoom=map.getZoom(); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); showToast("נשמר מיקום מפה","success");};
+window.setDefaultLocation=()=>{appSettings.center=[map.getCenter().lng,map.getCenter().lat]; appSettings.zoom=map.getZoom(); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); saveDB(); showToast("נשמר מיקום מפה","success");};
 
 window.exportTableToCSV = () => { 
     let customHeaders = appSettings.customFields.join(',');
@@ -1245,6 +1265,7 @@ window.createNewTemplate = async () => {
     if(!text) return;
     appSettings.templates.push({ title, text });
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
     renderTemplates();
     showToast("התבנית נשמרה", "success");
 };
@@ -1257,6 +1278,7 @@ window.editTemplate = async (idx) => {
     if(!text) return;
     appSettings.templates[idx] = { title, text };
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
     renderTemplates();
     showToast("התבנית עודכנה", "success");
 };
@@ -1266,6 +1288,7 @@ window.deleteTemplate = async (idx) => {
     if(!proceed) return;
     appSettings.templates.splice(idx, 1);
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
     renderTemplates();
     showToast("התבנית נמחקה", "success");
 };
@@ -1423,6 +1446,7 @@ window.sendCommWhatsApp = async () => {
     } else if (choice === '2') {
         newWin.location.href = `whatsapp://send?phone=${targetPhone}&text=${targetText}`;
     }
+    window.focus();
 
     if(p.length > 1) showToast('נפתח חלון לנמען הראשון בלבד (מגבלת וואטסאפ)', 'warning');
     else showToast('פותח וואטסאפ...', 'success');
@@ -1472,6 +1496,7 @@ window.sendCommEmail = async () => {
         window.location.href = mailtoLink;
         showToast('נפתחה תוכנת המייל שבמחשב', 'success');
     }
+    window.focus();
 
     // איפוס הרשימה
     commRecipients = [];
