@@ -346,29 +346,33 @@
         </div>
         
         <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
-            <h4 style="margin:0 0 10px 0;"><i class="fas fa-map-marker-alt"></i> מיקום מרכזי במפה</h4>
+            <h4 style="margin:0 0 12px 0;"><i class="fas fa-map-marker-alt"></i> מיקום מרכזי במפה</h4>
             
-            <div style="margin-bottom: 12px;">
-                <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer;">
-                    <input type="radio" name="homeLocType" id="locTypePrimary" value="primary" onchange="toggleHomeLocUI()">
-                    מיקום קבוע (הצג סמל ייעודי)
-                </label>
+            <!-- אפשרות 1: בית חב"ד -->
+            <div style="margin-bottom: 14px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer; margin:0;">
+                        <input type="radio" name="homeLocType" id="locTypePrimary" value="primary" onchange="toggleHomeLocUI()">
+                        בית חב"ד
+                    </label>
+                    <button class="btn btn-outline" style="width:auto; padding:4px 10px; font-size:12px;" onclick="openPrimaryChangeUI()"><i class="fas fa-pen"></i> שנה כתובת</button>
+                </div>
                 <div id="primaryLocUI" style="margin-top:8px; margin-right:25px; display:none;">
-                    <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">מיקום נוכחי: <strong id="currentPrimaryAddress">לא הוגדר</strong></div>
-                    <button class="btn btn-outline" style="width:auto; padding:6px 12px; font-size:12px;" onclick="openPrimaryChangeUI()"><i class="fas fa-pen"></i> שנה מיקום</button>
+                    <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">כתובת נוכחית: <strong id="currentPrimaryAddress">לא הוגדר</strong></div>
                     <div id="primaryGeocoderWrapper" style="display:none; margin-top:10px; position:relative; z-index:3002;">
                         <div id="settingsPrimaryGeocoderContainer" style="text-align:right;"></div>
-                        <button class="btn btn-success" style="width:auto; padding:6px 15px; font-size:12px; margin-top:8px;" onclick="confirmPrimaryChange()"><i class="fas fa-check"></i> שמור מיקום זה</button>
+                        <button class="btn btn-success" style="width:auto; padding:6px 15px; font-size:12px; margin-top:8px;" onclick="confirmPrimaryChange()"><i class="fas fa-check"></i> שמור</button>
                     </div>
                 </div>
             </div>
 
+            <!-- אפשרות 2: אחר -->
             <div>
-                <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer;">
+                <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer; margin-bottom:8px;">
                     <input type="radio" name="homeLocType" id="locTypeOther" value="other" onchange="toggleHomeLocUI()">
-                    אחר (מיקום זמני ללא סמל)
+                    אחר
                 </label>
-                <div id="otherLocUI" style="margin-top:8px; margin-right:25px; display:none; position:relative; z-index:3001;">
+                <div id="otherLocUI" style="margin-right:25px; display:none; position:relative; z-index:3001;">
                     <div id="settingsOtherGeocoderContainer" style="text-align:right;"></div>
                 </div>
             </div>

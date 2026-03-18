@@ -150,7 +150,10 @@ window.toggleHomeLocUI = () => {
     const isPrimary = document.getElementById('locTypePrimary').checked;
     document.getElementById('primaryLocUI').style.display = isPrimary ? 'block' : 'none';
     document.getElementById('otherLocUI').style.display = isPrimary ? 'none' : 'block';
-    document.getElementById('primaryGeocoderWrapper').style.display = 'none'; 
+    document.getElementById('primaryGeocoderWrapper').style.display = 'none';
+    if(isPrimary) {
+        document.getElementById('currentPrimaryAddress').innerText = (appSettings.primaryLocation && appSettings.primaryLocation.address) ? appSettings.primaryLocation.address : 'לא הוגדר';
+    }
 };
 
 window.openPrimaryChangeUI = () => { document.getElementById('primaryGeocoderWrapper').style.display = 'block'; };
@@ -1079,7 +1082,8 @@ function refreshMap(filteredRes = null) {
     if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding:0; list-style:none; font-weight:normal;">${alerts.slice(0,6).join('')}${alerts.length>6?'<li style="padding-top:5px; color:var(--text-muted);">ועוד...</li>':''}</ul></div>`;
     if(chart) chart.destroy(); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#64748b']}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
     
-    updateGoalTracker(); 
+    updateGoalTracker();
+    updateHomeButton();
 }
 
 window.markTaskDoneFromDash = (bldgEnc, aptIdx, taskIdx) => { 
