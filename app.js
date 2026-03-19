@@ -69,7 +69,8 @@ if(!appSettings.templates) {
 document.documentElement.style.setProperty('--accent', appSettings.themeColor);
 let currentMainView = appSettings.defaultView || 'map';
 
-let db = getStoredJSON('community_data_final', {});
+let db = getStoredJSON('community_data_final', { meta: { lastModified: 0 } });
+if(!db.meta) db.meta = { lastModified: 0 };
 if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
 
 if(!db['__BOARDS__']) {
@@ -228,7 +229,12 @@ window.onload = () => {
     switchMainView(currentMainView);
     if(localStorage.getItem('darkMode')==='true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className='fas fa-sun'; }
     populateFilterDropdowns();
-    document.getElementById('smartSearch').addEventListener('input', handleOmniSearch);
+    // debounce לחיפוש — מונע ריצות מיותרות
+    function debounce(fn, delay = 300) {
+        let t;
+        return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+    }
+    document.getElementById('smartSearch').addEventListener('input', debounce(handleOmniSearch));
 
     const session = JSON.parse(localStorage.getItem('gdrive_session'));
     if (session && session.token && session.expiresAt > new Date().getTime()) {
@@ -300,9 +306,55 @@ async function geocodeMissingAddresses() {
                 updated = true;
             }
         } catch(e) {}
-        await new Promise(res => setTimeout(res, 1000));
+        await new Promise(res => setTimeout(res, 200));
     }
     if(updated) { saveDB(); refreshMap(); }
+}
+
+// merge חכם — מאחד נתונים מקומיים וענן
+function mergeDB(local, remote) {
+    if(!remote) return local;
+    if(!local) return remote;
+    const result = JSON.parse(JSON.stringify(local));
+    const localBuildings = local.buildings || {};
+    const remoteBuildings = remote.buildings || {};
+
+    // תמיכה במבנה הישן (מפתחות ישירים) ובמבנה החדש (buildings)
+    const getBuildings = (d) => d.buildings || 
+        Object.fromEntries(Object.entries(d).filter(([k]) => 
+            k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== 'meta'));
+
+    const lb = getBuildings(local);
+    const rb = getBuildings(remote);
+
+    for(let bId in rb) {
+        if(!lb[bId]) {
+            if(!result.buildings) result[bId] = rb[bId];
+            else result.buildings[bId] = rb[bId];
+            continue;
+        }
+        const localApts = (lb[bId].apts || []);
+        const remoteApts = (rb[bId].apts || []);
+        const map = new Map();
+        [...localApts, ...remoteApts].forEach(a => {
+            const key = `${a.name}_${a.num}`;
+            if(!map.has(key)) { map.set(key, a); }
+            else {
+                const existing = map.get(key);
+                map.set(key, { ...existing, ...a,
+                    updatedAt: Math.max(existing.updatedAt || 0, a.updatedAt || 0) });
+            }
+        });
+        const target = result.buildings ? result.buildings[bId] : result[bId];
+        if(target) target.apts = Array.from(map.values());
+    }
+
+    if(!result.meta) result.meta = {};
+    result.meta.lastModified = Math.max(
+        local.meta?.lastModified || 0,
+        remote.meta?.lastModified || 0
+    );
+    return result;
 }
 
 async function syncWithDrive() {
@@ -313,31 +365,40 @@ async function syncWithDrive() {
         if (list.files && list.files.length > 0) {
             driveFileId = list.files[0].id;
             const content = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, { headers: { Authorization: `Bearer ${accessToken}` } });
-            const driveDB = await content.json(); 
-            if(Object.keys(driveDB).length > 0) {
-                db = driveDB; 
-                // משיכת ההגדרות מהענן והחלתן על המערכת
-                if(db['__SETTINGS__']) {
-                    appSettings = db['__SETTINGS__'];
-                    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
-                    document.documentElement.style.setProperty('--accent', appSettings.themeColor);
-                    populateFilterDropdowns();
+            const remote = await content.json();
+            if(Object.keys(remote).length > 0) {
+                const remoteTime = remote.meta?.lastModified || 0;
+                const localTime = db.meta?.lastModified || 0;
+                if(remoteTime > localTime) {
+                    db = mergeDB(db, remote);
+                    if(db['__SETTINGS__']) {
+                        appSettings = db['__SETTINGS__'];
+                        localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+                        document.documentElement.style.setProperty('--accent', appSettings.themeColor);
+                        populateFilterDropdowns();
+                    }
+                } else if(localTime > remoteTime) {
+                    await pushToDrive();
+                } else {
+                    db = mergeDB(db, remote);
                 }
             }
         } else {
             const create = await fetch('https://www.googleapis.com/drive/v3/files', { method:'POST', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'}, body:JSON.stringify({name:'community_data_final.json',mimeType:'application/json'}) });
-            driveFileId = (await create.json()).id; await pushToDrive(); 
+            driveFileId = (await create.json()).id;
+            await pushToDrive();
         }
         if(!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info: {code:'',rep:'',notes:'',coords:null}, apts:[] };
         if(!db['__BOARDS__']) db['__BOARDS__'] = [{ id: 'b_default', name: 'לוח מעקב כללי', columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'], archived: false }];
-        localStorage.setItem('community_data_final', JSON.stringify(db)); setSyncStatus('ok', 'מסונכרן');
-    } catch(e) { setSyncStatus('error', 'שגיאה'); }
-    
+        if(!db.meta) db.meta = { lastModified: 0 };
+        saveLocal();
+        setSyncStatus('ok', 'מסונכרן');
+    } catch(e) { setSyncStatus('error', 'שגיאה'); console.error('sync error', e); }
+
     document.getElementById('splash-screen').style.opacity='0'; 
     setTimeout(() => { 
         document.getElementById('splash-screen').style.display='none'; 
         map.resize();
-        // עבור למיקום המרכזי המוגדר
         if(appSettings.homeLocation && appSettings.homeLocation.coords) {
             map.flyTo({ center: appSettings.homeLocation.coords, zoom: appSettings.zoom || 17.5, pitch: appSettings.pitch || 60, duration: 1200 });
         } else if(appSettings.center) {
@@ -345,34 +406,66 @@ async function syncWithDrive() {
         }
         handleOmniSearch(); 
         updateHomeButton();
-        
         const obModal = document.getElementById('onboardingModal');
-        if(!appSettings.homeLocation && obModal) {
-            obModal.style.display = 'flex';
-        }
-        
+        if(!appSettings.homeLocation && obModal) obModal.style.display = 'flex';
         geocodeMissingAddresses(); 
     }, 800);
 }
 
-async function pushToDrive() {
-    if(!driveFileId || !accessToken) return; setSyncStatus('wait', 'שומר...');
-    try { await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, { method:'PATCH', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'}, body:JSON.stringify(db) }); setSyncStatus('ok', 'נשמר'); } catch(e) { setSyncStatus('error', 'שגיאה'); }
+// שמירה מקומית
+function saveLocal() {
+    localStorage.setItem('community_data_final', JSON.stringify(db));
 }
+
+// queue לשמירה — מונע התנגשויות
+let saveQueue = Promise.resolve();
+function queueSave() {
+    saveQueue = saveQueue.then(() => pushToDrive());
+}
+
+// מניעת שמירה כפולה
+let isSaving = false;
+async function pushToDrive() {
+    if(!driveFileId || !accessToken) return;
+    if(isSaving) return;
+    isSaving = true;
+    setSyncStatus('wait', 'שומר...');
+    try {
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(db)
+        });
+        setSyncStatus('ok', 'נשמר');
+    } catch(e) {
+        setSyncStatus('error', 'שגיאה');
+        console.error(e);
+    } finally {
+        isSaving = false;
+    }
+}
+
 function setSyncStatus(st, txt) { document.getElementById('sync-text').innerText=txt; const ic=document.getElementById('sync-icon'), co=document.getElementById('sync-status'); if(st==='wait'){ic.className='fas fa-spinner fa-spin';co.style.color='var(--warning)';} if(st==='ok'){ic.className='fas fa-cloud-check';co.style.color='var(--success)';} if(st==='error'){ic.className='fas fa-exclamation-triangle';co.style.color='var(--danger)';} }
 
 function saveDB() { 
     // בדיקת בטיחות: לא שומרים לדרייב אם אין נתונים אמיתיים
-    const realKeys = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== NO_ADDRESS_KEY);
+    const realKeys = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== NO_ADDRESS_KEY && k !== 'meta');
     const hasRealData = realKeys.length > 0 || (db[NO_ADDRESS_KEY] && db[NO_ADDRESS_KEY].apts && db[NO_ADDRESS_KEY].apts.length > 0);
     if(!hasRealData) { console.warn('saveDB: מניעת שמירה של DB ריק'); return; }
 
-    // אורזים את כל ההגדרות לתוך קובץ הגיבוי!
-    db['__SETTINGS__'] = appSettings; 
-    
-    localStorage.setItem('community_data_final', JSON.stringify(db)); 
-    handleOmniSearch(); 
-    pushToDrive(); 
+    db.meta.lastModified = Date.now();
+    db['__SETTINGS__'] = appSettings;
+
+    saveLocal();
+    handleOmniSearch();
+    queueSave();
+}
+
+// autosave — debounce לשמירה אחרי 2 שניות
+let saveTimeout;
+function autoSave() {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => saveDB(), 2000);
 }
 
 window.switchMainView = function(viewName) {
@@ -442,6 +535,7 @@ window.markDirty = () => {
         btn.classList.add('btn-warning');
         btn.innerHTML = '<i class="fas fa-exclamation-circle"></i> שינויים לא שמורים - לחץ לשמירה';
     }
+    autoSave();
 };
 
 window.closeModals = () => { 
@@ -606,6 +700,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.fatherEmail=document.getElementById('cFatherEmail').value; a.motherEmail=document.getElementById('cMotherEmail').value;
     a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
     a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customFields={...tempCustom};
+    a.updatedAt = Date.now();
     isDirty=false; isCreatingNew=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
     if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
 });
@@ -1939,3 +2034,31 @@ window.executeImport = async () => {
     handleOmniSearch();
     showToast(`ייבוא הושלם! ${imported} חדשים, ${updated} עודכנו, ${skipped} דולגו`, 'success');
 };
+
+// ========== שיפורים נוספים ==========
+
+// 10. escape HTML לאבטחה
+function escapeHTML(str) {
+    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+
+// 11. טקסט סנכרון חכם
+function getLastSyncText() {
+    const t = db.meta && db.meta.lastModified;
+    if(!t) return 'לא סונכרן';
+    const diff = Math.floor((Date.now() - t) / 1000);
+    if(diff < 60) return `עודכן לפני ${diff} שניות`;
+    if(diff < 3600) return `עודכן לפני ${Math.floor(diff/60)} דקות`;
+    return `עודכן לפני ${Math.floor(diff/3600)} שעות`;
+}
+setInterval(() => {
+    const el = document.getElementById('sync-text');
+    if(el && el.innerText !== 'שומר...' && el.innerText !== 'שואב...') {
+        el.innerText = getLastSyncText();
+    }
+}, 5000);
+
+// 8. סנכרון אוטומטי כל 30 שניות
+setInterval(() => {
+    if(accessToken) syncWithDrive();
+}, 30000);
