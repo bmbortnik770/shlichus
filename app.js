@@ -311,43 +311,44 @@ async function geocodeMissingAddresses() {
     if(updated) { saveDB(); refreshMap(); }
 }
 
-// merge חכם — מאחד נתונים מקומיים וענן
+// merge חכם — מאחד נתונים מקומיים וענן לפי מבנה הקיים
 function mergeDB(local, remote) {
     if(!remote) return local;
     if(!local) return remote;
     const result = JSON.parse(JSON.stringify(local));
-    const localBuildings = local.buildings || {};
-    const remoteBuildings = remote.buildings || {};
 
-    // תמיכה במבנה הישן (מפתחות ישירים) ובמבנה החדש (buildings)
-    const getBuildings = (d) => d.buildings || 
-        Object.fromEntries(Object.entries(d).filter(([k]) => 
-            k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== 'meta'));
+    Object.keys(remote).forEach(k => {
+        // דלג על מפתחות מיוחדים
+        if(k === '__BOARDS__' || k === '__SETTINGS__' || k === 'meta') return;
 
-    const lb = getBuildings(local);
-    const rb = getBuildings(remote);
-
-    for(let bId in rb) {
-        if(!lb[bId]) {
-            if(!result.buildings) result[bId] = rb[bId];
-            else result.buildings[bId] = rb[bId];
-            continue;
+        if(!result[k]) {
+            // בניין חדש שלא קיים לוקאלית — קח מהענן
+            result[k] = remote[k];
+            return;
         }
-        const localApts = (lb[bId].apts || []);
-        const remoteApts = (rb[bId].apts || []);
+
+        // בניין קיים בשניהם — מזג דירות לפי שם+מספר
+        const localApts = result[k].apts || [];
+        const remoteApts = remote[k].apts || [];
         const map = new Map();
-        [...localApts, ...remoteApts].forEach(a => {
+
+        localApts.forEach(a => {
+            map.set(`${a.name}_${a.num}`, a);
+        });
+        remoteApts.forEach(a => {
             const key = `${a.name}_${a.num}`;
-            if(!map.has(key)) { map.set(key, a); }
-            else {
+            if(!map.has(key)) {
+                map.set(key, a);
+            } else {
                 const existing = map.get(key);
-                map.set(key, { ...existing, ...a,
-                    updatedAt: Math.max(existing.updatedAt || 0, a.updatedAt || 0) });
+                const localTime = existing.updatedAt || 0;
+                const remoteTime = a.updatedAt || 0;
+                // קח את הגרסה החדשה יותר
+                if(remoteTime > localTime) map.set(key, a);
             }
         });
-        const target = result.buildings ? result.buildings[bId] : result[bId];
-        if(target) target.apts = Array.from(map.values());
-    }
+        result[k].apts = Array.from(map.values());
+    });
 
     if(!result.meta) result.meta = {};
     result.meta.lastModified = Math.max(
@@ -461,11 +462,14 @@ function saveDB() {
     queueSave();
 }
 
-// autosave — debounce לשמירה אחרי 2 שניות
+// autosave — שומר לוקאלית בלבד בזמן עריכה (לא לדרייב)
 let saveTimeout;
 function autoSave() {
     clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => saveDB(), 2000);
+    saveTimeout = setTimeout(() => {
+        db['__SETTINGS__'] = appSettings;
+        saveLocal(); // רק לוקאלי — לא דרייב
+    }, 2000);
 }
 
 window.switchMainView = function(viewName) {
@@ -2058,7 +2062,7 @@ setInterval(() => {
     }
 }, 5000);
 
-// 8. סנכרון אוטומטי כל 30 שניות
+// סנכרון אוטומטי כל 30 שניות — רק אם המשתמש לא באמצע עריכה
 setInterval(() => {
-    if(accessToken) syncWithDrive();
+    if(accessToken && !isDirty) syncWithDrive();
 }, 30000);
