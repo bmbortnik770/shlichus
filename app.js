@@ -257,6 +257,8 @@ function updateHomeButton() {
 window.flyToHome = () => {
     if(appSettings.homeLocation && appSettings.homeLocation.coords) {
         map.flyTo({ center: appSettings.homeLocation.coords, zoom: 19, pitch: 60 });
+    } else {
+        showToast('לא הוגדר מיקום מרכזי. הגדר בהגדרות.', 'warning');
     }
 };
 
@@ -545,6 +547,8 @@ window.addModalBoard = async () => {
         const chosen = unjoined[num-1];
         tempBoards[chosen.id] = chosen.columns[0]; 
         markDirty(); renderModalBoards();
+    } else if(num) {
+        showToast('מספר לא תקין, נסה שוב', 'warning');
     }
 };
 
@@ -580,16 +584,16 @@ function renderTasks() {
         <div class="log-item" style="opacity:${t.done?0.6:1};"><div class="log-header"><span style="text-decoration:${t.done?'line-through':'none'};"><input type="checkbox" ${t.done?'checked':''} onchange="tempTasks[${i}].done=this.checked;markDirty();renderTasks()" style="margin-left:8px;">${t.text}</span><div><span style="color:var(--text-muted);font-size:11px;margin-left:10px;">${t.date||''}</span><button onclick="tempTasks.splice(${i},1);markDirty();renderTasks()" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button></div></div></div>
     `).join('');
 }
-window.addTask = (text='', date='') => { const t=text||document.getElementById('newTaskText').value, d=date||document.getElementById('newTaskDate').value; if(!t)return; markDirty(); tempTasks.push({text:t,date:d,done:false}); document.getElementById('newTaskText').value=''; renderTasks(); };
+window.addTask = (text='', date='') => { const t=text||document.getElementById('newTaskText').value, d=date||document.getElementById('newTaskDate').value; if(!t){ showToast('יש להזין תוכן למשימה', 'warning'); return; } markDirty(); tempTasks.push({text:t,date:d,done:false}); document.getElementById('newTaskText').value=''; renderTasks(); };
 
 function renderLogs() { document.getElementById('cLogsList').innerHTML = tempLogs.length===0 ? '<div class="empty-state"><i class="fas fa-comments"></i><div>עוד לא נוצר קשר. זה הזמן!</div></div>' : tempLogs.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((l,i) => `<div class="log-item"><div class="log-header"><span><i class="fas fa-calendar-alt"></i> ${l.date} - ${l.type}</span><button onclick="tempLogs.splice(${i},1);markDirty();renderLogs()" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-times"></i></button></div><div>${l.text}</div></div>`).join(''); }
-window.addInteractionLog = () => { const d=document.getElementById('newLogDate').value, t=document.getElementById('newLogType').value, txt=document.getElementById('newLogText').value; if(!d||!txt)return; markDirty(); tempLogs.push({date:d,type:t,text:txt}); document.getElementById('newLogText').value=''; renderLogs(); };
+window.addInteractionLog = () => { const d=document.getElementById('newLogDate').value, t=document.getElementById('newLogType').value, txt=document.getElementById('newLogText').value; if(!d||!txt){ showToast('יש למלא תאריך ותיאור', 'warning'); return; } markDirty(); tempLogs.push({date:d,type:t,text:txt}); document.getElementById('newLogText').value=''; renderLogs(); };
 
 function renderDonations() { let sum=tempDonations.reduce((a,b)=>a+Number(b.amount||0),0); document.getElementById('cDonationsSum').innerText=`₪${sum}`; document.getElementById('cDonationsList').innerHTML = tempDonations.length===0 ? '<div class="empty-state"><i class="fas fa-hand-holding-heart"></i><div>אין תרומות.</div></div>' : tempDonations.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((d,i) => `<div class="log-item"><div class="log-header"><span style="color:var(--success);"><i class="fas fa-shekel-sign"></i> ${d.amount}</span><span>${d.date}</span></div><div>${d.reason} <button onclick="tempDonations.splice(${i},1);markDirty();renderDonations()" style="float:left;background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button></div></div>`).join(''); }
 
 window.addDonation = () => { 
     const d=document.getElementById('newDonDate').value, a=document.getElementById('newDonAmount').value, r=document.getElementById('newDonReason').value; 
-    if(!d||!a)return; markDirty(); 
+    if(!d||!a){ showToast('יש למלא תאריך וסכום', 'warning'); return; } markDirty(); 
     tempDonations.push({date:d,amount:a,reason:r||'כללי'}); 
     if(Number(a) >= 500) { addTask(`להתקשר להגיד תודה אישית על התרומה (${a} ש"ח)`, d); showToast('נוצרה משימה להכרת הטוב! ' + getRandomCompliment(), 'info'); switchCrmTab('tasks'); }
     document.getElementById('newDonAmount').value=''; document.getElementById('newDonReason').value=''; renderDonations(); 
@@ -666,9 +670,21 @@ window.handleOmniSearch = () => {
         let col = getStatusColor(a);
         let matchStat = !currentFilters.status || (currentFilters.status==='green'&&col==='#10b981') || (currentFilters.status==='orange'&&col==='#f59e0b') || (currentFilters.status==='red'&&(col==='#ef4444'||col==='#94a3b8'));
             
-        // בדיקת נתונים חסרים
-        let hasMissing = (getAllPhones(a).length === 0) || (b === NO_ADDRESS_KEY);
-        let matchMissing = !window.missingDataMode || hasMissing;
+        // בדיקת נתונים חסרים לפי שדה נבחר
+        let matchMissing = true;
+        if(window.missingDataField) {
+            const f = window.missingDataField;
+            if(f === 'phone') matchMissing = getAllPhones(a).length === 0;
+            else if(f === 'email') matchMissing = getAllEmails(a).length === 0;
+            else if(f === 'address') matchMissing = b === NO_ADDRESS_KEY;
+            else if(f === 'style') matchMissing = !a.style;
+            else if(f === 'notes') matchMissing = !a.notes || a.notes.trim() === '';
+            else if(f === 'tags') matchMissing = !a.tags || a.tags.length === 0;
+            else if(f.startsWith('custom_')) {
+                const fieldName = f.replace('custom_', '');
+                matchMissing = !a.customData || !a.customData[fieldName];
+            }
+        }
 
         if(matchQ && matchStyle && matchTag && matchStat && matchMissing) res.push({bldg:b, idx:i, apt:a});
     });});
@@ -904,6 +920,7 @@ window.bulkPhone = () => {
 };
 
 window.bulkAddTagPrompt = async () => { 
+    if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
     const t = await showCustomDialog({ title: 'תגית המונית', message: 'הקלד תגית להוספה למשפחות:', showInput: true });
     if(t) { 
         ensureAuthAndExecute(()=>{ 
@@ -915,6 +932,7 @@ window.bulkAddTagPrompt = async () => {
 };
 
 window.bulkDelete = async () => { 
+    if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
     const proceed = await showCustomDialog({ title: 'מחיקה המונית', message: `למחוק ${bulkSelection.length} משפחות? פעולה בלתי הפיכה!`, showCancel: true });
     if(proceed) { 
         ensureAuthAndExecute(()=>{ 
@@ -925,6 +943,7 @@ window.bulkDelete = async () => {
 };
 
 window.bulkRoute = () => {
+    if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
     let waypoints = [];
     bulkSelection.forEach(v => {
         let [b, i] = v.split('|');
@@ -955,8 +974,31 @@ window.bulkRoute = () => {
 
 window.renderListView = (filteredRes = null) => {
     const inner = document.getElementById('list-inner');
-    let html=`<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
-        <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
+
+    // בניית רשימת השדות הזמינים לבדיקה (כולל שדות מותאמים)
+    const baseFields = [
+        { value: 'phone', label: 'טלפון' },
+        { value: 'email', label: 'מייל' },
+        { value: 'address', label: 'כתובת' },
+        { value: 'style', label: 'סגנון' },
+        { value: 'notes', label: 'הערות' },
+        { value: 'tags', label: 'תגיות' },
+    ];
+    const customFields = (appSettings.customFields || []).map(f => ({ value: 'custom_' + f, label: f }));
+    const allFields = [...baseFields, ...customFields];
+
+    const currentField = window.missingDataField || '';
+    const fieldOptions = `<option value="">בחר שדה לבדיקה...</option>` +
+        allFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
+
+    let html = `<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
+            <div style="display:flex; align-items:center; gap:6px;">
+                <select id="missingFieldSelect" onchange="applyMissingFieldFilter()" class="filter-select" style="width:auto; font-size:13px; padding:5px 10px; ${currentField ? 'border-color:var(--danger); color:var(--danger); font-weight:600;' : ''}">${fieldOptions}</select>
+                ${currentField ? `<button onclick="clearMissingFieldFilter()" class="btn-icon" style="color:var(--danger);" title="נקה סינון"><i class="fas fa-times"></i></button>` : ''}
+            </div>
+        </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
         </div>
@@ -993,6 +1035,54 @@ window.renderListView = (filteredRes = null) => {
     inner.innerHTML = html + `</tbody></table></div>`;
 };
 
+window.exportTableToCSV = () => {
+    let arr = [];
+    Object.keys(db).forEach(b => {
+        if(b === '__BOARDS__' || b === '__SETTINGS__') return;
+        db[b].apts.forEach(a => arr.push({ bldg: b, apt: a }));
+    });
+
+    if(arr.length === 0) { showToast('אין נתונים לייצוא', 'warning'); return; }
+
+    const customFields = appSettings.customFields || [];
+    const headers = ['כתובת', 'שם משפחה', 'אבא', 'אמא', 'טלפון ראשי', 'מייל', 'סגנון', 'תגיות', 'קשר אחרון', 'הערות', ...customFields];
+
+    const escape = v => `"${String(v||'').replace(/"/g,'""')}"`;
+
+    const rows = arr.map(({ bldg, apt: a }) => {
+        const phones = getAllPhones(a);
+        const emails = getAllEmails(a);
+        const lastDate = (a.interactions && a.interactions.length > 0)
+            ? a.interactions.sort((x,y) => new Date(y.date)-new Date(x.date))[0].date
+            : '';
+        const customVals = customFields.map(f => escape(a.customData && a.customData[f] ? a.customData[f] : ''));
+        return [
+            escape(bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : bldg),
+            escape(a.name),
+            escape(a.father),
+            escape(a.mother),
+            escape(phones[0] || ''),
+            escape(emails[0] || ''),
+            escape(a.style),
+            escape((a.tags||[]).join(', ')),
+            escape(lastDate),
+            escape(a.notes),
+            ...customVals
+        ].join(',');
+    });
+
+    const bom = '\uFEFF'; // תמיכה בעברית באקסל
+    const csv = bom + headers.map(escape).join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `קהילה_${new Date().toLocaleDateString('he-IL').replace(/\//g,'-')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`יוצאו ${arr.length} משפחות לאקסל`, 'success');
+};
+
 window.editGoal = async () => {
     let targetText = await showCustomDialog({ title: 'הגדרת יעד', message: 'מה המטרה שלך? (למשל שם רחוב, או תגית)', showInput: true, defaultValue: appSettings.goal.text });
     if(!targetText) return;
@@ -1003,6 +1093,8 @@ window.editGoal = async () => {
         saveDB();
         updateGoalTracker();
         showToast("היעד עודכן! יוצאים לדרך 🚀", "success");
+    } else if(targetNum !== null) {
+        showToast('יש להזין מספר חיובי תקין', 'warning');
     }
 };
 
@@ -1162,8 +1254,8 @@ window.openSettings=()=>{
     document.getElementById('settingsModal').style.display='flex';
 };
 window.updateThemePreview=()=>{appSettings.themeColor=document.getElementById('setThemeColor').value; document.documentElement.style.setProperty('--accent',appSettings.themeColor); if(map.getLayer('3d-buildings'))map.setPaintProperty('3d-buildings','fill-extrusion-color',['case',['boolean',['feature-state','hover'],false],appSettings.themeColor,'#d1d5db']);};
-window.addNewTag=async ()=>{const v=await showCustomDialog({title:'תגית חדשה', message:'שם התגית:', showInput:true}); if(v&&!appSettings.tags.includes(v)){appSettings.tags.push(v);openSettings();}};
-window.addNewCustomField=async ()=>{const v=await showCustomDialog({title:'שדה מותאם', message:'שם השדה:', showInput:true}); if(v&&!appSettings.customFields.includes(v)){appSettings.customFields.push(v);openSettings();}};
+window.addNewTag=async ()=>{const v=await showCustomDialog({title:'תגית חדשה', message:'שם התגית:', showInput:true}); if(v){ if(appSettings.tags.includes(v)){ showToast('תגית זו כבר קיימת', 'warning'); return; } appSettings.tags.push(v); saveDB(); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); openSettings(); }};
+window.addNewCustomField=async ()=>{const v=await showCustomDialog({title:'שדה מותאם', message:'שם השדה:', showInput:true}); if(v){ if(appSettings.customFields.includes(v)){ showToast('שדה זה כבר קיים', 'warning'); return; } appSettings.customFields.push(v); saveDB(); localStorage.setItem('crm_prefs',JSON.stringify(appSettings)); openSettings(); }};
 
 window.setItemColor = (type, name, color) => {
     if(type === 'style') appSettings.styleColors[name] = color;
@@ -1203,18 +1295,212 @@ window.addNewStyle = () => {
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); saveDB(); populateFilterDropdowns(); openSettings(); refreshMap();
 };
 
-window.missingDataMode = false;
-window.toggleMissingDataFilter = () => {
-    window.missingDataMode = !window.missingDataMode;
-    const btn = document.getElementById('missingDataBtn');
-    
-    if (window.missingDataMode) {
-        btn.style.background = 'var(--danger)';
-        btn.style.color = 'white';
-        showToast('מציג משפחות ללא טלפון או ללא כתובת מוגדרת', 'info');
-    } else {
-        btn.style.background = 'var(--bg-body)';
-        btn.style.color = 'var(--text-main)';
-    }
-    handleOmniSearch(); 
+window.missingDataField = '';
+window.applyMissingFieldFilter = () => {
+    const sel = document.getElementById('missingFieldSelect');
+    window.missingDataField = sel ? sel.value : '';
+    handleOmniSearch();
 };
+window.clearMissingFieldFilter = () => {
+    window.missingDataField = '';
+    handleOmniSearch();
+};
+
+window.saveSettingsAndClose = () => {
+    appSettings.defaultView = document.getElementById('setDefaultView').value;
+
+    const isPrimary = document.getElementById('locTypePrimary').checked;
+    if(isPrimary) {
+        if(appSettings.primaryLocation) {
+            appSettings.homeLocation = { coords: appSettings.primaryLocation.coords, address: appSettings.primaryLocation.address, isChabad: true };
+        } else if(appSettings.homeLocation) {
+            appSettings.homeLocation.isChabad = true;
+            appSettings.primaryLocation = { coords: appSettings.homeLocation.coords, address: appSettings.homeLocation.address };
+        }
+        tempOtherLoc = null;
+        otherGeocoder.clear();
+    } else {
+        if(tempOtherLoc) {
+            appSettings.homeLocation = { coords: tempOtherLoc.coords, address: tempOtherLoc.address, isChabad: false };
+        } else if(appSettings.homeLocation) {
+            appSettings.homeLocation.isChabad = false;
+        }
+    }
+
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
+    populateFilterDropdowns();
+    document.getElementById('settingsModal').style.display = 'none';
+    updateHomeButton();
+    refreshMap();
+    showToast('הגדרות נשמרו', 'success');
+};
+
+window.setDefaultLocation = () => {
+    appSettings.center = [map.getCenter().lng, map.getCenter().lat];
+    appSettings.zoom = map.getZoom();
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
+    showToast('נשמר מיקום מפה', 'success');
+};
+
+// --- פונקציות תקשורת: וואטסאפ ומייל ---
+
+window.sendCommWhatsApp = async () => {
+    const text = document.getElementById('waMessageText').value;
+    if(!text) return showToast('יש להזין תוכן להודעה', 'warning');
+    if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
+    
+    const validRecipients = commRecipients.filter(r => r.phone);
+    if(validRecipients.length === 0) return showToast('לא נמצאו טלפונים — הוסף מספר טלפון לאיש הקשר', 'error');
+
+    if(validRecipients.length > 1 || text.includes('[שם]')) {
+        startCommQueue('whatsapp', '', text, validRecipients);
+        commRecipients = [];
+        renderRecipientsList('whatsapp');
+        document.getElementById('waRecipientCount').innerText = 0;
+    } else {
+        const r = validRecipients[0];
+        let cp = String(r.phone).replace(/\D/g,'');
+        if(cp.startsWith('0')) cp = cp.substring(1);
+        
+        const link = `https://wa.me/972${cp}?text=${encodeURIComponent(text)}`;
+        const newWin = window.open(link, '_blank');
+
+        if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
+            showCustomDialog({
+                title: 'שגיאת דפדפן',
+                message: 'הדפדפן חוסם חלונות קופצים.\nאנא אשר פתיחת פופ-אפים מהאתר בשורת הכתובת למעלה.',
+                showCancel: false
+            });
+        } else {
+            showToast('פותח וואטסאפ...', 'success');
+            commRecipients = [];
+            renderRecipientsList('whatsapp');
+            document.getElementById('waRecipientCount').innerText = 0;
+        }
+    }
+};
+
+window.sendCommEmail = async () => {
+    const subjInput = document.getElementById('emSubject').value || 'הודעה מהקהילה';
+    const textInput = document.getElementById('emMessageText').value;
+    
+    if(!textInput) return showToast('יש להזין תוכן למייל', 'warning');
+    if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
+
+    const validRecipients = commRecipients.filter(r => r.email);
+    if(validRecipients.length === 0) return showToast('לא נמצאו מיילים — הוסף כתובת מייל לאיש הקשר', 'error');
+
+    if(textInput.includes('[שם]') || subjInput.includes('[שם]')) {
+        const proceed = await showChoiceDialog(
+             'שליחה אישית',
+             'האם להפעיל רצף שליחה אישי כדי להשתיל את שם המשפחה?',
+             'כן, התחל רצף', 'לא, שלח המוני (BCC)'
+        );
+        if(!proceed) return;
+        if(proceed === '1') {
+            startCommQueue('email', subjInput, textInput, validRecipients);
+            commRecipients = [];
+            renderRecipientsList('email');
+            document.getElementById('emRecipientCount').innerText = 0;
+            return;
+        }
+    }
+
+    const choice = await showChoiceDialog('בחירת פלטפורמה', 'איך תרצה לשלוח?', 'ג\'ימייל בדפדפן', 'תוכנה במחשב');
+    if(!choice) return;
+
+    const emails = validRecipients.map(r => r.email);
+    const finalSubj = subjInput.replace(/\[\s*שם\s*\]/g, '');
+    const finalText = textInput.replace(/\[\s*שם\s*\]/g, 'משפחה יקרה');
+
+    if (choice === '1') {
+        const link = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&bcc=${emails.join(',')}&su=${encodeURIComponent(finalSubj)}&body=${encodeURIComponent(finalText)}`;
+        const newWin = window.open(link, '_blank');
+        if (!newWin) {
+            showCustomDialog({ title: 'שגיאת דפדפן', message: 'אנא אשר חלונות קופצים בדפדפן.', showCancel: false });
+            return;
+        }
+    } else {
+        window.location.href = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(finalSubj)}&body=${encodeURIComponent(finalText)}`;
+    }
+
+    showToast('נפתחה תוכנת המייל', 'success');
+    commRecipients = [];
+    renderRecipientsList('email');
+    document.getElementById('emRecipientCount').innerText = 0;
+};
+
+// --- מערכת ניהול תור (Queue) ודיאלוגים בחירה ---
+
+function showChoiceDialog(title, message, btn1Text, btn2Text) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal';
+        overlay.style.display = 'flex';
+        overlay.style.zIndex = '100001';
+        overlay.innerHTML = `
+            <div class="modal-content modal-small" style="text-align:center;">
+                <h3 style="color:var(--accent);">${title}</h3>
+                <p>${message}</p>
+                <div style="display:flex; gap:10px; justify-content:center;">
+                    <button id="btn1" class="btn btn-primary" style="width:auto; padding:8px 15px;">${btn1Text}</button>
+                    <button id="btn2" class="btn btn-success" style="width:auto; padding:8px 15px;">${btn2Text}</button>
+                    <button id="btnC" class="btn btn-outline" style="width:auto; padding:8px 15px;">ביטול</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#btn1').onclick = () => { overlay.remove(); resolve('1'); };
+        overlay.querySelector('#btn2').onclick = () => { overlay.remove(); resolve('2'); };
+        overlay.querySelector('#btnC').onclick = () => { overlay.remove(); resolve(null); };
+    });
+}
+
+function startCommQueue(type, subject, text, recipients) {
+    window.commQueue = recipients;
+    window.currentQueueIdx = 0;
+    window.currentQueueType = type;
+    window.currentQueueSubject = subject;
+    window.currentQueueText = text;
+    
+    let qBox = document.getElementById('queueManagerBox');
+    if(!qBox) {
+        qBox = document.createElement('div');
+        qBox.id = 'queueManagerBox';
+        qBox.style.cssText = 'position:fixed; bottom:20px; right:20px; background:var(--surface); border:2px solid var(--accent); padding:15px; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.3); z-index:100000; width:300px;';
+        document.body.appendChild(qBox);
+    }
+    qBox.style.display = 'block';
+    processNextInQueue();
+}
+
+function processNextInQueue() {
+    const qBox = document.getElementById('queueManagerBox');
+    if(window.currentQueueIdx >= window.commQueue.length) {
+        qBox.innerHTML = '<h4 style="color:var(--success); margin:0 0 10px 0;">השליחה הושלמה!</h4><button class="btn btn-outline" onclick="this.parentElement.style.display=\'none\'">סגור</button>';
+        return;
+    }
+    const r = window.commQueue[window.currentQueueIdx];
+    const pText = window.currentQueueText.replace(/\[\s*שם\s*\]/g, r.name || '');
+    qBox.innerHTML = `
+        <h4 style="margin:0 0 10px 0; color:var(--accent);">תור שליחה אישית</h4>
+        <p style="font-size:14px;">נמען ${window.currentQueueIdx + 1} מתוך ${window.commQueue.length}:<br><b>${r.name}</b></p>
+        <div style="display:flex; gap:8px;">
+            <button class="btn btn-success" style="padding:8px;" onclick="executeQueueAction('${r.name}', '${r.phone}', '${r.email}', \`${pText}\`)">פתח הודעה</button>
+            <button class="btn btn-outline" style="padding:8px;" onclick="window.currentQueueIdx++; processNextInQueue()">דלג</button>
+        </div>`;
+}
+
+function executeQueueAction(name, phone, email, text) {
+    if(window.currentQueueType === 'whatsapp') {
+        let cp = String(phone).replace(/\D/g,'');
+        if(cp.startsWith('0')) cp = cp.substring(1);
+        window.open(`https://wa.me/972${cp}?text=${encodeURIComponent(text)}`, '_blank');
+    } else {
+        const s = window.currentQueueSubject.replace(/\[\s*שם\s*\]/g, name);
+        window.location.href = `mailto:${email}?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(text)}`;
+    }
+    window.currentQueueIdx++;
+    setTimeout(processNextInQueue, 600);
+}
