@@ -1504,3 +1504,438 @@ function executeQueueAction(name, phone, email, text) {
     window.currentQueueIdx++;
     setTimeout(processNextInQueue, 600);
 }
+
+// ========== פונקציות חסרות ==========
+
+function showToast(msg, type='info') {
+    const c = document.getElementById('toast-container');
+    if(!c) return;
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    const icons = { success:'fa-check-circle', error:'fa-times-circle', warning:'fa-exclamation-triangle', info:'fa-info-circle' };
+    t.innerHTML = `<i class="fas ${icons[type]||icons.info}"></i> ${msg}`;
+    c.appendChild(t);
+    setTimeout(() => { t.style.animation='fadeOut 0.3s ease-in forwards'; setTimeout(()=>t.remove(), 300); }, 3500);
+}
+
+// --- תבניות ---
+let commRecipients = [];
+
+window.renderTemplates = () => {
+    const c = document.getElementById('comm-templates');
+    if(!c) return;
+    const templates = appSettings.templates || [];
+    if(templates.length === 0) {
+        c.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><div>אין תבניות עדיין. צור תבנית חדשה!</div></div>';
+        return;
+    }
+    c.innerHTML = templates.map((t, i) => `
+        <div style="background:var(--bg-body); border:1px solid var(--border-light); border-radius:8px; padding:12px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <strong style="color:var(--accent);">${t.title}</strong>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-icon" onclick="editTemplate(${i})" title="ערוך"><i class="fas fa-pen"></i></button>
+                    <button class="btn-icon" style="color:var(--danger);" onclick="deleteTemplate(${i})" title="מחק"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <div style="font-size:13px; color:var(--text-muted); white-space:pre-wrap;">${t.text}</div>
+        </div>`).join('');
+};
+
+window.createNewTemplate = async () => {
+    const title = await showCustomDialog({ title: 'תבנית חדשה', message: 'שם קצר לתבנית:', showInput: true, showCancel: true });
+    if(!title) return;
+    const text = await showCustomDialog({ title: 'תוכן התבנית', message: 'הקלד את תוכן ההודעה.\n(אפשר להשתמש ב-[שם] לשם המשפחה)', showInput: true, showCancel: true });
+    if(!text) return;
+    if(!appSettings.templates) appSettings.templates = [];
+    appSettings.templates.push({ title, text });
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
+    renderTemplates();
+    showToast('התבנית נשמרה', 'success');
+};
+
+window.editTemplate = async (idx) => {
+    const t = appSettings.templates[idx];
+    const title = await showCustomDialog({ title: 'עריכת שם תבנית', message: 'שם התבנית:', showInput: true, defaultValue: t.title, showCancel: true });
+    if(!title) return;
+    const text = await showCustomDialog({ title: 'עריכת תוכן תבנית', message: 'תוכן ההודעה:', showInput: true, defaultValue: t.text, showCancel: true });
+    if(!text) return;
+    appSettings.templates[idx] = { title, text };
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
+    renderTemplates();
+    showToast('התבנית עודכנה', 'success');
+};
+
+window.deleteTemplate = async (idx) => {
+    const proceed = await showCustomDialog({ title: 'מחיקת תבנית', message: 'האם למחוק תבנית זו?', showCancel: true });
+    if(!proceed) return;
+    appSettings.templates.splice(idx, 1);
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    saveDB();
+    renderTemplates();
+    showToast('התבנית נמחקה', 'success');
+};
+
+// --- נמענים ---
+window.renderCommSenders = (type) => {
+    if(bulkSelection.length > 0) {
+        commRecipients = [];
+        bulkSelection.forEach(v => {
+            let [b,i] = v.split('|'); let a = db[b].apts[i];
+            commRecipients.push({ name: a.name||'ללא שם', phone: getAllPhones(a)[0]||'', email: getAllEmails(a)[0]||'', key: v });
+        });
+        bulkSelection = [];
+    }
+    const sel = document.getElementById(type === 'whatsapp' ? 'waTemplateSelect' : 'emTemplateSelect');
+    if(sel) {
+        sel.innerHTML = '<option value="">-- בחר תבנית או הקלד חופשי --</option>' +
+            (appSettings.templates || []).map((t, i) => `<option value="${i}">${t.title}</option>`).join('');
+    }
+    renderRecipientsList(type);
+};
+
+window.renderRecipientsList = (type) => {
+    const containerId = type === 'whatsapp' ? 'waRecipientsList' : 'emRecipientsList';
+    const countId = type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount';
+    const container = document.getElementById(containerId);
+    const countEl = document.getElementById(countId);
+    if(countEl) countEl.innerText = commRecipients.length;
+    if(!container) return;
+    if(commRecipients.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">אין נמענים. הוסף ידנית או סמן משפחות ברשימה/מפה.</div>`;
+        return;
+    }
+    const field = type === 'whatsapp' ? 'phone' : 'email';
+    container.innerHTML = commRecipients.map((r,i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-body);border:1px solid var(--border-light);border-radius:6px;margin-bottom:4px;">
+            <span style="flex:1;font-weight:600;font-size:13px;">${r.name}</span>
+            <span style="font-size:12px;color:var(--text-muted);direction:ltr;">${r[field]||'<span style="color:var(--danger);">חסר</span>'}</span>
+            <button class="btn-icon" style="color:var(--danger);padding:2px 6px;" onclick="removeRecipient(${i},'${type}')"><i class="fas fa-times"></i></button>
+        </div>`).join('');
+};
+
+window.removeRecipient = (idx, type) => {
+    commRecipients.splice(idx, 1);
+    renderRecipientsList(type);
+    const countEl = document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount');
+    if(countEl) countEl.innerText = commRecipients.length;
+};
+
+window.addRecipientManually = async (type) => {
+    const name = await showCustomDialog({ title: 'הוסף נמען', message: 'שם המשפחה:', showInput: true, showCancel: true });
+    if(!name) return;
+    const contact = await showCustomDialog({ title: 'הוסף נמען', message: type === 'whatsapp' ? 'מספר טלפון:' : 'כתובת מייל:', showInput: true, showCancel: true });
+    if(!contact) return;
+    commRecipients.push({ name, phone: type === 'whatsapp' ? contact : '', email: type === 'email' ? contact : '', key: '' });
+    renderRecipientsList(type);
+    const countEl = document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount');
+    if(countEl) countEl.innerText = commRecipients.length;
+};
+
+window.addRecipientsFromDB = (type) => {
+    const modal = document.getElementById('recipientPickerModal');
+    const list = document.getElementById('recipientPickerList');
+    if(!list) return;
+    list.innerHTML = '';
+    Object.keys(db).forEach(b => {
+        if(b === '__BOARDS__' || b === '__SETTINGS__') return;
+        db[b].apts.forEach((a, i) => {
+            const contact = type === 'whatsapp' ? getAllPhones(a)[0] : getAllEmails(a)[0];
+            if(!contact) return;
+            const key = `${b}|${i}`;
+            const already = commRecipients.find(r => r.key === key);
+            list.innerHTML += `<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--border-light);">
+                <input type="checkbox" ${already?'checked':''} onchange="togglePickerRecipient(this,'${encodeURIComponent(b)}',${i},'${type}')" style="width:16px;height:16px;">
+                <span style="flex:1;font-weight:600;">${a.name||'ללא שם'}</span>
+                <span style="font-size:12px;color:var(--text-muted);direction:ltr;">${contact}</span>
+            </div>`;
+        });
+    });
+    if(modal) { modal.dataset.type = type; modal.style.display = 'flex'; }
+};
+
+window.togglePickerRecipient = (cb, encB, i, type) => {
+    const b = decodeURIComponent(encB);
+    const a = db[b].apts[i];
+    const key = `${b}|${i}`;
+    if(cb.checked) {
+        if(!commRecipients.find(r => r.key === key)) {
+            commRecipients.push({ name: a.name||'ללא שם', phone: getAllPhones(a)[0]||'', email: getAllEmails(a)[0]||'', key });
+        }
+    } else {
+        commRecipients = commRecipients.filter(r => r.key !== key);
+    }
+    const countEl = document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount');
+    if(countEl) countEl.innerText = commRecipients.length;
+};
+
+window.closeRecipientPicker = (type) => {
+    const modal = document.getElementById('recipientPickerModal');
+    if(modal) modal.style.display = 'none';
+    renderRecipientsList(type);
+};
+
+window.previewWaTemplate = () => {
+    const idx = document.getElementById('waTemplateSelect').value;
+    if(idx !== '') document.getElementById('waMessageText').value = (appSettings.templates[idx]||{}).text || '';
+};
+
+window.previewEmTemplate = () => {
+    const idx = document.getElementById('emTemplateSelect').value;
+    if(idx !== '') document.getElementById('emMessageText').value = (appSettings.templates[idx]||{}).text || '';
+};
+
+// --- גיבוי וייבוא JSON ---
+window.exportData = () => {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `community_backup_${new Date().toLocaleDateString('he-IL').replace(/\//g,'-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('גיבוי הורד בהצלחה', 'success');
+};
+
+window.importData = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+        try {
+            const parsed = JSON.parse(ev.target.result);
+            const proceed = await showCustomDialog({ title: 'שחזור גיבוי', message: 'פעולה זו תדרוס את כל הנתונים הקיימים. להמשיך?', showCancel: true });
+            if(!proceed) return;
+            db = parsed;
+            saveDB();
+            handleOmniSearch();
+            showToast('הנתונים שוחזרו בהצלחה', 'success');
+        } catch(err) {
+            showToast('קובץ לא תקין', 'error');
+        }
+    };
+    reader.readAsText(file);
+};
+
+// --- ייבוא נתונים (CSV / Sheets) ---
+let importRawData = [];
+let importSource = '';
+
+window.openImportModal = () => {
+    importRawData = [];
+    importSource = '';
+    showImportStep('step1');
+    const m = document.getElementById('importModal');
+    if(m) m.style.display = 'flex';
+    const su = document.getElementById('sheetsUrlInput');
+    if(su) su.value = '';
+};
+
+window.closeImportModal = () => {
+    const m = document.getElementById('importModal');
+    if(m) m.style.display = 'none';
+};
+
+function showImportStep(step) {
+    ['importStep1','importStepCSV','importStepSheets','importStepMapping','importStepPreview']
+        .forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+    const map = { step1:'importStep1', csv:'importStepCSV', sheets:'importStepSheets', mapping:'importStepMapping', preview:'importStepPreview' };
+    if(map[step]) { const el = document.getElementById(map[step]); if(el) el.style.display = 'block'; }
+}
+
+window.selectImportSource = (src) => { importSource = src; showImportStep(src); };
+window.backToImportStep1 = () => showImportStep('step1');
+window.backToImportSource = () => showImportStep(importSource);
+window.backToImportMapping = () => showImportStep('mapping');
+
+window.handleCSVUpload = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const text = ev.target.result;
+        importRawData = parseCSV(text);
+        if(importRawData.length < 2) { showToast('הקובץ ריק או לא תקין', 'error'); return; }
+        buildMappingUI();
+        showImportStep('mapping');
+    };
+    reader.readAsText(file, 'UTF-8');
+};
+
+function parseCSV(text) {
+    const lines = text.trim().split(/\r?\n/);
+    return lines.map(line => {
+        const cols = []; let cur = '', inQ = false;
+        for(let i = 0; i < line.length; i++) {
+            const c = line[i];
+            if(c === '"') { inQ = !inQ; }
+            else if(c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+            else { cur += c; }
+        }
+        cols.push(cur.trim());
+        return cols;
+    });
+}
+
+window.fetchGoogleSheet = async () => {
+    const url = document.getElementById('sheetsUrlInput').value.trim();
+    if(!url) { showToast('יש להדביק קישור לגיליון', 'warning'); return; }
+    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if(!match) { showToast('קישור לא תקין — ודא שזה קישור לגוגל שיטס', 'error'); return; }
+    const sheetId = match[1];
+    showToast('שואב נתונים מהגיליון...', 'info');
+    try {
+        const res = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:Z1000`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if(!res.ok) throw new Error('שגיאה');
+        const data = await res.json();
+        if(!data.values || data.values.length < 2) { showToast('הגיליון ריק או לא נגיש', 'error'); return; }
+        importRawData = data.values;
+        buildMappingUI();
+        showImportStep('mapping');
+        showToast(`נמצאו ${data.values.length - 1} שורות`, 'success');
+    } catch(e) {
+        showToast('שגיאה בגישה לגיליון. ודא שהגיליון משותף ושאתה מחובר לגוגל.', 'error');
+    }
+};
+
+const SYSTEM_FIELDS = [
+    { value: '', label: '-- דלג --' },
+    { value: 'name', label: 'שם משפחה' },
+    { value: 'phone', label: 'טלפון' },
+    { value: 'email', label: 'מייל' },
+    { value: 'address', label: 'כתובת' },
+    { value: 'father', label: 'שם אב' },
+    { value: 'mother', label: 'שם אם' },
+    { value: 'style', label: 'סגנון' },
+    { value: 'notes', label: 'הערות' },
+    { value: 'tags', label: 'תגיות (מופרדות בפסיק)' },
+];
+
+function buildMappingUI() {
+    const headers = importRawData[0];
+    const countEl = document.getElementById('importRowCount');
+    if(countEl) countEl.innerText = importRawData.length - 1;
+    const autoMap = {
+        'שם':'name','name':'name','משפחה':'name','family':'name',
+        'טלפון':'phone','phone':'phone','mobile':'phone','נייד':'phone','Phone 1 - Value':'phone',
+        'מייל':'email','email':'email','mail':'email','E-mail 1 - Value':'email',
+        'כתובת':'address','address':'address','רחוב':'address',
+        'אבא':'father','father':'father','אב':'father',
+        'אמא':'mother','mother':'mother','אם':'mother',
+        'סגנון':'style','style':'style','הערות':'notes','notes':'notes','תגיות':'tags','tags':'tags',
+    };
+    const customFieldOpts = (appSettings.customFields || []).map(f => `<option value="custom_${f}">${f} (שדה מותאם)</option>`).join('');
+    const fieldOpts = SYSTEM_FIELDS.map(f => `<option value="${f.value}">${f.label}</option>`).join('') + customFieldOpts;
+    const container = document.getElementById('importMappingFields');
+    if(!container) return;
+    container.innerHTML = headers.map((h, i) => {
+        const sample = importRawData.slice(1, 4).map(r => r[i] || '').filter(Boolean).join(', ');
+        const autoVal = autoMap[h] || autoMap[h.toLowerCase()] || '';
+        const opts = fieldOpts.replace(`value="${autoVal}"`, `value="${autoVal}" selected`);
+        return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:center; margin-bottom:8px; padding:8px; background:var(--bg-body); border-radius:6px; border:1px solid var(--border-light);">
+            <div><div style="font-weight:600; font-size:13px;">${h}</div><div style="font-size:11px; color:var(--text-muted);">דוגמה: ${sample||'(ריק)'}</div></div>
+            <select class="filter-select" id="mapCol_${i}" style="font-size:12px;">${opts}</select>
+        </div>`;
+    }).join('');
+}
+
+window.runImportPreview = () => {
+    const mapped = getMappedRows();
+    if(mapped.length === 0) { showToast('אנא מפה לפחות שדה אחד', 'warning'); return; }
+    const duplicates = [];
+    mapped.forEach((row, i) => {
+        if(!row.name && !row.phone) return;
+        Object.keys(db).forEach(b => {
+            if(b === '__BOARDS__' || b === '__SETTINGS__') return;
+            db[b].apts.forEach(a => {
+                const sameName = row.name && a.name && a.name.trim() === row.name.trim();
+                const samePhone = row.phone && getAllPhones(a).some(p => p.replace(/\D/g,'') === row.phone.replace(/\D/g,''));
+                if(sameName || samePhone) duplicates.push(i);
+            });
+        });
+    });
+    const dupWarn = document.getElementById('importDuplicateWarning');
+    if(dupWarn) {
+        if(duplicates.length > 0) {
+            dupWarn.style.display = 'block';
+            dupWarn.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> נמצאו <strong>${duplicates.length}</strong> רשומות שעשויות להיות כפולות.`;
+        } else { dupWarn.style.display = 'none'; }
+    }
+    const previewEl = document.getElementById('importPreviewTable');
+    if(previewEl) {
+        previewEl.innerHTML = `<table class="data-table" style="font-size:12px;">
+            <thead><tr><th>שם</th><th>טלפון</th><th>מייל</th><th>כתובת</th><th>סטטוס</th></tr></thead>
+            <tbody>${mapped.slice(0,20).map((r,i)=>`<tr style="${duplicates.includes(i)?'background:rgba(245,158,11,0.1);':''}">
+                <td>${r.name||'-'}</td><td>${r.phone||'-'}</td><td>${r.email||'-'}</td><td>${r.address||'ללא כתובת'}</td>
+                <td>${duplicates.includes(i)?'<span style="color:var(--warning);">⚠️ כפול?</span>':'<span style="color:var(--success);">✓ חדש</span>'}</td>
+            </tr>`).join('')}</tbody></table>
+            ${mapped.length>20?`<div style="text-align:center;padding:8px;color:var(--text-muted);font-size:12px;">ועוד ${mapped.length-20} רשומות...</div>`:''}`;
+    }
+    showImportStep('preview');
+};
+
+function getMappedRows() {
+    const headers = importRawData[0];
+    const colMap = {};
+    headers.forEach((h, i) => {
+        const sel = document.getElementById(`mapCol_${i}`);
+        if(sel && sel.value) colMap[i] = sel.value;
+    });
+    return importRawData.slice(1).map(row => {
+        const obj = {};
+        Object.entries(colMap).forEach(([i, field]) => { const val=(row[i]||'').trim(); if(val) obj[field]=val; });
+        return obj;
+    }).filter(r => Object.keys(r).length > 0);
+}
+
+window.executeImport = async () => {
+    const mapped = getMappedRows();
+    let imported = 0, skipped = 0, updated = 0;
+    for(const row of mapped) {
+        let existingBldg = null, existingIdx = null;
+        Object.keys(db).forEach(b => {
+            if(b==='__BOARDS__'||b==='__SETTINGS__') return;
+            db[b].apts.forEach((a,i) => {
+                const sameName = row.name && a.name && a.name.trim()===row.name.trim();
+                const samePhone = row.phone && getAllPhones(a).some(p=>p.replace(/\D/g,'')===row.phone.replace(/\D/g,''));
+                if((sameName||samePhone) && !existingBldg) { existingBldg=b; existingIdx=i; }
+            });
+        });
+        if(existingBldg !== null) {
+            const choice = await showChoiceDialog('רשומה קיימת', `"${row.name||row.phone}" כבר קיימת במערכת. מה לעשות?`, 'עדכן אותה', 'דלג עליה');
+            if(choice === '1') {
+                const a = db[existingBldg].apts[existingIdx];
+                if(row.phone && !getAllPhones(a).includes(row.phone)) a.phone = row.phone;
+                if(row.email && !getAllEmails(a).includes(row.email)) a.email = row.email;
+                if(row.notes) a.notes = (a.notes?a.notes+'\n':'')+row.notes;
+                if(row.style) a.style = row.style;
+                if(row.tags) { if(!a.tags)a.tags=[]; row.tags.split(',').map(t=>t.trim()).forEach(t=>{if(t&&!a.tags.includes(t))a.tags.push(t);}); }
+                updated++;
+            } else { skipped++; }
+            continue;
+        }
+        const bldgKey = row.address && row.address.trim() ? row.address.trim() : NO_ADDRESS_KEY;
+        if(!db[bldgKey]) db[bldgKey] = { info:{code:'',rep:'',notes:'',coords:null}, apts:[] };
+        const newApt = {
+            name:row.name||'', father:row.father||'', mother:row.mother||'',
+            phone:row.phone||'', email:row.email||'',
+            style:row.style||appSettings.styles[0]||'',
+            notes:row.notes||'',
+            tags:row.tags?row.tags.split(',').map(t=>t.trim()).filter(Boolean):[],
+            boards:{}, childrenList:[], interactions:[], donations:[], tasks:[], customData:{}
+        };
+        Object.entries(row).forEach(([k,v])=>{ if(k.startsWith('custom_')) newApt.customData[k.replace('custom_','')]=v; });
+        db[bldgKey].apts.push(newApt);
+        imported++;
+    }
+    saveDB();
+    closeImportModal();
+    document.getElementById('settingsModal').style.display = 'none';
+    handleOmniSearch();
+    showToast(`ייבוא הושלם! ${imported} חדשים, ${updated} עודכנו, ${skipped} דולגו`, 'success');
+};
