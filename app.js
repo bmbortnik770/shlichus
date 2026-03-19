@@ -294,7 +294,7 @@ async function ensureAuthAndExecute(cb) {
 }
 
 async function geocodeMissingAddresses() {
-    const bldgs = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== NO_ADDRESS_KEY && (!db[k].info.coords || isNaN(db[k].info.coords[0])));
+    const bldgs = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== NO_ADDRESS_KEY && k !== 'meta' && db[k] && db[k].info && (!db[k].info.coords || isNaN(db[k].info.coords[0])));
     if(bldgs.length > 0) showToast("מתבצע עדכון מיקומים ברקע...", "info");
     let updated = false;
     for(let b of bldgs) {
@@ -760,7 +760,8 @@ window.handleOmniSearch = () => {
     
     const q=el.value.toLowerCase(), dd=document.getElementById('searchDropdown'); let res=[];
     Object.keys(db).forEach(b => { 
-        if(b === '__BOARDS__' || b === '__SETTINGS__') return;
+        if(b === '__BOARDS__' || b === '__SETTINGS__' || b === 'meta') return;
+        if(!db[b] || !db[b].apts) return;
         db[b].apts.forEach((a,i) => {
         let txt=`${b} ${a.name} ${getAllPhones(a).join(' ')} ${getAllEmails(a).join(' ')} ${a.notes||''} ${(a.tags||[]).join(' ')} ${a.father||''} ${a.mother||''}`.toLowerCase();
         let matchQ = q.length<2 || txt.includes(q);
@@ -898,7 +899,7 @@ window.deleteBoard = async (id) => {
     if(proceed) {
         db.__BOARDS__ = db.__BOARDS__.filter(x => x.id !== id);
         Object.keys(db).forEach(bldg => {
-           if(bldg !== '__BOARDS__' && bldg !== '__SETTINGS__') { db[bldg].apts.forEach(a => { if(a.boards && a.boards[id]) delete a.boards[id]; }); }
+           if(bldg !== '__BOARDS__' && bldg !== '__SETTINGS__' && bldg !== 'meta' && db[bldg] && db[bldg].apts) { db[bldg].apts.forEach(a => { if(a.boards && a.boards[id]) delete a.boards[id]; }); }
         });
         saveDB(); renderKanbanView(); showToast("הפרויקט נמחק לצמיתות", "success");
     }
@@ -943,7 +944,7 @@ window.renderKanbanView = (filteredRes = null) => {
     if(!activeBoard) return;
 
     let arr = filteredRes || []; 
-    if(!filteredRes) Object.keys(db).forEach(b=>{ if(b!=='__BOARDS__' && b!=='__SETTINGS__') db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})) });
+    if(!filteredRes) Object.keys(db).forEach(b=>{ if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts) db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})) });
     
     activeBoard.columns.forEach(stage => {
         let colCards = arr.filter(r => r.apt.boards && r.apt.boards[currentBoardId] === stage);
@@ -1105,7 +1106,7 @@ window.renderListView = (filteredRes = null) => {
     <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
     <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים ומייל</th></tr></thead><tbody>`;
     
-    let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__' && b!=='__SETTINGS__')db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
+    let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts)db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
     arr.forEach(r => {
         const enc=encodeURIComponent(r.bldg), bName=r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg, a=r.apt;
         let lastDate='-'; if(a.interactions&&a.interactions.length>0) lastDate=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date;
@@ -1137,7 +1138,7 @@ window.renderListView = (filteredRes = null) => {
 window.exportTableToCSV = () => {
     let arr = [];
     Object.keys(db).forEach(b => {
-        if(b === '__BOARDS__' || b === '__SETTINGS__') return;
+        if(b === '__BOARDS__' || b === '__SETTINGS__' || b === 'meta') return; if(!db[b] || !db[b].apts) return;
         db[b].apts.forEach(a => arr.push({ bldg: b, apt: a }));
     });
 
@@ -1201,7 +1202,7 @@ window.updateGoalTracker = () => {
     let count = 0;
     let q = appSettings.goal.text.toLowerCase();
     Object.keys(db).forEach(b => {
-        if(b === '__BOARDS__' || b === '__SETTINGS__') return;
+        if(b === '__BOARDS__' || b === '__SETTINGS__' || b === 'meta') return; if(!db[b] || !db[b].apts) return;
         db[b].apts.forEach(a => {
             let txt=`${b} ${a.name} ${(a.tags||[]).join(' ')}`.toLowerCase();
             if(txt.includes(q)) count++;
@@ -1234,7 +1235,7 @@ function refreshMap(filteredRes = null) {
     }
 
     Object.keys(db).forEach(k => {
-        if(k === '__BOARDS__' || k === '__SETTINGS__') return;
+        if(k === '__BOARDS__' || k === '__SETTINGS__' || k === 'meta') return; if(!db[k] || !db[k].apts) return;
         let maxVal=0, showBldg=false;
         
         db[k].apts.forEach((a,i) => {
@@ -1373,7 +1374,7 @@ window.renameStyle = async (idx) => {
     // העבר צבע לשם החדש
     if(appSettings.styleColors[oldName]) { appSettings.styleColors[newName] = appSettings.styleColors[oldName]; delete appSettings.styleColors[oldName]; }
     // עדכן את כל המשפחות
-    Object.keys(db).forEach(k => { if(k==='__BOARDS__') return; db[k].apts.forEach(a => { if(a.style===oldName) a.style=newName; }); });
+    Object.keys(db).forEach(k => { if(k==='__BOARDS__' || k==='__SETTINGS__' || k==='meta') return; if(!db[k] || !db[k].apts) return; db[k].apts.forEach(a => { if(a.style===oldName) a.style=newName; }); });
     saveDB(); localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); populateFilterDropdowns(); openSettings(); refreshMap();
 };
 
@@ -1739,7 +1740,7 @@ window.addRecipientsFromDB = (type) => {
     if(!list) return;
     list.innerHTML = '';
     Object.keys(db).forEach(b => {
-        if(b === '__BOARDS__' || b === '__SETTINGS__') return;
+        if(b === '__BOARDS__' || b === '__SETTINGS__' || b === 'meta') return; if(!db[b] || !db[b].apts) return;
         db[b].apts.forEach((a, i) => {
             const contact = type === 'whatsapp' ? getAllPhones(a)[0] : getAllEmails(a)[0];
             if(!contact) return;
@@ -1950,7 +1951,7 @@ window.runImportPreview = () => {
     mapped.forEach((row, i) => {
         if(!row.name && !row.phone) return;
         Object.keys(db).forEach(b => {
-            if(b === '__BOARDS__' || b === '__SETTINGS__') return;
+            if(b === '__BOARDS__' || b === '__SETTINGS__' || b === 'meta') return; if(!db[b] || !db[b].apts) return;
             db[b].apts.forEach(a => {
                 const sameName = row.name && a.name && a.name.trim() === row.name.trim();
                 const samePhone = row.phone && getAllPhones(a).some(p => p.replace(/\D/g,'') === row.phone.replace(/\D/g,''));
