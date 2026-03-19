@@ -286,7 +286,7 @@ async function ensureAuthAndExecute(cb) {
 }
 
 async function geocodeMissingAddresses() {
-    const bldgs = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== NO_ADDRESS_KEY && (!db[k].info.coords || isNaN(db[k].info.coords[0])));
+    const bldgs = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== NO_ADDRESS_KEY && (!db[k].info.coords || isNaN(db[k].info.coords[0])));
     if(bldgs.length > 0) showToast("מתבצע עדכון מיקומים ברקע...", "info");
     let updated = false;
     for(let b of bldgs) {
@@ -334,7 +334,13 @@ async function syncWithDrive() {
     document.getElementById('splash-screen').style.opacity='0'; 
     setTimeout(() => { 
         document.getElementById('splash-screen').style.display='none'; 
-        map.resize(); 
+        map.resize();
+        // עבור למיקום המרכזי המוגדר
+        if(appSettings.homeLocation && appSettings.homeLocation.coords) {
+            map.flyTo({ center: appSettings.homeLocation.coords, zoom: appSettings.zoom || 17.5, pitch: appSettings.pitch || 60, duration: 1200 });
+        } else if(appSettings.center) {
+            map.flyTo({ center: appSettings.center, zoom: appSettings.zoom || 17.5, pitch: appSettings.pitch || 60, duration: 1200 });
+        }
         handleOmniSearch(); 
         updateHomeButton();
         
