@@ -330,24 +330,24 @@ function mergeDB(local, remote) {
         // בניין קיים בשניהם — מזג דירות לפי שם+מספר
         const localApts = result[k].apts || [];
         const remoteApts = remote[k].apts || [];
-        const mergeMap = new Map();
+        const map = new Map();
 
         localApts.forEach(a => {
-            const key = a.id || `${a.name}_${a.num}`;
-            mergeMap.set(key, a);
+            map.set(`${a.name}_${a.num}`, a);
         });
         remoteApts.forEach(a => {
-            const key = a.id || `${a.name}_${a.num}`;
-            if(!mergeMap.has(key)) {
-                mergeMap.set(key, a);
+            const key = `${a.name}_${a.num}`;
+            if(!map.has(key)) {
+                map.set(key, a);
             } else {
-                const existing = mergeMap.get(key);
+                const existing = map.get(key);
                 const localTime = existing.updatedAt || 0;
                 const remoteTime = a.updatedAt || 0;
-                if(remoteTime > localTime) mergeMap.set(key, a);
+                // קח את הגרסה החדשה יותר
+                if(remoteTime > localTime) map.set(key, a);
             }
         });
-        result[k].apts = Array.from(mergeMap.values());
+        result[k].apts = Array.from(map.values());
     });
 
     if(!result.meta) result.meta = {};
@@ -524,7 +524,7 @@ window.openBuildingModal = function() {
 window.switchBldgTab = (tab) => { document.querySelectorAll('#buildingModal .crm-tab, #buildingModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`bldgTabBtn-${tab}`).classList.add('active'); document.getElementById(`bldgTab-${tab}`).classList.add('active'); };
 
 window.quickAddAptModal = () => { 
-    db[currentBldg].apts.push({ id: crypto.randomUUID(), num:'', name:'', style:appSettings.styles[0], boards:{}, tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); 
+    db[currentBldg].apts.push({ num:'', name:'', style:appSettings.styles[0], boards:{}, tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); 
     isCreatingNew = true;
     document.getElementById('buildingModal').style.display='none'; 
     openClientCard(db[currentBldg].apts.length-1); 
@@ -566,7 +566,7 @@ window.formatPhone = (el) => { let v=el.value.replace(/\D/g,''); if(v.length>3&&
 
 window.quickAddFamily = () => {
     currentBldg = NO_ADDRESS_KEY;
-    db[currentBldg].apts.push({id: crypto.randomUUID(), num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}});
+    db[currentBldg].apts.push({num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}});
     currentAptIdx = db[currentBldg].apts.length - 1;
     isCreatingNew = true;
     openClientCard(currentAptIdx);
@@ -1088,16 +1088,17 @@ window.renderListView = (filteredRes = null) => {
     const allFields = [...baseFields, ...customFields];
 
     const currentField = window.missingDataField || '';
-    const fieldOptions = `<option value="">סנן לפי שדה חסר...</option>` +
+    const fieldOptions = `<option value="">כל השדות</option>` +
         allFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
 
     let html = `<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
             <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
-            <div style="display:flex; align-items:center; gap:6px;">
-                <i class="fas fa-filter" style="color:${currentField ? 'var(--danger)' : 'var(--text-muted)'}; font-size:13px;"></i>
-                <select id="missingFieldSelect" onchange="applyMissingFieldFilter()" class="filter-select" style="width:auto; font-size:13px; padding:5px 10px; ${currentField ? 'border-color:var(--danger); color:var(--danger); font-weight:600;' : 'color:var(--text-muted);'}">${fieldOptions}</select>
-                ${currentField ? `<button onclick="clearMissingFieldFilter()" class="btn-icon" style="color:var(--danger);" title="נקה סינון"><i class="fas fa-times"></i></button>` : ''}
+            <div style="display:inline-flex; align-items:center; gap:6px; background:var(--bg-body); border:1.5px solid ${currentField ? 'var(--danger)' : 'var(--border-light)'}; border-radius:20px; padding:4px 12px; transition:border-color 0.2s; cursor:pointer;">
+                <i class="fas fa-filter" style="color:${currentField ? 'var(--danger)' : 'var(--text-muted)'}; font-size:11px;"></i>
+                <span style="font-size:12px; font-weight:600; color:${currentField ? 'var(--danger)' : 'var(--text-muted)'}; white-space:nowrap;">שדות חסרים:</span>
+                <select id="missingFieldSelect" onchange="applyMissingFieldFilter()" style="border:none; background:transparent; font-family:'Assistant'; font-size:13px; font-weight:${currentField ? '700' : '500'}; color:${currentField ? 'var(--danger)' : 'var(--text-main)'}; cursor:pointer; outline:none; padding:0;">${fieldOptions}</select>
+                ${currentField ? `<button onclick="clearMissingFieldFilter()" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0; font-size:12px; line-height:1;" title="נקה סינון"><i class="fas fa-times"></i></button>` : ''}
             </div>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -2023,7 +2024,6 @@ window.executeImport = async () => {
         const bldgKey = row.address && row.address.trim() ? row.address.trim() : NO_ADDRESS_KEY;
         if(!db[bldgKey]) db[bldgKey] = { info:{code:'',rep:'',notes:'',coords:null}, apts:[] };
         const newApt = {
-            id: crypto.randomUUID(),
             name:row.name||'', father:row.father||'', mother:row.mother||'',
             phone:row.phone||'', email:row.email||'',
             style:row.style||appSettings.styles[0]||'',
