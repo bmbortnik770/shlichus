@@ -1622,7 +1622,7 @@ function showToast(msg, type='info') {
 let commRecipients = [];
 
 window.renderTemplates = () => {
-    const c = document.getElementById('comm-templates');
+    const c = document.getElementById('templatesListContainer');
     if(!c) return;
     const templates = appSettings.templates || [];
     if(templates.length === 0) {
