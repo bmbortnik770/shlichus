@@ -1092,12 +1092,12 @@ window.renderListView = (filteredRes = null) => {
         allFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
 
     let html = `<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
-            <div style="display:inline-flex; align-items:center; gap:6px; background:var(--bg-body); border:1.5px solid ${currentField ? 'var(--danger)' : 'var(--border-light)'}; border-radius:20px; padding:4px 12px; transition:border-color 0.2s; cursor:pointer;">
+            <div style="display:inline-flex; align-items:center; gap:5px; background:var(--surface); border:1.5px solid ${currentField ? 'var(--danger)' : 'var(--border-light)'}; border-radius:8px; padding:4px 10px; transition:border-color 0.2s;">
                 <i class="fas fa-filter" style="color:${currentField ? 'var(--danger)' : 'var(--text-muted)'}; font-size:11px;"></i>
                 <span style="font-size:12px; font-weight:600; color:${currentField ? 'var(--danger)' : 'var(--text-muted)'}; white-space:nowrap;">שדות חסרים:</span>
-                <select id="missingFieldSelect" onchange="applyMissingFieldFilter()" style="border:none; background:transparent; font-family:'Assistant'; font-size:13px; font-weight:${currentField ? '700' : '500'}; color:${currentField ? 'var(--danger)' : 'var(--text-main)'}; cursor:pointer; outline:none; padding:0;">${fieldOptions}</select>
+                <select id="missingFieldSelect" onchange="applyMissingFieldFilter()" style="border:none; background:transparent; font-family:'Assistant'; font-size:13px; font-weight:${currentField ? '700' : '500'}; color:${currentField ? 'var(--danger)' : 'var(--text-main)'}; cursor:pointer; outline:none; padding:2px 0;">${fieldOptions}</select>
                 ${currentField ? `<button onclick="clearMissingFieldFilter()" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0; font-size:12px; line-height:1;" title="נקה סינון"><i class="fas fa-times"></i></button>` : ''}
             </div>
         </div>
