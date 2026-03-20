@@ -53,6 +53,8 @@ body { margin:0; padding:0; font-family:'Assistant',sans-serif; display:flex; he
 .btn { padding:10px; border-radius:6px; cursor:pointer; border:none; font-weight:600; font-family:'Assistant',sans-serif; width:100%; transition:all 0.2s ease; color:white; display:flex; justify-content:center; align-items:center; gap:8px; }
 .btn-primary { background:var(--accent); } .btn-success { background:var(--success); } .btn-warning { background:var(--warning); color:#fff; } .btn-danger { background:var(--danger); }
 .btn-outline { background:transparent; border:1px solid var(--border-light); color:var(--text-main); }
+.btn:hover { filter:brightness(0.9); }
+.btn-outline:hover { background:var(--table-hover); border-color:var(--accent); color:var(--accent); }
 .btn-icon { width:auto; background:transparent; color:var(--text-muted); padding:6px 10px; border:1px solid var(--border-light); border-radius:4px; cursor:pointer;}
 
 .fab-add { position:fixed; bottom:30px; right:30px; width:60px; height:60px; background:var(--accent); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 4px 15px rgba(59,130,246,0.4); cursor:pointer; z-index:1000; border:none; transition:0.3s; }

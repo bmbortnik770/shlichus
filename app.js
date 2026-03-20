@@ -1088,14 +1088,15 @@ window.renderListView = (filteredRes = null) => {
     const allFields = [...baseFields, ...customFields];
 
     const currentField = window.missingDataField || '';
-    const fieldOptions = `<option value="">בחר שדה לבדיקה...</option>` +
+    const fieldOptions = `<option value="">סנן לפי שדה חסר...</option>` +
         allFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
 
     let html = `<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
             <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
             <div style="display:flex; align-items:center; gap:6px;">
-                <select id="missingFieldSelect" onchange="applyMissingFieldFilter()" class="filter-select" style="width:auto; font-size:13px; padding:5px 10px; ${currentField ? 'border-color:var(--danger); color:var(--danger); font-weight:600;' : ''}">${fieldOptions}</select>
+                <i class="fas fa-filter" style="color:${currentField ? 'var(--danger)' : 'var(--text-muted)'}; font-size:13px;"></i>
+                <select id="missingFieldSelect" onchange="applyMissingFieldFilter()" class="filter-select" style="width:auto; font-size:13px; padding:5px 10px; ${currentField ? 'border-color:var(--danger); color:var(--danger); font-weight:600;' : 'color:var(--text-muted);'}">${fieldOptions}</select>
                 ${currentField ? `<button onclick="clearMissingFieldFilter()" class="btn-icon" style="color:var(--danger);" title="נקה סינון"><i class="fas fa-times"></i></button>` : ''}
             </div>
         </div>
