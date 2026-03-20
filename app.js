@@ -330,24 +330,24 @@ function mergeDB(local, remote) {
         // בניין קיים בשניהם — מזג דירות לפי שם+מספר
         const localApts = result[k].apts || [];
         const remoteApts = remote[k].apts || [];
-        const map = new Map();
+        const mergeMap = new Map();
 
         localApts.forEach(a => {
-            map.set(`${a.name}_${a.num}`, a);
+            const key = a.id || `${a.name}_${a.num}`;
+            mergeMap.set(key, a);
         });
         remoteApts.forEach(a => {
-            const key = `${a.name}_${a.num}`;
-            if(!map.has(key)) {
-                map.set(key, a);
+            const key = a.id || `${a.name}_${a.num}`;
+            if(!mergeMap.has(key)) {
+                mergeMap.set(key, a);
             } else {
-                const existing = map.get(key);
+                const existing = mergeMap.get(key);
                 const localTime = existing.updatedAt || 0;
                 const remoteTime = a.updatedAt || 0;
-                // קח את הגרסה החדשה יותר
-                if(remoteTime > localTime) map.set(key, a);
+                if(remoteTime > localTime) mergeMap.set(key, a);
             }
         });
-        result[k].apts = Array.from(map.values());
+        result[k].apts = Array.from(mergeMap.values());
     });
 
     if(!result.meta) result.meta = {};
@@ -524,7 +524,7 @@ window.openBuildingModal = function() {
 window.switchBldgTab = (tab) => { document.querySelectorAll('#buildingModal .crm-tab, #buildingModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`bldgTabBtn-${tab}`).classList.add('active'); document.getElementById(`bldgTab-${tab}`).classList.add('active'); };
 
 window.quickAddAptModal = () => { 
-    db[currentBldg].apts.push({ num:'', name:'', style:appSettings.styles[0], boards:{}, tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); 
+    db[currentBldg].apts.push({ id: crypto.randomUUID(), num:'', name:'', style:appSettings.styles[0], boards:{}, tags:[], childrenList:[], interactions:[], donations:[], tasks:[], customFields:{} }); 
     isCreatingNew = true;
     document.getElementById('buildingModal').style.display='none'; 
     openClientCard(db[currentBldg].apts.length-1); 
@@ -566,7 +566,7 @@ window.formatPhone = (el) => { let v=el.value.replace(/\D/g,''); if(v.length>3&&
 
 window.quickAddFamily = () => {
     currentBldg = NO_ADDRESS_KEY;
-    db[currentBldg].apts.push({num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}});
+    db[currentBldg].apts.push({id: crypto.randomUUID(), num:'',name:'',style:appSettings.styles[0],boards:{},tags:[],childrenList:[],interactions:[],donations:[],tasks:[],customFields:{}});
     currentAptIdx = db[currentBldg].apts.length - 1;
     isCreatingNew = true;
     openClientCard(currentAptIdx);
@@ -2022,6 +2022,7 @@ window.executeImport = async () => {
         const bldgKey = row.address && row.address.trim() ? row.address.trim() : NO_ADDRESS_KEY;
         if(!db[bldgKey]) db[bldgKey] = { info:{code:'',rep:'',notes:'',coords:null}, apts:[] };
         const newApt = {
+            id: crypto.randomUUID(),
             name:row.name||'', father:row.father||'', mother:row.mother||'',
             phone:row.phone||'', email:row.email||'',
             style:row.style||appSettings.styles[0]||'',
