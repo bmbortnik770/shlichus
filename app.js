@@ -517,9 +517,11 @@ window.openBuildingModal = function() {
     document.getElementById('bModalNavBtn').innerHTML = (c&&!isNaN(c[0])) ? `<a href="https://waze.com/ul?ll=${c[1]},${c[0]}&navigate=yes" target="_blank" class="btn btn-outline" style="padding:4px 10px; font-size:12px; border-radius:15px; width:auto; border-color:#33ccff; color:#33ccff;"><i class="fab fa-waze"></i> נווט</a>` : '';
     
     let aptList = b.apts.map((a, i) => {
-        let col = getStatusColor(a), bdg = (a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('');
+        let col = getStatusColor(a), bdg = (a.tags||[]).map(t=>`<span class="tag-badge">${escapeHTML(t)}</span>`).join('');
         let phones = getAllPhones(a); let ph = phones.length > 0 ? phones[0].replace(/\D/g, '') : '';
-        return `<div class="bldg-fam-item" style="border-right-color:${col}" onclick="openClientCard(${i})"><div><div style="font-weight:700;font-size:16px;">${a.name||'(ללא שם)'} <span style="font-size:12px;font-weight:normal;color:var(--text-muted);">(דירה ${a.num||'-'})</span></div><div style="margin-top:4px;">${bdg}</div></div><div style="display:flex;gap:8px;">${ph?`<a href="tel:${ph}" class="btn-icon" style="color:var(--success);border-color:var(--success);" onclick="event.stopPropagation()"><i class="fas fa-phone"></i></a>`:''}<button class="btn-icon" style="color:var(--accent);"><i class="fas fa-pen"></i></button></div></div>`;
+        let safeName = escapeHTML(a.name || '(ללא שם)');
+        let safeNum = escapeHTML(a.num || '-');
+        return `<div class="bldg-fam-item" style="border-right-color:${col}" onclick="openClientCard(${i})"><div><div style="font-weight:700;font-size:16px;">${safeName} <span style="font-size:12px;font-weight:normal;color:var(--text-muted);">(דירה ${safeNum})</span></div><div style="margin-top:4px;">${bdg}</div></div><div style="display:flex;gap:8px;">${ph?`<a href="tel:${ph}" class="btn-icon" style="color:var(--success);border-color:var(--success);" onclick="event.stopPropagation()"><i class="fas fa-phone"></i></a>`:''}<button class="btn-icon" style="color:var(--accent);"><i class="fas fa-pen"></i></button></div></div>`;
     }).join('');
     document.getElementById('bldgModalAptsList').innerHTML = aptList || '<div class="empty-state"><i class="fas fa-door-open"></i><div>אין משפחות רשומות בבניין.</div></div>';
     document.getElementById('bModalCode').value=b.info.code||''; document.getElementById('bModalRep').value=b.info.rep||''; document.getElementById('bModalNotes').value=b.info.notes||'';
@@ -954,13 +956,20 @@ window.renderKanbanView = (filteredRes = null) => {
     
     activeBoard.columns.forEach(stage => {
         let colCards = arr.filter(r => r.apt.boards && r.apt.boards[currentBoardId] === stage);
-        let colHtml = `<div class="kanban-col" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropCard(event, '${stage}')"><div class="kanban-header">${stage} <span style="background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:12px;font-size:12px;">${colCards.length}</span></div><div class="kanban-body">`;
+        let colHtml = `<div class="kanban-col" data-stage="${escapeHTML(stage)}" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropCard(event, '${stage}')"><div class="kanban-header">${escapeHTML(stage)} <span style="background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:12px;font-size:12px;">${colCards.length}</span></div><div class="kanban-body">`;
         colCards.forEach(r => {
             const safeName = escapeHTML(r.apt.name || 'ללא שם');
             const safeBldg = escapeHTML(r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg);
-            colHtml += `<div class="kanban-card" draggable="true" ondragstart="dragCard(event, '${encodeURIComponent(r.bldg)}', ${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})"><div class="kanban-card-title">${safeName}</div><div style="font-size:12px;color:var(--text-muted);margin-bottom:5px;">${safeBldg}</div></div>`;
+            colHtml += `<div class="kanban-card" data-enc-bldg="${encodeURIComponent(r.bldg)}" data-idx="${r.idx}" draggable="true" ondragstart="dragCard(event, '${encodeURIComponent(r.bldg)}', ${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})"><div class="kanban-card-title">${safeName}</div><div style="font-size:12px;color:var(--text-muted);margin-bottom:5px;">${safeBldg}</div></div>`;
         });
         c.innerHTML += colHtml + `</div></div>`;
+    });
+
+    // חיבור אירועי מגע לכל כרטיסייה לאחר הרינדור
+    c.querySelectorAll('.kanban-card').forEach(cardEl => {
+        const encBldg = cardEl.getAttribute('data-enc-bldg');
+        const idx = cardEl.getAttribute('data-idx');
+        if(encBldg !== null && idx !== null) initTouchDrag(cardEl, encBldg, parseInt(idx));
     });
 };
 
@@ -985,6 +994,61 @@ window.dropCard = (e, stage) => {
         saveDB(); showToast(`הועבר ל-${stage}`, 'info');
     }
 };
+
+// --- גרירה במגע (Touch Drag & Drop) ---
+let touchDragData = null, touchGhost = null;
+
+function initTouchDrag(cardEl, encBldg, idx) {
+    cardEl.addEventListener('touchstart', (e) => {
+        const activeBoard = db.__BOARDS__.find(b => b.id === document.getElementById('activeKanbanBoard').value);
+        if(activeBoard && activeBoard.archived) return;
+
+        touchDragData = { encBldg, idx };
+
+        // יצירת "רוח רפאים" שזזה עם האצבע
+        touchGhost = cardEl.cloneNode(true);
+        touchGhost.style.cssText = `position:fixed; opacity:0.75; pointer-events:none; z-index:9999; width:${cardEl.offsetWidth}px; transform:rotate(2deg); box-shadow:0 8px 24px rgba(0,0,0,0.25);`;
+        document.body.appendChild(touchGhost);
+    }, { passive: true });
+
+    cardEl.addEventListener('touchmove', (e) => {
+        if(!touchDragData) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        touchGhost.style.left = (t.clientX - touchGhost.offsetWidth / 2) + 'px';
+        touchGhost.style.top  = (t.clientY - 30) + 'px';
+
+        // הדגשת העמודה שמתחת לאצבע
+        document.querySelectorAll('.kanban-col').forEach(col => col.classList.remove('drag-over'));
+        touchGhost.style.display = 'none';
+        const elBelow = document.elementFromPoint(t.clientX, t.clientY);
+        touchGhost.style.display = '';
+        const col = elBelow && elBelow.closest('.kanban-col');
+        if(col) col.classList.add('drag-over');
+    }, { passive: false });
+
+    cardEl.addEventListener('touchend', (e) => {
+        if(!touchDragData) return;
+        const t = e.changedTouches[0];
+
+        // הסרת הדגשות
+        document.querySelectorAll('.kanban-col').forEach(col => col.classList.remove('drag-over'));
+        if(touchGhost) { touchGhost.remove(); touchGhost = null; }
+
+        // זיהוי העמודה שעליה שוחררה הכרטיסייה
+        const elBelow = document.elementFromPoint(t.clientX, t.clientY);
+        const targetCol = elBelow && elBelow.closest('.kanban-col');
+        if(targetCol && targetCol.dataset.stage) {
+            const bldg = decodeURIComponent(touchDragData.encBldg);
+            const activeBoardId = document.getElementById('activeKanbanBoard').value;
+            db[bldg].apts[touchDragData.idx].boards[activeBoardId] = targetCol.dataset.stage;
+            saveDB();
+            renderKanbanView();
+            showToast(`הועבר ל-${targetCol.dataset.stage}`, 'info');
+        }
+        touchDragData = null;
+    });
+}
 
 window.toggleAllBulk = (cb) => { const cbs=document.querySelectorAll('.bulk-cb'); cbs.forEach(c=>c.checked=cb.checked); updateBulkBar(); };
 window.updateBulkBar = () => { bulkSelection=[]; document.querySelectorAll('.bulk-cb:checked').forEach(c=>bulkSelection.push(c.value)); const bar=document.getElementById('bulkActionBar'); if(bulkSelection.length>0){bar.style.display='flex'; document.getElementById('bulkCount').innerText=`${bulkSelection.length} סומנו`;} else bar.style.display='none'; };
@@ -1819,6 +1883,19 @@ window.importData = (e) => {
     reader.onload = async (ev) => {
         try {
             const parsed = JSON.parse(ev.target.result);
+
+            // ולידציה: מבנה בסיסי
+            if(typeof parsed !== 'object' || !parsed['__BOARDS__'] || !parsed.meta) {
+                showToast('שגיאה: קובץ הגיבוי אינו תואם למבנה המערכת', 'error');
+                return;
+            }
+            // ולידציה נוספת: חייב להיות לפחות מפתח בניין אמיתי אחד
+            const hasRealData = Object.keys(parsed).some(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== 'meta');
+            if(!hasRealData) {
+                showToast('שגיאה: הקובץ לא מכיל נתוני קהילה', 'error');
+                return;
+            }
+
             const proceed = await showCustomDialog({ title: 'שחזור גיבוי', message: 'פעולה זו תדרוס את כל הנתונים הקיימים. להמשיך?', showCancel: true });
             if(!proceed) return;
             db = parsed;
@@ -2076,7 +2153,11 @@ setInterval(() => {
     }
 }, 5000);
 
-// סנכרון אוטומטי כל 30 שניות — רק אם המשתמש לא באמצע עריכה
+// סנכרון אוטומטי כל 30 שניות — רק אם המשתמש לא באמצע עריכה והטוקן בתוקף
 setInterval(() => {
-    if(accessToken && !isDirty) syncWithDrive();
+    const session = JSON.parse(localStorage.getItem('gdrive_session'));
+    const isTokenValid = session && session.expiresAt > (new Date().getTime() + 60000);
+    if(accessToken && !isDirty && isTokenValid) {
+        syncWithDrive();
+    }
 }, 30000);
