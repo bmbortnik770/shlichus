@@ -300,13 +300,17 @@ async function geocodeMissingAddresses() {
     for(let b of bldgs) {
         try {
             const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(b)}.json?country=il&language=he&access_token=${mapboxgl.accessToken}`);
+            if(r.status === 429) { 
+                await new Promise(res => setTimeout(res, 4000)); // המתנה במקרה של חסימה זמנית מהשרת
+                continue; 
+            }
             const d = await r.json();
             if(d.features && d.features.length > 0) {
                 db[b].info.coords = d.features[0].center;
                 updated = true;
             }
-        } catch(e) {}
-        await new Promise(res => setTimeout(res, 200));
+        } catch(e) { console.error("Geocode Error", e); }
+        await new Promise(res => setTimeout(res, 250));
     }
     if(updated) { saveDB(); refreshMap(); }
 }
@@ -544,6 +548,7 @@ window.markDirty = () => {
 
 window.closeModals = () => { 
     isDirty = false; 
+    pendingMoveMode = false; // התיקון: איפוס מצב העברה
     tempSelectedAddress = null;
     if(modalGeocoder) modalGeocoder.clear();
     document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); 
@@ -831,8 +836,9 @@ window.showContextMenu = (e, b, i) => {
     ctxIdx = i;
     const m = document.getElementById('contextMenu');
     m.style.display = 'block';
-    m.style.left = e.pageX + 'px';
-    m.style.top = e.pageY + 'px';
+    m.style.position = 'fixed'; // קיבוע לפי מסך למניעת בעיות גלילה
+    m.style.left = e.clientX + 'px';
+    m.style.top = e.clientY + 'px';
 };
 window.ctxEdit = () => { currentBldg = ctxBldg; document.getElementById('contextMenu').style.display='none'; openClientCard(ctxIdx); };
 window.ctxMove = () => { currentBldg = ctxBldg; currentAptIdx = ctxIdx; document.getElementById('contextMenu').style.display='none'; pendingMoveMode=true; document.getElementById('addressSearchModal').style.display='flex'; };
@@ -842,12 +848,12 @@ window.ctxDelete = () => {
     ensureAuthAndExecute(() => { 
         let deletedData = db[ctxBldg].apts.splice(ctxIdx, 1)[0]; 
         let deletedBldg = ctxBldg;
-        let deletedIdx = ctxIdx;
         saveDB(); 
         handleOmniSearch();
         showUndoToast("המשפחה נמחקה", () => {
-            db[deletedBldg].apts.splice(deletedIdx, 0, deletedData);
+            db[deletedBldg].apts.push(deletedData); // התיקון: דחיפה לסוף המערך למניעת התנגשויות
             saveDB();
+            handleOmniSearch(); // רענון תצוגה
             showToast("המחיקה בוטלה, המשפחה שוחזרה!", "success");
         }); 
     }); 
@@ -950,7 +956,9 @@ window.renderKanbanView = (filteredRes = null) => {
         let colCards = arr.filter(r => r.apt.boards && r.apt.boards[currentBoardId] === stage);
         let colHtml = `<div class="kanban-col" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropCard(event, '${stage}')"><div class="kanban-header">${stage} <span style="background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:12px;font-size:12px;">${colCards.length}</span></div><div class="kanban-body">`;
         colCards.forEach(r => {
-            colHtml += `<div class="kanban-card" draggable="true" ondragstart="dragCard(event, '${encodeURIComponent(r.bldg)}', ${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})"><div class="kanban-card-title">${r.apt.name||'ללא שם'}</div><div style="font-size:12px;color:var(--text-muted);margin-bottom:5px;">${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg}</div></div>`;
+            const safeName = escapeHTML(r.apt.name || 'ללא שם');
+            const safeBldg = escapeHTML(r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg);
+            colHtml += `<div class="kanban-card" draggable="true" ondragstart="dragCard(event, '${encodeURIComponent(r.bldg)}', ${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})"><div class="kanban-card-title">${safeName}</div><div style="font-size:12px;color:var(--text-muted);margin-bottom:5px;">${safeBldg}</div></div>`;
         });
         c.innerHTML += colHtml + `</div></div>`;
     });
@@ -1117,7 +1125,7 @@ window.renderListView = (filteredRes = null) => {
         if(a.boards && Object.keys(a.boards).length > 0) {
             boardsHtml = Object.entries(a.boards).map(([bid, status]) => {
                 const bObj = db.__BOARDS__.find(x => x.id === bid);
-                return bObj ? `<span class="board-badge">${bObj.name}: ${status}</span>` : '';
+                return bObj ? `<span class="board-badge">${escapeHTML(bObj.name)}: ${escapeHTML(status)}</span>` : '';
             }).join(' ');
         }
         
@@ -1125,11 +1133,14 @@ window.renderListView = (filteredRes = null) => {
         if(getAllPhones(a).length > 0) contactIcons += `<i class="fas fa-phone" style="color:var(--success); margin-left:5px;"></i>`;
         if(getAllEmails(a).length > 0) contactIcons += `<i class="fas fa-envelope" style="color:#ea4335;"></i>`;
 
+        const safeName = escapeHTML(a.name || '(ללא שם)');
+        const safeTags = (a.tags||[]).map(t => `<span class="tag-badge">${escapeHTML(t)}</span>`).join('');
+
         html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
             <td data-label="בחר" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" value="${r.bldg}|${r.idx}" onchange="updateBulkBar()"></td>
-            <td data-label="כתובת" onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${bName}</td>
-            <td data-label="משפחה"><b>${a.name||'(ללא שם)'}</b></td><td data-label="פרויקטים">${boardsHtml}</td>
-            <td data-label="תגיות">${(a.tags||[]).map(t=>`<span class="tag-badge">${t}</span>`).join('')}</td>
+            <td data-label="כתובת" onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(bName)}</td>
+            <td data-label="משפחה"><b>${safeName}</b></td><td data-label="פרויקטים">${boardsHtml}</td>
+            <td data-label="תגיות">${safeTags}</td>
             <td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>
             <td data-label="פרטי קשר" style="font-size:16px;">${contactIcons}</td>
         </tr>`;
