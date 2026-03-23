@@ -785,11 +785,84 @@ window.toggleAdvFilters = () => {
 
 function populateFilterDropdowns() {
     appSettings.styles = [...new Set(appSettings.styles)];
-    document.getElementById('fStyle').innerHTML='<option value="">כל הסגנונות</option>'+appSettings.styles.map(x=>`<option value="${x}">${x}</option>`).join('');
-    document.getElementById('fTag').innerHTML='<option value="">כל התגיות</option>'+appSettings.tags.map(x=>`<option value="${x}">${x}</option>`).join('');
+    appSettings.tags   = [...new Set(appSettings.tags)];
+
+    const container = document.getElementById('chipFiltersContainer');
+    if(!container) return;
+
+    let html = '';
+
+    // סטטוס קשר
+    const statuses = [
+        { val: 'green',  label: 'קשר טרי',      color: '#10b981' },
+        { val: 'orange', label: 'קשר בינוני',    color: '#f59e0b' },
+        { val: 'red',    label: 'לטיפול דחוף',  color: '#ef4444' },
+    ];
+    html += `<div class="chip-group"><div class="chip-group-title">סטטוס:</div>`;
+    statuses.forEach(s => {
+        const active = currentFilters.status === s.val ? 'active' : '';
+        html += `<div class="filter-chip ${active}" style="--chip-color:${s.color}" onclick="toggleChipFilter('status','${s.val}')">${s.label}</div>`;
+    });
+    html += `</div><div class="chip-divider"></div>`;
+
+    // סגנון
+    if(appSettings.styles.length > 0) {
+        html += `<div class="chip-group"><div class="chip-group-title">סגנון:</div>`;
+        appSettings.styles.forEach(s => {
+            const active = currentFilters.style === s ? 'active' : '';
+            const color  = getColorForString(s, 'style');
+            html += `<div class="filter-chip ${active}" style="--chip-color:${color}" onclick="toggleChipFilter('style','${s}')">${s}</div>`;
+        });
+        html += `</div><div class="chip-divider"></div>`;
+    }
+
+    // תגיות
+    if(appSettings.tags.length > 0) {
+        html += `<div class="chip-group"><div class="chip-group-title">תגיות:</div>`;
+        appSettings.tags.forEach(t => {
+            const active = currentFilters.tags === t ? 'active' : '';
+            const color  = getColorForString(t, 'tag');
+            html += `<div class="filter-chip ${active}" style="--chip-color:${color}" onclick="toggleChipFilter('tags','${t}')">${t}</div>`;
+        });
+        html += `</div><div class="chip-divider"></div>`;
+    }
+
+    // איתור חסרים
+    const baseMissingFields = [
+        { value: 'phone',   label: 'חסר טלפון'   },
+        { value: 'email',   label: 'חסר מייל'    },
+        { value: 'address', label: 'חסרה כתובת'  },
+        { value: 'style',   label: 'ללא סגנון'   },
+        { value: 'notes',   label: 'ללא הערות'   },
+        { value: 'tags',    label: 'ללא תגיות'   },
+    ];
+    const customMissingFields = (appSettings.customFields || []).map(f => ({ value: 'custom_' + f, label: `חסר: ${f}` }));
+    const allMissingFields = [...baseMissingFields, ...customMissingFields];
+
+    html += `<div class="chip-group"><div class="chip-group-title">איתור חסרים:</div>`;
+    allMissingFields.forEach(f => {
+        const active = window.missingDataField === f.value ? 'active' : '';
+        html += `<div class="filter-chip ${active}" style="--chip-color:var(--danger)" onclick="toggleMissingFieldFilter('${f.value}')">${f.label}</div>`;
+    });
+    html += `</div>`;
+
+    container.innerHTML = html;
 }
 
-window.applyAdvFilters = () => { currentFilters.style=document.getElementById('fStyle').value; currentFilters.tags=document.getElementById('fTag').value; currentFilters.status=document.getElementById('fStatus').value; handleOmniSearch(); };
+window.toggleChipFilter = (type, val) => {
+    if(currentFilters[type] === val) currentFilters[type] = '';
+    else currentFilters[type] = val;
+    populateFilterDropdowns();
+    handleOmniSearch();
+};
+
+window.missingDataField = '';
+window.toggleMissingFieldFilter = (val) => {
+    if(window.missingDataField === val) window.missingDataField = '';
+    else window.missingDataField = val;
+    populateFilterDropdowns();
+    handleOmniSearch();
+};
 
 window.handleOmniSearch = () => {
     const el = document.getElementById('smartSearch');
@@ -1245,17 +1318,6 @@ window.renderListView = (filteredRes = null) => {
     const hidden = appSettings.hiddenColumns || [];
     const visibleCols = TABLE_COLUMNS.filter(c => c.required || !hidden.includes(c.id));
 
-    const baseFields = [
-        { value: 'phone', label: 'טלפון' }, { value: 'email', label: 'מייל' },
-        { value: 'address', label: 'כתובת' }, { value: 'style', label: 'סגנון' },
-        { value: 'notes', label: 'הערות' }, { value: 'tags', label: 'תגיות' },
-    ];
-    const customMissingFields = (appSettings.customFields || []).map(f => ({ value: 'custom_' + f, label: f }));
-    const allMissingFields = [...baseFields, ...customMissingFields];
-    const currentField = window.missingDataField || '';
-    const fieldOptions = `<option value="">כל השדות</option>` +
-        allMissingFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
-
     const sortIcon = (col) => {
         if(window.tableSort.column !== col) return '<i class="fas fa-sort" style="color:var(--border-light); margin-right:5px; font-size:12px;"></i>';
         return window.tableSort.direction === 'asc'
@@ -1273,16 +1335,12 @@ window.renderListView = (filteredRes = null) => {
     }).join('');
 
     const hiddenCount = hidden.filter(h => TABLE_COLUMNS.find(c => c.id === h && !c.required)).length;
+    const hasMissingFilter = !!window.missingDataField;
 
     let html = `<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
-            <div style="display:inline-flex; align-items:center; gap:5px; background:var(--surface); border:1.5px solid ${currentField ? 'var(--danger)' : 'var(--border-light)'}; border-radius:8px; padding:4px 10px; transition:border-color 0.2s;">
-                <i class="fas fa-filter" style="color:${currentField ? 'var(--danger)' : 'var(--text-muted)'}; font-size:11px;"></i>
-                <span style="font-size:12px; font-weight:600; color:${currentField ? 'var(--danger)' : 'var(--text-muted)'}; white-space:nowrap;">שדות חסרים:</span>
-                <select id="missingFieldSelect" onchange="applyMissingFieldFilter()" style="border:none; background:transparent; font-family:'Assistant'; font-size:13px; font-weight:${currentField ? '700' : '500'}; color:${currentField ? 'var(--danger)' : 'var(--text-main)'}; cursor:pointer; outline:none; padding:2px 0;">${fieldOptions}</select>
-                ${currentField ? `<button onclick="clearMissingFieldFilter()" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0; font-size:12px; line-height:1;" title="נקה סינון"><i class="fas fa-times"></i></button>` : ''}
-            </div>
+            ${hasMissingFilter ? `<span style="background:rgba(239,68,68,0.1); color:var(--danger); border:1px solid rgba(239,68,68,0.3); border-radius:20px; padding:4px 12px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:6px;"><i class="fas fa-filter"></i> מסנן: חסרים פעיל <button onclick="toggleMissingFieldFilter('${window.missingDataField}')" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0;font-size:13px;"><i class="fas fa-times"></i></button></span>` : ''}
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
             <div style="position:relative;">
@@ -1644,16 +1702,7 @@ window.addNewStyle = () => {
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); saveDB(); populateFilterDropdowns(); openSettings(); refreshMap();
 };
 
-window.missingDataField = '';
-window.applyMissingFieldFilter = () => {
-    const sel = document.getElementById('missingFieldSelect');
-    window.missingDataField = sel ? sel.value : '';
-    handleOmniSearch();
-};
-window.clearMissingFieldFilter = () => {
-    window.missingDataField = '';
-    handleOmniSearch();
-};
+// missingDataField ו-toggleMissingFieldFilter מוגדרים ליד toggleChipFilter למעלה
 
 window.saveSettingsAndClose = () => {
     appSettings.defaultView = document.getElementById('setDefaultView').value;
@@ -2339,3 +2388,132 @@ setInterval(() => {
         syncWithDrive();
     }
 }, 30000);
+
+// ========== Command Palette ==========
+let cpSelectedIndex = 0;
+let cpCurrentItems = [];
+
+window.openCommandPalette = () => {
+    const overlay = document.getElementById('commandPaletteOverlay');
+    const cp = document.getElementById('commandPalette');
+    overlay.style.display = 'flex';
+    setTimeout(() => {
+        cp.classList.add('open');
+        const input = document.getElementById('cpInput');
+        input.focus();
+        input.value = '';
+
+        // רישום listeners — כאן ולא בטעינה, כדי שה-DOM יהיה מוכן
+        input.oninput = (e) => renderCpResults(e.target.value.toLowerCase());
+        input.onkeydown = (e) => {
+            if(e.key === 'ArrowDown') { e.preventDefault(); cpSelectedIndex = Math.min(cpSelectedIndex + 1, cpCurrentItems.length - 1); updateCpSelection(); }
+            if(e.key === 'ArrowUp')   { e.preventDefault(); cpSelectedIndex = Math.max(cpSelectedIndex - 1, 0); updateCpSelection(); }
+            if(e.key === 'Enter' && cpCurrentItems[cpSelectedIndex]) { e.preventDefault(); cpCurrentItems[cpSelectedIndex].action(); closeCommandPalette(); }
+        };
+    }, 10);
+    renderCpResults('');
+};
+
+window.closeCommandPalette = () => {
+    const cp = document.getElementById('commandPalette');
+    cp.classList.remove('open');
+    setTimeout(() => {
+        const overlay = document.getElementById('commandPaletteOverlay');
+        if(overlay) overlay.style.display = 'none';
+    }, 200);
+    const input = document.getElementById('cpInput');
+    if(input) input.value = '';
+};
+
+// קיצורי מקלדת גלובליים
+document.addEventListener('keydown', (e) => {
+    if((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        openCommandPalette();
+    }
+    const overlay = document.getElementById('commandPaletteOverlay');
+    if(e.key === 'Escape' && overlay && overlay.style.display === 'flex') {
+        closeCommandPalette();
+    }
+});
+
+function renderCpResults(query) {
+    cpSelectedIndex = 0;
+
+    const staticActions = [
+        { title: 'הוסף משפחה חדשה',           icon: 'fa-user-plus',  hint: 'פעולה',   keywords: ['חדש','הוסף','משפחה','add','new'],                   action: quickAddFamily },
+        { title: 'ייצא נתונים לאקסל',          icon: 'fa-file-excel', hint: 'ייצוא',   keywords: ['אקסל','ייצא','הורד','דוח','excel','csv'],           action: exportTableToCSV },
+        { title: 'החלף מצב כהה / בהיר',        icon: 'fa-adjust',     hint: 'תצוגה',   keywords: ['כהה','בהיר','לילה','dark','light','צבע','theme'],   action: toggleDarkMode },
+        { title: 'פתח הגדרות מערכת',           icon: 'fa-cog',        hint: 'הגדרות',  keywords: ['הגדרות','settings','config'],                      action: openSettings },
+        { title: 'עבור למפה',                   icon: 'fa-map',        hint: 'ניווט',   keywords: ['מפה','map'],                                       action: () => switchMainView('map') },
+        { title: 'עבור לרשימה',                icon: 'fa-list',       hint: 'ניווט',   keywords: ['רשימה','טבלה','list','table'],                     action: () => switchMainView('table') },
+        { title: 'עבור לפרויקטים (קנבן)',      icon: 'fa-columns',    hint: 'ניווט',   keywords: ['פרויקטים','קנבן','kanban','לוחות'],                action: () => switchMainView('kanban') },
+        { title: 'עבור למרכז תקשורת',          icon: 'fa-bullhorn',   hint: 'ניווט',   keywords: ['תקשורת','וואטסאפ','מייל','comm'],                  action: () => switchMainView('comm') },
+    ];
+
+    let html = '';
+    cpCurrentItems = [];
+
+    const matchedActions = staticActions.filter(a =>
+        !query || a.title.includes(query) || a.keywords.some(k => k.includes(query))
+    );
+
+    if(matchedActions.length > 0) {
+        html += '<div class="cp-group-title">פעולות ופקודות</div>';
+        matchedActions.forEach(a => {
+            const idx = cpCurrentItems.length;
+            cpCurrentItems.push(a);
+            html += `<div class="cp-item ${idx===0?'selected':''}" data-idx="${idx}"
+                onmouseover="cpSelectedIndex=${idx};updateCpSelection()"
+                onclick="cpCurrentItems[${idx}].action();closeCommandPalette()">
+                <i class="fas ${a.icon}" style="color:var(--accent);width:20px;text-align:center;"></i>
+                <span>${a.title}</span>
+                <span class="cp-hint">${a.hint}</span>
+            </div>`;
+        });
+    }
+
+    // חיפוש משפחות — רק מ-2 תווים
+    if(query.length >= 2) {
+        let famResults = [];
+        Object.keys(db).forEach(b => {
+            if(b === '__BOARDS__' || b === '__SETTINGS__' || b === 'meta') return;
+            if(!db[b] || !db[b].apts) return;
+            db[b].apts.forEach((a, i) => {
+                const txt = `${b} ${a.name||''} ${a.notes||''} ${getAllPhones(a).join(' ')}`.toLowerCase();
+                if(txt.includes(query)) famResults.push({ bldg: b, idx: i, apt: a });
+            });
+        });
+
+        if(famResults.length > 0) {
+            html += '<div class="cp-group-title">חיפוש משפחות</div>';
+            famResults.slice(0, 8).forEach(r => {
+                const idx = cpCurrentItems.length;
+                const bName = r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg;
+                cpCurrentItems.push({ action: () => { currentBldg = r.bldg; openClientCard(r.idx); } });
+                html += `<div class="cp-item" data-idx="${idx}"
+                    onmouseover="cpSelectedIndex=${idx};updateCpSelection()"
+                    onclick="cpCurrentItems[${idx}].action();closeCommandPalette()">
+                    <i class="fas fa-id-badge" style="color:var(--text-muted);width:20px;text-align:center;"></i>
+                    <span>${escapeHTML(r.apt.name||'ללא שם')} <span style="font-size:13px;opacity:0.7;font-weight:normal;">(${escapeHTML(bName)})</span></span>
+                    <span class="cp-hint">קפוץ לכרטיס</span>
+                </div>`;
+            });
+        }
+    }
+
+    if(cpCurrentItems.length === 0) {
+        html = `<div style="padding:40px;text-align:center;color:var(--text-muted);">
+            <i class="fas fa-search" style="font-size:30px;margin-bottom:15px;opacity:0.4;display:block;"></i>
+            לא נמצאו תוצאות
+        </div>`;
+    }
+
+    document.getElementById('cpResults').innerHTML = html;
+}
+
+function updateCpSelection() {
+    document.querySelectorAll('#cpResults .cp-item').forEach(el => el.classList.remove('selected'));
+    const sel = document.querySelector(`#cpResults .cp-item[data-idx="${cpSelectedIndex}"]`);
+    if(sel) { sel.classList.add('selected'); sel.scrollIntoView({ block: 'nearest' }); }
+}
