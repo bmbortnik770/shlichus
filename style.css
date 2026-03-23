@@ -212,3 +212,8 @@ body { margin:0; padding:0; font-family:'Assistant',sans-serif; display:flex; he
 .filter-chip:hover { border-color:var(--chip-color, var(--accent)); color:var(--chip-color, var(--accent)); transform:translateY(-1px); }
 .filter-chip.active { background:var(--chip-color, var(--accent)); color:#fff; border-color:var(--chip-color, var(--accent)); box-shadow:0 3px 8px rgba(0,0,0,0.15); }
 .chip-divider { width:1px; height:22px; background:var(--border-light); flex-shrink:0; }
+
+/* ========== Column Chooser Dropdown ========== */
+.column-chooser-dropdown { display:none; position:absolute; top:calc(100% + 6px); left:0; background:var(--surface); border:1.5px solid var(--border-light); border-radius:12px; padding:14px; min-width:220px; z-index:9999; box-shadow:0 8px 24px rgba(0,0,0,0.15); }
+.col-toggle { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--text-main); padding:5px 4px; cursor:pointer; border-radius:6px; transition:background 0.15s; }
+.col-toggle:hover { background:var(--bg-body); }

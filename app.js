@@ -58,6 +58,9 @@ if(!appSettings.homeLocation) {
 }
 
 if(!appSettings.customFields) appSettings.customFields = [];
+if(!appSettings.visibleColumns) {
+    appSettings.visibleColumns = ['address', 'name', 'boards', 'tags', 'lastContact', 'actions'];
+}
 if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי', target: 30 };
 if(!appSettings.templates) {
     appSettings.templates = [
@@ -91,7 +94,7 @@ let currentBldg = null, currentAptIdx = null;
 let tempChildren=[], tempTags=[], tempLogs=[], tempDonations=[], tempTasks=[], tempCustom={}, tempBoards={}; 
 let pendingMoveMode = false, isDirty = false, isCreatingNew = false;
 let bulkSelection = []; 
-let currentFilters = { tags: '', style: '', status: '' };
+let currentFilters = { tags: [], style: [], status: [] };
 let tempSelectedAddress = null;
 
 const compliments = ["אלוף! 💪", "פצצה! 🎯", "אין עליך! 🚀", "עבודה מדהימה! 🔥", "הקהילה גדלה! 👑"];
@@ -609,7 +612,7 @@ window.openClientCard = function(idx) {
     tempLogs=JSON.parse(JSON.stringify(a.interactions||[])); renderLogs();
     tempDonations=JSON.parse(JSON.stringify(a.donations||[])); renderDonations();
     tempTasks=JSON.parse(JSON.stringify(a.tasks||[])); renderTasks();
-    tempCustom=JSON.parse(JSON.stringify(a.customFields||{})); renderCustomFields();
+    tempCustom=JSON.parse(JSON.stringify(a.customData || a.customFields ||{})); renderCustomFields();
     tempBoards=JSON.parse(JSON.stringify(a.boards||{})); renderModalBoards();
     
     const tStr = new Date().toISOString().split('T')[0];
@@ -710,7 +713,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.fatherPhone=document.getElementById('cFatherPhone').value; a.motherPhone=document.getElementById('cMotherPhone').value; a.phones = '';
     a.fatherEmail=document.getElementById('cFatherEmail').value; a.motherEmail=document.getElementById('cMotherEmail').value;
     a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
-    a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customFields={...tempCustom};
+    a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customData={...tempCustom}; a.customFields=a.customData; // backward compat
     a.updatedAt = Date.now();
     isDirty=false; isCreatingNew=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
     if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
@@ -766,55 +769,53 @@ function renderChipFilters() {
     const container = document.getElementById('chipFiltersContainer');
     if(!container) return;
 
-    // קריאת הערכים הנוכחיים מה-dropdowns (מקור האמת)
-    const curStyle  = document.getElementById('fStyle')  ? document.getElementById('fStyle').value  : '';
-    const curTag    = document.getElementById('fTag')    ? document.getElementById('fTag').value    : '';
-    const curStatus = document.getElementById('fStatus') ? document.getElementById('fStatus').value : '';
-    const curMissing = window.missingDataField || '';
+    // currentFilters הוא מקור האמת — מערכים לרב-בחירה
+    const curStyles  = currentFilters.style;
+    const curTags    = currentFilters.tags;
+    const curStatuses = currentFilters.status;
+    const curMissingArr = window.missingDataFields || [];
 
     let html = '';
 
-    // פונקציית עזר לבניית קבוצת סינון מתקפלת
-    const buildGroup = (groupId, title, icon, options, curValue, isMissingField = false) => {
+    // פונקציית עזר לבניית קבוצת סינון מתקפלת עם רב-בחירה
+    const buildGroup = (groupId, title, icon, options, activeArr, isMissingField = false) => {
         if(options.length === 0) return '';
         const isOpen = window.openFilterGroup === groupId;
-        const hasActive = curValue !== '';
+        const hasActive = activeArr.length > 0;
 
-        // אם יש סינון פעיל והקטגוריה סגורה, נציג את הסינון על כפתור הקטגוריה
         let activeText = title;
         if (hasActive && !isOpen) {
-            const activeOpt = options.find(o => (o.value || o.val || o) === curValue);
-            const label = activeOpt ? (activeOpt.label || activeOpt) : curValue;
-            activeText = `${title}: ${label}`;
+            activeText = `${title}: ${activeArr.length === 1
+                ? (options.find(o => (o.value || o.val || o) === activeArr[0])?.label || activeArr[0])
+                : activeArr.length + ' נבחרו'}`;
         }
 
         let res = `<div class="chip-group" ${isMissingField ? 'style="margin-right:auto;"' : ''}>`;
-        
-        // כפתור הקטגוריה הראשי (טריגר לפתיחה/סגירה)
+
+        // כפתור ראשי — פתיחה/סגירה + סימן X לניקוי
         res += `<div class="filter-chip ${hasActive && !isOpen ? 'active' : ''}" 
                      style="${hasActive && !isOpen ? '' : 'background:var(--surface); border-color:var(--border-light); color:var(--text-main);'}" 
                      onclick="window.openFilterGroup=window.openFilterGroup==='${groupId}'?null:'${groupId}'; renderChipFilters();">
-                    <i class="${icon}" style="margin-left:6px; opacity:0.7;"></i>${activeText} 
-                    <i class="fas fa-chevron-${isOpen?'up':'down'}" style="margin-right:6px; font-size:10px; opacity:0.5;"></i>
+                    <i class="${icon}" style="margin-left:6px; opacity:0.7;"></i>${activeText}
+                    ${hasActive ? `<i class="fas fa-times" style="margin-right:6px; font-size:10px; opacity:0.7;" onclick="event.stopPropagation(); clearFilterGroup('${groupId}');"></i>` : `<i class="fas fa-chevron-${isOpen?'up':'down'}" style="margin-right:6px; font-size:10px; opacity:0.5;"></i>`}
                 </div>`;
 
-        // הצגת הצ'יפים של האפשרויות (רק אם הקבוצה פתוחה)
+        // הצ'יפים הפנימיים (נראים רק כשהקבוצה פתוחה)
         if (isOpen) {
             options.forEach(opt => {
                 const val = opt.val || opt.value || opt;
                 const label = opt.label || opt;
                 const color = opt.color || getColorForString(val, groupId);
-                const isActive = curValue === val;
+                const isActive = activeArr.includes(val);
 
                 let clickFn = '';
                 if (isMissingField) {
-                    clickFn = `window.missingDataField='${isActive?'':val}'; handleOmniSearch(); renderChipFilters();`;
+                    clickFn = `toggleMissingField('${val}');`;
                 } else {
-                    const selId = groupId === 'tag' ? 'fTag' : (groupId === 'style' ? 'fStyle' : 'fStatus');
-                    clickFn = `document.getElementById('${selId}').value='${isActive?'':val}'; applyAdvFilters(); renderChipFilters();`;
+                    clickFn = `toggleFilterVal('${groupId}','${val}');`;
                 }
 
-                res += `<div class="filter-chip ${isActive ? 'active' : ''}" style="--chip-color:${color}" onclick="${clickFn}">${label}</div>`;
+                res += `<div class="filter-chip ${isActive ? 'active' : ''}" style="--chip-color:${color}" onclick="${clickFn}">${label}${isActive ? ' <i class=\"fas fa-check\" style=\"font-size:10px; margin-right:4px;\"></i>' : ''}</div>`;
             });
         }
         res += `</div>`;
@@ -827,15 +828,15 @@ function renderChipFilters() {
         { val:'green',  label:'קשר טרי',   color:'#10b981' },
         { val:'orange', label:'קשר בינוני', color:'#f59e0b' },
         { val:'red',    label:'לטיפול דחוף',color:'#ef4444' }
-    ], curStatus);
+    ], curStatuses);
 
     // 2. סגנון
-    html += buildGroup('style', 'סגנון', 'fas fa-palette', appSettings.styles, curStyle);
+    html += buildGroup('style', 'סגנון', 'fas fa-palette', appSettings.styles, curStyles);
 
     // 3. תגיות
-    html += buildGroup('tag', 'תגיות', 'fas fa-tags', appSettings.tags, curTag);
+    html += buildGroup('tag', 'תגיות', 'fas fa-tags', appSettings.tags, curTags);
 
-    // 4. איתור חסרים (נדחף שמאלה אוטומטית בעזרת isMissingField = true)
+    // 4. איתור חסרים
     const missingFields = [
         { value:'phone',   label:'חסר טלפון'  },
         { value:'email',   label:'חסר מייל'   },
@@ -845,12 +846,50 @@ function renderChipFilters() {
         { value:'tags',    label:'ללא תגיות'  },
         ...(appSettings.customFields||[]).map(f=>({ value:'custom_'+f, label:`חסר: ${f}` }))
     ];
-    html += buildGroup('missing', 'איתור חסרים', 'fas fa-search-minus', missingFields, curMissing, true);
+    html += buildGroup('missing', 'איתור חסרים', 'fas fa-search-minus', missingFields, curMissingArr, true);
 
     container.innerHTML = html;
 }
 
-window.applyAdvFilters = () => { currentFilters.style=document.getElementById('fStyle').value; currentFilters.tags=document.getElementById('fTag').value; currentFilters.status=document.getElementById('fStatus').value; handleOmniSearch(); };
+// טוגל ערך בסינון רגיל (סגנון / תגית / סטטוס)
+window.toggleFilterVal = (groupId, val) => {
+    const key = groupId === 'tag' ? 'tags' : (groupId === 'style' ? 'style' : 'status');
+    const arr = currentFilters[key];
+    const idx = arr.indexOf(val);
+    if(idx === -1) arr.push(val); else arr.splice(idx, 1);
+    handleOmniSearch();
+    renderChipFilters();
+};
+
+// ניקוי קבוצה שלמה
+window.clearFilterGroup = (groupId) => {
+    if(groupId === 'missing') {
+        window.missingDataFields = [];
+        window.missingDataField = '';
+        const sel = document.getElementById('missingFieldSelect');
+        if(sel) sel.value = '';
+    } else {
+        const key = groupId === 'tag' ? 'tags' : (groupId === 'style' ? 'style' : 'status');
+        currentFilters[key] = [];
+    }
+    handleOmniSearch();
+    renderChipFilters();
+};
+
+// טוגל שדה חסר (רב-בחירה)
+window.toggleMissingField = (val) => {
+    if(!window.missingDataFields) window.missingDataFields = [];
+    const idx = window.missingDataFields.indexOf(val);
+    if(idx === -1) window.missingDataFields.push(val); else window.missingDataFields.splice(idx, 1);
+    // backward compat: missingDataField = ערך ראשון (לשימוש ב-missingFieldSelect)
+    window.missingDataField = window.missingDataFields[0] || '';
+    const sel = document.getElementById('missingFieldSelect');
+    if(sel) sel.value = window.missingDataField;
+    handleOmniSearch();
+    renderChipFilters();
+};
+
+window.applyAdvFilters = () => { handleOmniSearch(); };
 
 window.handleOmniSearch = () => {
     const el = document.getElementById('smartSearch');
@@ -863,25 +902,34 @@ window.handleOmniSearch = () => {
         db[b].apts.forEach((a,i) => {
         let txt=`${b} ${a.name} ${getAllPhones(a).join(' ')} ${getAllEmails(a).join(' ')} ${a.notes||''} ${(a.tags||[]).join(' ')} ${a.father||''} ${a.mother||''}`.toLowerCase();
         let matchQ = q.length<2 || txt.includes(q);
-        let matchStyle = !currentFilters.style || a.style===currentFilters.style;
-        let matchTag = !currentFilters.tags || (a.tags||[]).includes(currentFilters.tags);
+        let matchStyle = currentFilters.style.length===0 || currentFilters.style.includes(a.style);
+        let matchTag = currentFilters.tags.length===0 || currentFilters.tags.some(t=>(a.tags||[]).includes(t));
         let col = getStatusColor(a);
-        let matchStat = !currentFilters.status || (currentFilters.status==='green'&&col==='#10b981') || (currentFilters.status==='orange'&&col==='#f59e0b') || (currentFilters.status==='red'&&(col==='#ef4444'||col==='#94a3b8'));
+        let matchStat = currentFilters.status.length===0 || 
+            (currentFilters.status.includes('green')&&col==='#10b981') || 
+            (currentFilters.status.includes('orange')&&col==='#f59e0b') || 
+            (currentFilters.status.includes('red')&&(col==='#ef4444'||col==='#94a3b8'));
             
-        // בדיקת נתונים חסרים לפי שדה נבחר
+        // בדיקת נתונים חסרים — רב-בחירה (OR logic)
         let matchMissing = true;
-        if(window.missingDataField) {
-            const f = window.missingDataField;
-            if(f === 'phone') matchMissing = getAllPhones(a).length === 0;
-            else if(f === 'email') matchMissing = getAllEmails(a).length === 0;
-            else if(f === 'address') matchMissing = b === NO_ADDRESS_KEY;
-            else if(f === 'style') matchMissing = !a.style;
-            else if(f === 'notes') matchMissing = !a.notes || a.notes.trim() === '';
-            else if(f === 'tags') matchMissing = !a.tags || a.tags.length === 0;
-            else if(f.startsWith('custom_')) {
-                const fieldName = f.replace('custom_', '');
-                matchMissing = !a.customData || !a.customData[fieldName];
-            }
+        const missingFieldsArr = (window.missingDataFields && window.missingDataFields.length > 0)
+            ? window.missingDataFields
+            : (window.missingDataField ? [window.missingDataField] : []);
+        if(missingFieldsArr.length > 0) {
+            matchMissing = missingFieldsArr.some(f => {
+                if(f === 'phone') return getAllPhones(a).length === 0;
+                if(f === 'email') return getAllEmails(a).length === 0;
+                if(f === 'address') return b === NO_ADDRESS_KEY;
+                if(f === 'style') return !a.style;
+                if(f === 'notes') return !a.notes || a.notes.trim() === '';
+                if(f === 'tags') return !a.tags || a.tags.length === 0;
+                if(f.startsWith('custom_')) {
+                    const fieldName = f.replace('custom_', '');
+                    const customObj = a.customData || a.customFields || {};
+                    return !customObj[fieldName];
+                }
+                return false;
+            });
         }
 
         if(matchQ && matchStyle && matchTag && matchStat && matchMissing) res.push({bldg:b, idx:i, apt:a});
@@ -965,6 +1013,11 @@ document.addEventListener('click', (e) => {
     
     const ctx = document.getElementById('contextMenu');
     if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) { ctx.style.display = 'none'; }
+
+    const colMenu = document.getElementById('colChooserMenu');
+    if (colMenu && colMenu.style.display === 'block' && !e.target.closest('.column-chooser-dropdown') && !e.target.closest('button[onclick*="toggleTableColumnsMenu"]')) {
+        colMenu.style.display = 'none';
+    }
     
     if(e.target.classList.contains('modal')){
         if(e.target.id==='clientModal') attemptCloseCrmModal();
@@ -1270,23 +1323,42 @@ window.sortByColumn = (col) => {
     handleOmniSearch();
 };
 
+window.toggleTableColumnsMenu = (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('colChooserMenu');
+    if(menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+};
+
+window.toggleColumnVisibility = (colId) => {
+    if(appSettings.visibleColumns.includes(colId)) {
+        appSettings.visibleColumns = appSettings.visibleColumns.filter(c => c !== colId);
+    } else {
+        appSettings.visibleColumns.push(colId);
+    }
+    saveDB();
+    renderListView(window.currentFilteredData);
+};
+
 window.renderListView = (filteredRes = null) => {
     const inner = document.getElementById('list-inner');
 
-    const baseFields = [
-        { value: 'phone', label: 'טלפון' },
-        { value: 'email', label: 'מייל' },
-        { value: 'address', label: 'כתובת' },
-        { value: 'style', label: 'סגנון' },
-        { value: 'notes', label: 'הערות' },
-        { value: 'tags', label: 'תגיות' },
+    // הגדרת כל העמודות האפשריות במערכת
+    const allTableCols = [
+        { id: 'address', label: 'כתובת', sortable: true },
+        { id: 'name', label: 'משפחה', sortable: true },
+        { id: 'father', label: 'שם האב', sortable: true },
+        { id: 'mother', label: 'שם האם', sortable: true },
+        { id: 'phone', label: 'טלפונים', sortable: false },
+        { id: 'email', label: 'מיילים', sortable: false },
+        { id: 'style', label: 'סגנון', sortable: true },
+        { id: 'boards', label: 'פרויקטים', sortable: false },
+        { id: 'tags', label: 'תגיות', sortable: false },
+        { id: 'children', label: 'כמות ילדים', sortable: false },
+        { id: 'notes', label: 'הערות פנימיות', sortable: false },
+        { id: 'lastContact', label: 'קשר אחרון', sortable: true, defaultSort: 'date' },
+        ...(appSettings.customFields || []).map(f => ({ id: `custom_${f}`, label: f, sortable: true })),
+        { id: 'actions', label: 'פעולות מהירות', sortable: false }
     ];
-    const customFields = (appSettings.customFields || []).map(f => ({ value: 'custom_' + f, label: f }));
-    const allFields = [...baseFields, ...customFields];
-
-    const currentField = window.missingDataField || '';
-    const fieldOptions = `<option value="">כל השדות</option>` +
-        allFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
 
     const sortIcon = (col) => {
         if(window.tableSort.column !== col) return '<i class="fas fa-sort" style="color:var(--border-light); margin-right:5px; font-size:12px;"></i>';
@@ -1294,6 +1366,50 @@ window.renderListView = (filteredRes = null) => {
             ? '<i class="fas fa-sort-up" style="margin-right:5px; color:var(--accent);"></i>'
             : '<i class="fas fa-sort-down" style="margin-right:5px; color:var(--accent);"></i>';
     };
+
+    // סינון שדות חסרים (נשמר מהגרסה הקודמת)
+    const baseFields = [
+        { value: 'phone', label: 'חסר טלפון' },
+        { value: 'email', label: 'חסר מייל' },
+        { value: 'address', label: 'חסרה כתובת' },
+        { value: 'style', label: 'ללא סגנון' },
+        { value: 'notes', label: 'ללא הערות' },
+        { value: 'tags', label: 'ללא תגיות' },
+    ];
+    const missingCustomFields = (appSettings.customFields || []).map(f => ({ value: 'custom_' + f, label: 'חסר: ' + f }));
+    const allMissingFields = [...baseFields, ...missingCustomFields];
+    const currentField = window.missingDataField || '';
+    const fieldOptions = `<option value="">כל השדות</option>` +
+        allMissingFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
+
+    // בניית כפתור הגדרות עמודות והדרופדאון
+    const columnsMenuHtml = `
+        <div style="position:relative; display:inline-block;">
+            <button class="btn btn-outline" style="width:auto; padding:8px 15px; background:var(--surface);" onclick="toggleTableColumnsMenu(event)">
+                <i class="fas fa-columns"></i> הגדרות טבלה
+            </button>
+            <div id="colChooserMenu" class="column-chooser-dropdown">
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px; font-weight:700;">בחר עמודות להצגה:</div>
+                <div style="max-height:300px; overflow-y:auto; padding-left:5px;">
+                    ${allTableCols.map(col => `
+                        <label class="col-toggle">
+                            <input type="checkbox" ${appSettings.visibleColumns.includes(col.id) ? 'checked' : ''} onchange="toggleColumnVisibility('${col.id}')" style="width:16px;height:16px;accent-color:var(--accent);">
+                            ${escapeHTML(col.label)}
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+        </div>`;
+
+    // בניית כותרות הטבלה (thead) דינמית
+    let theadHtml = `<th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th>`;
+    allTableCols.forEach(col => {
+        if(appSettings.visibleColumns.includes(col.id)) {
+            let sortHtml = col.sortable ? sortIcon(col.defaultSort || col.id) : '';
+            let clickHtml = col.sortable ? `onclick="sortByColumn('${col.defaultSort || col.id}')" style="cursor:pointer; user-select:none; white-space:nowrap;"` : `style="white-space:nowrap;"`;
+            theadHtml += `<th ${clickHtml}>${escapeHTML(col.label)} ${sortHtml}</th>`;
+        }
+    });
 
     let html = `<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -1305,33 +1421,39 @@ window.renderListView = (filteredRes = null) => {
                 ${currentField ? `<button onclick="clearMissingFieldFilter()" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0; font-size:12px; line-height:1;" title="נקה סינון"><i class="fas fa-times"></i></button>` : ''}
             </div>
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            ${columnsMenuHtml}
             <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
         </div>
     </div>
     <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
-    <table class="data-table"><thead><tr>
-        <th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th>
-        <th onclick="sortByColumn('address')" style="cursor:pointer; user-select:none; white-space:nowrap;">כתובת ${sortIcon('address')}</th>
-        <th onclick="sortByColumn('name')" style="cursor:pointer; user-select:none; white-space:nowrap;">משפחה ${sortIcon('name')}</th>
-        <th>פרויקטים וסטטוס</th>
-        <th>תגיות</th>
-        <th onclick="sortByColumn('date')" style="cursor:pointer; user-select:none; white-space:nowrap;">קשר אחרון ${sortIcon('date')}</th>
-        <th>פעולות מהירות</th>
-    </tr></thead><tbody>`;
+    <table class="data-table"><thead><tr>${theadHtml}</tr></thead><tbody>`;
 
     let arr = filteredRes || [];
     if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts)db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
 
+    // מיון דינמי כולל שדות חדשים
     if(window.tableSort.column) {
         arr.sort((itemA, itemB) => {
             let valA = '', valB = '';
-            if(window.tableSort.column === 'name') { valA = itemA.apt.name || ''; valB = itemB.apt.name || ''; }
-            else if(window.tableSort.column === 'address') { valA = itemA.bldg === NO_ADDRESS_KEY ? '' : itemA.bldg; valB = itemB.bldg === NO_ADDRESS_KEY ? '' : itemB.bldg; }
-            else if(window.tableSort.column === 'date') {
-                valA = (itemA.apt.interactions && itemA.apt.interactions.length > 0) ? [...itemA.apt.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
-                valB = (itemB.apt.interactions && itemB.apt.interactions.length > 0) ? [...itemB.apt.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
+            const col = window.tableSort.column;
+            const a = itemA.apt, b = itemB.apt;
+
+            if(col === 'name') { valA = a.name || ''; valB = b.name || ''; }
+            else if(col === 'address') { valA = itemA.bldg === NO_ADDRESS_KEY ? '' : itemA.bldg; valB = itemB.bldg === NO_ADDRESS_KEY ? '' : itemB.bldg; }
+            else if(col === 'date') {
+                valA = (a.interactions && a.interactions.length > 0) ? [...a.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
+                valB = (b.interactions && b.interactions.length > 0) ? [...b.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
             }
+            else if(col === 'father') { valA = a.father || ''; valB = b.father || ''; }
+            else if(col === 'mother') { valA = a.mother || ''; valB = b.mother || ''; }
+            else if(col === 'style') { valA = a.style || ''; valB = b.style || ''; }
+            else if(col.startsWith('custom_')) {
+                let f = col.replace('custom_', '');
+                valA = (a.customData && a.customData[f]) || '';
+                valB = (b.customData && b.customData[f]) || '';
+            }
+
             if(valA < valB) return window.tableSort.direction === 'asc' ? -1 : 1;
             if(valA > valB) return window.tableSort.direction === 'asc' ? 1 : -1;
             return 0;
@@ -1365,15 +1487,45 @@ window.renderListView = (filteredRes = null) => {
 
         const safeName = escapeHTML(a.name || '(ללא שם)');
         const safeTags = (a.tags||[]).map(t => `<span class="tag-badge">${escapeHTML(t)}</span>`).join('');
+        // badge צבעוני לסגנון — נשמר מהגרסה הקודמת
+        const safeStyle = a.style
+            ? `<span class="tag-badge" style="background:${getColorForString(a.style,'style')}20; color:${getColorForString(a.style,'style')}; border-color:${getColorForString(a.style,'style')}50;">${escapeHTML(a.style)}</span>`
+            : '<span style="color:var(--text-muted);font-size:12px;">-</span>';
 
-        html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
-            <td data-label="בחר" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" value="${r.bldg}|${r.idx}" onchange="updateBulkBar()"></td>
-            <td data-label="כתובת" onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(bName)}</td>
-            <td data-label="משפחה"><b>${safeName}</b></td><td data-label="פרויקטים">${boardsHtml}</td>
-            <td data-label="תגיות">${safeTags}</td>
-            <td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>
-            <td data-label="פעולות" style="display:flex; gap:5px; align-items:center;">${contactIcons || '-'}</td>
-        </tr>`;
+        // יצירת תאי השורה באופן דינמי
+        let cellsHtml = `<td data-label="בחר" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" value="${r.bldg}|${r.idx}" onchange="updateBulkBar()"></td>`;
+
+        allTableCols.forEach(col => {
+            if(!appSettings.visibleColumns.includes(col.id)) return;
+
+            let content = '-';
+            if(col.id === 'address') content = `<span onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(bName)}</span>`;
+            else if(col.id === 'name') content = `<b>${safeName}</b>`;
+            else if(col.id === 'father') content = escapeHTML(a.father || '-');
+            else if(col.id === 'mother') content = escapeHTML(a.mother || '-');
+            else if(col.id === 'phone') content = escapeHTML(phones.join(', ') || '-');
+            else if(col.id === 'email') content = escapeHTML(emails.join(', ') || '-');
+            else if(col.id === 'style') content = safeStyle;
+            else if(col.id === 'boards') content = boardsHtml;
+            else if(col.id === 'tags') content = safeTags || '<span style="color:var(--text-muted);font-size:12px;">-</span>';
+            else if(col.id === 'children') content = a.childrenList && a.childrenList.length > 0 ? String(a.childrenList.length) : '-';
+            else if(col.id === 'notes') {
+                const notesVal = a.notes || '';
+                content = notesVal ? `<span style="font-size:13px; color:var(--text-main);">${escapeHTML(notesVal)}</span>` : '<i class="fas fa-minus" style="opacity:0.3;"></i>';
+            }
+            else if(col.id === 'lastContact') content = `<span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}`;
+            else if(col.id.startsWith('custom_')) {
+                const fName = col.id.replace('custom_', '');
+                const customObj = a.customData || a.customFields || {};
+                const val = customObj[fName] || '';
+                content = val ? `<span style="font-size:13px; color:var(--text-main);">${escapeHTML(val)}</span>` : '<i class="fas fa-minus" style="opacity:0.3;"></i>';
+            }
+            else if(col.id === 'actions') content = contactIcons || '-';
+
+            cellsHtml += `<td data-label="${escapeHTML(col.label)}">${content}</td>`;
+        });
+
+        html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">${cellsHtml}</tr>`;
     });
     inner.innerHTML = html + `</tbody></table></div>`;
 };
@@ -1649,12 +1801,22 @@ window.addNewStyle = () => {
 window.missingDataField = '';
 window.applyMissingFieldFilter = () => {
     const sel = document.getElementById('missingFieldSelect');
-    window.missingDataField = sel ? sel.value : '';
+    const val = sel ? sel.value : '';
+    if(val) {
+        if(!window.missingDataFields) window.missingDataFields = [];
+        if(!window.missingDataFields.includes(val)) window.missingDataFields.push(val);
+    }
+    window.missingDataField = val;
     handleOmniSearch();
+    renderChipFilters();
 };
 window.clearMissingFieldFilter = () => {
+    window.missingDataFields = [];
     window.missingDataField = '';
+    const sel = document.getElementById('missingFieldSelect');
+    if(sel) sel.value = '';
     handleOmniSearch();
+    renderChipFilters();
 };
 
 window.saveSettingsAndClose = () => {
