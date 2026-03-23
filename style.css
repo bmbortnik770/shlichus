@@ -203,3 +203,39 @@ body { margin:0; padding:0; font-family:'Assistant',sans-serif; display:flex; he
 }
 
 .mapboxgl-ctrl-geocoder { position: relative; z-index: 10000; }
+
+/* =========================================
+   Theme Engine + Transitions
+   ========================================= */
+
+body.theme-midnight { 
+    --primary:#020617; --secondary:#0f172a; --bg-body:#000000; 
+    --surface:#0f172a; --text-main:#e2e8f0; --text-muted:#94a3b8; 
+    --border-light:#1e293b; --table-hover:#0f172a;
+    --card-shadow:0 4px 20px rgba(255,255,255,0.02);
+    --hover-shadow:0 10px 25px rgba(255,255,255,0.04);
+}
+body.theme-pastel { 
+    --primary:#475569; --bg-body:#f8fafc; --surface:#ffffff; 
+    --border-light:#f1f5f9; --card-shadow:0 10px 40px -10px rgba(139,92,246,0.12);
+    --hover-shadow:0 15px 40px -10px rgba(139,92,246,0.2);
+}
+
+/* Smooth Page Transitions */
+.view-section { animation: viewFadeIn 0.35s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes viewFadeIn {
+    from { opacity:0; transform:translateY(12px) scale(0.99); }
+    to   { opacity:1; transform:translateY(0)   scale(1);    }
+}
+
+/* Custom Smart Tooltips */
+[data-tooltip] { position:relative; }
+[data-tooltip]::after {
+    content:attr(data-tooltip); position:absolute; bottom:120%; left:50%;
+    transform:translateX(-50%) translateY(8px); opacity:0; pointer-events:none;
+    background:var(--primary); color:#fff; padding:5px 11px; border-radius:8px;
+    font-size:12px; font-family:'Assistant'; white-space:nowrap;
+    transition:all 0.2s cubic-bezier(0.16,1,0.3,1); z-index:10000;
+    box-shadow:0 4px 10px rgba(0,0,0,0.2); font-weight:600;
+}
+[data-tooltip]:hover::after { transform:translateX(-50%) translateY(0); opacity:1; }

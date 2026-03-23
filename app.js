@@ -59,6 +59,14 @@ if(!appSettings.homeLocation) {
 
 if(!appSettings.customFields) appSettings.customFields = [];
 if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי', target: 30 };
+if(!appSettings.hiddenColumns) appSettings.hiddenColumns = [];
+if(!appSettings.themeVibe) appSettings.themeVibe = 'light';
+
+// הפעלת ערכת הנושא בטעינה
+(function applyTheme() {
+    document.body.classList.remove('theme-midnight', 'theme-pastel');
+    if(appSettings.themeVibe !== 'light') document.body.classList.add(`theme-${appSettings.themeVibe}`);
+})();
 if(!appSettings.templates) {
     appSettings.templates = [
         { title: 'הודעת פתיחה', text: 'שלום משפחת [שם], שמחים לעדכן אתכם ש...' },
@@ -480,12 +488,24 @@ window.switchMainView = function(viewName) {
     currentMainView = viewName;
     document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
     document.getElementById('tab-' + viewName).classList.add('active');
-    
-    document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
-    document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
-    document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
-    document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
-    
+
+    const viewMap = { map:'map-container', table:'list-container', kanban:'kanban-container', comm:'comm-container' };
+    const displayType = { map:'block', table:'block', kanban:'flex', comm:'flex' };
+
+    // הסתר את כולם
+    Object.values(viewMap).forEach(id => {
+        const el = document.getElementById(id);
+        if(el) { el.style.display = 'none'; el.classList.remove('view-section'); }
+    });
+
+    // הצג את הנבחר עם אנימציה
+    const target = document.getElementById(viewMap[viewName]);
+    if(target) {
+        target.style.display = displayType[viewName];
+        void target.offsetWidth; // force reflow להפעלת האנימציה
+        target.classList.add('view-section');
+    }
+
     if(viewName==='map') map.resize();
     handleOmniSearch(); 
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
@@ -875,6 +895,13 @@ document.addEventListener('click', (e) => {
     const ctx = document.getElementById('contextMenu');
     if (ctx && ctx.style.display === 'block' && !ctx.contains(e.target)) { ctx.style.display = 'none'; }
     
+    // סגירת בורר עמודות בלחיצה מחוץ
+    const colDd = document.getElementById('columnChooserDropdown');
+    const colBtn = document.getElementById('columnChooserBtn');
+    if(colDd && colDd.style.display === 'block' && !colDd.contains(e.target) && colBtn && !colBtn.contains(e.target)) {
+        colDd.style.display = 'none';
+    }
+    
     if(e.target.classList.contains('modal')){
         if(e.target.id==='clientModal') attemptCloseCrmModal();
         else if(e.target.id!=='customDialogModal' && e.target.id!=='onboardingModal') e.target.style.display='none';
@@ -1167,6 +1194,30 @@ window.bulkRoute = () => {
     clearBulkSelection();
 };
 
+// הגדרת כל עמודות הטבלה במקום אחד מרכזי
+const TABLE_COLUMNS = [
+    { id: 'address', label: 'כתובת',         sortKey: 'address', required: true  },
+    { id: 'name',    label: 'משפחה',          sortKey: 'name',    required: true  },
+    { id: 'boards',  label: 'פרויקטים',       sortKey: null,      required: false },
+    { id: 'tags',    label: 'תגיות',          sortKey: null,      required: false },
+    { id: 'date',    label: 'קשר אחרון',      sortKey: 'date',    required: false },
+    { id: 'actions', label: 'פעולות מהירות', sortKey: null,      required: false },
+];
+
+window.toggleTableColumn = (colId) => {
+    if(!appSettings.hiddenColumns) appSettings.hiddenColumns = [];
+    const idx = appSettings.hiddenColumns.indexOf(colId);
+    if(idx === -1) appSettings.hiddenColumns.push(colId);
+    else appSettings.hiddenColumns.splice(idx, 1);
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    handleOmniSearch();
+};
+
+window.toggleColumnChooser = () => {
+    const dd = document.getElementById('columnChooserDropdown');
+    if(dd) dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+};
+
 window.tableSort = { column: '', direction: 'asc' };
 
 window.sortByColumn = (col) => {
@@ -1181,21 +1232,19 @@ window.sortByColumn = (col) => {
 
 window.renderListView = (filteredRes = null) => {
     const inner = document.getElementById('list-inner');
+    const hidden = appSettings.hiddenColumns || [];
+    const visibleCols = TABLE_COLUMNS.filter(c => c.required || !hidden.includes(c.id));
 
     const baseFields = [
-        { value: 'phone', label: 'טלפון' },
-        { value: 'email', label: 'מייל' },
-        { value: 'address', label: 'כתובת' },
-        { value: 'style', label: 'סגנון' },
-        { value: 'notes', label: 'הערות' },
-        { value: 'tags', label: 'תגיות' },
+        { value: 'phone', label: 'טלפון' }, { value: 'email', label: 'מייל' },
+        { value: 'address', label: 'כתובת' }, { value: 'style', label: 'סגנון' },
+        { value: 'notes', label: 'הערות' }, { value: 'tags', label: 'תגיות' },
     ];
-    const customFields = (appSettings.customFields || []).map(f => ({ value: 'custom_' + f, label: f }));
-    const allFields = [...baseFields, ...customFields];
-
+    const customMissingFields = (appSettings.customFields || []).map(f => ({ value: 'custom_' + f, label: f }));
+    const allMissingFields = [...baseFields, ...customMissingFields];
     const currentField = window.missingDataField || '';
     const fieldOptions = `<option value="">כל השדות</option>` +
-        allFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
+        allMissingFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
 
     const sortIcon = (col) => {
         if(window.tableSort.column !== col) return '<i class="fas fa-sort" style="color:var(--border-light); margin-right:5px; font-size:12px;"></i>';
@@ -1203,6 +1252,17 @@ window.renderListView = (filteredRes = null) => {
             ? '<i class="fas fa-sort-up" style="margin-right:5px; color:var(--accent);"></i>'
             : '<i class="fas fa-sort-down" style="margin-right:5px; color:var(--accent);"></i>';
     };
+
+    // בניית dropdown בורר עמודות
+    const chooserItems = TABLE_COLUMNS.filter(c => !c.required).map(c => {
+        const isVisible = !hidden.includes(c.id);
+        return `<label style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; transition:background 0.15s;" onmouseover="this.style.background='var(--bg-body)'" onmouseout="this.style.background='transparent'">
+            <input type="checkbox" ${isVisible ? 'checked' : ''} onchange="toggleTableColumn('${c.id}')" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;">
+            ${c.label}
+        </label>`;
+    }).join('');
+
+    const hiddenCount = hidden.filter(h => TABLE_COLUMNS.find(c => c.id === h && !c.required)).length;
 
     let html = `<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -1214,20 +1274,31 @@ window.renderListView = (filteredRes = null) => {
                 ${currentField ? `<button onclick="clearMissingFieldFilter()" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0; font-size:12px; line-height:1;" title="נקה סינון"><i class="fas fa-times"></i></button>` : ''}
             </div>
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <div style="position:relative;">
+                <button id="columnChooserBtn" class="btn btn-outline" style="width:auto; padding:8px 15px;" onclick="toggleColumnChooser()">
+                    <i class="fas fa-columns"></i> עמודות${hiddenCount > 0 ? ` <span style="background:var(--accent);color:white;border-radius:10px;padding:1px 7px;font-size:11px;margin-right:4px;">${hiddenCount}</span>` : ''}
+                </button>
+                <div id="columnChooserDropdown" style="display:none; position:absolute; left:0; top:calc(100% + 8px); background:var(--surface); border:1px solid var(--border-light); border-radius:12px; box-shadow:var(--hover-shadow); padding:8px; z-index:1000; min-width:190px;">
+                    <div style="font-size:11px; font-weight:700; color:var(--text-muted); padding:4px 12px 8px; border-bottom:1px solid var(--border-light); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">הצג / הסתר עמודות</div>
+                    ${chooserItems}
+                </div>
+            </div>
             <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
         </div>
     </div>
-    <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
+    <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left:2px; padding-right:2px;">
     <table class="data-table"><thead><tr>
-        <th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th>
-        <th onclick="sortByColumn('address')" style="cursor:pointer; user-select:none; white-space:nowrap;">כתובת ${sortIcon('address')}</th>
-        <th onclick="sortByColumn('name')" style="cursor:pointer; user-select:none; white-space:nowrap;">משפחה ${sortIcon('name')}</th>
-        <th>פרויקטים וסטטוס</th>
-        <th>תגיות</th>
-        <th onclick="sortByColumn('date')" style="cursor:pointer; user-select:none; white-space:nowrap;">קשר אחרון ${sortIcon('date')}</th>
-        <th>פעולות מהירות</th>
-    </tr></thead><tbody>`;
+        <th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th>`;
+
+    visibleCols.forEach(col => {
+        if(col.sortKey) {
+            html += `<th onclick="sortByColumn('${col.sortKey}')" style="cursor:pointer; user-select:none; white-space:nowrap;">${col.label} ${sortIcon(col.sortKey)}</th>`;
+        } else {
+            html += `<th>${col.label}</th>`;
+        }
+    });
+    html += `</tr></thead><tbody>`;
 
     let arr = filteredRes || [];
     if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts)db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
@@ -1275,13 +1346,18 @@ window.renderListView = (filteredRes = null) => {
         const safeName = escapeHTML(a.name || '(ללא שם)');
         const safeTags = (a.tags||[]).map(t => `<span class="tag-badge">${escapeHTML(t)}</span>`).join('');
 
+        const cellMap = {
+            address: `<td data-label="כתובת" onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(bName)}</td>`,
+            name:    `<td data-label="משפחה"><b>${safeName}</b></td>`,
+            boards:  `<td data-label="פרויקטים">${boardsHtml}</td>`,
+            tags:    `<td data-label="תגיות">${safeTags}</td>`,
+            date:    `<td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>`,
+            actions: `<td data-label="פעולות" style="display:flex; gap:5px; align-items:center;">${contactIcons || '-'}</td>`,
+        };
+
         html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
             <td data-label="בחר" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" value="${r.bldg}|${r.idx}" onchange="updateBulkBar()"></td>
-            <td data-label="כתובת" onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(bName)}</td>
-            <td data-label="משפחה"><b>${safeName}</b></td><td data-label="פרויקטים">${boardsHtml}</td>
-            <td data-label="תגיות">${safeTags}</td>
-            <td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>
-            <td data-label="פעולות" style="display:flex; gap:5px; align-items:center;">${contactIcons || '-'}</td>
+            ${visibleCols.map(c => cellMap[c.id]).join('')}
         </tr>`;
     });
     inner.innerHTML = html + `</tbody></table></div>`;
@@ -1475,7 +1551,10 @@ window.toggleDarkMode=() => {document.body.classList.toggle('dark-mode');localSt
 function toggleMobileMenu(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open');}
 
 window.openSettings=()=>{
-    document.getElementById('setThemeColor').value=appSettings.themeColor; document.getElementById('setDefaultView').value=appSettings.defaultView;
+    document.getElementById('setThemeColor').value=appSettings.themeColor; 
+    document.getElementById('setDefaultView').value=appSettings.defaultView;
+    const vibeEl = document.getElementById('setThemeVibe');
+    if(vibeEl) vibeEl.value = appSettings.themeVibe || 'light';
     const chabadAddr = (appSettings.primaryLocation && appSettings.primaryLocation.address) 
         ? appSettings.primaryLocation.address 
         : (appSettings.homeLocation && appSettings.homeLocation.isChabad && appSettings.homeLocation.address) 
@@ -1568,6 +1647,12 @@ window.clearMissingFieldFilter = () => {
 
 window.saveSettingsAndClose = () => {
     appSettings.defaultView = document.getElementById('setDefaultView').value;
+
+    // שמירת ערכת נושא
+    const vibe = document.getElementById('setThemeVibe').value;
+    appSettings.themeVibe = vibe;
+    document.body.classList.remove('theme-midnight', 'theme-pastel');
+    if(vibe !== 'light') document.body.classList.add(`theme-${vibe}`);
 
     const isPrimary = document.getElementById('locTypePrimary').checked;
     if(isPrimary) {
