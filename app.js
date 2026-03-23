@@ -760,11 +760,13 @@ function populateFilterDropdowns() {
     renderChipFilters();
 }
 
+window.openFilterGroup = null; // שמירת המצב של איזו קטגוריה פתוחה כרגע
+
 function renderChipFilters() {
     const container = document.getElementById('chipFiltersContainer');
     if(!container) return;
 
-    // קרא את הערכים הנוכחיים מה-dropdowns (מקור האמת)
+    // קריאת הערכים הנוכחיים מה-dropdowns (מקור האמת)
     const curStyle  = document.getElementById('fStyle')  ? document.getElementById('fStyle').value  : '';
     const curTag    = document.getElementById('fTag')    ? document.getElementById('fTag').value    : '';
     const curStatus = document.getElementById('fStatus') ? document.getElementById('fStatus').value : '';
@@ -772,45 +774,68 @@ function renderChipFilters() {
 
     let html = '';
 
-    // סטטוס
-    const statuses = [
-        { val:'green',  label:'קשר טרי',     color:'#10b981' },
-        { val:'orange', label:'קשר בינוני',   color:'#f59e0b' },
-        { val:'red',    label:'לטיפול דחוף', color:'#ef4444' },
-    ];
-    html += `<div class="chip-group"><span class="chip-group-title">סטטוס:</span>`;
-    statuses.forEach(s => {
-        const active = curStatus === s.val ? 'active' : '';
-        html += `<div class="filter-chip ${active}" style="--chip-color:${s.color}"
-            onclick="document.getElementById('fStatus').value='${curStatus===s.val?'':s.val}'; applyAdvFilters(); renderChipFilters();">${s.label}</div>`;
-    });
-    html += `</div><div class="chip-divider"></div>`;
+    // פונקציית עזר לבניית קבוצת סינון מתקפלת
+    const buildGroup = (groupId, title, icon, options, curValue, isMissingField = false) => {
+        if(options.length === 0) return '';
+        const isOpen = window.openFilterGroup === groupId;
+        const hasActive = curValue !== '';
 
-    // סגנון
-    if(appSettings.styles.length > 0) {
-        html += `<div class="chip-group"><span class="chip-group-title">סגנון:</span>`;
-        appSettings.styles.forEach(s => {
-            const active = curStyle === s ? 'active' : '';
-            const color  = getColorForString(s, 'style');
-            html += `<div class="filter-chip ${active}" style="--chip-color:${color}"
-                onclick="document.getElementById('fStyle').value='${curStyle===s?'':s}'; applyAdvFilters(); renderChipFilters();">${s}</div>`;
-        });
-        html += `</div><div class="chip-divider"></div>`;
-    }
+        // אם יש סינון פעיל והקטגוריה סגורה, נציג את הסינון על כפתור הקטגוריה
+        let activeText = title;
+        if (hasActive && !isOpen) {
+            const activeOpt = options.find(o => (o.value || o.val || o) === curValue);
+            const label = activeOpt ? (activeOpt.label || activeOpt) : curValue;
+            activeText = `${title}: ${label}`;
+        }
 
-    // תגיות
-    if(appSettings.tags.length > 0) {
-        html += `<div class="chip-group"><span class="chip-group-title">תגיות:</span>`;
-        appSettings.tags.forEach(t => {
-            const active = curTag === t ? 'active' : '';
-            const color  = getColorForString(t, 'tag');
-            html += `<div class="filter-chip ${active}" style="--chip-color:${color}"
-                onclick="document.getElementById('fTag').value='${curTag===t?'':t}'; applyAdvFilters(); renderChipFilters();">${t}</div>`;
-        });
-        html += `</div><div class="chip-divider"></div>`;
-    }
+        let res = `<div class="chip-group" ${isMissingField ? 'style="margin-right:auto;"' : ''}>`;
+        
+        // כפתור הקטגוריה הראשי (טריגר לפתיחה/סגירה)
+        res += `<div class="filter-chip ${hasActive && !isOpen ? 'active' : ''}" 
+                     style="${hasActive && !isOpen ? '' : 'background:var(--surface); border-color:var(--border-light); color:var(--text-main);'}" 
+                     onclick="window.openFilterGroup=window.openFilterGroup==='${groupId}'?null:'${groupId}'; renderChipFilters();">
+                    <i class="${icon}" style="margin-left:6px; opacity:0.7;"></i>${activeText} 
+                    <i class="fas fa-chevron-${isOpen?'up':'down'}" style="margin-right:6px; font-size:10px; opacity:0.5;"></i>
+                </div>`;
 
-    // איתור חסרים
+        // הצגת הצ'יפים של האפשרויות (רק אם הקבוצה פתוחה)
+        if (isOpen) {
+            options.forEach(opt => {
+                const val = opt.val || opt.value || opt;
+                const label = opt.label || opt;
+                const color = opt.color || getColorForString(val, groupId);
+                const isActive = curValue === val;
+
+                let clickFn = '';
+                if (isMissingField) {
+                    clickFn = `window.missingDataField='${isActive?'':val}'; handleOmniSearch(); renderChipFilters();`;
+                } else {
+                    const selId = groupId === 'tag' ? 'fTag' : (groupId === 'style' ? 'fStyle' : 'fStatus');
+                    clickFn = `document.getElementById('${selId}').value='${isActive?'':val}'; applyAdvFilters(); renderChipFilters();`;
+                }
+
+                res += `<div class="filter-chip ${isActive ? 'active' : ''}" style="--chip-color:${color}" onclick="${clickFn}">${label}</div>`;
+            });
+        }
+        res += `</div>`;
+        if(!isMissingField) res += `<div class="chip-divider"></div>`;
+        return res;
+    };
+
+    // 1. סטטוס קשר
+    html += buildGroup('status', 'סטטוס', 'fas fa-chart-line', [
+        { val:'green',  label:'קשר טרי',   color:'#10b981' },
+        { val:'orange', label:'קשר בינוני', color:'#f59e0b' },
+        { val:'red',    label:'לטיפול דחוף',color:'#ef4444' }
+    ], curStatus);
+
+    // 2. סגנון
+    html += buildGroup('style', 'סגנון', 'fas fa-palette', appSettings.styles, curStyle);
+
+    // 3. תגיות
+    html += buildGroup('tag', 'תגיות', 'fas fa-tags', appSettings.tags, curTag);
+
+    // 4. איתור חסרים (נדחף שמאלה אוטומטית בעזרת isMissingField = true)
     const missingFields = [
         { value:'phone',   label:'חסר טלפון'  },
         { value:'email',   label:'חסר מייל'   },
@@ -818,15 +843,9 @@ function renderChipFilters() {
         { value:'style',   label:'ללא סגנון'  },
         { value:'notes',   label:'ללא הערות'  },
         { value:'tags',    label:'ללא תגיות'  },
-        ...(appSettings.customFields||[]).map(f=>({ value:'custom_'+f, label:`חסר: ${f}` })),
+        ...(appSettings.customFields||[]).map(f=>({ value:'custom_'+f, label:`חסר: ${f}` }))
     ];
-    html += `<div class="chip-group"><span class="chip-group-title">חסרים:</span>`;
-    missingFields.forEach(f => {
-        const active = curMissing === f.value ? 'active' : '';
-        html += `<div class="filter-chip ${active}" style="--chip-color:var(--danger)"
-            onclick="window.missingDataField='${curMissing===f.value?'':f.value}'; handleOmniSearch(); renderChipFilters();">${f.label}</div>`;
-    });
-    html += `</div>`;
+    html += buildGroup('missing', 'איתור חסרים', 'fas fa-search-minus', missingFields, curMissing, true);
 
     container.innerHTML = html;
 }
