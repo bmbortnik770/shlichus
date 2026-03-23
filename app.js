@@ -795,18 +795,25 @@ function renderChipFilters() {
     const buildGroup = (groupId, title, icon, options, activeArr, isMissingField = false) => {
         if(options.length === 0) return '';
         const isOpen = window.openFilterGroup === groupId;
-        const hasActive = activeArr.length > 0;
+        // עבור smart_view — activeArr הוא string (לא מערך)
+        const isSmartView = groupId === 'smart_view';
+        const curVal = isSmartView ? activeArr : null;
+        const hasActive = isSmartView ? (curVal && curVal !== 'v_all') : activeArr.length > 0;
 
         let activeText = title;
         if (hasActive && !isOpen) {
-            activeText = `${title}: ${activeArr.length === 1
-                ? (options.find(o => (o.value || o.val || o) === activeArr[0])?.label || activeArr[0])
-                : activeArr.length + ' נבחרו'}`;
+            if(isSmartView) {
+                const activeView = (appSettings.smartViews || []).find(v => v.id === curVal);
+                activeText = `${title}: ${activeView ? activeView.name : curVal}`;
+            } else {
+                activeText = `${title}: ${activeArr.length === 1
+                    ? (options.find(o => (o.value || o.val || o) === activeArr[0])?.label || activeArr[0])
+                    : activeArr.length + ' נבחרו'}`;
+            }
         }
 
         let res = `<div class="chip-group" ${isMissingField ? 'style="margin-right:auto;"' : ''}>`;
 
-        // כפתור ראשי — פתיחה/סגירה + סימן X לניקוי
         res += `<div class="filter-chip ${hasActive && !isOpen ? 'active' : ''}" 
                      style="${hasActive && !isOpen ? '' : 'background:var(--surface); border-color:var(--border-light); color:var(--text-main);'}" 
                      onclick="window.openFilterGroup=window.openFilterGroup==='${groupId}'?null:'${groupId}'; renderChipFilters();">
@@ -814,22 +821,28 @@ function renderChipFilters() {
                     ${hasActive ? `<i class="fas fa-times" style="margin-right:6px; font-size:10px; opacity:0.7;" onclick="event.stopPropagation(); clearFilterGroup('${groupId}');"></i>` : `<i class="fas fa-chevron-${isOpen?'up':'down'}" style="margin-right:6px; font-size:10px; opacity:0.5;"></i>`}
                 </div>`;
 
-        // הצ'יפים הפנימיים (נראים רק כשהקבוצה פתוחה)
         if (isOpen) {
             options.forEach(opt => {
                 const val = opt.val || opt.value || opt;
                 const label = opt.label || opt;
-                const color = opt.color || getColorForString(val, groupId);
-                const isActive = activeArr.includes(val);
+                const color = opt.color || (isSmartView ? 'var(--accent)' : getColorForString(val, groupId));
+                const isActive = isSmartView ? (curVal === val) : activeArr.includes(val);
+                const iconHtml = opt.icon ? `<i class="fas ${opt.icon}" style="margin-left:5px; opacity:0.8;"></i>` : '';
 
                 let clickFn = '';
-                if (isMissingField) {
+                if(isMissingField) {
                     clickFn = `toggleMissingField('${val}');`;
+                } else if(isSmartView) {
+                    if(val === 'edit_rules') {
+                        clickFn = `openSmartViewsManager();`;
+                    } else {
+                        clickFn = `applySmartView('${isActive ? 'v_all' : val}'); renderChipFilters();`;
+                    }
                 } else {
                     clickFn = `toggleFilterVal('${groupId}','${val}');`;
                 }
 
-                res += `<div class="filter-chip ${isActive ? 'active' : ''}" style="--chip-color:${color}" onclick="${clickFn}">${label}${isActive ? ' <i class=\"fas fa-check\" style=\"font-size:10px; margin-right:4px;\"></i>' : ''}</div>`;
+                res += `<div class="filter-chip ${isActive ? 'active' : ''}" style="--chip-color:${color}" onclick="${clickFn}">${iconHtml}${label}${isActive && !isSmartView ? ' <i class="fas fa-check" style="font-size:10px; margin-right:4px;"></i>' : ''}</div>`;
             });
         }
         res += `</div>`;
@@ -862,6 +875,11 @@ function renderChipFilters() {
     ];
     html += buildGroup('missing', 'איתור חסרים', 'fas fa-search-minus', missingFields, curMissingArr, true);
 
+    // 5. תצוגות חכמות
+    const smartViewOptions = (appSettings.smartViews || []).map(v => ({ value: v.id, label: v.name, icon: v.icon }));
+    smartViewOptions.push({ value: 'edit_rules', label: 'ערוך כללים...', icon: 'fa-cog', color: '#64748b' });
+    html += buildGroup('smart_view', 'תצוגה חכמה', 'fas fa-magic', smartViewOptions, window.activeSmartView || 'v_all');
+
     container.innerHTML = html;
 }
 
@@ -880,8 +898,11 @@ window.clearFilterGroup = (groupId) => {
     if(groupId === 'missing') {
         window.missingDataFields = [];
         window.missingDataField = '';
-        const sel = document.getElementById('missingFieldSelect');
-        if(sel) sel.value = '';
+    } else if(groupId === 'smart_view') {
+        window.activeSmartView = 'v_all';
+        handleOmniSearch();
+        renderChipFilters();
+        return;
     } else {
         const key = groupId === 'tag' ? 'tags' : (groupId === 'style' ? 'style' : 'status');
         currentFilters[key] = [];
@@ -895,10 +916,7 @@ window.toggleMissingField = (val) => {
     if(!window.missingDataFields) window.missingDataFields = [];
     const idx = window.missingDataFields.indexOf(val);
     if(idx === -1) window.missingDataFields.push(val); else window.missingDataFields.splice(idx, 1);
-    // backward compat: missingDataField = ערך ראשון (לשימוש ב-missingFieldSelect)
     window.missingDataField = window.missingDataFields[0] || '';
-    const sel = document.getElementById('missingFieldSelect');
-    if(sel) sel.value = window.missingDataField;
     handleOmniSearch();
     renderChipFilters();
 };
@@ -946,42 +964,58 @@ window.handleOmniSearch = () => {
             });
         }
 
-        // לוגיקת Smart Views
+        // לוגיקת Smart Views (מנוע מורחב עם תמיכה אחורה)
         let matchSmartView = true;
         if(window.activeSmartView && window.activeSmartView !== 'v_all') {
             const view = (appSettings.smartViews || []).find(v => v.id === window.activeSmartView);
             if(view) {
-                if(view.rule === 'no_visit_3m') {
-                    const visits = (a.interactions || []).filter(i => i.type === 'ביקור').map(i => new Date(i.date));
-                    if(visits.length === 0) { matchSmartView = true; }
-                    else {
-                        const lastVisit = new Date(Math.max.apply(null, visits));
-                        matchSmartView = ((new Date() - lastVisit) / (1000 * 60 * 60 * 24 * 30)) > 3;
-                    }
-                }
-                else if(view.rule === 'bday_month') {
-                    const currentMonth = new Date().getMonth();
-                    matchSmartView = (a.childrenList || []).some(c => c.dob && new Date(c.dob).getMonth() === currentMonth);
-                }
-                else if(view.rule === 'child_age') {
-                    const targetAge = parseInt(view.value);
+                const rule = view.rule;
+                if(rule === 'child_age') {
+                    const targetAge = parseInt(view.param1 || view.value);
                     const currentYear = new Date().getFullYear();
-                    matchSmartView = (a.childrenList || []).some(c => {
-                        if(!c.dob) return false;
-                        return (currentYear - new Date(c.dob).getFullYear()) === targetAge;
-                    });
+                    matchSmartView = (a.childrenList || []).some(c => c.dob && (currentYear - new Date(c.dob).getFullYear()) === targetAge);
                 }
-                else if(view.rule === 'no_visit_months' || view.rule === 'no_call_months') {
-                    const months = parseInt(view.value);
-                    const typeMap = view.rule === 'no_visit_months' ? 'ביקור' : 'שיחה';
-                    const logs = (a.interactions || []).filter(i => i.type === typeMap).map(i => new Date(i.date));
+                else if(rule === 'no_interaction') {
+                    const typeFilter = view.param1 || 'כלשהו';
+                    const months = parseInt(view.param2 || view.value || 3);
+                    let logs = (a.interactions || []);
+                    if(typeFilter !== 'כלשהו') logs = logs.filter(i => i.type === typeFilter);
                     if(logs.length === 0) matchSmartView = true;
                     else {
-                        const lastDate = new Date(Math.max.apply(null, logs));
+                        const lastDate = new Date(Math.max.apply(null, logs.map(i => new Date(i.date))));
                         matchSmartView = ((new Date() - lastDate) / (1000 * 60 * 60 * 24 * 30)) >= months;
                     }
                 }
-                else if(view.rule === 'has_tag') {
+                else if(rule === 'has_open_tasks') {
+                    matchSmartView = (a.tasks || []).some(t => !t.done);
+                }
+                else if(rule === 'in_project') {
+                    matchSmartView = !!(a.boards && a.boards[view.param1] !== undefined);
+                }
+                // תאימות אחורה לכללים ישנים
+                else if(rule === 'no_visit_3m') {
+                    const visits = (a.interactions || []).filter(i => i.type === 'ביקור');
+                    if(visits.length === 0) matchSmartView = true;
+                    else {
+                        const last = new Date(Math.max.apply(null, visits.map(i => new Date(i.date))));
+                        matchSmartView = ((new Date() - last) / (1000 * 60 * 60 * 24 * 30)) > 3;
+                    }
+                }
+                else if(rule === 'bday_month') {
+                    const currentMonth = new Date().getMonth();
+                    matchSmartView = (a.childrenList || []).some(c => c.dob && new Date(c.dob).getMonth() === currentMonth);
+                }
+                else if(rule === 'no_visit_months' || rule === 'no_call_months') {
+                    const months = parseInt(view.value || 3);
+                    const type = rule === 'no_visit_months' ? 'ביקור' : 'שיחה';
+                    const logs = (a.interactions || []).filter(i => i.type === type);
+                    if(logs.length === 0) matchSmartView = true;
+                    else {
+                        const last = new Date(Math.max.apply(null, logs.map(i => new Date(i.date))));
+                        matchSmartView = ((new Date() - last) / (1000 * 60 * 60 * 24 * 30)) >= months;
+                    }
+                }
+                else if(rule === 'has_tag') {
                     matchSmartView = (a.tags || []).includes(view.value);
                 }
             }
@@ -1405,47 +1439,78 @@ window.applySmartSort = (sortType) => {
 };
 
 // ========== מנוע יצירת תצוגות חכמות ==========
-window.openSmartViewBuilder = () => {
-    document.getElementById('svName').value = '';
-    document.getElementById('smartViewBuilderModal').style.display = 'flex';
+window.openSmartViewsManager = () => {
+    renderExistingSmartViews();
+    const nameEl = document.getElementById('svName');
+    if(nameEl) nameEl.value = '';
     updateSvRuleInput();
+    document.getElementById('smartViewsManagerModal').style.display = 'flex';
+};
+
+window.renderExistingSmartViews = () => {
+    const list = document.getElementById('svExistingRulesList');
+    if(!list) return;
+    const views = (appSettings.smartViews || []).filter(v => !['v_all','v_novisit','v_bday'].includes(v.id));
+    if(views.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted); font-size:14px;">אין כללים מותאמים אישית.</div>';
+        return;
+    }
+    list.innerHTML = views.map(v => `
+        <div style="background:var(--bg-body); padding:10px 15px; border-radius:10px; margin-bottom:10px; border:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:600; font-size:14px;"><i class="fas ${escapeHTML(v.icon)}" style="color:var(--accent); margin-left:8px;"></i>${escapeHTML(v.name)}</div>
+            <button class="btn-icon" style="color:var(--danger); border:none; padding:4px; box-shadow:none;" onclick="deleteSmartView('${v.id}')"><i class="fas fa-trash"></i></button>
+        </div>
+    `).join('');
 };
 
 window.updateSvRuleInput = () => {
-    const type = document.getElementById('svRuleType').value;
+    const typeEl = document.getElementById('svRuleType');
     const container = document.getElementById('svRuleValueContainer');
-    if(type.includes('months')) {
-        container.innerHTML = '<label style="color:var(--primary); font-weight:bold;">כמה חודשים עברו?</label><input type="number" id="svRuleValue" class="inline-input" placeholder="למשל: 6" min="1">';
+    if(!typeEl || !container) return;
+    const type = typeEl.value;
+
+    if(type === 'no_interaction') {
+        container.innerHTML = `
+            <label style="font-size:12px; font-weight:bold;">סוג קשר:</label>
+            <select id="svParam1" class="inline-input" style="margin-bottom:10px;"><option value="כלשהו">כל קשר שהוא</option><option value="ביקור">רק ביקורים</option><option value="שיחה">רק שיחות</option></select>
+            <label style="font-size:12px; font-weight:bold;">חודשים שעברו לפחות:</label>
+            <input type="number" id="svParam2" class="inline-input" value="3" min="1">
+        `;
     } else if(type === 'child_age') {
-        container.innerHTML = '<label style="color:var(--primary); font-weight:bold;">גיל הילד (בשנים)</label><input type="number" id="svRuleValue" class="inline-input" placeholder="למשל: 13 (לבר מצווה)" min="0">';
-    } else if(type === 'has_tag') {
-        container.innerHTML = `<label style="color:var(--primary); font-weight:bold;">בחר תגית מתוך הרשימה:</label><select id="svRuleValue" class="inline-input">${(appSettings.tags||[]).map(t=>`<option value="${escapeHTML(t)}">${escapeHTML(t)}</option>`).join('')}</select>`;
+        container.innerHTML = '<label style="font-size:12px; font-weight:bold;">גיל הילד השנה:</label><input type="number" id="svParam1" class="inline-input" placeholder="למשל 13" min="0">';
+    } else if(type === 'has_open_tasks') {
+        container.innerHTML = '<div style="font-size:13px; color:var(--text-muted);">הכלל יאתר כל משפחה שיש לה משימה פתוחה.</div><input type="hidden" id="svParam1" value="true">';
+    } else if(type === 'in_project') {
+        const projOptions = (db.__BOARDS__ || []).filter(b=>!b.archived).map(b => `<option value="${b.id}">${escapeHTML(b.name)}</option>`).join('');
+        container.innerHTML = `<label style="font-size:12px; font-weight:bold;">בחר פרויקט פעיל:</label><select id="svParam1" class="inline-input">${projOptions}</select>`;
     }
 };
 
 window.saveSmartView = () => {
     const name = document.getElementById('svName').value.trim();
-    const icon = document.getElementById('svIcon').value;
     const type = document.getElementById('svRuleType').value;
-    const valEl = document.getElementById('svRuleValue');
-    const val = valEl ? valEl.value : '';
-    if(!name || !val) return showToast('נא למלא את שם התצוגה ואת הערך לסינון', 'warning');
+    const p1El = document.getElementById('svParam1');
+    const p2El = document.getElementById('svParam2');
+    const p1 = p1El ? p1El.value : '';
+    const p2 = p2El ? p2El.value : '';
+
+    if(!name) return showToast('יש לתת שם לכלל החדש', 'warning');
 
     const newId = 'v_custom_' + Date.now();
-    appSettings.smartViews.push({ id: newId, name, icon, rule: type, value: val });
+    appSettings.smartViews.push({ id: newId, name, icon: document.getElementById('svIcon').value, rule: type, param1: p1, param2: p2 });
     saveDB();
-    document.getElementById('smartViewBuilderModal').style.display = 'none';
-    showToast('תצוגה חכמה נוצרה בהצלחה!', 'success');
-    window.activeSmartView = newId;
-    handleOmniSearch(); // קודם מחשב נתונים, אחר כך renderListView נקרא מתוכו
+    renderExistingSmartViews();
+    renderChipFilters();
+    showToast('כלל נשמר בהצלחה!', 'success');
 };
 
 window.deleteSmartView = (viewId) => {
     appSettings.smartViews = appSettings.smartViews.filter(v => v.id !== viewId);
     if(window.activeSmartView === viewId) window.activeSmartView = 'v_all';
     saveDB();
+    renderExistingSmartViews();
+    renderChipFilters();
     handleOmniSearch();
-    showToast('התצוגה נמחקה', 'info');
 };
 
 window.renderListView = (filteredRes = null) => {
@@ -1505,21 +1570,6 @@ window.renderListView = (filteredRes = null) => {
         }
     });
 
-    // יצירת שורת ה-Smart Views
-    const smartViewsHtml = `
-        <div class="smart-views-bar">
-            ${(appSettings.smartViews || []).map(v => `
-                <div class="smart-view-tab ${window.activeSmartView === v.id ? 'active' : ''}" onclick="applySmartView('${v.id}')">
-                    <i class="fas ${escapeHTML(v.icon)}"></i> ${escapeHTML(v.name)}
-                    ${v.id.startsWith('v_custom_') ? `<i class="fas fa-times" style="margin-right:8px; opacity:0.5; transition:0.2s;" onmouseover="this.style.opacity=1;this.style.color='var(--danger)';" onmouseout="this.style.opacity=0.5;this.style.color='';" onclick="event.stopPropagation(); deleteSmartView('${v.id}')" title="מחק תצוגה"></i>` : ''}
-                </div>
-            `).join('')}
-            <div class="smart-view-tab" style="border-style: dashed; background: transparent;" onclick="openSmartViewBuilder()">
-                <i class="fas fa-plus"></i> צור כלל חדש
-            </div>
-        </div>
-    `;
-
     // יצירת דרופדאון Smart Sort
     const smartSortHtml = `
         <select class="smart-sort-select" onchange="applySmartSort(this.value)">
@@ -1530,7 +1580,6 @@ window.renderListView = (filteredRes = null) => {
     `;
 
     let html = `
-        ${smartViewsHtml}
         <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <h2 style="margin:0;"><i class="fas fa-list"></i> אינדקס קהילה</h2>
@@ -1923,27 +1972,6 @@ window.addNewStyle = () => {
     if(appSettings.styles.includes(v)) { showToast('סגנון זה כבר קיים', 'warning'); return; }
     appSettings.styles.push(v);
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); saveDB(); populateFilterDropdowns(); openSettings(); refreshMap();
-};
-
-window.missingDataField = '';
-window.applyMissingFieldFilter = () => {
-    const sel = document.getElementById('missingFieldSelect');
-    const val = sel ? sel.value : '';
-    if(val) {
-        if(!window.missingDataFields) window.missingDataFields = [];
-        if(!window.missingDataFields.includes(val)) window.missingDataFields.push(val);
-    }
-    window.missingDataField = val;
-    handleOmniSearch();
-    renderChipFilters();
-};
-window.clearMissingFieldFilter = () => {
-    window.missingDataFields = [];
-    window.missingDataField = '';
-    const sel = document.getElementById('missingFieldSelect');
-    if(sel) sel.value = '';
-    handleOmniSearch();
-    renderChipFilters();
 };
 
 window.saveSettingsAndClose = () => {

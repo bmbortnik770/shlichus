@@ -514,40 +514,41 @@
 </div>
 
 <script src="app.js?v=11"></script>
-<div id="smartViewBuilderModal" class="modal" style="z-index: 10001;">
-    <div class="modal-content modal-small">
+<div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
+    <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3 style="margin:0; color:var(--primary); font-size: 20px;"><i class="fas fa-magic" style="color:var(--accent); margin-left: 8px;"></i> יצירת תצוגה חכמה</h3>
-            <button class="btn-icon" onclick="document.getElementById('smartViewBuilderModal').style.display='none'" style="border:none; font-size:18px; background: transparent; box-shadow: none;"><i class="fas fa-times"></i></button>
+            <h3 style="margin:0; color:var(--primary); font-size: 20px;"><i class="fas fa-magic" style="color:var(--accent); margin-left: 8px;"></i> ניהול תצוגות חכמות</h3>
+            <button class="btn-icon" onclick="document.getElementById('smartViewsManagerModal').style.display='none'" style="border:none; font-size:18px; background:transparent; box-shadow:none;"><i class="fas fa-times"></i></button>
         </div>
-        <div class="form-group">
-            <label>שם התצוגה (למשל: "בני מצווה השנה")</label>
-            <input type="text" id="svName" class="inline-input" placeholder="הקלד שם לטאב החדש...">
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-            <div class="form-group">
-                <label>בחר סמל (אייקון)</label>
-                <select id="svIcon" class="inline-input">
-                    <option value="fa-star">⭐ כוכב</option>
-                    <option value="fa-birthday-cake">🎂 עוגה</option>
-                    <option value="fa-walking">🚶 הליכה (ביקור)</option>
-                    <option value="fa-phone">📞 טלפון</option>
-                    <option value="fa-tags">🏷️ תגיות</option>
-                    <option value="fa-bullseye">🎯 מטרה</option>
-                </select>
+        <div style="display:flex; gap:20px;">
+            <div style="flex:1; border-left:1px solid var(--border-light); padding-left:20px;">
+                <h4 style="margin:0 0 15px 0; font-size:15px; color:var(--text-muted);">כללים קיימים:</h4>
+                <div id="svExistingRulesList" style="max-height:300px; overflow-y:auto; padding-left:5px;"></div>
             </div>
-            <div class="form-group">
-                <label>סוג הכלל לסינון</label>
-                <select id="svRuleType" class="inline-input" onchange="updateSvRuleInput()">
-                    <option value="child_age">ילד בגיל מסוים (שנים)</option>
-                    <option value="no_visit_months">ללא ביקור בית (חודשים)</option>
-                    <option value="no_call_months">ללא שיחת טלפון (חודשים)</option>
-                    <option value="has_tag">מכילה תגית ספציפית</option>
-                </select>
+            <div style="flex:1;">
+                <h4 style="margin:0 0 15px 0; font-size:15px; color:var(--text-muted);">צור כלל חדש:</h4>
+                <div class="form-group"><input type="text" id="svName" class="inline-input" placeholder="שם התצוגה (למשל: דורש ביקור)..."></div>
+                <div class="form-group">
+                    <select id="svIcon" class="inline-input">
+                        <option value="fa-star">⭐ כוכב</option>
+                        <option value="fa-birthday-cake">🎂 יום הולדת</option>
+                        <option value="fa-walking">🚶 ביקור</option>
+                        <option value="fa-phone">📞 שיחה</option>
+                        <option value="fa-check-double">✅ משימות</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <select id="svRuleType" class="inline-input" onchange="updateSvRuleInput()">
+                        <option value="child_age">ילדים בגיל מסוים השנה</option>
+                        <option value="no_interaction">חוסר קשר (חודשים)</option>
+                        <option value="has_open_tasks">יש משימות פתוחות</option>
+                        <option value="in_project">משתתף בפרויקט מסוים</option>
+                    </select>
+                </div>
+                <div class="form-group" id="svRuleValueContainer" style="background:var(--bg-body); padding:15px; border-radius:12px; border:1px solid var(--border-light); min-height:60px;"></div>
+                <button class="btn btn-primary" style="margin-top:10px; width:100%;" onclick="saveSmartView()"><i class="fas fa-plus"></i> שמור כלל</button>
             </div>
         </div>
-        <div class="form-group" id="svRuleValueContainer" style="background:var(--bg-body); padding:15px; border-radius:12px; border:1px solid var(--border-light);"></div>
-        <button class="btn btn-primary" style="font-size: 16px; padding: 12px; margin-top: 10px;" onclick="saveSmartView()"><i class="fas fa-save"></i> שמור תצוגה לטאב חדש</button>
     </div>
 </div>
 
