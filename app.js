@@ -1105,6 +1105,27 @@ window.bulkAddTagPrompt = async () => {
     } 
 };
 
+window.bulkAddToBoardPrompt = async () => {
+    if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
+    const activeBoards = db.__BOARDS__.filter(b => !b.archived);
+    if(activeBoards.length === 0) return showToast("אין פרויקטים פעילים במערכת", "warning");
+    const opts = activeBoards.map((b, i) => `${i+1}. ${b.name}`).join('\n');
+    const num = await showCustomDialog({ title: 'צירוף המוני לפרויקט', message: `לאיזה פרויקט לצרף את ${bulkSelection.length} המשפחות?\n${opts}`, showInput: true });
+    if(!num || isNaN(num) || num < 1 || num > activeBoards.length) return;
+    const board = activeBoards[num - 1];
+    ensureAuthAndExecute(() => {
+        bulkSelection.forEach(v => {
+            let [b, i] = v.split('|');
+            let a = db[b].apts[i];
+            if(!a.boards) a.boards = {};
+            if(!a.boards[board.id]) a.boards[board.id] = board.columns[0];
+        });
+        saveDB();
+        clearBulkSelection();
+        showToast(`${bulkSelection.length} משפחות צורפו ל"${board.name}"! ${getRandomCompliment()}`, "success");
+    });
+};
+
 window.bulkDelete = async () => { 
     if(bulkSelection.length === 0) return showToast("יש לסמן משפחות קודם!", "warning");
     const proceed = await showCustomDialog({ title: 'מחיקה המונית', message: `למחוק ${bulkSelection.length} משפחות? פעולה בלתי הפיכה!`, showCancel: true });
