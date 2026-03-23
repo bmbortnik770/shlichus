@@ -239,3 +239,15 @@ body.theme-pastel {
     box-shadow:0 4px 10px rgba(0,0,0,0.2); font-weight:600;
 }
 [data-tooltip]:hover::after { transform:translateX(-50%) translateY(0); opacity:1; }
+
+/* תיקון tooltip לכפתור FAB — מופיע שמאלה ולא מחוץ למסך */
+.fab-add[data-tooltip]::after {
+    left: auto;
+    right: 0;
+    transform: translateX(0) translateY(8px);
+    bottom: 120%;
+}
+.fab-add[data-tooltip]:hover::after {
+    transform: translateX(0) translateY(0);
+    opacity: 1;
+}
