@@ -796,6 +796,8 @@ window.handleOmniSearch = () => {
         if(matchQ && matchStyle && matchTag && matchStat && matchMissing) res.push({bldg:b, idx:i, apt:a});
     });});
     
+    window.currentFilteredData = res;
+    
     if(q.length>=2 && res.length>0) { 
         dd.style.display='block'; 
         dd.innerHTML=res.slice(0,15).map(r=>`<div class="search-item" onclick="jumpToSearchResult('${encodeURIComponent(r.bldg)}',${r.idx})"><div class="search-item-title">${r.apt.name||'ללא שם'} <span style="font-size:12px;">(${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg})</span></div></div>`).join(''); 
@@ -1144,10 +1146,21 @@ window.bulkRoute = () => {
     clearBulkSelection();
 };
 
+window.tableSort = { column: '', direction: 'asc' };
+
+window.sortByColumn = (col) => {
+    if(window.tableSort.column === col) {
+        window.tableSort.direction = window.tableSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        window.tableSort.column = col;
+        window.tableSort.direction = 'asc';
+    }
+    handleOmniSearch();
+};
+
 window.renderListView = (filteredRes = null) => {
     const inner = document.getElementById('list-inner');
 
-    // בניית רשימת השדות הזמינים לבדיקה (כולל שדות מותאמים)
     const baseFields = [
         { value: 'phone', label: 'טלפון' },
         { value: 'email', label: 'מייל' },
@@ -1162,6 +1175,13 @@ window.renderListView = (filteredRes = null) => {
     const currentField = window.missingDataField || '';
     const fieldOptions = `<option value="">כל השדות</option>` +
         allFields.map(f => `<option value="${f.value}" ${currentField === f.value ? 'selected' : ''}>${f.label}</option>`).join('');
+
+    const sortIcon = (col) => {
+        if(window.tableSort.column !== col) return '<i class="fas fa-sort" style="color:var(--border-light); margin-right:5px; font-size:12px;"></i>';
+        return window.tableSort.direction === 'asc'
+            ? '<i class="fas fa-sort-up" style="margin-right:5px; color:var(--accent);"></i>'
+            : '<i class="fas fa-sort-down" style="margin-right:5px; color:var(--accent);"></i>';
+    };
 
     let html = `<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -1178,13 +1198,38 @@ window.renderListView = (filteredRes = null) => {
         </div>
     </div>
     <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
-    <table class="data-table"><thead><tr><th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th><th>כתובת</th><th>משפחה</th><th>פרויקטים וסטטוס</th><th>תגיות</th><th>קשר אחרון</th><th>טלפונים ומייל</th></tr></thead><tbody>`;
-    
-    let arr = filteredRes || []; if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts)db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
+    <table class="data-table"><thead><tr>
+        <th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th>
+        <th onclick="sortByColumn('address')" style="cursor:pointer; user-select:none; white-space:nowrap;">כתובת ${sortIcon('address')}</th>
+        <th onclick="sortByColumn('name')" style="cursor:pointer; user-select:none; white-space:nowrap;">משפחה ${sortIcon('name')}</th>
+        <th>פרויקטים וסטטוס</th>
+        <th>תגיות</th>
+        <th onclick="sortByColumn('date')" style="cursor:pointer; user-select:none; white-space:nowrap;">קשר אחרון ${sortIcon('date')}</th>
+        <th>פעולות מהירות</th>
+    </tr></thead><tbody>`;
+
+    let arr = filteredRes || [];
+    if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts)db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
+
+    if(window.tableSort.column) {
+        arr.sort((itemA, itemB) => {
+            let valA = '', valB = '';
+            if(window.tableSort.column === 'name') { valA = itemA.apt.name || ''; valB = itemB.apt.name || ''; }
+            else if(window.tableSort.column === 'address') { valA = itemA.bldg === NO_ADDRESS_KEY ? '' : itemA.bldg; valB = itemB.bldg === NO_ADDRESS_KEY ? '' : itemB.bldg; }
+            else if(window.tableSort.column === 'date') {
+                valA = (itemA.apt.interactions && itemA.apt.interactions.length > 0) ? [...itemA.apt.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
+                valB = (itemB.apt.interactions && itemB.apt.interactions.length > 0) ? [...itemB.apt.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
+            }
+            if(valA < valB) return window.tableSort.direction === 'asc' ? -1 : 1;
+            if(valA > valB) return window.tableSort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
     arr.forEach(r => {
         const enc=encodeURIComponent(r.bldg), bName=r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg, a=r.apt;
-        let lastDate='-'; if(a.interactions&&a.interactions.length>0) lastDate=a.interactions.sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date;
-        
+        let lastDate='-'; if(a.interactions&&a.interactions.length>0) lastDate=[...a.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date;
+
         let boardsHtml = '-';
         if(a.boards && Object.keys(a.boards).length > 0) {
             boardsHtml = Object.entries(a.boards).map(([bid, status]) => {
@@ -1192,10 +1237,19 @@ window.renderListView = (filteredRes = null) => {
                 return bObj ? `<span class="board-badge">${escapeHTML(bObj.name)}: ${escapeHTML(status)}</span>` : '';
             }).join(' ');
         }
-        
+
         let contactIcons = '';
-        if(getAllPhones(a).length > 0) contactIcons += `<i class="fas fa-phone" style="color:var(--success); margin-left:5px;"></i>`;
-        if(getAllEmails(a).length > 0) contactIcons += `<i class="fas fa-envelope" style="color:#ea4335;"></i>`;
+        const phones = getAllPhones(a);
+        const emails = getAllEmails(a);
+        if(phones.length > 0) {
+            let cleanPhone = phones[0].replace(/\D/g, '');
+            let waPhone = cleanPhone.startsWith('0') ? '972' + cleanPhone.substring(1) : cleanPhone;
+            contactIcons += `<a href="tel:${cleanPhone}" class="btn-icon" style="color:var(--success); border-color:var(--success); margin-left:5px; text-decoration:none;" onclick="event.stopPropagation()" title="חייג"><i class="fas fa-phone"></i></a>`;
+            contactIcons += `<a href="https://wa.me/${waPhone}" target="_blank" class="btn-icon" style="color:#25D366; border-color:#25D366; margin-left:5px; text-decoration:none;" onclick="event.stopPropagation()" title="וואטסאפ"><i class="fab fa-whatsapp"></i></a>`;
+        }
+        if(emails.length > 0) {
+            contactIcons += `<a href="mailto:${emails[0]}" class="btn-icon" style="color:#ea4335; border-color:#ea4335; text-decoration:none;" onclick="event.stopPropagation()" title="שלח מייל"><i class="fas fa-envelope"></i></a>`;
+        }
 
         const safeName = escapeHTML(a.name || '(ללא שם)');
         const safeTags = (a.tags||[]).map(t => `<span class="tag-badge">${escapeHTML(t)}</span>`).join('');
@@ -1206,18 +1260,24 @@ window.renderListView = (filteredRes = null) => {
             <td data-label="משפחה"><b>${safeName}</b></td><td data-label="פרויקטים">${boardsHtml}</td>
             <td data-label="תגיות">${safeTags}</td>
             <td data-label="קשר אחרון"><span class="status-dot" style="background:${getStatusColor(a)};"></span> ${lastDate}</td>
-            <td data-label="פרטי קשר" style="font-size:16px;">${contactIcons}</td>
+            <td data-label="פעולות" style="display:flex; gap:5px; align-items:center;">${contactIcons || '-'}</td>
         </tr>`;
     });
     inner.innerHTML = html + `</tbody></table></div>`;
 };
 
 window.exportTableToCSV = () => {
-    let arr = [];
-    Object.keys(db).forEach(b => {
-        if(b === '__BOARDS__' || b === '__SETTINGS__' || b === 'meta') return; if(!db[b] || !db[b].apts) return;
-        db[b].apts.forEach(a => arr.push({ bldg: b, apt: a }));
-    });
+    // ייצוא רק של הרשומות המסוננות אם יש חיפוש או סינון פעיל
+    let arr = window.currentFilteredData;
+    const isFiltered = document.getElementById('smartSearch').value !== '' || currentFilters.style || currentFilters.tags || currentFilters.status || window.missingDataField;
+    
+    if (!arr || !isFiltered) {
+        arr = [];
+        Object.keys(db).forEach(b => {
+            if(b === '__BOARDS__' || b === '__SETTINGS__' || b === 'meta') return; if(!db[b] || !db[b].apts) return;
+            db[b].apts.forEach(a => arr.push({ bldg: b, apt: a }));
+        });
+    }
 
     if(arr.length === 0) { showToast('אין נתונים לייצוא', 'warning'); return; }
 
@@ -1226,7 +1286,9 @@ window.exportTableToCSV = () => {
 
     const escape = v => `"${String(v||'').replace(/"/g,'""')}"`;
 
-    const rows = arr.map(({ bldg, apt: a }) => {
+    const rows = arr.map((row) => {
+        const bldg = row.bldg;
+        const a = row.apt;
         const phones = getAllPhones(a);
         const emails = getAllEmails(a);
         const lastDate = (a.interactions && a.interactions.length > 0)
@@ -1248,14 +1310,14 @@ window.exportTableToCSV = () => {
         ].join(',');
     });
 
-    const bom = '\uFEFF'; // תמיכה בעברית באקסל
+    const bom = '\uFEFF';
     const csv = bom + headers.map(escape).join(',') + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `קהילה_${new Date().toLocaleDateString('he-IL').replace(/\//g,'-')}.csv`;
-    a.click();
+    const aDoc = document.createElement('a');
+    aDoc.href = url;
+    aDoc.download = `קהילה_${new Date().toLocaleDateString('he-IL').replace(/\//g,'-')}.csv`;
+    aDoc.click();
     URL.revokeObjectURL(url);
     showToast(`יוצאו ${arr.length} משפחות לאקסל`, 'success');
 };
