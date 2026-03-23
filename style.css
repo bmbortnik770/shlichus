@@ -251,3 +251,27 @@ body.theme-pastel {
     transform: translateX(0) translateY(0);
     opacity: 1;
 }
+/* מניעת חיתוך tooltips — sidebar צריך overflow-x גלוי */
+#sidebar { overflow-x: visible; }
+
+/* תיקון tooltip בקצוות — עמודה אחרונה בטבלה ופריטי בניין */
+.data-table td:last-child [data-tooltip]::after,
+.bldg-fam-item [data-tooltip]::after {
+    left: auto;
+    right: 50%;
+    transform: translateX(50%) translateY(10px);
+}
+.data-table td:last-child [data-tooltip]:hover::after,
+.bldg-fam-item [data-tooltip]:hover::after {
+    transform: translateX(50%) translateY(0);
+}
+
+/* תיקון ערכת Midnight — קנבן ופופאפ מפה */
+body.theme-midnight .kanban-col {
+    background: #0f172a;
+    border-color: #1e293b;
+}
+body.theme-midnight .hover-popup .mapboxgl-popup-content {
+    background: #0f172a;
+    border-color: #3b82f6;
+}

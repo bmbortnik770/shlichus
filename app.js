@@ -586,8 +586,18 @@ window.attemptCloseCrmModal = async () => {
     }
     isDirty=false; 
     isCreatingNew=false;
-    document.getElementById('clientModal').style.display='none'; 
-    if(currentBldg!==NO_ADDRESS_KEY && currentMainView==='map') openBuildingModal(); 
+
+    // שמירת ערכים לפני timeout — מניעת race condition
+    const savedBldg = currentBldg;
+    const savedView = currentMainView;
+
+    const modal = document.getElementById('clientModal');
+    modal.classList.add('closing');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        modal.classList.remove('closing');
+        if(savedBldg !== NO_ADDRESS_KEY && savedView === 'map') openBuildingModal();
+    }, 280);
 };
 window.formatPhone = (el) => { let v=el.value.replace(/\D/g,''); if(v.length>3&&v.length<=6) v=v.slice(0,3)+'-'+v.slice(3); else if(v.length>6) v=v.slice(0,3)+'-'+v.slice(3,6)+'-'+v.slice(6,10); el.value=v; };
 
