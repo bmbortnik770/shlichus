@@ -83,6 +83,7 @@
             <div class="main-tab" onclick="switchMainView('table')" id="tab-table"><i class="fas fa-list"></i> רשימה</div>
             <div class="main-tab" onclick="switchMainView('kanban')" id="tab-kanban"><i class="fas fa-project-diagram"></i> פרויקטים</div>
             <div class="main-tab" onclick="switchMainView('comm')" id="tab-comm"><i class="fas fa-bullhorn"></i> תקשורת</div>
+            <div class="main-tab" onclick="switchMainView('tasks')" id="tab-tasks"><i class="fas fa-check-double"></i> מרכז משימות</div>
         </div>
     </div>
 
@@ -211,6 +212,27 @@
 
             <div id="comm-logs" class="comm-tab-content"><h3 style="margin-top:0;">היסטוריית תקשורת</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
         </div>
+    </div>
+</div>
+
+<div id="tasks-container" style="display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; padding:20px 0 0 0; gap:15px;">
+    <div class="kanban-hub-header">
+        <h2 style="margin:0; color:var(--primary);"><i class="fas fa-check-double" style="color:var(--accent);"></i> מרכז משימות חכם</h2>
+    </div>
+    <div style="flex-grow:1; overflow-y:auto; padding:0 20px 80px 20px;">
+        <div style="background:var(--surface); padding:20px; border-radius:16px; box-shadow:var(--card-shadow); margin-bottom:20px; border:1px solid var(--border-light);">
+            <div style="display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
+                <div style="position:relative; flex:1; min-width:250px;">
+                    <input type="text" id="globalTaskInput" class="inline-input" placeholder="הקלד משימה חדשה... (השתמש ב-@ כדי לתייג משפחה)" style="font-size:16px; padding:14px; border-radius:12px;" autocomplete="off">
+                    <div id="mentionDropdown" style="display:none; position:absolute; top:100%; right:0; background:var(--surface); border:1px solid var(--border-light); border-radius:12px; box-shadow:var(--hover-shadow); z-index:1000; max-height:250px; overflow-y:auto; width:100%; margin-top:8px;"></div>
+                </div>
+                <input type="date" id="globalTaskDate" class="inline-input" style="width:auto; padding:14px; border-radius:12px;">
+                <button class="btn btn-primary" style="width:auto; padding:14px 30px; border-radius:12px; font-size:16px;" onclick="saveGlobalTask()"><i class="fas fa-plus"></i> הוסף משימה</button>
+            </div>
+            <div id="taskTagsContainer" style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; min-height:20px;"></div>
+        </div>
+        <h3 style="margin:0 0 15px 0; color:var(--text-main); font-size:18px;"><i class="fas fa-inbox" style="color:var(--text-muted);"></i> כל המשימות הפתוחות במערכת</h3>
+        <div id="globalTasksList"></div>
     </div>
 </div>
 
@@ -492,5 +514,42 @@
 </div>
 
 <script src="app.js?v=11"></script>
+<div id="smartViewBuilderModal" class="modal" style="z-index: 10001;">
+    <div class="modal-content modal-small">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="margin:0; color:var(--primary); font-size: 20px;"><i class="fas fa-magic" style="color:var(--accent); margin-left: 8px;"></i> יצירת תצוגה חכמה</h3>
+            <button class="btn-icon" onclick="document.getElementById('smartViewBuilderModal').style.display='none'" style="border:none; font-size:18px; background: transparent; box-shadow: none;"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="form-group">
+            <label>שם התצוגה (למשל: "בני מצווה השנה")</label>
+            <input type="text" id="svName" class="inline-input" placeholder="הקלד שם לטאב החדש...">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+            <div class="form-group">
+                <label>בחר סמל (אייקון)</label>
+                <select id="svIcon" class="inline-input">
+                    <option value="fa-star">⭐ כוכב</option>
+                    <option value="fa-birthday-cake">🎂 עוגה</option>
+                    <option value="fa-walking">🚶 הליכה (ביקור)</option>
+                    <option value="fa-phone">📞 טלפון</option>
+                    <option value="fa-tags">🏷️ תגיות</option>
+                    <option value="fa-bullseye">🎯 מטרה</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>סוג הכלל לסינון</label>
+                <select id="svRuleType" class="inline-input" onchange="updateSvRuleInput()">
+                    <option value="child_age">ילד בגיל מסוים (שנים)</option>
+                    <option value="no_visit_months">ללא ביקור בית (חודשים)</option>
+                    <option value="no_call_months">ללא שיחת טלפון (חודשים)</option>
+                    <option value="has_tag">מכילה תגית ספציפית</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group" id="svRuleValueContainer" style="background:var(--bg-body); padding:15px; border-radius:12px; border:1px solid var(--border-light);"></div>
+        <button class="btn btn-primary" style="font-size: 16px; padding: 12px; margin-top: 10px;" onclick="saveSmartView()"><i class="fas fa-save"></i> שמור תצוגה לטאב חדש</button>
+    </div>
+</div>
+
 </body>
 </html>

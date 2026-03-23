@@ -61,6 +61,15 @@ if(!appSettings.customFields) appSettings.customFields = [];
 if(!appSettings.visibleColumns) {
     appSettings.visibleColumns = ['address', 'name', 'boards', 'tags', 'lastContact', 'actions'];
 }
+if(!appSettings.smartViews) {
+    appSettings.smartViews = [
+        { id: 'v_all', name: 'כל המשפחות', icon: 'fa-users', rule: 'none' },
+        { id: 'v_novisit', name: 'דורש ביקור (מעל 3 חודשים)', icon: 'fa-walking', rule: 'no_visit_3m' },
+        { id: 'v_bday', name: 'ילדים חוגגים יום הולדת החודש', icon: 'fa-birthday-cake', rule: 'bday_month' }
+    ];
+}
+window.activeSmartView = 'v_all';
+window.customSmartSort = '';
 if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי', target: 30 };
 if(!appSettings.templates) {
     appSettings.templates = [
@@ -488,8 +497,13 @@ window.switchMainView = function(viewName) {
     document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
     document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
     document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
+    document.getElementById('tasks-container').style.display = viewName==='tasks'?'flex':'none';
     
     if(viewName==='map') map.resize();
+    if(viewName==='tasks') {
+        document.getElementById('globalTaskDate').value = new Date().toISOString().split('T')[0];
+        renderGlobalTasks();
+    }
     handleOmniSearch(); 
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
 };
@@ -932,7 +946,48 @@ window.handleOmniSearch = () => {
             });
         }
 
-        if(matchQ && matchStyle && matchTag && matchStat && matchMissing) res.push({bldg:b, idx:i, apt:a});
+        // לוגיקת Smart Views
+        let matchSmartView = true;
+        if(window.activeSmartView && window.activeSmartView !== 'v_all') {
+            const view = (appSettings.smartViews || []).find(v => v.id === window.activeSmartView);
+            if(view) {
+                if(view.rule === 'no_visit_3m') {
+                    const visits = (a.interactions || []).filter(i => i.type === 'ביקור').map(i => new Date(i.date));
+                    if(visits.length === 0) { matchSmartView = true; }
+                    else {
+                        const lastVisit = new Date(Math.max.apply(null, visits));
+                        matchSmartView = ((new Date() - lastVisit) / (1000 * 60 * 60 * 24 * 30)) > 3;
+                    }
+                }
+                else if(view.rule === 'bday_month') {
+                    const currentMonth = new Date().getMonth();
+                    matchSmartView = (a.childrenList || []).some(c => c.dob && new Date(c.dob).getMonth() === currentMonth);
+                }
+                else if(view.rule === 'child_age') {
+                    const targetAge = parseInt(view.value);
+                    const currentYear = new Date().getFullYear();
+                    matchSmartView = (a.childrenList || []).some(c => {
+                        if(!c.dob) return false;
+                        return (currentYear - new Date(c.dob).getFullYear()) === targetAge;
+                    });
+                }
+                else if(view.rule === 'no_visit_months' || view.rule === 'no_call_months') {
+                    const months = parseInt(view.value);
+                    const typeMap = view.rule === 'no_visit_months' ? 'ביקור' : 'שיחה';
+                    const logs = (a.interactions || []).filter(i => i.type === typeMap).map(i => new Date(i.date));
+                    if(logs.length === 0) matchSmartView = true;
+                    else {
+                        const lastDate = new Date(Math.max.apply(null, logs));
+                        matchSmartView = ((new Date() - lastDate) / (1000 * 60 * 60 * 24 * 30)) >= months;
+                    }
+                }
+                else if(view.rule === 'has_tag') {
+                    matchSmartView = (a.tags || []).includes(view.value);
+                }
+            }
+        }
+
+        if(matchQ && matchStyle && matchTag && matchStat && matchMissing && matchSmartView) res.push({bldg:b, idx:i, apt:a});
     });});
     
     window.currentFilteredData = res;
@@ -1339,6 +1394,60 @@ window.toggleColumnVisibility = (colId) => {
     renderListView(window.currentFilteredData);
 };
 
+window.applySmartView = (viewId) => {
+    window.activeSmartView = viewId;
+    handleOmniSearch();
+};
+
+window.applySmartSort = (sortType) => {
+    window.customSmartSort = sortType;
+    handleOmniSearch();
+};
+
+// ========== מנוע יצירת תצוגות חכמות ==========
+window.openSmartViewBuilder = () => {
+    document.getElementById('svName').value = '';
+    document.getElementById('smartViewBuilderModal').style.display = 'flex';
+    updateSvRuleInput();
+};
+
+window.updateSvRuleInput = () => {
+    const type = document.getElementById('svRuleType').value;
+    const container = document.getElementById('svRuleValueContainer');
+    if(type.includes('months')) {
+        container.innerHTML = '<label style="color:var(--primary); font-weight:bold;">כמה חודשים עברו?</label><input type="number" id="svRuleValue" class="inline-input" placeholder="למשל: 6" min="1">';
+    } else if(type === 'child_age') {
+        container.innerHTML = '<label style="color:var(--primary); font-weight:bold;">גיל הילד (בשנים)</label><input type="number" id="svRuleValue" class="inline-input" placeholder="למשל: 13 (לבר מצווה)" min="0">';
+    } else if(type === 'has_tag') {
+        container.innerHTML = `<label style="color:var(--primary); font-weight:bold;">בחר תגית מתוך הרשימה:</label><select id="svRuleValue" class="inline-input">${(appSettings.tags||[]).map(t=>`<option value="${escapeHTML(t)}">${escapeHTML(t)}</option>`).join('')}</select>`;
+    }
+};
+
+window.saveSmartView = () => {
+    const name = document.getElementById('svName').value.trim();
+    const icon = document.getElementById('svIcon').value;
+    const type = document.getElementById('svRuleType').value;
+    const valEl = document.getElementById('svRuleValue');
+    const val = valEl ? valEl.value : '';
+    if(!name || !val) return showToast('נא למלא את שם התצוגה ואת הערך לסינון', 'warning');
+
+    const newId = 'v_custom_' + Date.now();
+    appSettings.smartViews.push({ id: newId, name, icon, rule: type, value: val });
+    saveDB();
+    document.getElementById('smartViewBuilderModal').style.display = 'none';
+    showToast('תצוגה חכמה נוצרה בהצלחה!', 'success');
+    window.activeSmartView = newId;
+    handleOmniSearch(); // קודם מחשב נתונים, אחר כך renderListView נקרא מתוכו
+};
+
+window.deleteSmartView = (viewId) => {
+    appSettings.smartViews = appSettings.smartViews.filter(v => v.id !== viewId);
+    if(window.activeSmartView === viewId) window.activeSmartView = 'v_all';
+    saveDB();
+    handleOmniSearch();
+    showToast('התצוגה נמחקה', 'info');
+};
+
 window.renderListView = (filteredRes = null) => {
     const inner = document.getElementById('list-inner');
 
@@ -1396,11 +1505,38 @@ window.renderListView = (filteredRes = null) => {
         }
     });
 
-    let html = `<div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
+    // יצירת שורת ה-Smart Views
+    const smartViewsHtml = `
+        <div class="smart-views-bar">
+            ${(appSettings.smartViews || []).map(v => `
+                <div class="smart-view-tab ${window.activeSmartView === v.id ? 'active' : ''}" onclick="applySmartView('${v.id}')">
+                    <i class="fas ${escapeHTML(v.icon)}"></i> ${escapeHTML(v.name)}
+                    ${v.id.startsWith('v_custom_') ? `<i class="fas fa-times" style="margin-right:8px; opacity:0.5; transition:0.2s;" onmouseover="this.style.opacity=1;this.style.color='var(--danger)';" onmouseout="this.style.opacity=0.5;this.style.color='';" onclick="event.stopPropagation(); deleteSmartView('${v.id}')" title="מחק תצוגה"></i>` : ''}
+                </div>
+            `).join('')}
+            <div class="smart-view-tab" style="border-style: dashed; background: transparent;" onclick="openSmartViewBuilder()">
+                <i class="fas fa-plus"></i> צור כלל חדש
+            </div>
+        </div>
+    `;
+
+    // יצירת דרופדאון Smart Sort
+    const smartSortHtml = `
+        <select class="smart-sort-select" onchange="applySmartSort(this.value)">
+            <option value="">מיון רגיל (לפי עמודות)</option>
+            <option value="last_call" ${window.customSmartSort === 'last_call' ? 'selected' : ''}>מיין לפי: שיחה אחרונה</option>
+            <option value="last_visit" ${window.customSmartSort === 'last_visit' ? 'selected' : ''}>מיין לפי: ביקור בית אחרון</option>
+        </select>
+    `;
+
+    let html = `
+        ${smartViewsHtml}
+        <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-            <h2 style="margin:0;"><i class="fas fa-list"></i> רשימת משפחות</h2>
+            <h2 style="margin:0;"><i class="fas fa-list"></i> אינדקס קהילה</h2>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            ${smartSortHtml}
             ${columnsMenuHtml}
             <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
         </div>
@@ -1411,12 +1547,24 @@ window.renderListView = (filteredRes = null) => {
     let arr = filteredRes || [];
     if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts)db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
 
-    // מיון דינמי כולל שדות חדשים
-    if(window.tableSort.column) {
-        arr.sort((itemA, itemB) => {
+    // מיון משולב: מיון חכם בעדיפות, אחרת מיון לפי עמודה
+    arr.sort((itemA, itemB) => {
+        const a = itemA.apt, b = itemB.apt;
+
+        if(window.customSmartSort) {
+            const getLatestDate = (apt, type) => {
+                const logs = (apt.interactions || []).filter(i => i.type === type);
+                return logs.length > 0 ? new Date(Math.max(...logs.map(l => new Date(l.date)))) : new Date(0);
+            };
+            const typeMap = { 'last_call': 'שיחה', 'last_visit': 'ביקור' };
+            const dateA = getLatestDate(a, typeMap[window.customSmartSort]);
+            const dateB = getLatestDate(b, typeMap[window.customSmartSort]);
+            return dateB - dateA;
+        }
+
+        if(window.tableSort && window.tableSort.column) {
             let valA = '', valB = '';
             const col = window.tableSort.column;
-            const a = itemA.apt, b = itemB.apt;
 
             if(col === 'name') { valA = a.name || ''; valB = b.name || ''; }
             else if(col === 'address') { valA = itemA.bldg === NO_ADDRESS_KEY ? '' : itemA.bldg; valB = itemB.bldg === NO_ADDRESS_KEY ? '' : itemB.bldg; }
@@ -1435,9 +1583,9 @@ window.renderListView = (filteredRes = null) => {
 
             if(valA < valB) return window.tableSort.direction === 'asc' ? -1 : 1;
             if(valA > valB) return window.tableSort.direction === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }
+        }
+        return 0;
+    });
 
     arr.forEach(r => {
         const enc=encodeURIComponent(r.bldg), bName=r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg, a=r.apt;
@@ -2476,3 +2624,233 @@ setInterval(() => {
         syncWithDrive();
     }
 }, 30000);
+
+// ========== Smart Tasks & Mentions Engine ==========
+if(!db.meta.generalTasks) db.meta.generalTasks = [];
+window.currentTaskMentions = [];
+let mentionSearchIndex = 0;
+let gtInput = null; // יאותחל לאחר טעינת ה-DOM
+
+function initTasksEngine() {
+    gtInput = document.getElementById('globalTaskInput');
+    if(!gtInput) return;
+
+    gtInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        const words = val.split(' ');
+        const lastWord = words[words.length - 1];
+
+        if(lastWord.startsWith('@') && lastWord.length > 1) {
+            const query = lastWord.substring(1).toLowerCase();
+            renderMentionSuggestions(query);
+        } else {
+            document.getElementById('mentionDropdown').style.display = 'none';
+        }
+    });
+
+    gtInput.addEventListener('keydown', (e) => {
+        const dd = document.getElementById('mentionDropdown');
+        if(dd.style.display === 'block') {
+            const items = dd.querySelectorAll('.mention-item');
+            if(e.key === 'ArrowDown') { e.preventDefault(); mentionSearchIndex = Math.min(mentionSearchIndex + 1, items.length - 1); updateMentionSelection(items); }
+            if(e.key === 'ArrowUp') { e.preventDefault(); mentionSearchIndex = Math.max(mentionSearchIndex - 1, 0); updateMentionSelection(items); }
+            if(e.key === 'Enter' && items[mentionSearchIndex]) { e.preventDefault(); items[mentionSearchIndex].click(); }
+        }
+    });
+}
+
+// קריאה לאתחול לאחר switchMainView (הטאסק קונטיינר רק אז מרונדר)
+const _origSwitchMainView = window.switchMainView;
+window.switchMainView = function(viewName) {
+    _origSwitchMainView(viewName);
+    if(viewName === 'tasks') initTasksEngine();
+};
+
+function renderMentionSuggestions(query) {
+    const dd = document.getElementById('mentionDropdown');
+    if(!dd) return;
+
+    // זיהוי מצב חיפוש ילדים: המשתמש הקליד "ילד ..." או "ילד:"
+    const childMode = query.startsWith('ילד');
+    const childQuery = childMode ? query.replace(/^ילד[:\s]*/, '').trim() : '';
+
+    let results = [];
+    Object.keys(db).forEach(b => {
+        if(b==='__BOARDS__' || b==='__SETTINGS__' || b==='meta') return;
+        if(!db[b] || !db[b].apts) return;
+        db[b].apts.forEach((a, i) => {
+            if(childMode) {
+                // חיפוש בילדים בלבד
+                (a.childrenList || []).forEach((c, ci) => {
+                    if(c.name && c.name.toLowerCase().includes(childQuery)) {
+                        results.push({ bldg: b, idx: i, name: a.name, matchName: c.name, role: 'ילד', icon: 'fa-child' });
+                    }
+                });
+            } else {
+                // ברירת מחדל: שם משפחה, שם אב, שם אם
+                const familyMatch = a.name && a.name.toLowerCase().includes(query);
+                const fatherMatch = a.father && a.father.toLowerCase().includes(query);
+                const motherMatch = a.mother && a.mother.toLowerCase().includes(query);
+                if(familyMatch) {
+                    results.push({ bldg: b, idx: i, name: a.name, matchName: a.name, role: 'משפחה', icon: 'fa-users' });
+                } else if(fatherMatch) {
+                    results.push({ bldg: b, idx: i, name: a.name, matchName: a.father, role: 'אב', icon: 'fa-user' });
+                } else if(motherMatch) {
+                    results.push({ bldg: b, idx: i, name: a.name, matchName: a.mother, role: 'אם', icon: 'fa-user' });
+                }
+            }
+        });
+    });
+
+    if(results.length > 0) {
+        dd.innerHTML = results.slice(0, 10).map((r, i) => `
+            <div class="mention-item ${i===0?'active':''}" onclick="addMention('${encodeURIComponent(r.bldg)}', ${r.idx}, '${escapeHTML(r.name)}')">
+                <span><i class="fas ${r.icon}" style="color:var(--text-muted); margin-left:8px;"></i>
+                    ${r.matchName !== r.name ? `<span style="opacity:0.6; font-size:12px;">(${escapeHTML(r.role)})</span> ${escapeHTML(r.matchName)} — ` : ''}
+                    משפחת ${escapeHTML(r.name)}
+                </span>
+                <span class="cp-hint">${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':escapeHTML(r.bldg)}</span>
+            </div>
+        `).join('');
+        dd.style.display = 'block';
+        mentionSearchIndex = 0;
+    } else {
+        dd.style.display = 'none';
+    }
+}
+
+function updateMentionSelection(items) {
+    items.forEach(el => el.classList.remove('active'));
+    if(items[mentionSearchIndex]) {
+        items[mentionSearchIndex].classList.add('active');
+        items[mentionSearchIndex].scrollIntoView({ block: 'nearest' });
+    }
+}
+
+window.addMention = (bEnc, idx, name) => {
+    const bldg = decodeURIComponent(bEnc);
+    if(!window.currentTaskMentions.find(m => m.bldg === bldg && m.idx === idx)) {
+        window.currentTaskMentions.push({ bldg, idx, name });
+    }
+    if(gtInput) {
+        const words = gtInput.value.split(' ');
+        words.pop();
+        gtInput.value = words.join(' ') + (words.length > 0 ? ' ' : '');
+        gtInput.focus();
+    }
+    const dd = document.getElementById('mentionDropdown');
+    if(dd) dd.style.display = 'none';
+    renderTaskTags();
+};
+
+function renderTaskTags() {
+    const c = document.getElementById('taskTagsContainer');
+    if(!c) return;
+    c.innerHTML = window.currentTaskMentions.map((m, i) => `
+        <span class="task-tag"><i class="fas fa-user-check"></i> עבור ${escapeHTML(m.name)} <i class="fas fa-times" onclick="window.currentTaskMentions.splice(${i},1); renderTaskTags();" title="הסר שיוך"></i></span>
+    `).join('');
+}
+
+window.saveGlobalTask = () => {
+    if(!gtInput) gtInput = document.getElementById('globalTaskInput');
+    const text = gtInput ? gtInput.value.trim() : '';
+    const dateEl = document.getElementById('globalTaskDate');
+    const date = dateEl ? dateEl.value : '';
+    if(!text) return showToast('נא להזין את תוכן המשימה קודם', 'warning');
+
+    const taskObj = { text, date, done: false };
+
+    if(window.currentTaskMentions.length > 0) {
+        window.currentTaskMentions.forEach(m => {
+            if(!db[m.bldg].apts[m.idx].tasks) db[m.bldg].apts[m.idx].tasks = [];
+            db[m.bldg].apts[m.idx].tasks.push({...taskObj});
+        });
+        showToast(`המשימה פוצלה ונוספה ל-${window.currentTaskMentions.length} כרטיסי משפחה!`, 'success');
+    } else {
+        if(!db.meta.generalTasks) db.meta.generalTasks = [];
+        db.meta.generalTasks.push(taskObj);
+        showToast('המשימה נשמרה כמשימה כללית ללא שיוך.', 'success');
+    }
+
+    if(gtInput) gtInput.value = '';
+    window.currentTaskMentions = [];
+    renderTaskTags();
+    saveDB();
+    renderGlobalTasks();
+};
+
+window.renderGlobalTasks = () => {
+    const c = document.getElementById('globalTasksList');
+    if(!c) return;
+
+    let allTasks = [];
+
+    (db.meta.generalTasks || []).forEach((t, i) => {
+        if(!t.done) allTasks.push({ ...t, isGeneral: true, idx: i });
+    });
+
+    Object.keys(db).forEach(b => {
+        if(b==='__BOARDS__' || b==='__SETTINGS__' || b==='meta') return;
+        if(!db[b] || !db[b].apts) return;
+        db[b].apts.forEach((a, i) => {
+            (a.tasks || []).forEach((t, tIdx) => {
+                if(!t.done) allTasks.push({ ...t, isGeneral: false, bldg: b, aptIdx: i, taskIdx: tIdx, familyName: a.name });
+            });
+        });
+    });
+
+    allTasks.sort((x, y) => new Date(x.date || '2099-01-01') - new Date(y.date || '2099-01-01'));
+
+    if(allTasks.length === 0) {
+        c.innerHTML = '<div class="empty-state modern-empty"><i class="fas fa-glass-cheers" style="font-size:45px;"></i><h4>אין משימות פתוחות!</h4><p>איזה אלוף! הכל נקי ומסודר.</p></div>';
+        return;
+    }
+
+    c.innerHTML = allTasks.map(t => {
+        let clickFn = t.isGeneral
+            ? `completeGlobalTask(true, null, null, ${t.idx}, this)`
+            : `completeGlobalTask(false, '${encodeURIComponent(t.bldg)}', ${t.aptIdx}, ${t.taskIdx}, this)`;
+
+        let badge = t.isGeneral
+            ? `<span class="tag-badge" style="background:var(--border-light); color:var(--text-muted); cursor:default;"><i class="fas fa-globe"></i> משימה כללית</span>`
+            : `<span class="tag-badge" style="cursor:pointer;" onclick="currentBldg='${t.bldg}'; openClientCard(${t.aptIdx})"><i class="fas fa-user-circle"></i> ${escapeHTML(t.familyName)} (פתח כרטיס)</span>`;
+
+        let isPastDue = t.date && new Date(t.date) < new Date(new Date().setHours(0,0,0,0));
+        let dateColor = isPastDue ? 'var(--danger)' : 'var(--text-muted)';
+
+        return `
+        <div class="global-task-row">
+            <div style="display:flex; align-items:flex-start; gap:15px; flex:1;">
+                <button class="btn-icon" style="background:transparent; border:2px solid var(--border-light); color:transparent; padding:8px 12px; transition:0.2s;" onmouseover="this.style.color='var(--success)';this.style.borderColor='var(--success)';" onmouseout="this.style.color='transparent';this.style.borderColor='var(--border-light)';" onclick="${clickFn}" title="סמן כמבוצע"><i class="fas fa-check"></i></button>
+                <div>
+                    <div style="font-weight:700; font-size:16px; margin-bottom:6px; color:var(--text-main);">${escapeHTML(t.text)}</div>
+                    <div style="display:flex; gap:10px; align-items:center; font-size:13px; flex-wrap:wrap;">
+                        ${badge}
+                        <span style="color:${dateColor}; font-weight:${isPastDue?'bold':'normal'};"><i class="far fa-calendar-alt"></i> ${t.date || 'ללא תאריך יעד'} ${isPastDue?'(באיחור)':''}</span>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+};
+
+window.completeGlobalTask = (isGeneral, bEnc, aptIdx, tIdx, btnEl) => {
+    if(btnEl) {
+        btnEl.disabled = true;
+        btnEl.closest('.global-task-row').classList.add('task-done-anim');
+        btnEl.style.color = 'var(--success)';
+        btnEl.style.background = 'rgba(16,185,129,0.1)';
+        btnEl.style.borderColor = 'var(--success)';
+    }
+    setTimeout(() => {
+        if(isGeneral) {
+            db.meta.generalTasks[tIdx].done = true;
+        } else {
+            const bldg = decodeURIComponent(bEnc);
+            db[bldg].apts[aptIdx].tasks[tIdx].done = true;
+        }
+        saveDB();
+        showToast('המשימה הושלמה וירדה מהדאשבורד!', 'success');
+        renderGlobalTasks();
+    }, 500);
+};
