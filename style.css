@@ -203,118 +203,12 @@ body { margin:0; padding:0; font-family:'Assistant',sans-serif; display:flex; he
 }
 
 .mapboxgl-ctrl-geocoder { position: relative; z-index: 10000; }
-
-/* =========================================
-   Theme Engine + Transitions
-   ========================================= */
-
-body.theme-midnight { 
-    --primary:#020617; --secondary:#0f172a; --bg-body:#000000; 
-    --surface:#0f172a; --text-main:#e2e8f0; --text-muted:#94a3b8; 
-    --border-light:#1e293b; --table-hover:#0f172a;
-    --card-shadow:0 4px 20px rgba(255,255,255,0.02);
-    --hover-shadow:0 10px 25px rgba(255,255,255,0.04);
-}
-body.theme-pastel { 
-    --primary:#475569; --bg-body:#f8fafc; --surface:#ffffff; 
-    --border-light:#f1f5f9; --card-shadow:0 10px 40px -10px rgba(139,92,246,0.12);
-    --hover-shadow:0 15px 40px -10px rgba(139,92,246,0.2);
-}
-
-/* Smooth Page Transitions */
-.view-section { animation: viewFadeIn 0.35s cubic-bezier(0.16,1,0.3,1) both; }
-@keyframes viewFadeIn {
-    from { opacity:0; transform:translateY(12px); }
-    to   { opacity:1; transform:translateY(0);    }
-}
-
-/* Custom Smart Tooltips */
-[data-tooltip] { position:relative; }
-[data-tooltip]::after {
-    content:attr(data-tooltip); position:absolute; bottom:120%; left:50%;
-    transform:translateX(-50%) translateY(8px); opacity:0; pointer-events:none;
-    background:var(--primary); color:#fff; padding:5px 11px; border-radius:8px;
-    font-size:12px; font-family:'Assistant'; white-space:nowrap;
-    transition:all 0.2s cubic-bezier(0.16,1,0.3,1); z-index:10000;
-    box-shadow:0 4px 10px rgba(0,0,0,0.2); font-weight:600;
-}
-[data-tooltip]:hover::after { transform:translateX(-50%) translateY(0); opacity:1; }
-
-/* תיקון tooltip לכפתור FAB — מופיע שמאלה ולא מחוץ למסך */
-.fab-add[data-tooltip]::after {
-    left: auto;
-    right: 0;
-    transform: translateX(0) translateY(8px);
-    bottom: 120%;
-}
-.fab-add[data-tooltip]:hover::after {
-    transform: translateX(0) translateY(0);
-    opacity: 1;
-}
-/* מניעת חיתוך tooltips — sidebar צריך overflow-x גלוי */
-#sidebar { overflow-x: visible; }
-
-/* תיקון tooltip בקצוות — עמודה אחרונה בטבלה ופריטי בניין */
-.data-table td:last-child [data-tooltip]::after,
-.bldg-fam-item [data-tooltip]::after {
-    left: auto;
-    right: 50%;
-    transform: translateX(50%) translateY(10px);
-}
-.data-table td:last-child [data-tooltip]:hover::after,
-.bldg-fam-item [data-tooltip]:hover::after {
-    transform: translateX(50%) translateY(0);
-}
-
-/* תיקון ערכת Midnight — קנבן ופופאפ מפה */
-body.theme-midnight .kanban-col {
-    background: #0f172a;
-    border-color: #1e293b;
-}
-body.theme-midnight .hover-popup .mapboxgl-popup-content {
-    background: #0f172a;
-    border-color: #3b82f6;
-}
-
-/* ========== Command Palette ========== */
-#commandPalette {
-    width:650px; max-width:95%; background:var(--surface);
-    border-radius:16px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);
-    overflow:hidden; border:1px solid var(--border-light);
-    transform:scale(0.97) translateY(-10px); opacity:0;
-    transition:all 0.2s cubic-bezier(0.16,1,0.3,1);
-}
-#commandPalette.open { transform:scale(1) translateY(0); opacity:1; }
-#cpInputWrapper {
-    padding:18px 25px; border-bottom:1px solid var(--border-light);
-    display:flex; align-items:center; gap:15px; background:var(--bg-body);
-}
-#cpInput {
-    border:none; background:transparent; font-size:20px; outline:none;
-    color:var(--text-main); width:100%; font-family:'Assistant'; font-weight:600;
-}
-#cpResults { max-height:420px; overflow-y:auto; padding:8px; }
-.cp-item {
-    padding:11px 15px; border-radius:10px; cursor:pointer;
-    display:flex; align-items:center; gap:12px;
-    color:var(--text-main); font-size:15px; font-weight:600;
-    transition:background 0.1s; margin-bottom:2px;
-}
-.cp-item.selected, .cp-item:hover { background:var(--accent); color:#fff; }
-.cp-item.selected .cp-hint, .cp-item:hover .cp-hint { color:rgba(255,255,255,0.75); }
-.cp-item.selected i, .cp-item:hover i { color:#fff !important; }
-.cp-hint { margin-right:auto; font-size:12px; color:var(--text-muted); font-weight:normal; white-space:nowrap; }
-.cp-group-title {
-    font-size:11px; font-weight:700; color:var(--text-muted);
-    padding:12px 15px 6px; text-transform:uppercase; letter-spacing:0.8px;
-}
-
 /* ========== Filter Chips ========== */
-.filter-chips-wrapper { display:flex; gap:15px; overflow-x:auto; padding:5px 0; flex:3; align-items:center; scrollbar-width:none; }
+.filter-chips-wrapper { display:flex; gap:12px; overflow-x:auto; padding:3px 0; flex:3; align-items:center; scrollbar-width:none; }
 .filter-chips-wrapper::-webkit-scrollbar { display:none; }
-.chip-group { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+.chip-group { display:flex; gap:7px; align-items:center; flex-shrink:0; }
 .chip-group-title { font-size:12px; font-weight:700; color:var(--text-muted); white-space:nowrap; }
-.filter-chip { padding:6px 13px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; transition:0.2s; border:1.5px solid var(--border-light); background:var(--surface); color:var(--text-main); white-space:nowrap; user-select:none; box-shadow:var(--card-shadow); }
+.filter-chip { padding:5px 12px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s; border:1.5px solid var(--border-light); background:var(--surface); color:var(--text-main); white-space:nowrap; user-select:none; }
 .filter-chip:hover { border-color:var(--chip-color, var(--accent)); color:var(--chip-color, var(--accent)); transform:translateY(-1px); }
-.filter-chip.active { background:var(--chip-color, var(--accent)); color:white; border-color:var(--chip-color, var(--accent)); box-shadow:0 4px 10px rgba(0,0,0,0.15); }
-.chip-divider { width:1px; height:24px; background:var(--border-light); flex-shrink:0; }
+.filter-chip.active { background:var(--chip-color, var(--accent)); color:#fff; border-color:var(--chip-color, var(--accent)); box-shadow:0 3px 8px rgba(0,0,0,0.15); }
+.chip-divider { width:1px; height:22px; background:var(--border-light); flex-shrink:0; }

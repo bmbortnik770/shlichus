@@ -90,9 +90,13 @@
         <div class="search-wrapper">
             <i class="fas fa-search"></i>
             <input type="text" id="smartSearch" placeholder="חיפוש מהיר (שם, טלפון, רחוב)..." autocomplete="off">
-            <div class="btn-icon" style="font-size:12px; padding:4px 8px; background:var(--bg-body); box-shadow:none; cursor:pointer; white-space:nowrap;" onclick="openCommandPalette()" title="פתח חיפוש חכם">⌘K</div>
             <div id="searchDropdown"></div>
         </div>
+        <!-- dropdowns נשארים ברקע לתאימות עם הלוגיקה הקיימת -->
+        <select id="fStyle" style="display:none" onchange="applyAdvFilters()"><option value="">כל הסגנונות</option></select>
+        <select id="fTag" style="display:none" onchange="applyAdvFilters()"><option value="">כל התגיות</option></select>
+        <select id="fStatus" style="display:none" onchange="applyAdvFilters()"><option value="">כל הסטטוסים</option><option value="green">קשר טרי (ירוק)</option><option value="orange">קשר בינוני (כתום)</option><option value="red">לטיפול (אדום/אפור)</option></select>
+        <!-- צ'יפים ויזואליים — מגדירים את ה-dropdowns ומפעילים applyAdvFilters -->
         <div id="chipFiltersContainer" class="filter-chips-wrapper"></div>
     </div>
 
@@ -104,8 +108,8 @@
                 <option value="style">צבע: לפי סגנון</option>
                 <option value="tag">צבע: לפי תגית</option>
             </select>
-            <button class="map-ctrl-btn" onclick="toggleMapStyle()" data-tooltip="החלף תצוגת לוויין/רחוב"><i class="fas fa-layer-group"></i></button>
-            <button class="map-ctrl-btn" id="btnGoHome" onclick="flyToHome()" data-tooltip="חזור למיקום המרכזי" style="display:none; color:var(--accent); margin-top:8px;"><i class="fas fa-home" id="homeIconBtn"></i></button>
+            <button class="map-ctrl-btn" onclick="toggleMapStyle()" title="החלף תצוגת לוויין/רחוב"><i class="fas fa-layer-group"></i></button>
+            <button class="map-ctrl-btn" id="btnGoHome" onclick="flyToHome()" title="חזור למיקום המרכזי" style="display:none; color:var(--accent); margin-top:8px;"><i class="fas fa-home" id="homeIconBtn"></i></button>
         </div>
     </div>
     
@@ -442,14 +446,6 @@
                 <div class="form-group"><label>צבע נושא</label><input type="color" id="setThemeColor" style="height:40px; padding:2px;" onchange="updateThemePreview()"></div>
                 <div class="form-group"><label>מסך פתיחה</label><select id="setDefaultView"><option value="map">מפה</option><option value="table">טבלה</option><option value="kanban">פרויקטים</option></select></div>
             </div>
-            <div class="form-group" style="margin-top:10px;">
-                <label>ערכת נושא (Vibe)</label>
-                <select id="setThemeVibe" style="font-size:14px;">
-                    <option value="light">☀️ סטנדרטי ובהיר (Default)</option>
-                    <option value="pastel">🌸 פסטל רך (Pastel)</option>
-                    <option value="midnight">🌙 כהה עמוק (Midnight)</option>
-                </select>
-            </div>
         </div>
 
         <details style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
@@ -496,16 +492,5 @@
 </div>
 
 <script src="app.js?v=11"></script>
-<div id="commandPaletteOverlay" onclick="if(event.target===this) closeCommandPalette()" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:999999; align-items:flex-start; justify-content:center; padding-top:12vh;">
-    <div id="commandPalette">
-        <div id="cpInputWrapper">
-            <i class="fas fa-search" style="font-size:20px; color:var(--text-muted); flex-shrink:0;"></i>
-            <input type="text" id="cpInput" placeholder="חפש משפחה, פעולה... (נסה 'אקסל' או 'כהה')" autocomplete="off">
-            <span style="font-size:12px; background:var(--surface); padding:4px 8px; border-radius:6px; color:var(--text-muted); border:1px solid var(--border-light); font-weight:bold; flex-shrink:0;">Esc</span>
-        </div>
-        <div id="cpResults"></div>
-    </div>
-</div>
-
 </body>
 </html>
