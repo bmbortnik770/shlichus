@@ -2771,6 +2771,17 @@ window.addMention = (bEnc, idx, name) => {
     renderTaskTags();
 };
 
+// סגירת דרופדאון התיוגים (@) אם לוחצים מחוץ לאזור
+document.addEventListener('click', (e) => {
+    const mentionDd = document.getElementById('mentionDropdown');
+    if (mentionDd && mentionDd.style.display === 'block') {
+        const taskInput = document.getElementById('globalTaskInput');
+        if (e.target !== taskInput && !mentionDd.contains(e.target)) {
+            mentionDd.style.display = 'none';
+        }
+    }
+});
+
 function renderTaskTags() {
     const c = document.getElementById('taskTagsContainer');
     if(!c) return;
