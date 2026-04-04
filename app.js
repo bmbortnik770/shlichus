@@ -209,6 +209,20 @@ window.confirmPrimaryChange = () => {
     showToast('כתובת בית חב"ד עודכנה ונשמרה!', 'success');
 };
 
+window.handleGoogleLogin = function() {
+    try {
+        const client = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: handleAuth
+        });
+        client.requestAccessToken();
+    } catch(e) {
+        console.error('Google login error:', e);
+        alert('שגיאה בהתחברות: ' + e.message);
+    }
+};
+
 window.onload = () => {
     let lastLogin = localStorage.getItem('last_login_date');
     let todayStr = new Date().toISOString().split('T')[0];
@@ -252,8 +266,7 @@ window.onload = () => {
     if (session && session.token && session.expiresAt > new Date().getTime()) {
         accessToken = session.token; document.getElementById('auth-overlay').style.display='none'; document.getElementById('splash-screen').style.display='flex'; syncWithDrive();
     } else {
-        window.gClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleAuth });
-        document.getElementById('google-btn').innerHTML = `<button class="btn btn-primary" style="padding:12px 20px; font-size:16px;" onclick="window.gClient.requestAccessToken()"><i class="fab fa-google"></i> התחבר לענן</button>`;
+        document.getElementById('google-btn').innerHTML = `<button class="btn btn-primary" style="padding:12px 20px; font-size:16px;" onclick="handleGoogleLogin()"><i class="fab fa-google"></i> התחבר לענן</button>`;
         setTimeout(() => { document.getElementById('splash-screen').style.opacity='0'; setTimeout(()=>{document.getElementById('splash-screen').style.display='none'; document.getElementById('auth-overlay').style.display='flex';}, 800); }, 1500);
     }
 };
