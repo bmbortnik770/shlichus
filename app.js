@@ -252,9 +252,21 @@ window.onload = () => {
     if (session && session.token && session.expiresAt > new Date().getTime()) {
         accessToken = session.token; document.getElementById('auth-overlay').style.display='none'; document.getElementById('splash-screen').style.display='flex'; syncWithDrive();
     } else {
-        window.gClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleAuth });
-        document.getElementById('google-btn').innerHTML = `<button class="btn btn-primary" style="padding:12px 20px; font-size:16px;" onclick="window.gClient.requestAccessToken()"><i class="fab fa-google"></i> התחבר לענן</button>`;
-        setTimeout(() => { document.getElementById('splash-screen').style.opacity='0'; setTimeout(()=>{document.getElementById('splash-screen').style.display='none'; document.getElementById('auth-overlay').style.display='flex';}, 800); }, 1500);
+        function initGoogleAuth() {
+            window.gClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleAuth });
+            document.getElementById('google-btn').innerHTML = `<button class="btn btn-primary" style="padding:12px 20px; font-size:16px;" onclick="window.gClient.requestAccessToken()"><i class="fab fa-google"></i> התחבר לענן</button>`;
+        }
+        function showAuthOverlay() {
+            document.getElementById('splash-screen').style.opacity='0';
+            setTimeout(()=>{ document.getElementById('splash-screen').style.display='none'; document.getElementById('auth-overlay').style.display='flex'; }, 800);
+        }
+        // בטלפון GSI נטען async — ממתינים לו אם צריך
+        if (typeof google !== 'undefined' && google.accounts) {
+            initGoogleAuth();
+        } else {
+            window.addEventListener('load', initGoogleAuth);
+        }
+        setTimeout(showAuthOverlay, 1500);
     }
 };
 
