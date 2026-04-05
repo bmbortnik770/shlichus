@@ -211,12 +211,12 @@ window.confirmPrimaryChange = () => {
 
 window.handleGoogleLogin = function() {
     try {
-        const client = google.accounts.oauth2.initTokenClient({
+        window.gClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
             callback: handleAuth
         });
-        client.requestAccessToken();
+        window.gClient.requestAccessToken({ scope: SCOPES, prompt: 'consent' });
     } catch(e) {
         console.error('Google login error:', e);
         alert('שגיאה בהתחברות: ' + e.message);
@@ -315,7 +315,20 @@ window.logout = async function() {
 };
 async function ensureAuthAndExecute(cb) {
     const session = JSON.parse(localStorage.getItem('gdrive_session'));
-    if (!session || session.expiresAt < new Date().getTime() + 60000) { showToast("מחדש חיבור...", "warning"); window.gClient.callback = (r)=>{ handleAuth(r); setTimeout(cb, 1000); }; window.gClient.requestAccessToken({prompt: '', scope: SCOPES}); } else { cb(); }
+    if (!session || session.expiresAt < new Date().getTime() + 60000) {
+        showToast("מחדש חיבור...", "warning");
+        if (!window.gClient) {
+            window.gClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: handleAuth
+            });
+        }
+        window.gClient.callback = (r)=>{ handleAuth(r); setTimeout(cb, 1000); };
+        window.gClient.requestAccessToken({ scope: SCOPES, prompt: '' });
+    } else {
+        cb();
+    }
 }
 
 async function geocodeMissingAddresses() {
