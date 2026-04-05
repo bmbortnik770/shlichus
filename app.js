@@ -216,7 +216,7 @@ window.handleGoogleLogin = function() {
             scope: SCOPES,
             callback: handleAuth
         });
-        window.gClient.requestAccessToken({ scope: SCOPES, prompt: 'consent' });
+        window.gClient.requestAccessToken({ prompt: 'consent' });
     } catch(e) {
         console.error('Google login error:', e);
         alert('שגיאה בהתחברות: ' + e.message);
@@ -325,7 +325,7 @@ async function ensureAuthAndExecute(cb) {
             });
         }
         window.gClient.callback = (r)=>{ handleAuth(r); setTimeout(cb, 1000); };
-        window.gClient.requestAccessToken({ scope: SCOPES, prompt: '' });
+        window.gClient.requestAccessToken({ prompt: 'consent' });
     } else {
         cb();
     }
