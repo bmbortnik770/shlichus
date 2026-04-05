@@ -216,7 +216,7 @@ window.handleGoogleLogin = function() {
             scope: SCOPES,
             callback: handleAuth
         });
-        window.gClient.requestAccessToken({ scope: SCOPES, prompt: 'consent' });
+        window.gClient.requestAccessToken({ prompt: 'consent' });
     } catch(e) {
         console.error('Google login error:', e);
         alert('שגיאה בהתחברות: ' + e.message);
@@ -263,20 +263,8 @@ window.onload = () => {
     document.getElementById('smartSearch').addEventListener('input', debounce(handleOmniSearch));
 
     const session = JSON.parse(localStorage.getItem('gdrive_session'));
-    const offlineMode = localStorage.getItem('offline_mode') === 'true';
     if (session && session.token && session.expiresAt > new Date().getTime()) {
         accessToken = session.token; document.getElementById('auth-overlay').style.display='none'; document.getElementById('splash-screen').style.display='flex'; syncWithDrive();
-    } else if (offlineMode) {
-        document.getElementById('auth-overlay').style.display='none';
-        document.getElementById('splash-screen').style.opacity='0';
-        setTimeout(() => { document.getElementById('splash-screen').style.display='none'; }, 800);
-        const syncIcon = document.getElementById('sync-icon');
-        const syncText = document.getElementById('sync-text');
-        if(syncIcon) syncIcon.className = 'fas fa-exclamation-triangle';
-        if(syncText) syncText.innerText = 'מצב מקומי בלבד';
-        const syncStatus = document.getElementById('sync-status');
-        if(syncStatus) syncStatus.style.color = 'var(--warning)';
-        refreshMap(); updateKPIs(); updateHomeButton(); geocodeMissingAddresses();
     } else {
         document.getElementById('google-btn').innerHTML = `<button class="btn btn-primary" style="padding:12px 20px; font-size:16px;" onclick="handleGoogleLogin()"><i class="fab fa-google"></i> התחבר לענן</button>`;
         setTimeout(() => { document.getElementById('splash-screen').style.opacity='0'; setTimeout(()=>{document.getElementById('splash-screen').style.display='none'; document.getElementById('auth-overlay').style.display='flex';}, 800); }, 1500);
@@ -321,35 +309,9 @@ function handleAuth(resp) {
     document.getElementById('auth-overlay').style.opacity='0'; document.getElementById('splash-screen').style.display='flex'; document.getElementById('splash-screen').style.opacity='1';
     setTimeout(() => { document.getElementById('auth-overlay').style.display='none'; syncWithDrive(); }, 500);
 }
-window.continueWithoutLogin = function() {
-    localStorage.setItem('offline_mode', 'true');
-    document.getElementById('auth-overlay').style.opacity = '0';
-    document.getElementById('splash-screen').style.display = 'flex';
-    document.getElementById('splash-screen').style.opacity = '1';
-    setTimeout(() => {
-        document.getElementById('auth-overlay').style.display = 'none';
-        document.getElementById('splash-screen').innerHTML = '<i class="fas fa-globe-americas pulse-logo"></i><h2 style="margin:0;font-size:28px;">מערכת ניהול קהילה</h2><p style="color:#94a3b8;margin-top:10px;"><i class="fas fa-spinner fa-spin"></i> טוען נתונים מקומיים...</p>';
-        setTimeout(() => {
-            document.getElementById('splash-screen').style.opacity = '0';
-            setTimeout(() => { document.getElementById('splash-screen').style.display = 'none'; }, 500);
-            const syncIcon = document.getElementById('sync-icon');
-            const syncText = document.getElementById('sync-text');
-            if(syncIcon) syncIcon.className = 'fas fa-exclamation-triangle';
-            if(syncText) syncText.innerText = 'מצב מקומי בלבד';
-            const syncStatus = document.getElementById('sync-status');
-            if(syncStatus) syncStatus.style.color = 'var(--warning)';
-            refreshMap();
-            updateKPIs();
-            updateHomeButton();
-            geocodeMissingAddresses();
-            showToast('פועל במצב מקומי — הנתונים נשמרים רק במכשיר זה', 'warning');
-        }, 1200);
-    }, 400);
-};
-
 window.logout = async function() { 
     const proceed = await showCustomDialog({ title: 'התנתקות', message: 'האם אתה בטוח שברצונך להתנתק מהחשבון?', showCancel: true });
-    if(proceed) { localStorage.removeItem('gdrive_session'); localStorage.removeItem('offline_mode'); location.reload(); } 
+    if(proceed) { localStorage.removeItem('gdrive_session'); location.reload(); } 
 };
 async function ensureAuthAndExecute(cb) {
     const session = JSON.parse(localStorage.getItem('gdrive_session'));
@@ -363,7 +325,7 @@ async function ensureAuthAndExecute(cb) {
             });
         }
         window.gClient.callback = (r)=>{ handleAuth(r); setTimeout(cb, 1000); };
-        window.gClient.requestAccessToken({ scope: SCOPES, prompt: '' });
+        window.gClient.requestAccessToken({ prompt: 'consent' });
     } else {
         cb();
     }
