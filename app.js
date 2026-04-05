@@ -211,6 +211,7 @@ window.confirmPrimaryChange = () => {
 
 window.handleGoogleLogin = function() {
     try {
+        alert('SCOPE: ' + SCOPES + '\nGoogle loaded: ' + (typeof google !== 'undefined'));
         const client = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
@@ -219,7 +220,7 @@ window.handleGoogleLogin = function() {
         client.requestAccessToken();
     } catch(e) {
         console.error('Google login error:', e);
-        alert('שגיאה בהתחברות: ' + e.message);
+        alert('שגיאה: ' + e.message);
     }
 };
 
