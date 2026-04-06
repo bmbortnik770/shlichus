@@ -1,579 +1,169 @@
-/* ===================================================
-   mobile.css — שיפורי מובייל למערכת ניהול קהילה
-   הוסף את הקובץ הזה אחרי style.css ב-index.html:
-   <link rel="stylesheet" href="mobile.css">
-   =================================================== */
+/* =============================================================
+   mobile.css — שיפורי מובייל — אדיטיבי בלבד, לא שובר כלום
+   ============================================================= */
 
-/* ── טיפוגרפיה ובסיס ── */
-@media (max-width: 768px) {
-  * {
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  body {
-    font-size: 15px;
-  }
-
-  /* ── כותרת עליונה למובייל ── */
-  .mobile-header {
-    padding: 14px 18px;
-    height: 58px;
-    box-sizing: border-box;
-    position: sticky;
-    top: 0;
-    z-index: 1001;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
-  }
-
-  .mobile-header h3 {
-    font-size: 17px;
-    letter-spacing: 0.3px;
-  }
-
-  .mobile-header button {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.15) !important;
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* ── תפריט צד ── */
-  #sidebar {
-    right: -100vw !important;
-    width: 88vw !important;
-    min-width: unset !important;
-    max-width: 360px;
-    padding: 18px 15px;
-    gap: 12px;
-    height: 100dvh;
-    border-radius: 0 !important;
-  }
-
-  #sidebar.open {
-    right: 0 !important;
-    box-shadow: -12px 0 40px rgba(0,0,0,0.35);
-  }
-
-  #sidebar h2 {
-    font-size: 18px !important;
-  }
-
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  .kpi-box {
-    padding: 12px 10px !important;
-    border-radius: 14px !important;
-  }
-
-  .kpi-box div:first-child {
-    font-size: 28px !important;
-  }
-
-  .stat-card {
-    padding: 12px !important;
-    border-radius: 14px !important;
-  }
-
-  /* ── ניווט עליון (טאבים) ── */
-  #main-content {
-    padding-top: 0;
-    height: calc(100dvh - 58px);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .top-nav-bar {
-    padding: 10px 10px 6px !important;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .top-nav-bar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .main-tabs {
-    padding: 4px !important;
-    gap: 2px;
-    border-radius: 22px !important;
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
-
-  .main-tab {
-    padding: 7px 13px !important;
-    font-size: 13px !important;
-    border-radius: 18px !important;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .main-tab i {
-    margin-left: 4px;
-  }
-
-  /* ── שורת פילטרים + חיפוש ── */
-  .quick-filters-bar {
-    padding: 6px 12px 8px !important;
-    gap: 8px !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-  }
-
-  .search-wrapper {
-    height: 48px !important;
-    border-radius: 24px !important;
-    padding: 0 16px !important;
-    min-width: unset !important;
-    width: 100% !important;
-    box-sizing: border-box;
-  }
-
-  .search-wrapper input {
-    font-size: 15px !important;
-  }
-
-  /* צ'יפים - גלילה אופקית נקייה */
-  .filter-chips-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding: 2px 0 4px !important;
-    gap: 8px !important;
-  }
-
-  .filter-chip {
-    padding: 6px 14px !important;
-    font-size: 13px !important;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  /* ── מפה ── */
-  #map-container {
-    margin: 0 10px 10px !important;
-    border-radius: 14px !important;
-    flex: 1;
-  }
-
-  .map-custom-controls {
-    bottom: 18px;
-    left: 8px;
-  }
-
-  .map-ctrl-btn {
-    width: 44px !important;
-    height: 44px !important;
-    border-radius: 12px !important;
-    font-size: 17px !important;
-  }
-
-  /* ── טבלה (מצב כרטיסיות) ── */
-  #list-container {
-    padding: 8px 10px !important;
-  }
-
-  .data-table tr {
-    border-radius: 14px !important;
-    margin-bottom: 10px !important;
-    padding: 12px 10px !important;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.06) !important;
-  }
-
-  .data-table td {
-    padding: 10px 8px !important;
-    font-size: 14px !important;
-  }
-
-  .data-table td::before {
-    font-size: 12px !important;
-    min-width: 90px;
-  }
-
-  /* ── מודאלים ── */
-  .modal {
-    padding: 8px;
-    align-items: flex-end !important;
-  }
-
-  .modal-content {
-    width: 100% !important;
-    margin: 0 !important;
-    border-radius: 24px 24px 0 0 !important;
-    padding: 22px 18px !important;
-    max-height: 92dvh !important;
-    overflow-y: auto;
-    position: relative;
-  }
-
-  /* אינדיקטור גרירה בראש מודאל */
-  .modal-content::before {
-    content: '';
-    display: block;
-    width: 40px;
-    height: 4px;
-    background: var(--border-light);
-    border-radius: 2px;
-    margin: 0 auto 16px;
-  }
-
-  .modal-small {
-    max-height: 75dvh !important;
-  }
-
-  .modal-content h3 {
-    font-size: 18px !important;
-  }
-
-  /* ── כפתורים ── */
-  .btn {
-    height: 48px !important;
-    font-size: 15px !important;
-    border-radius: 14px !important;
-    touch-action: manipulation;
-  }
-
-  .btn-icon {
-    width: 42px !important;
-    height: 42px !important;
-    border-radius: 12px !important;
-    font-size: 16px !important;
-  }
-
-  /* FAB - כפתור הוספה */
-  .fab-add {
-    bottom: 24px !important;
-    right: 18px !important;
-    width: 58px !important;
-    height: 58px !important;
-    font-size: 24px !important;
-    border-radius: 18px !important;
-    box-shadow: 0 6px 20px rgba(59,130,246,0.45) !important;
-  }
-
-  /* ── Kanban ── */
-  #kanban-container {
-    padding: 10px 0 0 !important;
-  }
-
-  .kanban-hub-header {
-    margin: 0 10px !important;
-    padding: 12px 14px !important;
-    border-radius: 14px !important;
-  }
-
-  #kanban-board-scroll {
-    padding: 10px !important;
-    gap: 10px !important;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .kanban-col {
-    min-width: 260px !important;
-    max-width: 260px !important;
-    border-radius: 16px !important;
-  }
-
-  .kanban-card {
-    border-radius: 12px !important;
-    padding: 12px !important;
-    font-size: 14px !important;
-  }
-
-  /* ── toast הודעות ── */
-  #toast-container {
-    bottom: 80px !important;
-    left: 12px !important;
-    right: 12px !important;
-    top: unset !important;
-  }
-
-  .toast {
-    border-radius: 14px !important;
-    font-size: 14px !important;
-    padding: 12px 16px !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
-  }
-
-  /* ── תצוגות חכמות - עמודות ← שורות ── */
-  #smartViewsManagerModal .modal-content > div[style*="gap:20px"] {
-    flex-direction: column !important;
-    gap: 16px !important;
-  }
-
-  #smartViewsManagerModal div[style*="border-left"] {
-    border-left: none !important;
-    border-top: 1px solid var(--border-light);
-    padding-left: 0 !important;
-    padding-top: 16px;
-  }
-
-  /* ── גריד 2 עמודות → 1 בהגדרות ── */
-  div[style*="grid-template-columns:1fr 1fr"] {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* ── bulk action bar ── */
-  #bulkActionBar {
-    bottom: 12px !important;
-    width: calc(100% - 24px) !important;
-    border-radius: 18px !important;
-    padding: 10px 14px !important;
-    gap: 8px !important;
-    flex-wrap: wrap;
-    justify-content: center !important;
-  }
-
-  #bulkActionBar .btn {
-    flex: 1;
-    min-width: 120px;
-    height: 42px !important;
-    font-size: 13px !important;
-  }
-
-  /* ── פאנל ניווט ── */
-  #nav-panel {
-    border-radius: 20px 20px 0 0 !important;
-    max-height: 88dvh !important;
-  }
-
-  .nav-stop-name {
-    font-size: 19px !important;
-  }
-
-  .nav-stop-distance {
-    font-size: 24px !important;
-  }
-
-  /* ── inputs ── */
-  .form-group {
-    margin-bottom: 14px !important;
-  }
-
-  .form-group label {
-    font-size: 13px;
-    margin-bottom: 5px;
-    display: block;
-  }
-
-  .inline-input,
-  input[type="text"],
-  input[type="number"],
-  input[type="tel"],
-  select,
-  textarea {
-    height: 46px;
-    border-radius: 12px !important;
-    padding: 0 14px !important;
-    width: 100%;
-    box-sizing: border-box;
-    touch-action: manipulation;
-  }
-
-  textarea {
-    height: auto !important;
-    padding: 12px 14px !important;
-    min-height: 90px;
-  }
-
-  /* ── בחר נמענים ── */
-  #recipientPickerList {
-    max-height: 45dvh !important;
-  }
+/* ── 1. ניווט תחתון ── */
+.bottom-nav {
+    display: none; /* ברירת מחדל — נסתר בדסקטופ */
 }
 
-/* ── מסכים קטנים מאוד (≤380px, iPhone SE) ── */
-@media (max-width: 380px) {
-  .main-tab {
-    padding: 6px 10px !important;
-    font-size: 12px !important;
-  }
-
-  .main-tab span {
-    display: none; /* הסתר טקסט, הישאר עם אייקון */
-  }
-
-  #sidebar {
-    width: 94vw !important;
-  }
-
-  .kpi-box div:first-child {
-    font-size: 24px !important;
-  }
-
-  .filter-chip {
-    padding: 5px 10px !important;
-    font-size: 12px !important;
-  }
-}
-
-/* ── מניעת zoom ב-iOS בלחיצה על inputs ── */
 @media (max-width: 768px) {
-  input[type="text"],
-  input[type="number"],
-  input[type="tel"],
-  input[type="email"],
-  select,
-  textarea {
-    font-size: 16px !important;
-  }
-}
+    /* מסתיר את סרגל הטאבים העליון — ה-JS עדיין עובד כרגיל */
+    .top-nav-bar {
+        display: none !important;
+    }
 
-/* ================================================================
-   שדרוג UX — לפי המלצות Gemini
-   ================================================================ */
+    /* מרווח תחתון לגוף כדי שהתוכן לא יחפוף לניווט */
+    body {
+        padding-bottom: 68px;
+    }
 
-/* ── 1. Glassmorphism — זכוכית חלבית לכותרת ולניווט תחתון ── */
-@media (max-width: 768px) {
-  .mobile-header {
-    background: rgba(59, 130, 246, 0.82) !important;
-    backdrop-filter: blur(18px) saturate(180%);
-    -webkit-backdrop-filter: blur(18px) saturate(180%);
-    box-shadow: 0 2px 20px rgba(0,0,0,0.10) !important;
-    border-bottom: none !important;
-  }
+    /* ניווט תחתון */
+    .bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        height: 64px;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        box-shadow: 0 -2px 20px rgba(0,0,0,0.08);
+        z-index: 999;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
 
-  .bottom-nav {
-    background: rgba(255, 255, 255, 0.88) !important;
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-top: none !important;
-    box-shadow: 0 -2px 24px rgba(0,0,0,0.07) !important;
-  }
+    body.dark-mode .bottom-nav {
+        background: rgba(15, 23, 42, 0.92);
+    }
 
-  body.dark-mode .mobile-header {
-    background: rgba(15, 23, 42, 0.85) !important;
-  }
+    .bottom-nav-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        border: none;
+        background: transparent;
+        color: #94a3b8;
+        font-size: 10px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+        transition: color 0.2s;
+    }
 
-  body.dark-mode .bottom-nav {
-    background: rgba(15, 23, 42, 0.90) !important;
-  }
+    .bottom-nav-item i {
+        font-size: 20px;
+        transition: transform 0.2s;
+    }
 
-  /* כרטיסים "צפים" — ללא border, עם צל רך */
-  .data-table tr,
-  .stat-card,
-  .kanban-card,
-  .bldg-fam-item,
-  .global-task-row {
-    border: none !important;
-    box-shadow: 0 4px 18px rgba(149, 157, 165, 0.12) !important;
-    transition: transform 0.18s ease, box-shadow 0.18s ease !important;
-  }
+    .bottom-nav-item.active {
+        color: var(--accent, #3b82f6);
+    }
 
-  .data-table tr:active,
-  .kanban-card:active,
-  .bldg-fam-item:active,
-  .global-task-row:active {
-    transform: scale(0.985) !important;
-    box-shadow: 0 2px 8px rgba(149, 157, 165, 0.18) !important;
-  }
-}
+    .bottom-nav-item.active i {
+        transform: translateY(-2px) scale(1.1);
+    }
 
-/* ── 2. כותרת מתחבאת בגלילה (מחלקה נשלטת ע"י JS) ── */
-@media (max-width: 768px) {
-  .mobile-header {
-    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: transform;
-  }
+    /* כפתור ניווט — FAB */
+    .bottom-nav-item.nav-fab {
+        flex: 0 0 56px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+        color: white !important;
+        margin-top: -16px;
+        box-shadow: 0 4px 16px rgba(99,102,241,0.45);
+        font-size: 11px;
+    }
 
-  .mobile-header.header-hidden {
-    transform: translateY(-100%);
-  }
-}
+    /* ── 2. כותרת עליונה ── */
+    .mobile-header {
+        background: rgba(59, 130, 246, 0.9) !important;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        position: sticky;
+        top: 0;
+        z-index: 900;
+        transition: transform 0.28s ease;
+        box-shadow: 0 2px 16px rgba(0,0,0,0.1) !important;
+    }
 
-/* ── 3. Bottom Sheet — ידית גרירה בולטת + אנימציה ── */
-@media (max-width: 768px) {
-  .modal-content::before {
-    content: '';
-    display: block;
-    width: 48px !important;
-    height: 5px !important;
-    background: var(--border-light) !important;
-    border-radius: 10px !important;
-    margin: 0 auto 18px !important;
-    opacity: 0.6;
-  }
+    .mobile-header.header-hidden {
+        transform: translateY(-100%);
+    }
 
-  .modal-content {
-    animation: mobileSlideUp 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards !important;
-    padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px) !important;
-  }
+    /* ── 3. Bottom Sheet מודאלים ── */
+    .modal {
+        align-items: flex-end !important;
+    }
 
-  @keyframes mobileSlideUp {
-    from { transform: translateY(100%); opacity: 0.6; }
-    to   { transform: translateY(0);    opacity: 1;   }
-  }
-}
+    .modal-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        border-radius: 24px 24px 0 0 !important;
+        max-height: 92dvh !important;
+        overflow-y: auto;
+        animation: sheetUp 0.3s cubic-bezier(0.34, 1.3, 0.64, 1) forwards;
+        padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px) !important;
+    }
 
-/* ── 4. Swipe Actions — כרטיסי משפחה ברשימה ── */
-@media (max-width: 768px) {
-  /* עטיפת כרטיס עם אזורי פעולה מאחור */
-  .swipe-row-wrapper {
-    position: relative;
-    overflow: hidden;
-    border-radius: 14px;
-    margin-bottom: 10px;
-  }
+    .modal-content::before {
+        content: '';
+        display: block;
+        width: 44px;
+        height: 5px;
+        background: #cbd5e1;
+        border-radius: 10px;
+        margin: 0 auto 16px;
+    }
 
-  .swipe-row-actions {
-    position: absolute;
-    top: 0; bottom: 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 12px;
-    pointer-events: none;
-    transition: opacity 0.15s;
-    opacity: 0;
-  }
+    @keyframes sheetUp {
+        from { transform: translateY(80px); opacity: 0.5; }
+        to   { transform: translateY(0);    opacity: 1; }
+    }
 
-  .swipe-row-actions.left  { right: 0; background: linear-gradient(to left,  rgba(37,211,102,0.15), transparent); }
-  .swipe-row-actions.right { left:  0; background: linear-gradient(to right, rgba(239,68,68,0.15),  transparent); }
+    /* ── 4. Glassmorphism לכרטיסים ── */
+    .stat-card,
+    .kpi-box,
+    .kanban-card,
+    .bldg-fam-item,
+    .global-task-row {
+        border-color: transparent !important;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.07) !important;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
 
-  .swipe-row-wrapper.swiped-left  .swipe-row-actions.left  { opacity: 1; pointer-events: all; }
-  .swipe-row-wrapper.swiped-right .swipe-row-actions.right { opacity: 1; pointer-events: all; }
+    .kanban-card:active,
+    .bldg-fam-item:active {
+        transform: scale(0.98);
+    }
 
-  .swipe-row-actions .action-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
-    width: 54px;
-    height: 54px;
-    border-radius: 12px;
-    border: none;
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    color: white;
-    font-family: inherit;
-    justify-content: center;
-  }
+    /* ── 5. פורמים — מניעת zoom ב-iOS ── */
+    input[type="text"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="date"],
+    input[type="number"],
+    input[type="search"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
 
-  .swipe-row-actions .action-btn i { font-size: 18px; }
-  .swipe-row-actions .action-btn.wa  { background: #25D366; }
-  .swipe-row-actions .action-btn.log { background: var(--accent, #3b82f6); }
+    /* ── 6. Toast מעל הניווט התחתון ── */
+    #toast-container {
+        bottom: 76px !important;
+    }
 
-  .swipe-row-inner {
-    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-    background: var(--surface, #fff);
-    border-radius: 14px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .swipe-row-wrapper.swiped-left  .swipe-row-inner { transform: translateX(-80px); }
-  .swipe-row-wrapper.swiped-right .swipe-row-inner { transform: translateX(80px);  }
+    /* ── 7. כפתורי Mapbox מעל הניווט ── */
+    .mapboxgl-ctrl-bottom-right,
+    .mapboxgl-ctrl-bottom-left {
+        bottom: 72px !important;
+    }
 }

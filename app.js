@@ -516,20 +516,20 @@ function autoSave() {
 
 window.switchMainView = function(viewName) {
     currentMainView = viewName;
+    // desktop tabs
     document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
     const desktopTab = document.getElementById('tab-' + viewName);
     if(desktopTab) desktopTab.classList.add('active');
+    // bottom nav
+    document.querySelectorAll('.bottom-nav-item').forEach(b=>b.classList.remove('active'));
+    const mobileBtn = document.getElementById('bn-' + viewName);
+    if(mobileBtn) mobileBtn.classList.add('active');
     
     document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
     document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
     document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
     document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
     document.getElementById('tasks-container').style.display = viewName==='tasks'?'flex':'none';
-    
-    // עדכון ניווט תחתון במובייל
-    document.querySelectorAll('.bottom-nav-item').forEach(b=>b.classList.remove('active'));
-    const mobileBtn = document.getElementById('bn-' + viewName);
-    if(mobileBtn) mobileBtn.classList.add('active');
     
     if(viewName==='map') map.resize();
     if(viewName==='tasks') {
@@ -540,183 +540,29 @@ window.switchMainView = function(viewName) {
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
 };
 
-// הצגת ניווט תחתון רק במובייל
-(function initBottomNav() {
-    function checkMobile() {
-        const nav = document.getElementById('bottomNav');
-        if(nav) nav.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
-    }
-    window.addEventListener('resize', checkMobile);
-    if(document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', checkMobile);
-    } else {
-        checkMobile();
-    }
-})();
-
-// ── Haptic Feedback — רטט קצר בפעולות חשובות ──
-function haptic(type = 'light') {
+// ── Haptic Feedback ──
+window.haptic = function(type) {
     if (!window.navigator || !window.navigator.vibrate) return;
-    const patterns = { light: 30, medium: 50, success: [30, 40, 30], error: [60, 30, 60] };
-    navigator.vibrate(patterns[type] || 30);
-}
+    const p = { light: 28, medium: 50, success: [25,35,25], error: [55,30,55] };
+    navigator.vibrate(p[type] || 28);
+};
 
 // ── כותרת מתחבאת בגלילה ──
-(function initHideHeaderOnScroll() {
-    let lastScrollTop = 0;
-    let ticking = false;
-
-    function onScroll() {
-        if (!ticking) {
-            window.requestAnimationFrame(() => {
-                const header = document.querySelector('.mobile-header');
-                if (!header || window.innerWidth > 768) { ticking = false; return; }
-                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-                if (scrollTop > lastScrollTop && scrollTop > 70) {
-                    header.classList.add('header-hidden');
-                } else {
-                    header.classList.remove('header-hidden');
-                }
-                lastScrollTop = Math.max(0, scrollTop);
-                ticking = false;
-            });
-            ticking = true;
-        }
+(function() {
+    var last = 0, ticking = false;
+    function check() {
+        var header = document.querySelector('.mobile-header');
+        if (!header || window.innerWidth > 768) { ticking = false; return; }
+        var st = window.pageYOffset || document.documentElement.scrollTop;
+        if (st > last && st > 70) { header.classList.add('header-hidden'); }
+        else { header.classList.remove('header-hidden'); }
+        last = Math.max(0, st);
+        ticking = false;
     }
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-
-    // גלילה בתוך list-inner ו-kanban
-    document.addEventListener('DOMContentLoaded', () => {
-        ['list-inner', 'kanban-board-scroll', 'comm-content-area'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.addEventListener('scroll', onScroll, { passive: true });
-        });
-    });
-})();
-
-// ── גרירת מודאל למטה לסגירה (drag to dismiss) ──
-(function initDragToDismissModals() {
-    document.addEventListener('touchstart', (e) => {
-        const handle = e.target.closest('.modal-content');
-        if (!handle) return;
-        const modal = handle.closest('.modal');
-        if (!modal) return;
-
-        let startY = e.touches[0].clientY;
-        let isDragging = false;
-
-        function onMove(ev) {
-            const dy = ev.touches[0].clientY - startY;
-            if (dy > 0) {
-                isDragging = true;
-                handle.style.transform = `translateY(${dy}px)`;
-                handle.style.transition = 'none';
-                handle.style.opacity = String(Math.max(0.5, 1 - dy / 400));
-            }
-        }
-
-        function onEnd(ev) {
-            const dy = ev.changedTouches[0].clientY - startY;
-            handle.style.transition = '';
-            handle.style.transform = '';
-            handle.style.opacity = '';
-            if (dy > 120) {
-                haptic('light');
-                modal.style.display = 'none';
-            }
-            document.removeEventListener('touchmove', onMove);
-            document.removeEventListener('touchend', onEnd);
-        }
-
-        document.addEventListener('touchmove', onMove, { passive: true });
-        document.addEventListener('touchend', onEnd);
+    window.addEventListener('scroll', function() {
+        if (!ticking) { requestAnimationFrame(check); ticking = true; }
     }, { passive: true });
 })();
-
-// ── Swipe Actions על שורות רשימה ──
-window.initSwipeRows = function() {
-    if (window.innerWidth > 768) return;
-
-    document.querySelectorAll('tr[onclick]').forEach(row => {
-        // אל תעטוף שוב אם כבר עטוף
-        if (row.closest('.swipe-row-wrapper')) return;
-
-        const onclickAttr = row.getAttribute('onclick') || '';
-        // חלץ bldg ו-idx מה-onclick
-        const match = onclickAttr.match(/currentBldg='([^']+)'.*openClientCard\((\d+)\)/);
-        if (!match) return;
-
-        const bldgRaw = match[1];
-        const idx = match[2];
-        const apt = db[bldgRaw] && db[bldgRaw].apts && db[bldgRaw].apts[parseInt(idx)];
-        if (!apt) return;
-
-        const phones = [apt.fatherPhone, apt.motherPhone].filter(Boolean);
-        const waPhone = phones.length > 0 ? phones[0].replace(/\D/g,'').replace(/^0/, '972') : null;
-
-        // עטוף בעטיפה
-        const wrapper = document.createElement('div');
-        wrapper.className = 'swipe-row-wrapper';
-
-        const actionsLeft = document.createElement('div');
-        actionsLeft.className = 'swipe-row-actions left';
-        actionsLeft.innerHTML = waPhone
-            ? `<button class="action-btn wa" onclick="haptic('success'); window.open('https://wa.me/${waPhone}','_blank')"><i class="fab fa-whatsapp"></i>וואטסאפ</button>`
-            : '';
-
-        const actionsRight = document.createElement('div');
-        actionsRight.className = 'swipe-row-actions right';
-        actionsRight.innerHTML = `<button class="action-btn log" onclick="haptic('medium'); currentBldg='${bldgRaw}'; openClientCard(${idx}); setTimeout(()=>{ const t=document.querySelector('.crm-tab[onclick*=interactions]'); if(t) t.click(); }, 300);"><i class="fas fa-pen"></i>תיעוד</button>`;
-
-        const inner = document.createElement('div');
-        inner.className = 'swipe-row-inner';
-
-        row.parentNode.insertBefore(wrapper, row);
-        wrapper.appendChild(actionsLeft);
-        wrapper.appendChild(actionsRight);
-        inner.appendChild(row);
-        wrapper.appendChild(inner);
-
-        // מנגנון swipe
-        let startX = 0, currentX = 0, moved = false;
-
-        inner.addEventListener('touchstart', e => {
-            startX = e.touches[0].clientX;
-            moved = false;
-        }, { passive: true });
-
-        inner.addEventListener('touchmove', e => {
-            currentX = e.touches[0].clientX;
-            const dx = currentX - startX;
-            moved = Math.abs(dx) > 8;
-        }, { passive: true });
-
-        inner.addEventListener('touchend', () => {
-            if (!moved) return;
-            const dx = currentX - startX;
-            const threshold = 55;
-            if (dx < -threshold) {
-                wrapper.classList.remove('swiped-right');
-                wrapper.classList.add('swiped-left');
-                haptic('light');
-            } else if (dx > threshold) {
-                wrapper.classList.remove('swiped-left');
-                wrapper.classList.add('swiped-right');
-                haptic('light');
-            } else {
-                wrapper.classList.remove('swiped-left', 'swiped-right');
-            }
-        });
-
-        // סגירה בלחיצה מחוץ
-        document.addEventListener('touchstart', e => {
-            if (!wrapper.contains(e.target)) {
-                wrapper.classList.remove('swiped-left', 'swiped-right');
-            }
-        }, { passive: true });
-    });
-};
 
 window.switchCommTab = function(tabName) {
     document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
@@ -1914,8 +1760,6 @@ window.renderListView = (filteredRes = null) => {
         html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">${cellsHtml}</tr>`;
     });
     inner.innerHTML = html + `</tbody></table></div>`;
-    // הפעלת swipe actions במובייל
-    requestAnimationFrame(() => window.initSwipeRows && window.initSwipeRows());
 };
 
 window.exportTableToCSV = () => {
