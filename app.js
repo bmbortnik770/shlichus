@@ -554,6 +554,170 @@ window.switchMainView = function(viewName) {
     }
 })();
 
+// ── Haptic Feedback — רטט קצר בפעולות חשובות ──
+function haptic(type = 'light') {
+    if (!window.navigator || !window.navigator.vibrate) return;
+    const patterns = { light: 30, medium: 50, success: [30, 40, 30], error: [60, 30, 60] };
+    navigator.vibrate(patterns[type] || 30);
+}
+
+// ── כותרת מתחבאת בגלילה ──
+(function initHideHeaderOnScroll() {
+    let lastScrollTop = 0;
+    let ticking = false;
+
+    function onScroll() {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                const header = document.querySelector('.mobile-header');
+                if (!header || window.innerWidth > 768) { ticking = false; return; }
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                if (scrollTop > lastScrollTop && scrollTop > 70) {
+                    header.classList.add('header-hidden');
+                } else {
+                    header.classList.remove('header-hidden');
+                }
+                lastScrollTop = Math.max(0, scrollTop);
+                ticking = false;
+            });
+            ticking = true;
+        }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    // גלילה בתוך list-inner ו-kanban
+    document.addEventListener('DOMContentLoaded', () => {
+        ['list-inner', 'kanban-board-scroll', 'comm-content-area'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('scroll', onScroll, { passive: true });
+        });
+    });
+})();
+
+// ── גרירת מודאל למטה לסגירה (drag to dismiss) ──
+(function initDragToDismissModals() {
+    document.addEventListener('touchstart', (e) => {
+        const handle = e.target.closest('.modal-content');
+        if (!handle) return;
+        const modal = handle.closest('.modal');
+        if (!modal) return;
+
+        let startY = e.touches[0].clientY;
+        let isDragging = false;
+
+        function onMove(ev) {
+            const dy = ev.touches[0].clientY - startY;
+            if (dy > 0) {
+                isDragging = true;
+                handle.style.transform = `translateY(${dy}px)`;
+                handle.style.transition = 'none';
+                handle.style.opacity = String(Math.max(0.5, 1 - dy / 400));
+            }
+        }
+
+        function onEnd(ev) {
+            const dy = ev.changedTouches[0].clientY - startY;
+            handle.style.transition = '';
+            handle.style.transform = '';
+            handle.style.opacity = '';
+            if (dy > 120) {
+                haptic('light');
+                modal.style.display = 'none';
+            }
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+        }
+
+        document.addEventListener('touchmove', onMove, { passive: true });
+        document.addEventListener('touchend', onEnd);
+    }, { passive: true });
+})();
+
+// ── Swipe Actions על שורות רשימה ──
+window.initSwipeRows = function() {
+    if (window.innerWidth > 768) return;
+
+    document.querySelectorAll('tr[onclick]').forEach(row => {
+        // אל תעטוף שוב אם כבר עטוף
+        if (row.closest('.swipe-row-wrapper')) return;
+
+        const onclickAttr = row.getAttribute('onclick') || '';
+        // חלץ bldg ו-idx מה-onclick
+        const match = onclickAttr.match(/currentBldg='([^']+)'.*openClientCard\((\d+)\)/);
+        if (!match) return;
+
+        const bldgRaw = match[1];
+        const idx = match[2];
+        const apt = db[bldgRaw] && db[bldgRaw].apts && db[bldgRaw].apts[parseInt(idx)];
+        if (!apt) return;
+
+        const phones = [apt.fatherPhone, apt.motherPhone].filter(Boolean);
+        const waPhone = phones.length > 0 ? phones[0].replace(/\D/g,'').replace(/^0/, '972') : null;
+
+        // עטוף בעטיפה
+        const wrapper = document.createElement('div');
+        wrapper.className = 'swipe-row-wrapper';
+
+        const actionsLeft = document.createElement('div');
+        actionsLeft.className = 'swipe-row-actions left';
+        actionsLeft.innerHTML = waPhone
+            ? `<button class="action-btn wa" onclick="haptic('success'); window.open('https://wa.me/${waPhone}','_blank')"><i class="fab fa-whatsapp"></i>וואטסאפ</button>`
+            : '';
+
+        const actionsRight = document.createElement('div');
+        actionsRight.className = 'swipe-row-actions right';
+        actionsRight.innerHTML = `<button class="action-btn log" onclick="haptic('medium'); currentBldg='${bldgRaw}'; openClientCard(${idx}); setTimeout(()=>{ const t=document.querySelector('.crm-tab[onclick*=interactions]'); if(t) t.click(); }, 300);"><i class="fas fa-pen"></i>תיעוד</button>`;
+
+        const inner = document.createElement('div');
+        inner.className = 'swipe-row-inner';
+
+        row.parentNode.insertBefore(wrapper, row);
+        wrapper.appendChild(actionsLeft);
+        wrapper.appendChild(actionsRight);
+        inner.appendChild(row);
+        wrapper.appendChild(inner);
+
+        // מנגנון swipe
+        let startX = 0, currentX = 0, moved = false;
+
+        inner.addEventListener('touchstart', e => {
+            startX = e.touches[0].clientX;
+            moved = false;
+        }, { passive: true });
+
+        inner.addEventListener('touchmove', e => {
+            currentX = e.touches[0].clientX;
+            const dx = currentX - startX;
+            moved = Math.abs(dx) > 8;
+        }, { passive: true });
+
+        inner.addEventListener('touchend', () => {
+            if (!moved) return;
+            const dx = currentX - startX;
+            const threshold = 55;
+            if (dx < -threshold) {
+                wrapper.classList.remove('swiped-right');
+                wrapper.classList.add('swiped-left');
+                haptic('light');
+            } else if (dx > threshold) {
+                wrapper.classList.remove('swiped-left');
+                wrapper.classList.add('swiped-right');
+                haptic('light');
+            } else {
+                wrapper.classList.remove('swiped-left', 'swiped-right');
+            }
+        });
+
+        // סגירה בלחיצה מחוץ
+        document.addEventListener('touchstart', e => {
+            if (!wrapper.contains(e.target)) {
+                wrapper.classList.remove('swiped-left', 'swiped-right');
+            }
+        }, { passive: true });
+    });
+};
+
 window.switchCommTab = function(tabName) {
     document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
     document.getElementById('commTabBtn-' + tabName).classList.add('active');
@@ -775,7 +939,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
     a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customData={...tempCustom}; a.customFields=a.customData; // backward compat
     a.updatedAt = Date.now();
-    isDirty=false; isCreatingNew=false; saveDB(); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
+    isDirty=false; isCreatingNew=false; saveDB(); haptic('success'); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
     if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
 });
 
@@ -1750,6 +1914,8 @@ window.renderListView = (filteredRes = null) => {
         html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">${cellsHtml}</tr>`;
     });
     inner.innerHTML = html + `</tbody></table></div>`;
+    // הפעלת swipe actions במובייל
+    requestAnimationFrame(() => window.initSwipeRows && window.initSwipeRows());
 };
 
 window.exportTableToCSV = () => {
@@ -2935,6 +3101,7 @@ window.completeGlobalTask = (isGeneral, bEnc, aptIdx, tIdx, btnEl) => {
             db[bldg].apts[aptIdx].tasks[tIdx].done = true;
         }
         saveDB();
+        haptic('success');
         showToast('המשימה הושלמה וירדה מהדאשבורד!', 'success');
         renderGlobalTasks();
     }, 500);
