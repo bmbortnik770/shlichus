@@ -1,0 +1,432 @@
+/* ===================================================
+   mobile.css — שיפורי מובייל למערכת ניהול קהילה
+   הוסף את הקובץ הזה אחרי style.css ב-index.html:
+   <link rel="stylesheet" href="mobile.css">
+   =================================================== */
+
+/* ── טיפוגרפיה ובסיס ── */
+@media (max-width: 768px) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-size: 15px;
+  }
+
+  /* ── כותרת עליונה למובייל ── */
+  .mobile-header {
+    padding: 14px 18px;
+    height: 58px;
+    box-sizing: border-box;
+    position: sticky;
+    top: 0;
+    z-index: 1001;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+  }
+
+  .mobile-header h3 {
+    font-size: 17px;
+    letter-spacing: 0.3px;
+  }
+
+  .mobile-header button {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.15) !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── תפריט צד ── */
+  #sidebar {
+    right: -100vw !important;
+    width: 88vw !important;
+    min-width: unset !important;
+    max-width: 360px;
+    padding: 18px 15px;
+    gap: 12px;
+    height: 100dvh;
+    border-radius: 0 !important;
+  }
+
+  #sidebar.open {
+    right: 0 !important;
+    box-shadow: -12px 0 40px rgba(0,0,0,0.35);
+  }
+
+  #sidebar h2 {
+    font-size: 18px !important;
+  }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .kpi-box {
+    padding: 12px 10px !important;
+    border-radius: 14px !important;
+  }
+
+  .kpi-box div:first-child {
+    font-size: 28px !important;
+  }
+
+  .stat-card {
+    padding: 12px !important;
+    border-radius: 14px !important;
+  }
+
+  /* ── ניווט עליון (טאבים) ── */
+  #main-content {
+    padding-top: 0;
+    height: calc(100dvh - 58px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .top-nav-bar {
+    padding: 10px 10px 6px !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .top-nav-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .main-tabs {
+    padding: 4px !important;
+    gap: 2px;
+    border-radius: 22px !important;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .main-tab {
+    padding: 7px 13px !important;
+    font-size: 13px !important;
+    border-radius: 18px !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .main-tab i {
+    margin-left: 4px;
+  }
+
+  /* ── שורת פילטרים + חיפוש ── */
+  .quick-filters-bar {
+    padding: 6px 12px 8px !important;
+    gap: 8px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .search-wrapper {
+    height: 48px !important;
+    border-radius: 24px !important;
+    padding: 0 16px !important;
+    min-width: unset !important;
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .search-wrapper input {
+    font-size: 15px !important;
+  }
+
+  /* צ'יפים - גלילה אופקית נקייה */
+  .filter-chips-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 2px 0 4px !important;
+    gap: 8px !important;
+  }
+
+  .filter-chip {
+    padding: 6px 14px !important;
+    font-size: 13px !important;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── מפה ── */
+  #map-container {
+    margin: 0 10px 10px !important;
+    border-radius: 14px !important;
+    flex: 1;
+  }
+
+  .map-custom-controls {
+    bottom: 18px;
+    left: 8px;
+  }
+
+  .map-ctrl-btn {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+    font-size: 17px !important;
+  }
+
+  /* ── טבלה (מצב כרטיסיות) ── */
+  #list-container {
+    padding: 8px 10px !important;
+  }
+
+  .data-table tr {
+    border-radius: 14px !important;
+    margin-bottom: 10px !important;
+    padding: 12px 10px !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06) !important;
+  }
+
+  .data-table td {
+    padding: 10px 8px !important;
+    font-size: 14px !important;
+  }
+
+  .data-table td::before {
+    font-size: 12px !important;
+    min-width: 90px;
+  }
+
+  /* ── מודאלים ── */
+  .modal {
+    padding: 8px;
+    align-items: flex-end !important;
+  }
+
+  .modal-content {
+    width: 100% !important;
+    margin: 0 !important;
+    border-radius: 24px 24px 0 0 !important;
+    padding: 22px 18px !important;
+    max-height: 92dvh !important;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  /* אינדיקטור גרירה בראש מודאל */
+  .modal-content::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: var(--border-light);
+    border-radius: 2px;
+    margin: 0 auto 16px;
+  }
+
+  .modal-small {
+    max-height: 75dvh !important;
+  }
+
+  .modal-content h3 {
+    font-size: 18px !important;
+  }
+
+  /* ── כפתורים ── */
+  .btn {
+    height: 48px !important;
+    font-size: 15px !important;
+    border-radius: 14px !important;
+    touch-action: manipulation;
+  }
+
+  .btn-icon {
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 12px !important;
+    font-size: 16px !important;
+  }
+
+  /* FAB - כפתור הוספה */
+  .fab-add {
+    bottom: 24px !important;
+    right: 18px !important;
+    width: 58px !important;
+    height: 58px !important;
+    font-size: 24px !important;
+    border-radius: 18px !important;
+    box-shadow: 0 6px 20px rgba(59,130,246,0.45) !important;
+  }
+
+  /* ── Kanban ── */
+  #kanban-container {
+    padding: 10px 0 0 !important;
+  }
+
+  .kanban-hub-header {
+    margin: 0 10px !important;
+    padding: 12px 14px !important;
+    border-radius: 14px !important;
+  }
+
+  #kanban-board-scroll {
+    padding: 10px !important;
+    gap: 10px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kanban-col {
+    min-width: 260px !important;
+    max-width: 260px !important;
+    border-radius: 16px !important;
+  }
+
+  .kanban-card {
+    border-radius: 12px !important;
+    padding: 12px !important;
+    font-size: 14px !important;
+  }
+
+  /* ── toast הודעות ── */
+  #toast-container {
+    bottom: 80px !important;
+    left: 12px !important;
+    right: 12px !important;
+    top: unset !important;
+  }
+
+  .toast {
+    border-radius: 14px !important;
+    font-size: 14px !important;
+    padding: 12px 16px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
+  }
+
+  /* ── תצוגות חכמות - עמודות ← שורות ── */
+  #smartViewsManagerModal .modal-content > div[style*="gap:20px"] {
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  #smartViewsManagerModal div[style*="border-left"] {
+    border-left: none !important;
+    border-top: 1px solid var(--border-light);
+    padding-left: 0 !important;
+    padding-top: 16px;
+  }
+
+  /* ── גריד 2 עמודות → 1 בהגדרות ── */
+  div[style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── bulk action bar ── */
+  #bulkActionBar {
+    bottom: 12px !important;
+    width: calc(100% - 24px) !important;
+    border-radius: 18px !important;
+    padding: 10px 14px !important;
+    gap: 8px !important;
+    flex-wrap: wrap;
+    justify-content: center !important;
+  }
+
+  #bulkActionBar .btn {
+    flex: 1;
+    min-width: 120px;
+    height: 42px !important;
+    font-size: 13px !important;
+  }
+
+  /* ── פאנל ניווט ── */
+  #nav-panel {
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 88dvh !important;
+  }
+
+  .nav-stop-name {
+    font-size: 19px !important;
+  }
+
+  .nav-stop-distance {
+    font-size: 24px !important;
+  }
+
+  /* ── inputs ── */
+  .form-group {
+    margin-bottom: 14px !important;
+  }
+
+  .form-group label {
+    font-size: 13px;
+    margin-bottom: 5px;
+    display: block;
+  }
+
+  .inline-input,
+  input[type="text"],
+  input[type="number"],
+  input[type="tel"],
+  select,
+  textarea {
+    height: 46px;
+    border-radius: 12px !important;
+    padding: 0 14px !important;
+    width: 100%;
+    box-sizing: border-box;
+    touch-action: manipulation;
+  }
+
+  textarea {
+    height: auto !important;
+    padding: 12px 14px !important;
+    min-height: 90px;
+  }
+
+  /* ── בחר נמענים ── */
+  #recipientPickerList {
+    max-height: 45dvh !important;
+  }
+}
+
+/* ── מסכים קטנים מאוד (≤380px, iPhone SE) ── */
+@media (max-width: 380px) {
+  .main-tab {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+
+  .main-tab span {
+    display: none; /* הסתר טקסט, הישאר עם אייקון */
+  }
+
+  #sidebar {
+    width: 94vw !important;
+  }
+
+  .kpi-box div:first-child {
+    font-size: 24px !important;
+  }
+
+  .filter-chip {
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* ── מניעת zoom ב-iOS בלחיצה על inputs ── */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="email"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
