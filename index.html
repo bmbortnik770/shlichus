@@ -20,6 +20,7 @@
 
     <link rel="stylesheet" href="style.css?v=5">
     <link rel="stylesheet" href="nav.css?v=1">
+    <link rel="stylesheet" href="mobile.css">
 </head>
 <body>
 
@@ -555,5 +556,26 @@
     </div>
 </div>
 
+<!-- ניווט תחתון למובייל -->
+<nav class="bottom-nav" id="bottomNav" style="display:none;">
+    <button class="bottom-nav-item active" id="bn-map" onclick="switchMainView('map')">
+        <i class="fas fa-map-marker-alt"></i><span>מפה</span>
+    </button>
+    <button class="bottom-nav-item" id="bn-table" onclick="switchMainView('table')">
+        <i class="fas fa-list"></i><span>רשימה</span>
+    </button>
+    <button class="bottom-nav-item" id="bn-kanban" onclick="switchMainView('kanban')">
+        <i class="fas fa-project-diagram"></i><span>פרויקטים</span>
+    </button>
+    <button class="bottom-nav-item nav-fab" onclick="NavModule.openRoutePlannerModal()">
+        <i class="fas fa-route"></i><span>ניווט</span>
+    </button>
+    <button class="bottom-nav-item" id="bn-comm" onclick="switchMainView('comm')">
+        <i class="fas fa-bullhorn"></i><span>תקשורת</span>
+    </button>
+    <button class="bottom-nav-item" id="bn-tasks" onclick="switchMainView('tasks')">
+        <i class="fas fa-check-double"></i><span>משימות</span>
+    </button>
+</nav>
 </body>
 </html>

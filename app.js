@@ -517,13 +517,19 @@ function autoSave() {
 window.switchMainView = function(viewName) {
     currentMainView = viewName;
     document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
-    document.getElementById('tab-' + viewName).classList.add('active');
+    const desktopTab = document.getElementById('tab-' + viewName);
+    if(desktopTab) desktopTab.classList.add('active');
     
     document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
     document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
     document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
     document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
     document.getElementById('tasks-container').style.display = viewName==='tasks'?'flex':'none';
+    
+    // עדכון ניווט תחתון במובייל
+    document.querySelectorAll('.bottom-nav-item').forEach(b=>b.classList.remove('active'));
+    const mobileBtn = document.getElementById('bn-' + viewName);
+    if(mobileBtn) mobileBtn.classList.add('active');
     
     if(viewName==='map') map.resize();
     if(viewName==='tasks') {
@@ -533,6 +539,20 @@ window.switchMainView = function(viewName) {
     handleOmniSearch(); 
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
 };
+
+// הצגת ניווט תחתון רק במובייל
+(function initBottomNav() {
+    function checkMobile() {
+        const nav = document.getElementById('bottomNav');
+        if(nav) nav.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+    }
+    window.addEventListener('resize', checkMobile);
+    if(document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', checkMobile);
+    } else {
+        checkMobile();
+    }
+})();
 
 window.switchCommTab = function(tabName) {
     document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
