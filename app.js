@@ -516,53 +516,98 @@ function autoSave() {
 
 window.switchMainView = function(viewName) {
     currentMainView = viewName;
-    // desktop tabs
-    document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
-    const desktopTab = document.getElementById('tab-' + viewName);
-    if(desktopTab) desktopTab.classList.add('active');
-    // bottom nav
-    document.querySelectorAll('.bottom-nav-item').forEach(b=>b.classList.remove('active'));
-    const mobileBtn = document.getElementById('bn-' + viewName);
-    if(mobileBtn) mobileBtn.classList.add('active');
-    
+    // desktop tabs (null-safe — tab-nav doesn't exist as a switchable view)
+    document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+    const dtab = document.getElementById('tab-' + viewName);
+    if (dtab) dtab.classList.add('active');
+    // mobile bottom nav
+    document.querySelectorAll('.bottom-nav-item[id^="bn-"]').forEach(b => b.classList.remove('active'));
+    const mbtn = document.getElementById('bn-' + viewName);
+    if (mbtn) mbtn.classList.add('active');
+
     document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
     document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
     document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
     document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
     document.getElementById('tasks-container').style.display = viewName==='tasks'?'flex':'none';
-    
+
     if(viewName==='map') map.resize();
     if(viewName==='tasks') {
         document.getElementById('globalTaskDate').value = new Date().toISOString().split('T')[0];
         renderGlobalTasks();
     }
-    handleOmniSearch(); 
+    handleOmniSearch();
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
 };
 
-// ── Haptic Feedback ──
+// ── Haptic ──
 window.haptic = function(type) {
-    if (!window.navigator || !window.navigator.vibrate) return;
-    const p = { light: 28, medium: 50, success: [25,35,25], error: [55,30,55] };
-    navigator.vibrate(p[type] || 28);
+    if (!navigator.vibrate) return;
+    ({light:()=>navigator.vibrate(28), medium:()=>navigator.vibrate(50),
+      success:()=>navigator.vibrate([25,35,25]), error:()=>navigator.vibrate([55,30,55])
+    }[type] || (()=>navigator.vibrate(28)))();
 };
 
-// ── כותרת מתחבאת בגלילה ──
+// ── Hide header on scroll ──
 (function() {
-    var last = 0, ticking = false;
-    function check() {
-        var header = document.querySelector('.mobile-header');
-        if (!header || window.innerWidth > 768) { ticking = false; return; }
-        var st = window.pageYOffset || document.documentElement.scrollTop;
-        if (st > last && st > 70) { header.classList.add('header-hidden'); }
-        else { header.classList.remove('header-hidden'); }
-        last = Math.max(0, st);
-        ticking = false;
+    var last=0, tick=false;
+    function upd() {
+        var h=document.querySelector('.mobile-header');
+        if(!h||window.innerWidth>768){tick=false;return;}
+        var st=window.pageYOffset||document.documentElement.scrollTop;
+        h.classList.toggle('header-hidden', st>last && st>70);
+        last=Math.max(0,st); tick=false;
     }
-    window.addEventListener('scroll', function() {
-        if (!ticking) { requestAnimationFrame(check); ticking = true; }
-    }, { passive: true });
+    window.addEventListener('scroll',function(){if(!tick){requestAnimationFrame(upd);tick=true;}},{passive:true});
 })();
+
+// ── FAB Speed Dial ──
+window.toggleFabDial = function() {
+    var dial = document.getElementById('fabSpeedDial');
+    var fab  = document.getElementById('superFab');
+    if (!dial) return;
+    var open = dial.classList.toggle('open');
+    fab.classList.toggle('open', open);
+};
+
+window.closeFabDial = function(e) {
+    if (e && e.target !== document.getElementById('fabSpeedDial') && !e.target.classList.contains('fab-scrim')) return;
+    var dial = document.getElementById('fabSpeedDial');
+    var fab  = document.getElementById('superFab');
+    if (dial) dial.classList.remove('open');
+    if (fab)  fab.classList.remove('open');
+};
+
+window.fabAction = function(type) {
+    window.closeFabDial();
+    if (type === 'family') {
+        window.quickAddFamily();
+    } else if (type === 'task') {
+        switchMainView('tasks');
+        setTimeout(() => {
+            var inp = document.getElementById('globalTaskInput');
+            if (inp) inp.focus();
+        }, 350);
+    } else if (type === 'donation') {
+        // open a family first, or show hint
+        showToast('פתח כרטיס משפחה ואז לשונית תרומות כדי לרשום תרומה', 'info');
+    } else if (type === 'here') {
+        if (!navigator.geolocation) { showToast('GPS אינו זמין', 'warning'); return; }
+        showToast('מאתר מיקום...', 'info');
+        navigator.geolocation.getCurrentPosition(pos => {
+            var {latitude:lat, longitude:lng} = pos.coords;
+            fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`)
+                .then(r=>r.json()).then(d=>{
+                    var addr = d.features&&d.features[0]
+                        ? (d.features[0].place_name_he||d.features[0].place_name).split(',')[0].trim()
+                        : 'מיקום נוכחי';
+                    switchMainView('map');
+                    map.flyTo({center:[lng,lat], zoom:18, pitch:50, duration:1200});
+                    showToast('📍 ' + addr, 'success');
+                }).catch(()=>showToast('לא ניתן לזהות כתובת', 'warning'));
+        }, ()=>showToast('לא ניתן לקבל מיקום', 'warning'));
+    }
+};
 
 window.switchCommTab = function(tabName) {
     document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
@@ -785,7 +830,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
     a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customData={...tempCustom}; a.customFields=a.customData; // backward compat
     a.updatedAt = Date.now();
-    isDirty=false; isCreatingNew=false; saveDB(); haptic('success'); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
+    isDirty=false; isCreatingNew=false; saveDB(); if(window.haptic) haptic('success'); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
     if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
 });
 
@@ -1207,44 +1252,102 @@ window.deleteBoard = async (id) => {
 window.renderKanbanView = (filteredRes = null) => {
     const sel = document.getElementById('activeKanbanBoard');
     let currentBoardId = sel.value;
-    
+
     let activeOptions = db.__BOARDS__.filter(b=>!b.archived).map(b => `<option value="${b.id}">${b.name}</option>`).join('');
     let archivedOptions = db.__BOARDS__.filter(b=>b.archived).map(b => `<option value="${b.id}">${b.name}</option>`).join('');
     sel.innerHTML = `<optgroup label="פרויקטים פעילים">${activeOptions}</optgroup><optgroup label="ארכיון (סגורים)">${archivedOptions}</optgroup>`;
-    
+
     if(currentBoardId && db.__BOARDS__.find(b=>b.id===currentBoardId)) sel.value = currentBoardId;
     else currentBoardId = db.__BOARDS__[0].id;
-    
+
     const activeBoard = db.__BOARDS__.find(b => b.id === currentBoardId);
-    
+
     if (!activeBoard) {
         document.getElementById('activeKanbanBoard').value = 'b_default';
         return renderKanbanView(filteredRes);
     }
-    
+
     const actionsSpan = document.getElementById('kanbanBoardActions');
     if(activeBoard.id === 'b_default') {
-         actionsSpan.innerHTML = `
-             <button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות</button> 
-             <span class="tag-badge" style="background:#e2e8f0; color:#64748b; border:none; margin-right:10px;"><i class="fas fa-lock"></i> מוגן</span>`;
+         actionsSpan.innerHTML = `<button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות</button> <span class="tag-badge" style="background:#e2e8f0; color:#64748b; border:none; margin-right:10px;"><i class="fas fa-lock"></i> מוגן</span>`;
     } else if(activeBoard.archived) {
-         actionsSpan.innerHTML = `
-             <span class="tag-badge" style="background:rgba(239,68,68,0.1); color:var(--danger); border:none; margin-left:10px;"><i class="fas fa-archive"></i> בארכיון</span>
-             <button class="btn-icon" onclick="toggleBoardArchive('${activeBoard.id}')" title="שחזר פרויקט"><i class="fas fa-unlock"></i> שחזר</button> 
-             <button class="btn-icon" style="color:var(--danger);" onclick="deleteBoard('${activeBoard.id}')" title="מחק פרויקט"><i class="fas fa-trash"></i></button>`;
+         actionsSpan.innerHTML = `<span class="tag-badge" style="background:rgba(239,68,68,0.1); color:var(--danger); border:none; margin-left:10px;"><i class="fas fa-archive"></i> בארכיון</span><button class="btn-icon" onclick="toggleBoardArchive('${activeBoard.id}')" title="שחזר פרויקט"><i class="fas fa-unlock"></i> שחזר</button><button class="btn-icon" style="color:var(--danger);" onclick="deleteBoard('${activeBoard.id}')" title="מחק פרויקט"><i class="fas fa-trash"></i></button>`;
     } else {
-         actionsSpan.innerHTML = `
-             <button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות</button> 
-             <button class="btn-icon" onclick="toggleBoardArchive('${activeBoard.id}')" title="נעל והעבר לארכיון"><i class="fas fa-archive"></i> לארכיון</button>
-             <button class="btn-icon" style="color:var(--danger);" onclick="deleteBoard('${activeBoard.id}')" title="מחק פרויקט"><i class="fas fa-trash"></i></button>`;
+         actionsSpan.innerHTML = `<button class="btn-icon" onclick="editCurrentBoard()"><i class="fas fa-cog"></i> ערוך עמודות</button><button class="btn-icon" onclick="toggleBoardArchive('${activeBoard.id}')" title="נעל והעבר לארכיון"><i class="fas fa-archive"></i> לארכיון</button><button class="btn-icon" style="color:var(--danger);" onclick="deleteBoard('${activeBoard.id}')" title="מחק פרויקט"><i class="fas fa-trash"></i></button>`;
     }
 
-    const c = document.getElementById('kanban-board-scroll'); c.innerHTML = '';
+    const c = document.getElementById('kanban-board-scroll');
+    c.innerHTML = '';
     if(!activeBoard) return;
 
-    let arr = filteredRes || []; 
+    let arr = filteredRes || [];
     if(!filteredRes) Object.keys(db).forEach(b=>{ if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts) db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})) });
-    
+
+    const isMobile = window.innerWidth <= 768;
+
+    if (isMobile) {
+        // ── MOBILE: grouped list by stage ──
+        activeBoard.columns.forEach(stage => {
+            const colCards = arr.filter(r => r.apt.boards && r.apt.boards[currentBoardId] === stage);
+
+            let groupHtml = `<div class="mobile-kanban-group">
+                <div class="mkg-header" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.classList.toggle('collapsed')">
+                    <div class="mkg-header-left">
+                        <span>${escapeHTML(stage)}</span>
+                        <span class="mkg-count">${colCards.length}</span>
+                    </div>
+                    <i class="fas fa-chevron-down mkg-toggle-icon"></i>
+                </div>
+                <div class="mkg-body">`;
+
+            if (colCards.length === 0) {
+                groupHtml += `<div style="padding:14px 16px; color:var(--text-muted); font-size:13px; text-align:center;">אין כרטיסיות בשלב זה</div>`;
+            } else {
+                colCards.forEach(r => {
+                    const safeName = escapeHTML(r.apt.name || 'ללא שם');
+                    const safeBldg = escapeHTML(r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg);
+                    const encBldg = encodeURIComponent(r.bldg);
+                    groupHtml += `<div class="mkg-card" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
+                        <div class="mkg-card-info">
+                            <div class="mkg-card-name">${safeName}</div>
+                            <div class="mkg-card-addr">${safeBldg}</div>
+                        </div>
+                        <button class="mkg-status-chip" onclick="event.stopPropagation(); openStagePicker('${encBldg}', ${r.idx}, '${currentBoardId}', '${escapeHTML(stage)}')">${escapeHTML(stage)} <i class="fas fa-chevron-down" style="font-size:10px;"></i></button>
+                    </div>`;
+                });
+            }
+
+            groupHtml += `</div></div>`;
+            c.innerHTML += groupHtml;
+        });
+
+        // cards not in any stage
+        const unassigned = arr.filter(r => !r.apt.boards || !r.apt.boards[currentBoardId]);
+        if (unassigned.length > 0) {
+            let groupHtml = `<div class="mobile-kanban-group">
+                <div class="mkg-header" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.classList.toggle('collapsed')">
+                    <div class="mkg-header-left"><span>לא משויך</span><span class="mkg-count" style="background:#94a3b8;">${unassigned.length}</span></div>
+                    <i class="fas fa-chevron-down mkg-toggle-icon"></i>
+                </div>
+                <div class="mkg-body">`;
+            unassigned.forEach(r => {
+                const encBldg = encodeURIComponent(r.bldg);
+                groupHtml += `<div class="mkg-card" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
+                    <div class="mkg-card-info">
+                        <div class="mkg-card-name">${escapeHTML(r.apt.name || 'ללא שם')}</div>
+                        <div class="mkg-card-addr">${escapeHTML(r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg)}</div>
+                    </div>
+                    <button class="mkg-status-chip" style="background:rgba(148,163,184,0.15); color:#64748b;" onclick="event.stopPropagation(); openStagePicker('${encBldg}', ${r.idx}, '${currentBoardId}', '')">שייך <i class="fas fa-chevron-down" style="font-size:10px;"></i></button>
+                </div>`;
+            });
+            groupHtml += `</div></div>`;
+            c.innerHTML += groupHtml;
+        }
+
+        return; // skip desktop drag/drop setup
+    }
+
+    // ── DESKTOP: original columns ──
     activeBoard.columns.forEach(stage => {
         let colCards = arr.filter(r => r.apt.boards && r.apt.boards[currentBoardId] === stage);
         let colHtml = `<div class="kanban-col" data-stage="${escapeHTML(stage)}" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropCard(event, '${stage}')"><div class="kanban-header">${escapeHTML(stage)} <span style="background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:12px;font-size:12px;">${colCards.length}</span></div><div class="kanban-body">`;
@@ -1256,13 +1359,45 @@ window.renderKanbanView = (filteredRes = null) => {
         c.innerHTML += colHtml + `</div></div>`;
     });
 
-    // חיבור אירועי מגע לכל כרטיסייה לאחר הרינדור
     c.querySelectorAll('.kanban-card').forEach(cardEl => {
         const encBldg = cardEl.getAttribute('data-enc-bldg');
         const idx = cardEl.getAttribute('data-idx');
         if(encBldg !== null && idx !== null) initTouchDrag(cardEl, encBldg, parseInt(idx));
     });
 };
+
+// Stage picker for mobile kanban
+window.openStagePicker = function(encBldg, idx, boardId, currentStage) {
+    const bldg = decodeURIComponent(encBldg);
+    const board = db.__BOARDS__.find(b => b.id === boardId);
+    if (!board) return;
+
+    const list = document.getElementById('stagePickerList');
+    const modal = document.getElementById('stagePickerModal');
+    if (!list || !modal) return;
+
+    list.innerHTML = board.columns.map(stage => `
+        <button class="stage-picker-btn ${stage === currentStage ? 'current' : ''}"
+            onclick="moveToStage('${encBldg}', ${idx}, '${boardId}', '${escapeHTML(stage)}')">
+            ${stage === currentStage ? '<i class="fas fa-check" style="margin-left:8px; color:var(--accent);"></i>' : ''}
+            ${escapeHTML(stage)}
+        </button>
+    `).join('');
+
+    modal.style.display = 'flex';
+};
+
+window.moveToStage = function(encBldg, idx, boardId, stage) {
+    const bldg = decodeURIComponent(encBldg);
+    if (!db[bldg] || !db[bldg].apts[idx]) return;
+    if (!db[bldg].apts[idx].boards) db[bldg].apts[idx].boards = {};
+    db[bldg].apts[idx].boards[boardId] = stage;
+    saveDB();
+    showToast('הועבר ל-' + stage, 'success');
+    if (window.haptic) haptic('medium');
+    document.getElementById('stagePickerModal').style.display = 'none';
+    renderKanbanView();
+};;
 
 window.allowDrop = (e) => { 
     const activeBoard = db.__BOARDS__.find(b => b.id === document.getElementById('activeKanbanBoard').value);
@@ -1571,8 +1706,96 @@ window.deleteSmartView = (viewId) => {
 
 window.renderListView = (filteredRes = null) => {
     const inner = document.getElementById('list-inner');
+    const isMobile = window.innerWidth <= 768;
 
-    // הגדרת כל העמודות האפשריות במערכת
+    let arr = filteredRes || [];
+    if (!filteredRes) {
+        Object.keys(db).forEach(b => {
+            if (b === '__BOARDS__' || b === '__SETTINGS__' || b === 'meta') return;
+            if (!db[b] || !db[b].apts) return;
+            db[b].apts.forEach((a, i) => arr.push({ bldg: b, idx: i, apt: a }));
+        });
+    }
+
+    // sort
+    arr.sort((itemA, itemB) => {
+        const a = itemA.apt, b = itemB.apt;
+        if (window.customSmartSort) {
+            const getLatestDate = (apt, type) => {
+                const logs = (apt.interactions || []).filter(i => i.type === type);
+                return logs.length > 0 ? new Date(Math.max(...logs.map(l => new Date(l.date)))) : new Date(0);
+            };
+            const typeMap = { 'last_call': 'שיחה', 'last_visit': 'ביקור' };
+            return getLatestDate(b, typeMap[window.customSmartSort]) - getLatestDate(a, typeMap[window.customSmartSort]);
+        }
+        if (window.tableSort && window.tableSort.column) {
+            let valA = '', valB = '';
+            const col = window.tableSort.column;
+            if (col === 'name') { valA = a.name || ''; valB = b.name || ''; }
+            else if (col === 'address') { valA = itemA.bldg === NO_ADDRESS_KEY ? '' : itemA.bldg; valB = itemB.bldg === NO_ADDRESS_KEY ? '' : itemB.bldg; }
+            else if (col === 'date') {
+                valA = (a.interactions && a.interactions.length > 0) ? [...a.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
+                valB = (b.interactions && b.interactions.length > 0) ? [...b.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
+            }
+            else if (col === 'father') { valA = a.father || ''; valB = b.father || ''; }
+            else if (col === 'mother') { valA = a.mother || ''; valB = b.mother || ''; }
+            else if (col === 'style') { valA = a.style || ''; valB = b.style || ''; }
+            if (valA < valB) return window.tableSort.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return window.tableSort.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+    });
+
+    // ── MOBILE: smart card feed ──
+    if (isMobile) {
+        let feedHtml = `<div class="feed-toolbar">
+            <h2><i class="fas fa-users" style="color:var(--accent);margin-left:6px;"></i>קהילה (${arr.length})</h2>
+            <div class="feed-toolbar-actions">
+                <button class="btn-icon" onclick="exportTableToCSV()" title="ייצוא"><i class="fas fa-file-excel"></i></button>
+            </div>
+        </div>
+        <div class="mobile-feed">`;
+
+        if (arr.length === 0) {
+            feedHtml += `<div class="empty-state" style="margin:40px auto;"><i class="fas fa-search" style="font-size:48px;opacity:.3;"></i><h4>אין תוצאות</h4></div>`;
+        } else {
+            arr.forEach(r => {
+                const a = r.apt;
+                const bName = r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg;
+                const phones = getAllPhones(a);
+                const statusColor = getStatusColor(a);
+                let lastDate = '';
+                if (a.interactions && a.interactions.length > 0) {
+                    lastDate = [...a.interactions].sort((x,y) => new Date(y.date)-new Date(x.date))[0].date;
+                }
+                const cleanPhone = phones.length > 0 ? phones[0].replace(/\D/g,'') : '';
+                const waPhone = cleanPhone.startsWith('0') ? '972' + cleanPhone.substring(1) : cleanPhone;
+                const tagsHtml = (a.tags||[]).map(t => `<span class="mfc-tag">${escapeHTML(t)}</span>`).join('');
+                const encBldg = encodeURIComponent(r.bldg);
+
+                feedHtml += `<div class="mobile-family-card" style="--card-status-color:${statusColor}">
+                    <div class="mfc-body" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
+                        <div class="mfc-name">${escapeHTML(a.name || '(ללא שם)')}</div>
+                        <div class="mfc-address"><i class="fas fa-map-marker-alt" style="color:var(--accent);font-size:11px;"></i>${escapeHTML(bName)}</div>
+                        ${tagsHtml ? `<div class="mfc-tags">${tagsHtml}</div>` : ''}
+                        ${lastDate ? `<div class="mfc-last-contact"><i class="far fa-clock"></i> ${lastDate}</div>` : ''}
+                    </div>
+                    <div class="mfc-actions">
+                        ${cleanPhone ? `<a class="mfc-action-btn call" href="tel:${cleanPhone}" onclick="event.stopPropagation()"><i class="fas fa-phone"></i><span>חייג</span></a>` : ''}
+                        ${waPhone ? `<a class="mfc-action-btn wa" href="https://wa.me/${waPhone}" target="_blank" onclick="event.stopPropagation()"><i class="fab fa-whatsapp"></i><span>וואטסאפ</span></a>` : ''}
+                        <button class="mfc-action-btn log" onclick="event.stopPropagation(); currentBldg='${r.bldg}'; openClientCard(${r.idx}); setTimeout(()=>{const t=document.getElementById('tabBtn-interactions'); if(t)t.click();},350)"><i class="fas fa-pen"></i><span>תיעוד</span></button>
+                        <button class="mfc-action-btn map-btn" onclick="event.stopPropagation(); flyToBuildingFromTable('${encBldg}')"><i class="fas fa-map"></i><span>מפה</span></button>
+                    </div>
+                </div>`;
+            });
+        }
+
+        feedHtml += `</div>`;
+        inner.innerHTML = feedHtml;
+        return;
+    }
+
+    // ── DESKTOP: original table view ──
     const allTableCols = [
         { id: 'address', label: 'כתובת', sortable: true },
         { id: 'name', label: 'משפחה', sortable: true },
@@ -1597,7 +1820,6 @@ window.renderListView = (filteredRes = null) => {
             : '<i class="fas fa-sort-down" style="margin-right:5px; color:var(--accent);"></i>';
     };
 
-    // בניית כפתור הגדרות עמודות והדרופדאון
     const columnsMenuHtml = `
         <div style="position:relative; display:inline-block;">
             <button class="btn btn-outline" style="width:auto; padding:8px 15px; background:var(--surface);" onclick="toggleTableColumnsMenu(event)">
@@ -1616,7 +1838,6 @@ window.renderListView = (filteredRes = null) => {
             </div>
         </div>`;
 
-    // בניית כותרות הטבלה (thead) דינמית
     let theadHtml = `<th style="width:30px;"><input type="checkbox" id="bulkSelectAll" onchange="toggleAllBulk(this)"></th>`;
     allTableCols.forEach(col => {
         if(appSettings.visibleColumns.includes(col.id)) {
@@ -1626,7 +1847,6 @@ window.renderListView = (filteredRes = null) => {
         }
     });
 
-    // יצירת דרופדאון Smart Sort
     const smartSortHtml = `
         <select class="smart-sort-select" onchange="applySmartSort(this.value)">
             <option value="">מיון רגיל (לפי עמודות)</option>
@@ -1648,49 +1868,6 @@ window.renderListView = (filteredRes = null) => {
     </div>
     <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
     <table class="data-table"><thead><tr>${theadHtml}</tr></thead><tbody>`;
-
-    let arr = filteredRes || [];
-    if(!filteredRes) Object.keys(db).forEach(b=>{if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts)db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a}))});
-
-    // מיון משולב: מיון חכם בעדיפות, אחרת מיון לפי עמודה
-    arr.sort((itemA, itemB) => {
-        const a = itemA.apt, b = itemB.apt;
-
-        if(window.customSmartSort) {
-            const getLatestDate = (apt, type) => {
-                const logs = (apt.interactions || []).filter(i => i.type === type);
-                return logs.length > 0 ? new Date(Math.max(...logs.map(l => new Date(l.date)))) : new Date(0);
-            };
-            const typeMap = { 'last_call': 'שיחה', 'last_visit': 'ביקור' };
-            const dateA = getLatestDate(a, typeMap[window.customSmartSort]);
-            const dateB = getLatestDate(b, typeMap[window.customSmartSort]);
-            return dateB - dateA;
-        }
-
-        if(window.tableSort && window.tableSort.column) {
-            let valA = '', valB = '';
-            const col = window.tableSort.column;
-
-            if(col === 'name') { valA = a.name || ''; valB = b.name || ''; }
-            else if(col === 'address') { valA = itemA.bldg === NO_ADDRESS_KEY ? '' : itemA.bldg; valB = itemB.bldg === NO_ADDRESS_KEY ? '' : itemB.bldg; }
-            else if(col === 'date') {
-                valA = (a.interactions && a.interactions.length > 0) ? [...a.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
-                valB = (b.interactions && b.interactions.length > 0) ? [...b.interactions].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date : '';
-            }
-            else if(col === 'father') { valA = a.father || ''; valB = b.father || ''; }
-            else if(col === 'mother') { valA = a.mother || ''; valB = b.mother || ''; }
-            else if(col === 'style') { valA = a.style || ''; valB = b.style || ''; }
-            else if(col.startsWith('custom_')) {
-                let f = col.replace('custom_', '');
-                valA = (a.customData && a.customData[f]) || '';
-                valB = (b.customData && b.customData[f]) || '';
-            }
-
-            if(valA < valB) return window.tableSort.direction === 'asc' ? -1 : 1;
-            if(valA > valB) return window.tableSort.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-    });
 
     arr.forEach(r => {
         const enc=encodeURIComponent(r.bldg), bName=r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg, a=r.apt;
@@ -1719,17 +1896,14 @@ window.renderListView = (filteredRes = null) => {
 
         const safeName = escapeHTML(a.name || '(ללא שם)');
         const safeTags = (a.tags||[]).map(t => `<span class="tag-badge">${escapeHTML(t)}</span>`).join('');
-        // badge צבעוני לסגנון — נשמר מהגרסה הקודמת
         const safeStyle = a.style
             ? `<span class="tag-badge" style="background:${getColorForString(a.style,'style')}20; color:${getColorForString(a.style,'style')}; border-color:${getColorForString(a.style,'style')}50;">${escapeHTML(a.style)}</span>`
             : '<span style="color:var(--text-muted);font-size:12px;">-</span>';
 
-        // יצירת תאי השורה באופן דינמי
         let cellsHtml = `<td data-label="בחר" onclick="event.stopPropagation()"><input type="checkbox" class="bulk-cb" value="${r.bldg}|${r.idx}" onchange="updateBulkBar()"></td>`;
 
         allTableCols.forEach(col => {
             if(!appSettings.visibleColumns.includes(col.id)) return;
-
             let content = '-';
             if(col.id === 'address') content = `<span onclick="flyToBuildingFromTable('${enc}'); event.stopPropagation();" style="color:var(--accent);font-weight:600;cursor:pointer;"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(bName)}</span>`;
             else if(col.id === 'name') content = `<b>${safeName}</b>`;
@@ -1753,14 +1927,13 @@ window.renderListView = (filteredRes = null) => {
                 content = val ? `<span style="font-size:13px; color:var(--text-main);">${escapeHTML(val)}</span>` : '<i class="fas fa-minus" style="opacity:0.3;"></i>';
             }
             else if(col.id === 'actions') content = contactIcons || '-';
-
             cellsHtml += `<td data-label="${escapeHTML(col.label)}">${content}</td>`;
         });
 
         html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">${cellsHtml}</tr>`;
     });
     inner.innerHTML = html + `</tbody></table></div>`;
-};
+};;
 
 window.exportTableToCSV = () => {
     // ייצוא רק של הרשומות המסוננות אם יש חיפוש או סינון פעיל
@@ -2945,7 +3118,6 @@ window.completeGlobalTask = (isGeneral, bEnc, aptIdx, tIdx, btnEl) => {
             db[bldg].apts[aptIdx].tasks[tIdx].done = true;
         }
         saveDB();
-        haptic('success');
         showToast('המשימה הושלמה וירדה מהדאשבורד!', 'success');
         renderGlobalTasks();
     }, 500);

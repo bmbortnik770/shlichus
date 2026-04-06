@@ -239,7 +239,58 @@
     </div>
 </div>
 
-<button class="fab-add" onclick="quickAddFamily()" title="הוסף משפחה חדשה מהר"><i class="fas fa-plus"></i></button>
+<!-- Speed Dial overlay -->
+<div class="fab-speed-dial" id="fabSpeedDial" onclick="closeFabDial(event)">
+    <div class="fab-scrim"></div>
+    <div class="fab-actions">
+        <div class="fab-action-item">
+            <button class="fab-action-btn" style="background:#10b981;color:white;" onclick="fabAction('family')" title="הוסף משפחה">📝</button>
+            <span class="fab-action-label">משפחה חדשה</span>
+        </div>
+        <div class="fab-action-item">
+            <button class="fab-action-btn" style="background:#3b82f6;color:white;" onclick="fabAction('task')" title="משימה כללית">✅</button>
+            <span class="fab-action-label">משימה חדשה</span>
+        </div>
+        <div class="fab-action-item">
+            <button class="fab-action-btn" style="background:#f59e0b;color:white;" onclick="fabAction('donation')" title="תרומה">💰</button>
+            <span class="fab-action-label">רישום תרומה</span>
+        </div>
+        <div class="fab-action-item">
+            <button class="fab-action-btn" style="background:#8b5cf6;color:white;" onclick="fabAction('here')" title="אני כאן">📍</button>
+            <span class="fab-action-label">אני כאן עכשיו</span>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Bottom Nav -->
+<nav class="bottom-nav" id="bottomNav">
+    <button class="bottom-nav-item active" id="bn-map" onclick="switchMainView('map')">
+        <i class="fas fa-map-marker-alt"></i><span>מפה</span>
+    </button>
+    <button class="bottom-nav-item" id="bn-table" onclick="switchMainView('table')">
+        <i class="fas fa-list"></i><span>רשימה</span>
+    </button>
+    <button class="bottom-nav-item bn-fab-slot" id="bn-fab">
+        <button class="super-fab" id="superFab" onclick="toggleFabDial()">
+            <i class="fas fa-plus"></i>
+        </button>
+    </button>
+    <button class="bottom-nav-item" id="bn-kanban" onclick="switchMainView('kanban')">
+        <i class="fas fa-project-diagram"></i><span>פרויקטים</span>
+    </button>
+    <button class="bottom-nav-item" id="bn-tasks" onclick="switchMainView('tasks')">
+        <i class="fas fa-check-double"></i><span>משימות</span>
+    </button>
+</nav>
+
+<!-- Stage Picker Bottom Sheet (for mobile kanban) -->
+<div class="modal stage-picker-sheet" id="stagePickerModal" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-content" style="padding:20px 18px;">
+        <h3 style="margin:0 0 16px 0; font-size:18px; font-weight:700;"><i class="fas fa-exchange-alt" style="color:var(--accent); margin-left:8px;"></i> העבר לשלב</h3>
+        <div class="stage-picker-list" id="stagePickerList"></div>
+        <button class="btn" style="width:100%; margin-top:12px; background:var(--bg-body); color:var(--text-muted);" onclick="document.getElementById('stagePickerModal').style.display='none'">ביטול</button>
+    </div>
+</div>
 
 <div id="onboardingModal" class="modal" style="z-index: 100000;">
     <div class="modal-content modal-small" style="text-align:center;">
@@ -556,27 +607,5 @@
     </div>
 </div>
 
-
-<!-- ניווט תחתון למובייל -->
-<nav class="bottom-nav" id="bottomNav">
-    <button class="bottom-nav-item active" id="bn-map" onclick="switchMainView('map')">
-        <i class="fas fa-map-marker-alt"></i><span>מפה</span>
-    </button>
-    <button class="bottom-nav-item" id="bn-table" onclick="switchMainView('table')">
-        <i class="fas fa-list"></i><span>רשימה</span>
-    </button>
-    <button class="bottom-nav-item" id="bn-kanban" onclick="switchMainView('kanban')">
-        <i class="fas fa-project-diagram"></i><span>פרויקטים</span>
-    </button>
-    <button class="bottom-nav-item nav-fab" onclick="NavModule.openRoutePlannerModal()">
-        <i class="fas fa-route"></i><span>ניווט</span>
-    </button>
-    <button class="bottom-nav-item" id="bn-comm" onclick="switchMainView('comm')">
-        <i class="fas fa-bullhorn"></i><span>תקשורת</span>
-    </button>
-    <button class="bottom-nav-item" id="bn-tasks" onclick="switchMainView('tasks')">
-        <i class="fas fa-check-double"></i><span>משימות</span>
-    </button>
-</nav>
 </body>
 </html>

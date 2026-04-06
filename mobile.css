@@ -1,169 +1,478 @@
 /* =============================================================
-   mobile.css — שיפורי מובייל — אדיטיבי בלבד, לא שובר כלום
+   mobile.css  —  Mobile-First Native App Upgrade
+   5 features: Cards Feed · Floating Omni-Bar · Super FAB ·
+                Kanban Grouped List · Bottom Sheets
    ============================================================= */
 
-/* ── 1. ניווט תחתון ── */
-.bottom-nav {
-    display: none; /* ברירת מחדל — נסתר בדסקטופ */
+:root {
+  --bn-h: 68px;
+  --header-h: 56px;
+  --sheet-radius: 24px;
+  --fab-size: 58px;
 }
 
+/* ── Bottom Nav hidden on desktop ── */
+.bottom-nav { display: none; }
+
 @media (max-width: 768px) {
-    /* מסתיר את סרגל הטאבים העליון — ה-JS עדיין עובד כרגיל */
-    .top-nav-bar {
-        display: none !important;
-    }
 
-    /* מרווח תחתון לגוף כדי שהתוכן לא יחפוף לניווט */
-    body {
-        padding-bottom: 68px;
-    }
+  body {
+    padding-bottom: var(--bn-h) !important;
+    -webkit-text-size-adjust: 100%;
+  }
 
-    /* ניווט תחתון */
-    .bottom-nav {
-        display: flex;
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        height: 64px;
-        background: rgba(255, 255, 255, 0.92);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
-        box-shadow: 0 -2px 20px rgba(0,0,0,0.08);
-        z-index: 999;
-        padding-bottom: env(safe-area-inset-bottom, 0px);
-    }
+  .top-nav-bar { display: none !important; }
 
-    body.dark-mode .bottom-nav {
-        background: rgba(15, 23, 42, 0.92);
-    }
+  /* ── Bottom Nav ── */
+  .bottom-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: var(--bn-h);
+    background: rgba(255,255,255,0.93);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    box-shadow: 0 -1px 0 rgba(0,0,0,0.06), 0 -8px 24px rgba(0,0,0,0.06);
+    z-index: 800;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    align-items: center;
+  }
 
-    .bottom-nav-item {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        border: none;
-        background: transparent;
-        color: #94a3b8;
-        font-size: 10px;
-        font-weight: 600;
-        font-family: inherit;
-        cursor: pointer;
-        padding: 0;
-        -webkit-tap-highlight-color: transparent;
-        transition: color 0.2s;
-    }
+  body.dark-mode .bottom-nav {
+    background: rgba(15,23,42,0.95);
+    box-shadow: 0 -1px 0 rgba(255,255,255,0.06);
+  }
 
-    .bottom-nav-item i {
-        font-size: 20px;
-        transition: transform 0.2s;
-    }
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 6px 0;
+    -webkit-tap-highlight-color: transparent;
+    transition: color .18s;
+    min-height: 44px;
+  }
 
-    .bottom-nav-item.active {
-        color: var(--accent, #3b82f6);
-    }
+  .bottom-nav-item i { font-size: 21px; transition: transform .18s; }
+  .bottom-nav-item.active { color: var(--accent, #3b82f6); }
+  .bottom-nav-item.active i { transform: translateY(-2px) scale(1.12); }
+  .bottom-nav-item.bn-fab-slot { flex: 0 0 var(--fab-size); position: relative; }
 
-    .bottom-nav-item.active i {
-        transform: translateY(-2px) scale(1.1);
-    }
+  /* ── Mobile Header ── */
+  .mobile-header {
+    height: var(--header-h) !important;
+    background: rgba(59,130,246,0.9) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.08) !important;
+    position: sticky;
+    top: 0;
+    z-index: 700;
+    transition: transform .28s ease;
+  }
 
-    /* כפתור ניווט — FAB */
-    .bottom-nav-item.nav-fab {
-        flex: 0 0 56px;
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
-        color: white !important;
-        margin-top: -16px;
-        box-shadow: 0 4px 16px rgba(99,102,241,0.45);
-        font-size: 11px;
-    }
+  .mobile-header.header-hidden { transform: translateY(-100%); }
+  body.dark-mode .mobile-header { background: rgba(15,23,42,0.92) !important; }
 
-    /* ── 2. כותרת עליונה ── */
-    .mobile-header {
-        background: rgba(59, 130, 246, 0.9) !important;
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        position: sticky;
-        top: 0;
-        z-index: 900;
-        transition: transform 0.28s ease;
-        box-shadow: 0 2px 16px rgba(0,0,0,0.1) !important;
-    }
+  /* ── 1. FLOATING OMNI-BAR ── */
+  .quick-filters-bar {
+    padding: 10px 12px 6px !important;
+    gap: 8px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
 
-    .mobile-header.header-hidden {
-        transform: translateY(-100%);
-    }
+  .search-wrapper {
+    background: rgba(255,255,255,0.96) !important;
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border-radius: 28px !important;
+    height: 50px !important;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08) !important;
+    border: 1.5px solid rgba(255,255,255,0.8) !important;
+    padding: 0 18px !important;
+    width: 100% !important;
+    box-sizing: border-box;
+  }
 
-    /* ── 3. Bottom Sheet מודאלים ── */
-    .modal {
-        align-items: flex-end !important;
-    }
+  body.dark-mode .search-wrapper {
+    background: rgba(30,41,59,0.96) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+  }
 
-    .modal-content {
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        border-radius: 24px 24px 0 0 !important;
-        max-height: 92dvh !important;
-        overflow-y: auto;
-        animation: sheetUp 0.3s cubic-bezier(0.34, 1.3, 0.64, 1) forwards;
-        padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px) !important;
-    }
+  .search-wrapper input {
+    font-size: 15px !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
 
-    .modal-content::before {
-        content: '';
-        display: block;
-        width: 44px;
-        height: 5px;
-        background: #cbd5e1;
-        border-radius: 10px;
-        margin: 0 auto 16px;
-    }
+  .filter-chips-wrapper {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 6px !important;
+    padding: 4px 2px 6px !important;
+  }
+  .filter-chips-wrapper::-webkit-scrollbar { display: none; }
 
-    @keyframes sheetUp {
-        from { transform: translateY(80px); opacity: 0.5; }
-        to   { transform: translateY(0);    opacity: 1; }
-    }
+  .filter-chip, .chip-btn {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    height: 34px !important;
+    border-radius: 17px !important;
+    padding: 0 14px !important;
+    font-size: 13px !important;
+  }
 
-    /* ── 4. Glassmorphism לכרטיסים ── */
-    .stat-card,
-    .kpi-box,
-    .kanban-card,
-    .bldg-fam-item,
-    .global-task-row {
-        border-color: transparent !important;
-        box-shadow: 0 4px 18px rgba(0,0,0,0.07) !important;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
+  /* map fills screen */
+  #map-container {
+    position: relative !important;
+    height: calc(100dvh - var(--header-h) - var(--bn-h)) !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
 
-    .kanban-card:active,
-    .bldg-fam-item:active {
-        transform: scale(0.98);
-    }
+  #map { height: 100% !important; border-radius: 0 !important; }
 
-    /* ── 5. פורמים — מניעת zoom ב-iOS ── */
-    input[type="text"],
-    input[type="tel"],
-    input[type="email"],
-    input[type="date"],
-    input[type="number"],
-    input[type="search"],
-    select,
-    textarea {
-        font-size: 16px !important;
-    }
+  .mapboxgl-ctrl-bottom-right,
+  .mapboxgl-ctrl-bottom-left { bottom: calc(var(--bn-h) + 12px) !important; }
 
-    /* ── 6. Toast מעל הניווט התחתון ── */
-    #toast-container {
-        bottom: 76px !important;
-    }
+  .map-custom-controls { bottom: calc(var(--bn-h) + 16px) !important; left: 10px !important; }
 
-    /* ── 7. כפתורי Mapbox מעל הניווט ── */
-    .mapboxgl-ctrl-bottom-right,
-    .mapboxgl-ctrl-bottom-left {
-        bottom: 72px !important;
-    }
+  /* ── 2. SUPER FAB ── */
+  .super-fab {
+    width: var(--fab-size);
+    height: var(--fab-size);
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent, #3b82f6) 0%, #6366f1 100%);
+    border: none;
+    color: white;
+    font-size: 26px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    z-index: 810;
+    margin-top: -20px;
+  }
+
+  .super-fab.open {
+    transform: rotate(45deg) scale(1.08);
+    box-shadow: 0 6px 28px rgba(99,102,241,0.65);
+  }
+
+  .fab-speed-dial {
+    position: fixed;
+    inset: 0;
+    z-index: 790;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+
+  .fab-speed-dial.open { pointer-events: all; opacity: 1; }
+
+  .fab-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(3px);
+  }
+
+  .fab-actions {
+    position: absolute;
+    bottom: calc(var(--bn-h) + var(--fab-size) + 14px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .fab-action-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-direction: row-reverse;
+    opacity: 0;
+    transform: translateY(24px) scale(0.88);
+    transition: opacity .22s, transform .22s;
+  }
+
+  .fab-speed-dial.open .fab-action-item { opacity: 1; transform: translateY(0) scale(1); }
+  .fab-speed-dial.open .fab-action-item:nth-child(1) { transition-delay: .04s; }
+  .fab-speed-dial.open .fab-action-item:nth-child(2) { transition-delay: .08s; }
+  .fab-speed-dial.open .fab-action-item:nth-child(3) { transition-delay: .13s; }
+  .fab-speed-dial.open .fab-action-item:nth-child(4) { transition-delay: .18s; }
+
+  .fab-action-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .15s;
+  }
+  .fab-action-btn:active { transform: scale(0.92); }
+
+  .fab-action-label {
+    background: rgba(255,255,255,0.96);
+    color: #1e293b;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.14);
+    white-space: nowrap;
+    font-family: inherit;
+  }
+
+  body.dark-mode .fab-action-label { background: rgba(30,41,59,0.97); color: #f1f5f9; }
+
+  /* ── 3. FAMILY CARDS FEED ── */
+  .mobile-feed {
+    padding: 12px 12px 0 !important;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .feed-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px 4px;
+    gap: 8px;
+  }
+
+  .feed-toolbar h2 { margin: 0; font-size: 18px !important; font-weight: 700; }
+  .feed-toolbar-actions { display: flex; gap: 8px; align-items: center; }
+
+  .mobile-family-card {
+    background: var(--surface, #fff);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
+    overflow: hidden;
+    position: relative;
+    transition: transform .15s ease, box-shadow .15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-family-card:active { transform: scale(0.985); box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+
+  .mobile-family-card::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 4px; height: 100%;
+    border-radius: 0 20px 20px 0;
+    background: var(--card-status-color, #94a3b8);
+  }
+
+  .mfc-body { padding: 14px 16px 10px; cursor: pointer; }
+  .mfc-name { font-size: 17px; font-weight: 700; color: var(--text-main, #1e293b); margin-bottom: 3px; }
+  .mfc-address { font-size: 13px; color: var(--text-muted, #94a3b8); display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+  .mfc-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .mfc-tag { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 10px; background: rgba(59,130,246,0.1); color: var(--accent, #3b82f6); }
+  .mfc-last-contact { font-size: 12px; color: var(--text-muted); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+
+  .mfc-actions { display: flex; border-top: 1px solid var(--border-light, #f1f5f9); }
+
+  .mfc-action-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 10px 4px;
+    border: none;
+    background: transparent;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background .15s;
+    font-family: inherit;
+    text-decoration: none;
+  }
+  .mfc-action-btn:active { filter: brightness(0.9); }
+  .mfc-action-btn i { font-size: 18px; }
+  .mfc-action-btn.call { color: #10b981; }
+  .mfc-action-btn.call:active { background: rgba(16,185,129,0.08); }
+  .mfc-action-btn.wa { color: #25D366; }
+  .mfc-action-btn.wa:active { background: rgba(37,211,102,0.08); }
+  .mfc-action-btn.log { color: var(--accent, #3b82f6); }
+  .mfc-action-btn.log:active { background: rgba(59,130,246,0.08); }
+  .mfc-action-btn.map-btn { color: #f59e0b; }
+  .mfc-action-btn.map-btn:active { background: rgba(245,158,11,0.08); }
+
+  /* ── 4. MOBILE KANBAN GROUPED LIST ── */
+  .mobile-kanban-group {
+    margin-bottom: 10px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--surface, #fff);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  }
+
+  .mkg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 16px;
+    background: var(--bg-body, #f8fafc);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text-main);
+    gap: 10px;
+  }
+
+  .mkg-header-left { display: flex; align-items: center; gap: 10px; flex: 1; }
+  .mkg-count { background: var(--accent, #3b82f6); color: white; font-size: 12px; padding: 2px 9px; border-radius: 12px; font-weight: 700; }
+  .mkg-toggle-icon { font-size: 13px; color: var(--text-muted); transition: transform .2s; }
+  .mkg-header.collapsed .mkg-toggle-icon { transform: rotate(-90deg); }
+  .mkg-body.collapsed { display: none; }
+
+  .mkg-card {
+    display: flex;
+    align-items: center;
+    padding: 13px 16px;
+    border-top: 1px solid var(--border-light, #f1f5f9);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background .12s;
+    gap: 12px;
+  }
+
+  .mkg-card:active { background: var(--bg-body, #f8fafc); }
+  .mkg-card-info { flex: 1; min-width: 0; }
+  .mkg-card-name { font-weight: 700; font-size: 15px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mkg-card-addr { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .mkg-status-chip {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 14px;
+    background: rgba(59,130,246,0.1);
+    color: var(--accent, #3b82f6);
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+
+  .kanban-hub-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    padding: 12px 14px !important;
+  }
+
+  #activeKanbanBoard { width: 100% !important; font-size: 15px !important; height: 44px !important; }
+
+  /* ── 5. BOTTOM SHEETS ── */
+  .modal { align-items: flex-end !important; padding: 0 !important; }
+
+  .modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: var(--sheet-radius) var(--sheet-radius) 0 0 !important;
+    max-height: 92dvh !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    animation: sheetSlideUp .3s cubic-bezier(.34,1.15,.64,1) forwards;
+    padding-bottom: max(env(safe-area-inset-bottom, 16px), 20px) !important;
+  }
+
+  .modal-content::before {
+    content: '';
+    display: block;
+    width: 44px; height: 5px;
+    background: #cbd5e1;
+    border-radius: 10px;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes sheetSlideUp {
+    from { transform: translateY(72px); opacity: 0.6; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  /* Stage picker sheet */
+  .stage-picker-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+
+  .stage-picker-btn {
+    width: 100%;
+    text-align: right;
+    padding: 14px 18px;
+    border-radius: 14px;
+    border: 2px solid var(--border-light, #e2e8f0);
+    background: var(--bg-body, #f8fafc);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-main);
+    cursor: pointer;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color .15s, background .15s;
+  }
+
+  .stage-picker-btn.current {
+    border-color: var(--accent, #3b82f6);
+    background: rgba(59,130,246,0.07);
+    color: var(--accent, #3b82f6);
+  }
+
+  /* ── MISC FIXES ── */
+  input[type="text"], input[type="tel"], input[type="email"],
+  input[type="date"], input[type="number"], select, textarea {
+    font-size: 16px !important;
+  }
+
+  #toast-container { bottom: calc(var(--bn-h) + 12px) !important; }
+
+  .crm-tabs { overflow-x: auto !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .crm-tabs::-webkit-scrollbar { display: none; }
+  .crm-tab { white-space: nowrap !important; flex-shrink: 0 !important; min-height: 44px !important; font-size: 13px !important; }
+
+  #sidebar { right: -100vw !important; width: 88vw !important; max-width: 360px; height: 100dvh; transition: right .28s cubic-bezier(.4,0,.2,1); z-index: 1200 !important; }
+  #sidebar.open { right: 0 !important; box-shadow: -12px 0 40px rgba(0,0,0,0.3); }
+
+  .sidebar-overlay.open { display: block !important; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1100; backdrop-filter: blur(2px); }
+
+  #list-container { height: calc(100dvh - var(--header-h) - var(--bn-h)); overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 !important; }
+  #kanban-container { height: calc(100dvh - var(--header-h) - var(--bn-h)); overflow-y: auto; -webkit-overflow-scrolling: touch; flex-direction: column !important; padding: 0 12px 12px !important; }
+  #tasks-container, #comm-container { height: calc(100dvh - var(--header-h) - var(--bn-h)); overflow-y: auto; -webkit-overflow-scrolling: touch; }
 }
