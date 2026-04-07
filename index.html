@@ -29,9 +29,21 @@
 <div id="toast-container"></div>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMobileMenu()"></div>
 
+<!-- Static header (desktop only — hidden on mobile via CSS) -->
 <div class="mobile-header">
     <h3 style="margin:0;"><i class="fas fa-users"></i> ניהול קהילה</h3>
     <button onclick="toggleMobileMenu()" style="background:none;border:none;color:white;font-size:20px;"><i class="fas fa-bars"></i></button>
+</div>
+
+<!-- Floating Omni-bar (mobile only — shown above map/content) -->
+<div class="mobile-omnibar" id="mobileOmnibar">
+    <div class="mobile-omnibar-inner">
+        <i class="fas fa-search" style="color:#94a3b8; font-size:15px; flex-shrink:0;"></i>
+        <input class="omnibar-search" id="omnibarInput" type="text" placeholder="חיפוש שם, טלפון, רחוב..." autocomplete="off">
+        <button class="mobile-omnibar-menu-btn" onclick="toggleMobileMenu()" title="תפריט">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
 </div>
 
 <div id="sidebar">
@@ -270,11 +282,12 @@
     <button class="bottom-nav-item" id="bn-table" onclick="switchMainView('table')">
         <i class="fas fa-list"></i><span>רשימה</span>
     </button>
-    <button class="bottom-nav-item bn-fab-slot" id="bn-fab">
-        <button class="super-fab" id="superFab" onclick="toggleFabDial()">
+    <!-- FAB slot: a div so we don't get nested-button invalid HTML -->
+    <div class="bn-fab-slot" id="bn-fab" aria-hidden="true">
+        <button class="super-fab" id="superFab" onclick="toggleFabDial()" aria-label="פעולות מהירות">
             <i class="fas fa-plus"></i>
         </button>
-    </button>
+    </div>
     <button class="bottom-nav-item" id="bn-kanban" onclick="switchMainView('kanban')">
         <i class="fas fa-project-diagram"></i><span>פרויקטים</span>
     </button>

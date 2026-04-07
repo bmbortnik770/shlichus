@@ -25,7 +25,7 @@
 
   /* ── Bottom Nav ── */
   .bottom-nav {
-    display: flex !important;
+    display: flex;
     position: fixed;
     bottom: 0; left: 0; right: 0;
     height: var(--bn-h);
@@ -34,8 +34,10 @@
     -webkit-backdrop-filter: blur(20px) saturate(160%);
     box-shadow: 0 -1px 0 rgba(0,0,0,0.06), 0 -8px 24px rgba(0,0,0,0.06);
     z-index: 800;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    align-items: center;
+    /* safe-area: pad the bar itself, not height, so items stay visible */
+    padding: 0 0 env(safe-area-inset-bottom, 0px);
+    align-items: stretch;
+    overflow: visible;          /* lets FAB pop above the bar */
   }
 
   body.dark-mode .bottom-nav {
@@ -43,6 +45,7 @@
     box-shadow: 0 -1px 0 rgba(255,255,255,0.06);
   }
 
+  /* Regular nav buttons — equal width, flex-column */
   .bottom-nav-item {
     flex: 1;
     display: flex;
@@ -57,39 +60,122 @@
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    padding: 6px 0;
+    padding: 6px 2px;
     -webkit-tap-highlight-color: transparent;
     transition: color .18s;
-    min-height: 44px;
+    min-width: 0;               /* allow shrink */
   }
 
-  .bottom-nav-item i { font-size: 21px; transition: transform .18s; }
+  .bottom-nav-item i { font-size: 20px; transition: transform .18s; }
+  .bottom-nav-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: block;
+  }
   .bottom-nav-item.active { color: var(--accent, #3b82f6); }
   .bottom-nav-item.active i { transform: translateY(-2px) scale(1.12); }
-  .bottom-nav-item.bn-fab-slot { flex: 0 0 var(--fab-size); position: relative; }
 
-  /* ── Mobile Header ── */
-  .mobile-header {
-    height: var(--header-h) !important;
-    background: rgba(59,130,246,0.9) !important;
-    backdrop-filter: blur(16px) !important;
-    -webkit-backdrop-filter: blur(16px) !important;
-    box-shadow: 0 1px 0 rgba(0,0,0,0.08) !important;
-    position: sticky;
-    top: 0;
-    z-index: 700;
-    transition: transform .28s ease;
+  /* FAB slot — fixed 72 px, does NOT stretch (no flex:1) */
+  .bn-fab-slot {
+    flex: 0 0 72px;
+    position: relative;         /* anchor for the absolute FAB */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
   }
 
-  .mobile-header.header-hidden { transform: translateY(-100%); }
-  body.dark-mode .mobile-header { background: rgba(15,23,42,0.92) !important; }
+  /* ── Mobile Header — hidden; floating omnibar replaces it ── */
+  .mobile-header {
+    display: none !important;
+  }
 
-  /* ── 1. FLOATING OMNI-BAR ── */
+  /* body no longer needs top padding since header is gone */
+  body {
+    padding-top: 0 !important;
+  }
+
+  /* ── Floating Omni-bar header (replaces .mobile-header) ── */
+  .mobile-omnibar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 700;
+    padding: env(safe-area-inset-top, 0px) 12px 0;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .mobile-omnibar-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.93);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border-radius: 28px;
+    height: 50px;
+    padding: 0 6px 0 16px;
+    margin-top: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.13), 0 1px 4px rgba(0,0,0,0.07);
+    pointer-events: all;
+  }
+
+  body.dark-mode .mobile-omnibar-inner {
+    background: rgba(15,23,42,0.93);
+  }
+
+  .mobile-omnibar-inner .omnibar-search {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 15px !important;
+    color: var(--text-main);
+    outline: none;
+    font-family: inherit;
+  }
+
+  .mobile-omnibar-inner .omnibar-search::placeholder { color: #94a3b8; }
+
+  .mobile-omnibar-menu-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent, #3b82f6);
+    color: white;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── 1. FLOATING OMNI-BAR + filters bar ── */
+
+  /* Map view: hide the static filters bar entirely (omnibar replaces) */
+  #map-container ~ .quick-filters-bar,
+  #map-container + .quick-filters-bar {
+    display: none !important;
+  }
+
+  /* All views: static filters bar styling */
   .quick-filters-bar {
     padding: 10px 12px 6px !important;
     gap: 8px !important;
     flex-direction: column !important;
     align-items: stretch !important;
+  }
+
+  /* Non-map containers: top padding to clear the omnibar when needed */
+  #list-container,
+  #kanban-container,
+  #tasks-container,
+  #comm-container {
+    padding-top: 4px !important;
   }
 
   .search-wrapper {
@@ -137,10 +223,10 @@
     font-size: 13px !important;
   }
 
-  /* map fills screen */
+  /* map fills full screen under omnibar and bottom nav */
   #map-container {
     position: relative !important;
-    height: calc(100dvh - var(--header-h) - var(--bn-h)) !important;
+    height: calc(100dvh - var(--bn-h)) !important;
     margin: 0 !important;
     border-radius: 0 !important;
   }
@@ -150,17 +236,76 @@
   .mapboxgl-ctrl-bottom-right,
   .mapboxgl-ctrl-bottom-left { bottom: calc(var(--bn-h) + 12px) !important; }
 
-  .map-custom-controls { bottom: calc(var(--bn-h) + 16px) !important; left: 10px !important; }
+  .map-custom-controls {
+    bottom: calc(var(--bn-h) + 16px) !important;
+    left: 10px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+
+  /* compact color-mode selector — icon-only pill */
+  #markerColorMode {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    /* shrink text so only the circle icon bg shows; color the text transparent */
+    color: transparent !important;
+    font-size: 0 !important;
+    border-radius: 12px !important;
+    border: 2px solid var(--accent) !important;
+    background:
+      var(--surface, #fff)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2.5' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='3' fill='%233b82f6'/%3E%3C/svg%3E")
+      center / 20px no-repeat !important;
+    cursor: pointer !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+    text-indent: -9999px !important;   /* belt-and-suspenders: push text off screen */
+  }
+
+  /* reveal actual text in a tooltip-like title on tap — no extra HTML needed */
+  #markerColorMode option {
+    color: var(--text-main) !important;
+    background: var(--surface, #fff) !important;
+    font-size: 15px !important;
+    text-indent: 0 !important;
+  }
+
+  /* all map control buttons — uniform small circles */
+  .map-ctrl-btn {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    font-size: 15px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+    flex-shrink: 0 !important;
+  }
 
   /* ── 2. SUPER FAB ── */
   .super-fab {
+    /* sit in the centre of .bn-fab-slot and rise 16px above the bar */
+    position: absolute;
+    bottom: calc(50% - var(--fab-size) / 2 + 16px); /* floats above bar */
+    left: 50%;
+    transform: translateX(-50%);
+
     width: var(--fab-size);
     height: var(--fab-size);
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent, #3b82f6) 0%, #6366f1 100%);
-    border: none;
+    border: 3px solid var(--bg-body, #fff); /* white ring separates from bar */
     color: white;
-    font-size: 26px;
+    font-size: 24px;
     cursor: pointer;
     box-shadow: 0 4px 20px rgba(99,102,241,0.5);
     display: flex;
@@ -168,13 +313,18 @@
     justify-content: center;
     transition: transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
     -webkit-tap-highlight-color: transparent;
-    position: relative;
     z-index: 810;
-    margin-top: -20px;
+  }
+
+  .super-fab .fas {
+    transition: transform .22s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  .super-fab.open .fas {
+    transform: rotate(45deg);
   }
 
   .super-fab.open {
-    transform: rotate(45deg) scale(1.08);
     box-shadow: 0 6px 28px rgba(99,102,241,0.65);
   }
 
