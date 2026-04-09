@@ -9,7 +9,7 @@ function getStoredJSON(key, defaultVal) {
 }
 
 const CLIENT_ID = '348261974014-242r9b0dvctlka7rj3aetu81v96ere46.apps.googleusercontent.com';
-const SCOPES = 'email profile https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata';
 let accessToken = null, driveFileId = null;
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
@@ -214,9 +214,13 @@ window.handleGoogleLogin = function() {
         window.gClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
-            callback: handleAuth
+            callback: handleAuth,
+            error_callback: (err) => {
+                console.error('Google auth error:', err);
+                showToast('שגיאת התחברות: ' + (err.message || err.type), 'error');
+            }
         });
-        window.gClient.requestAccessToken({ prompt: 'consent' });
+        window.gClient.requestAccessToken({ prompt: 'select_account' });
     } catch(e) {
         console.error('Google login error:', e);
         alert('שגיאה בהתחברות: ' + e.message);
@@ -266,7 +270,9 @@ window.onload = () => {
 
     const session = JSON.parse(localStorage.getItem('gdrive_session'));
     if (session && session.token && session.expiresAt > new Date().getTime()) {
-        accessToken = session.token; document.getElementById('auth-overlay').style.display='none'; document.getElementById('splash-screen').style.display='flex'; syncWithDrive();
+        accessToken = session.token;
+        scheduleTokenRefresh(); // schedule refresh before token expires
+        document.getElementById('auth-overlay').style.display='none'; document.getElementById('splash-screen').style.display='flex'; syncWithDrive();
     } else {
         document.getElementById('google-btn').innerHTML = `<button class="btn btn-primary" style="padding:12px 20px; font-size:16px;" onclick="handleGoogleLogin()"><i class="fab fa-google"></i> התחבר לענן</button>`;
         setTimeout(() => { document.getElementById('splash-screen').style.opacity='0'; setTimeout(()=>{document.getElementById('splash-screen').style.display='none'; document.getElementById('auth-overlay').style.display='flex';}, 800); }, 1500);
@@ -307,7 +313,10 @@ window.saveOnboardingLocation = () => {
 };
 
 function handleAuth(resp) {
-    accessToken = resp.access_token; localStorage.setItem('gdrive_session', JSON.stringify({ token: accessToken, expiresAt: new Date().getTime() + 3500000 }));
+    accessToken = resp.access_token;
+    const expiresAt = new Date().getTime() + 3500000;
+    localStorage.setItem('gdrive_session', JSON.stringify({ token: accessToken, expiresAt }));
+    scheduleTokenRefresh();
     document.getElementById('auth-overlay').style.opacity='0'; document.getElementById('splash-screen').style.display='flex'; document.getElementById('splash-screen').style.opacity='1';
     setTimeout(() => { document.getElementById('auth-overlay').style.display='none'; syncWithDrive(); }, 500);
 }
@@ -316,7 +325,7 @@ window.logout = async function() {
     if(proceed) { localStorage.removeItem('gdrive_session'); location.reload(); } 
 };
 async function ensureAuthAndExecute(cb) {
-    const session = JSON.parse(localStorage.getItem('gdrive_session'));
+    const session = JSON.parse(localStorage.getItem('gdrive_session') || 'null');
     if (!session || session.expiresAt < new Date().getTime() + 60000) {
         showToast("מחדש חיבור...", "warning");
         if (!window.gClient) {
@@ -327,7 +336,7 @@ async function ensureAuthAndExecute(cb) {
             });
         }
         window.gClient.callback = (r)=>{ handleAuth(r); setTimeout(cb, 1000); };
-        window.gClient.requestAccessToken({ prompt: 'consent' });
+        window.gClient.requestAccessToken({ prompt: 'select_account' });
     } else {
         cb();
     }
@@ -402,11 +411,53 @@ function mergeDB(local, remote) {
     return result;
 }
 
+// ── Auto-refresh token before it expires ──
+function scheduleTokenRefresh() {
+    const session = JSON.parse(localStorage.getItem('gdrive_session') || 'null');
+    if (!session) return;
+    const msUntilExpiry = session.expiresAt - Date.now();
+    const refreshIn = Math.max(msUntilExpiry - 120000, 10000); // refresh 2 min before expiry
+    setTimeout(async () => {
+        if (!accessToken) return;
+        try {
+            if (!window.gClient) {
+                window.gClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID, scope: SCOPES, callback: handleAuth
+                });
+            }
+            // Silent refresh — no UI prompt
+            window.gClient.requestAccessToken({ prompt: 'none' });
+        } catch(e) {
+            console.warn('Silent token refresh failed:', e);
+        }
+    }, refreshIn);
+}
+
 async function syncWithDrive(forcePull = false) {
     setSyncStatus('wait', 'שואב...');
     try {
         const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='community_data_final.json'&spaces=drive`, { headers: { Authorization: `Bearer ${accessToken}` } });
-        if (!res.ok) throw new Error('Drive API error: ' + res.status);
+        if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+                // Token expired or revoked — stop all retries, clear session, show re-auth
+                localStorage.removeItem('gdrive_session');
+                accessToken = null;
+                setSyncStatus('error', 'פג תוקף — יש להתחבר מחדש');
+                // Make sure splash is hidden
+                const splash = document.getElementById('splash-screen');
+                if (splash) { splash.style.opacity = '0'; setTimeout(() => { splash.style.display = 'none'; }, 600); }
+                // Show re-auth button in sidebar (non-blocking)
+                showToast('חיבור Google פג — לחץ "התחבר מחדש" בתפריט', 'warning');
+                setSyncStatus('error', 'לחץ התחבר מחדש');
+                // Update sync button in sidebar to a prominent re-auth button
+                const syncRow = document.querySelector('.gdrive-sync-row');
+                if (syncRow) {
+                    syncRow.innerHTML = '<button class="btn btn-primary" style="width:100%;font-size:14px;" onclick="handleGoogleLogin()"><i class="fab fa-google" style="margin-left:6px;"></i>התחבר מחדש לענן</button>';
+                }
+                return; // STOP — do not throw, do not retry
+            }
+            throw new Error('Drive API error: ' + res.status);
+        }
         const list = await res.json();
         if (list.files && list.files.length > 0) {
             driveFileId = list.files[0].id;
@@ -450,7 +501,20 @@ async function syncWithDrive(forcePull = false) {
         if(!db.meta) db.meta = { lastModified: 0 };
         saveLocal();
         setSyncStatus('ok', 'מסונכרן');
-    } catch(e) { setSyncStatus('error', 'שגיאה'); console.error('sync error', e); }
+    } catch(e) {
+        console.error('sync error', e);
+        const msg = e?.message || String(e);
+        if (msg.includes('401') || msg.includes('403') || msg.includes('invalid_token')) {
+            setSyncStatus('error', 'פג תוקף');
+            showToast('חיבור Google פג — לחץ "סנכרן" להתחבר מחדש', 'warning');
+        } else if (msg.includes('Drive API error')) {
+            setSyncStatus('error', 'שגיאת API');
+            showToast('שגיאת Drive: ' + msg + ' — נסה להתנתק ולהתחבר שוב', 'error');
+        } else {
+            setSyncStatus('error', 'שגיאה');
+            showToast('שגיאת סנכרון: ' + msg, 'error');
+        }
+    }
 
     document.getElementById('splash-screen').style.opacity='0'; 
     setTimeout(() => { 
@@ -469,6 +533,42 @@ async function syncWithDrive(forcePull = false) {
     }, 800);
 }
 
+
+
+// ── Wrapper for manual sync button — re-auths if token expired ──
+window.manualSync = async function() {
+    const session = JSON.parse(localStorage.getItem('gdrive_session') || 'null');
+    const tokenValid = session && session.token && session.expiresAt > Date.now();
+    if (!tokenValid || !accessToken) {
+        showToast('מתחבר מחדש ל-Google...', 'info');
+        try {
+            await new Promise((resolve, reject) => {
+                if (!window.gClient) {
+                    window.gClient = google.accounts.oauth2.initTokenClient({
+                        client_id: CLIENT_ID,
+                        scope: SCOPES,
+                        callback: (resp) => {
+                            if (resp.error) { reject(resp.error); return; }
+                            handleAuth(resp);
+                            resolve();
+                        }
+                    });
+                } else {
+                    window.gClient.callback = (resp) => {
+                        if (resp.error) { reject(resp.error); return; }
+                        handleAuth(resp);
+                        resolve();
+                    };
+                }
+                window.gClient.requestAccessToken({ prompt: 'none' });
+            });
+        } catch(err) {
+            showToast('לא ניתן להתחבר: ' + err, 'error');
+            return;
+        }
+    }
+    await syncWithDrive();
+};
 
 // ── שחזור כפוי מהענן (דורס נתונים מקומיים) ──
 window.forcePullFromDrive = async function() {
@@ -3001,6 +3101,8 @@ setInterval(() => {
     const isTokenValid = session && session.expiresAt > (new Date().getTime() + 60000);
     if(accessToken && !isDirty && isTokenValid) {
         syncWithDrive();
+    } else if (!accessToken) {
+        clearInterval(window._autoSyncInterval);
     }
 }, 30000);
 
