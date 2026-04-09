@@ -253,6 +253,8 @@ window.onload = () => {
     }
 
     switchMainView(currentMainView);
+    // Set initial body view class for CSS targeting
+    document.body.classList.add('view-' + currentMainView);
     if(localStorage.getItem('darkMode')==='true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className='fas fa-sun'; }
     populateFilterDropdowns();
     // debounce לחיפוש — מונע ריצות מיותרות
@@ -400,10 +402,11 @@ function mergeDB(local, remote) {
     return result;
 }
 
-async function syncWithDrive() {
+async function syncWithDrive(forcePull = false) {
     setSyncStatus('wait', 'שואב...');
     try {
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='community_data_final.json'`, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='community_data_final.json'&spaces=drive`, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!res.ok) throw new Error('Drive API error: ' + res.status);
         const list = await res.json();
         if (list.files && list.files.length > 0) {
             driveFileId = list.files[0].id;
@@ -412,18 +415,29 @@ async function syncWithDrive() {
             if(Object.keys(remote).length > 0) {
                 const remoteTime = remote.meta?.lastModified || 0;
                 const localTime = db.meta?.lastModified || 0;
-                if(remoteTime > localTime) {
+
+                // Count real data entries in local vs remote
+                const countFamilies = (d) => Object.keys(d).filter(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== 'meta' && d[k]?.apts?.length > 0).reduce((s, k) => s + d[k].apts.length, 0);
+                const localFamilies = countFamilies(db);
+                const remoteFamilies = countFamilies(remote);
+
+                // Force pull if: explicitly requested, local is empty, or remote has significantly more data
+                if(forcePull || localFamilies === 0 || remoteFamilies > localFamilies * 1.5) {
+                    db = remote;
+                    showToast(`נטענו ${remoteFamilies} משפחות מהענן! ✅`, 'success');
+                } else if(remoteTime > localTime) {
                     db = mergeDB(db, remote);
-                    if(db['__SETTINGS__']) {
-                        appSettings = db['__SETTINGS__'];
-                        localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
-                        document.documentElement.style.setProperty('--accent', appSettings.themeColor);
-                        populateFilterDropdowns();
-                    }
                 } else if(localTime > remoteTime) {
                     await pushToDrive();
                 } else {
                     db = mergeDB(db, remote);
+                }
+
+                if(db['__SETTINGS__']) {
+                    appSettings = db['__SETTINGS__'];
+                    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+                    document.documentElement.style.setProperty('--accent', appSettings.themeColor);
+                    populateFilterDropdowns();
                 }
             }
         } else {
@@ -454,6 +468,27 @@ async function syncWithDrive() {
         geocodeMissingAddresses(); 
     }, 800);
 }
+
+
+// ── שחזור כפוי מהענן (דורס נתונים מקומיים) ──
+window.forcePullFromDrive = async function() {
+    if (!accessToken) {
+        showToast('יש להתחבר לחשבון Google קודם', 'warning');
+        return;
+    }
+    const confirmed = await showCustomDialog({
+        title: 'שחזור מהענן',
+        message: 'פעולה זו תחליף את כל הנתונים המקומיים בנתונים מהענן. להמשיך?',
+        showCancel: true
+    });
+    if (!confirmed) return;
+    showToast('טוען נתונים מהענן...', 'info');
+    await syncWithDrive(true);
+    saveLocal();
+    refreshMap();
+    handleOmniSearch();
+    showToast('שחזור הושלם בהצלחה! ✅', 'success');
+};
 
 // שמירה מקומית
 function saveLocal() {
@@ -516,7 +551,7 @@ function autoSave() {
 
 window.switchMainView = function(viewName) {
     currentMainView = viewName;
-    // desktop tabs (null-safe — tab-nav doesn't exist as a switchable view)
+    // desktop tabs (null-safe)
     document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
     const dtab = document.getElementById('tab-' + viewName);
     if (dtab) dtab.classList.add('active');
@@ -525,11 +560,55 @@ window.switchMainView = function(viewName) {
     const mbtn = document.getElementById('bn-' + viewName);
     if (mbtn) mbtn.classList.add('active');
 
+    // body view class — CSS uses this to show/hide elements per view
+    document.body.classList.remove('view-map','view-table','view-kanban','view-tasks','view-comm');
+    document.body.classList.add('view-' + viewName);
+
     document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
     document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
     document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
     document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
     document.getElementById('tasks-container').style.display = viewName==='tasks'?'flex':'none';
+
+    // Mobile: inject search strip for list + kanban
+    if (window.innerWidth <= 768) {
+        var strip = document.getElementById('mobileViewSearch');
+        if (viewName === 'table' || viewName === 'kanban') {
+            if (!strip) {
+                strip = document.createElement('div');
+                strip.id = 'mobileViewSearch';
+                strip.className = 'mobile-view-search';
+                strip.innerHTML = [
+                    '<div class="search-wrapper" style="display:flex;align-items:center;gap:10px;">',
+                    '  <i class="fas fa-search" style="color:#94a3b8;font-size:13px;flex-shrink:0;"></i>',
+                    '  <input type="text" id="mobileViewSearchInput" placeholder="חיפוש שם, טלפון, רחוב..." autocomplete="off"',
+                    '    style="flex:1;border:none;background:transparent;outline:none;font-size:15px;font-family:inherit;direction:rtl;text-align:right;">',
+                    '  <i class="fas fa-times" id="mobileViewSearchClear" style="color:#94a3b8;font-size:13px;flex-shrink:0;cursor:pointer;display:none;"',
+                    '    onclick="document.getElementById(\'mobileViewSearchInput\').value=\'\';',
+                    '    document.getElementById(\'smartSearch\').value=\'\';',
+                    '    document.getElementById(\'smartSearch\').dispatchEvent(new Event(\'input\',{bubbles:true}));',
+                    '    this.style.display=\'none\';"></i>',
+                    '</div>',
+                    '<div class="filter-chips-wrapper" id="mobileChipsContainer"></div>'
+                ].join('');
+                document.body.appendChild(strip);
+                var msi = document.getElementById('mobileViewSearchInput');
+                msi.addEventListener('input', function() {
+                    var real = document.getElementById('smartSearch');
+                    if (real) { real.value = this.value; real.dispatchEvent(new Event('input',{bubbles:true})); }
+                    var clr = document.getElementById('mobileViewSearchClear');
+                    if (clr) clr.style.display = this.value ? 'inline' : 'none';
+                });
+            }
+            strip.style.display = 'flex';
+            // Mirror filter chips
+            var desktopChips = document.getElementById('chipFiltersContainer');
+            var mobileChips = document.getElementById('mobileChipsContainer');
+            if (desktopChips && mobileChips) mobileChips.innerHTML = desktopChips.innerHTML;
+        } else {
+            if (strip) strip.style.display = 'none';
+        }
+    }
 
     if(viewName==='map') map.resize();
     if(viewName==='tasks') {
@@ -538,6 +617,27 @@ window.switchMainView = function(viewName) {
     }
     handleOmniSearch();
     if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
+};;
+
+// ── Mobile search strip: appears on list/kanban/tasks/comm, hidden on map ──
+window.updateMobileSearchStrip = function(viewName) {
+    if (window.innerWidth > 768) return;
+    var strip = document.getElementById('mobileViewSearch');
+    if (!strip) return;
+    var mapViews = ['map'];
+    if (mapViews.includes(viewName)) {
+        strip.style.display = 'none';
+    } else {
+        strip.style.display = 'flex';
+        strip.style.flexDirection = 'column';
+        // Adjust container top-padding to account for strip height (~100px total)
+        var extraPad = strip.offsetHeight || 50;
+        var containers = ['list-container','kanban-container','tasks-container','comm-container'];
+        containers.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.style.paddingTop = (76 + extraPad) + 'px';
+        });
+    }
 };
 
 // ── Haptic ──
@@ -547,6 +647,33 @@ window.haptic = function(type) {
       success:()=>navigator.vibrate([25,35,25]), error:()=>navigator.vibrate([55,30,55])
     }[type] || (()=>navigator.vibrate(28)))();
 };
+
+
+// ── Omnibar sync: mobile search input mirrors #smartSearch ──
+(function initOmnibar() {
+    function sync() {
+        var omni = document.getElementById('omnibarInput');
+        var real = document.getElementById('smartSearch');
+        if (!omni || !real) return;
+
+        // omnibar → real search (triggers existing search logic)
+        omni.addEventListener('input', function() {
+            real.value = this.value;
+            real.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+
+        // real search → omnibar (keeps them in sync when changed elsewhere)
+        real.addEventListener('input', function() {
+            if (document.activeElement !== omni) omni.value = this.value;
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', sync);
+    } else {
+        sync();
+    }
+})();
 
 // ── Hide header on scroll ──
 (function() {
@@ -568,14 +695,16 @@ window.toggleFabDial = function() {
     if (!dial) return;
     var open = dial.classList.toggle('open');
     fab.classList.toggle('open', open);
+    // lock body scroll when sheet is open
+    document.body.style.overflow = open ? 'hidden' : '';
 };
 
-window.closeFabDial = function(e) {
-    if (e && e.target !== document.getElementById('fabSpeedDial') && !e.target.classList.contains('fab-scrim')) return;
+window.closeFabDial = function() {
     var dial = document.getElementById('fabSpeedDial');
     var fab  = document.getElementById('superFab');
     if (dial) dial.classList.remove('open');
     if (fab)  fab.classList.remove('open');
+    document.body.style.overflow = '';
 };
 
 window.fabAction = function(type) {
@@ -584,28 +713,18 @@ window.fabAction = function(type) {
         window.quickAddFamily();
     } else if (type === 'task') {
         switchMainView('tasks');
-        setTimeout(() => {
-            var inp = document.getElementById('globalTaskInput');
-            if (inp) inp.focus();
-        }, 350);
+        setTimeout(() => { var inp = document.getElementById('globalTaskInput'); if (inp) inp.focus(); }, 350);
     } else if (type === 'donation') {
-        // open a family first, or show hint
         showToast('פתח כרטיס משפחה ואז לשונית תרומות כדי לרשום תרומה', 'info');
-    } else if (type === 'here') {
-        if (!navigator.geolocation) { showToast('GPS אינו זמין', 'warning'); return; }
-        showToast('מאתר מיקום...', 'info');
-        navigator.geolocation.getCurrentPosition(pos => {
-            var {latitude:lat, longitude:lng} = pos.coords;
-            fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`)
-                .then(r=>r.json()).then(d=>{
-                    var addr = d.features&&d.features[0]
-                        ? (d.features[0].place_name_he||d.features[0].place_name).split(',')[0].trim()
-                        : 'מיקום נוכחי';
-                    switchMainView('map');
-                    map.flyTo({center:[lng,lat], zoom:18, pitch:50, duration:1200});
-                    showToast('📍 ' + addr, 'success');
-                }).catch(()=>showToast('לא ניתן לזהות כתובת', 'warning'));
-        }, ()=>showToast('לא ניתן לקבל מיקום', 'warning'));
+    } else if (type === 'nav') {
+        // Open the route planner modal (NavModule)
+        setTimeout(function() {
+            if (window.NavModule && window.NavModule.openRoutePlannerModal) {
+                window.NavModule.openRoutePlannerModal();
+            } else {
+                showToast('מודול הניווט אינו זמין', 'warning');
+            }
+        }, 150); // slight delay so close animation finishes first
     }
 };
 
@@ -1344,6 +1463,9 @@ window.renderKanbanView = (filteredRes = null) => {
             c.innerHTML += groupHtml;
         }
 
+        // On mobile, force block layout (flex from switchMainView would make columns horizontal)
+        var kc = document.getElementById('kanban-container');
+        if (kc) { kc.style.display = 'block'; kc.style.overflowY = 'auto'; }
         return; // skip desktop drag/drop setup
     }
 
@@ -1397,7 +1519,7 @@ window.moveToStage = function(encBldg, idx, boardId, stage) {
     if (window.haptic) haptic('medium');
     document.getElementById('stagePickerModal').style.display = 'none';
     renderKanbanView();
-};;
+};
 
 window.allowDrop = (e) => { 
     const activeBoard = db.__BOARDS__.find(b => b.id === document.getElementById('activeKanbanBoard').value);
@@ -1933,7 +2055,7 @@ window.renderListView = (filteredRes = null) => {
         html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">${cellsHtml}</tr>`;
     });
     inner.innerHTML = html + `</tbody></table></div>`;
-};;
+};
 
 window.exportTableToCSV = () => {
     // ייצוא רק של הרשומות המסוננות אם יש חיפוש או סינון פעיל

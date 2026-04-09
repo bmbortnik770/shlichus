@@ -46,6 +46,18 @@
     </div>
 </div>
 
+<!-- Mobile Search Strip: visible on list/kanban/tasks/comm, hidden on map -->
+<div class="mobile-view-search" id="mobileViewSearch" style="display:none;">
+    <div class="search-wrapper" style="position:relative;">
+        <i class="fas fa-search"></i>
+        <input type="text" id="mobileStripSearch" placeholder="חיפוש מהיר..." autocomplete="off"
+            oninput="document.getElementById('smartSearch').value=this.value; document.getElementById('smartSearch').dispatchEvent(new Event('input',{bubbles:true}))">
+    </div>
+    <div class="filter-chips-wrapper" id="mobileStripChips">
+        <!-- chips will be cloned here by JS -->
+    </div>
+</div>
+
 <div id="sidebar">
     <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:15px; border-bottom:1px solid var(--border-light);">
         <h2 style="margin:0; color:var(--text-main); font-size:22px; font-weight:700;"><i class="fas fa-users" style="color:var(--accent); margin-left:8px;"></i>ניהול קהילה</h2>
@@ -56,9 +68,19 @@
         </div>
     </div>
     
-    <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-body); padding:10px 15px; border-radius:12px; border:1px solid var(--border-light); font-size:13px; margin-bottom:5px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
-        <span style="font-weight:600; color:var(--text-main);">Google Drive:</span>
-        <span id="sync-status" style="display:flex; align-items:center; gap:5px; color:var(--warning); font-weight:600;"><i id="sync-icon" class="fas fa-spinner fa-spin"></i> <span id="sync-text">ממתין...</span></span>
+    <div style="background:var(--bg-body); padding:10px 15px; border-radius:12px; border:1px solid var(--border-light); font-size:13px; margin-bottom:5px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:600; color:var(--text-main);">Google Drive:</span>
+            <span id="sync-status" style="display:flex; align-items:center; gap:5px; color:var(--warning); font-weight:600;"><i id="sync-icon" class="fas fa-spinner fa-spin"></i> <span id="sync-text">ממתין...</span></span>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button onclick="syncWithDrive()" class="btn btn-outline" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;">
+                <i class="fas fa-sync-alt"></i> סנכרן
+            </button>
+            <button onclick="forcePullFromDrive()" class="btn btn-warning" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;" title="טען מחדש את כל הנתונים מהענן (דורס נתונים מקומיים)">
+                <i class="fas fa-cloud-download-alt"></i> שחזר מענן
+            </button>
+        </div>
     </div>
 
     <div id="welcomeMessage" style="font-weight:600; color:var(--accent); font-size:14px; text-align:center; padding:10px; background:rgba(59,130,246,0.1); border-radius:8px; margin-bottom:10px;"></div>
@@ -130,7 +152,7 @@
     </div>
     
     <div id="list-container">
-        <div id="list-inner" style="padding: 20px; box-sizing: border-box;"></div>
+        <div id="list-inner" style="padding: 0; box-sizing: border-box;"></div>
     </div>
     
     <div id="kanban-container">
@@ -251,48 +273,60 @@
     </div>
 </div>
 
-<!-- Speed Dial overlay -->
-<div class="fab-speed-dial" id="fabSpeedDial" onclick="closeFabDial(event)">
-    <div class="fab-scrim"></div>
-    <div class="fab-actions">
-        <div class="fab-action-item">
-            <button class="fab-action-btn" style="background:#10b981;color:white;" onclick="fabAction('family')" title="הוסף משפחה">📝</button>
-            <span class="fab-action-label">משפחה חדשה</span>
-        </div>
-        <div class="fab-action-item">
-            <button class="fab-action-btn" style="background:#3b82f6;color:white;" onclick="fabAction('task')" title="משימה כללית">✅</button>
-            <span class="fab-action-label">משימה חדשה</span>
-        </div>
-        <div class="fab-action-item">
-            <button class="fab-action-btn" style="background:#f59e0b;color:white;" onclick="fabAction('donation')" title="תרומה">💰</button>
-            <span class="fab-action-label">רישום תרומה</span>
-        </div>
-        <div class="fab-action-item">
-            <button class="fab-action-btn" style="background:#8b5cf6;color:white;" onclick="fabAction('here')" title="אני כאן">📍</button>
-            <span class="fab-action-label">אני כאן עכשיו</span>
+<!-- Speed Dial — modern bottom sheet panel -->
+<div class="fab-speed-dial" id="fabSpeedDial">
+    <div class="fab-scrim" onclick="closeFabDial()"></div>
+    <div class="fab-sheet">
+        <div class="fab-sheet-handle"></div>
+        <div class="fab-sheet-title">פעולה מהירה</div>
+        <div class="fab-sheet-grid">
+            <button class="fab-sheet-btn" onclick="fabAction('family')">
+                <div class="fab-sheet-icon" style="background:linear-gradient(135deg,#10b981,#059669)">
+                    <i class="fas fa-user-plus"></i>
+                </div>
+                <span>משפחה חדשה</span>
+            </button>
+            <button class="fab-sheet-btn" onclick="fabAction('task')">
+                <div class="fab-sheet-icon" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">
+                    <i class="fas fa-check-square"></i>
+                </div>
+                <span>משימה חדשה</span>
+            </button>
+            <button class="fab-sheet-btn" onclick="fabAction('donation')">
+                <div class="fab-sheet-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+                    <i class="fas fa-donate"></i>
+                </div>
+                <span>רישום תרומה</span>
+            </button>
+            <button class="fab-sheet-btn" onclick="fabAction('nav')">
+                <div class="fab-sheet-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">
+                    <i class="fas fa-route"></i>
+                </div>
+                <span>ניווט מסלול</span>
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Mobile Bottom Nav -->
 <nav class="bottom-nav" id="bottomNav">
-    <button class="bottom-nav-item active" id="bn-map" onclick="switchMainView('map')">
-        <i class="fas fa-map-marker-alt"></i><span>מפה</span>
+    <button class="bottom-nav-item" id="bn-tasks" onclick="switchMainView('tasks')">
+        <i class="fas fa-check-double"></i><span>משימות</span>
     </button>
-    <button class="bottom-nav-item" id="bn-table" onclick="switchMainView('table')">
-        <i class="fas fa-list"></i><span>רשימה</span>
+    <button class="bottom-nav-item" id="bn-kanban" onclick="switchMainView('kanban')">
+        <i class="fas fa-project-diagram"></i><span>פרויקטים</span>
     </button>
-    <!-- FAB slot: a div so we don't get nested-button invalid HTML -->
+    <!-- FAB slot -->
     <div class="bn-fab-slot" id="bn-fab" aria-hidden="true">
         <button class="super-fab" id="superFab" onclick="toggleFabDial()" aria-label="פעולות מהירות">
             <i class="fas fa-plus"></i>
         </button>
     </div>
-    <button class="bottom-nav-item" id="bn-kanban" onclick="switchMainView('kanban')">
-        <i class="fas fa-project-diagram"></i><span>פרויקטים</span>
+    <button class="bottom-nav-item" id="bn-table" onclick="switchMainView('table')">
+        <i class="fas fa-list"></i><span>רשימה</span>
     </button>
-    <button class="bottom-nav-item" id="bn-tasks" onclick="switchMainView('tasks')">
-        <i class="fas fa-check-double"></i><span>משימות</span>
+    <button class="bottom-nav-item active" id="bn-map" onclick="switchMainView('map')">
+        <i class="fas fa-map-marker-alt"></i><span>מפה</span>
     </button>
 </nav>
 
