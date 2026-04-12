@@ -108,7 +108,7 @@ html, body {
     position: fixed;
     bottom: calc(25px + var(--safe-b));
     left: 20px; /* צד שמאל כי אנחנו ב-RTL, הכי נוח לאגודל ימין */
-    z-index: 1000;
+    z-index: 3000;
     display: flex;
     flex-direction: column;
     align-items: center;
