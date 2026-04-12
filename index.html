@@ -584,6 +584,28 @@
     </div>
 </div>
 
+<!-- ══ Desktop FAB ══ -->
+<div id="desktopFabBackdrop" onclick="closeDesktopFab()" style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(15,23,42,0.4); backdrop-filter:blur(3px);"></div>
+
+<div id="desktopFabDial" style="display:none; position:fixed; bottom:110px; left:30px; z-index:9001; display:none; flex-direction:column; gap:12px; align-items:flex-start;">
+    <button class="dfab-option" onclick="closeDesktopFab(); window.quickAddFamily()">
+        <div class="dfab-icon" style="background:linear-gradient(135deg,#10b981,#059669);"><i class="fas fa-user-plus"></i></div>
+        <span class="dfab-label">משפחה חדשה</span>
+    </button>
+    <button class="dfab-option" onclick="closeDesktopFab(); switchMainView('tasks'); setTimeout(()=>{const i=document.getElementById('globalTaskInput');if(i)i.focus();},350)">
+        <div class="dfab-icon" style="background:linear-gradient(135deg,#3b82f6,#2563eb);"><i class="fas fa-check-square"></i></div>
+        <span class="dfab-label">משימה חדשה</span>
+    </button>
+    <button class="dfab-option" onclick="closeDesktopFab(); showToast('פתח כרטיס משפחה ואז לשונית תרומות','info')">
+        <div class="dfab-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706);"><i class="fas fa-donate"></i></div>
+        <span class="dfab-label">רישום תרומה</span>
+    </button>
+</div>
+
+<button id="desktopFab" onclick="toggleDesktopFab()" title="פעולות מהירות" aria-label="פעולות מהירות">
+    <i class="fas fa-plus" id="desktopFabIcon"></i>
+</button>
+
 <script src="app.js?v=14"></script>
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">

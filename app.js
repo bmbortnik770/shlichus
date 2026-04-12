@@ -835,6 +835,27 @@ window.haptic = function(type) {
 
 // ── FAB Speed Dial removed (mobile only) ──
 
+// ── Desktop FAB ──────────────────────────────────────────────
+window.toggleDesktopFab = function() {
+    const fab    = document.getElementById('desktopFab');
+    const dial   = document.getElementById('desktopFabDial');
+    const backdrop = document.getElementById('desktopFabBackdrop');
+    const isOpen = dial.classList.contains('open');
+    if (isOpen) {
+        closeDesktopFab();
+    } else {
+        dial.classList.add('open');
+        fab.classList.add('open');
+        backdrop.style.display = 'block';
+    }
+};
+
+window.closeDesktopFab = function() {
+    document.getElementById('desktopFab').classList.remove('open');
+    document.getElementById('desktopFabDial').classList.remove('open');
+    document.getElementById('desktopFabBackdrop').style.display = 'none';
+};
+
 window.switchCommTab = function(tabName) {
     document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
     document.getElementById('commTabBtn-' + tabName).classList.add('active');
