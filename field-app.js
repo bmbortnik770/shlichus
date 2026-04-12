@@ -11,6 +11,28 @@
 
 'use strict';
 
+// ── גלאי שגיאות גלובלי (לדיבוג על טלפון ללא קונסול) ──────
+window.onerror = function(msg, src, line, col, err) {
+    const text = (err && err.message ? err.message : msg) + ' [שורה ' + line + ']';
+    const c = document.getElementById('f-toast-container');
+    if (c) {
+        const t = document.createElement('div');
+        t.className = 'f-toast f-toast-error';
+        t.style.cssText = 'opacity:1;transform:none;word-break:break-word;font-size:12px;';
+        t.innerHTML = '<i class="fas fa-bug"></i> ' + text;
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 12000);
+    } else {
+        alert('שגיאה: ' + text);
+    }
+    return false;
+};
+
+window.onunhandledrejection = function(e) {
+    const msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason);
+    window.onerror('Promise: ' + msg, '', 0);
+};
+
 // ── קבועים ──────────────────────────────────────────────────
 const CLIENT_ID   = '348261974014-242r9b0dvctlka7rj3aetu81v96ere46.apps.googleusercontent.com';
 const SCOPES      = 'email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata';
