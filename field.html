@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#1e40af">
+    <meta name="theme-color" content="#2563eb">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="שטח CRM">
@@ -21,191 +21,64 @@
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
 
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+
     <link rel="stylesheet" href="field-style.css">
 </head>
 <body>
 
-<!-- ══ SPLASH ══ -->
-<div id="f-splash">
-    <i class="fas fa-map-marked-alt"></i>
-    <h2>אפליקציית שטח</h2>
-    <p><i class="fas fa-spinner fa-spin"></i> טוען נתונים...</p>
-</div>
-
-<!-- ══ AUTH ══ -->
-<div id="f-auth">
-    <div class="f-auth-card">
-        <i class="fas fa-satellite-dish"></i>
-        <h2>כניסה לשטח</h2>
-        <p>יש להתחבר לחשבון Google כדי לסנכרן נתונים</p>
-        <button id="f-login-btn" onclick="fieldApp.login()">
-            <i class="fab fa-google"></i> כניסה עם Google
-        </button>
-        <button class="f-offline-btn" onclick="fieldApp.continueOffline()">
-            המשך במצב לא-מקוון
-        </button>
+    <div id="f-splash" class="f-splash">
+        <i class="fas fa-map-marked-alt pulse-logo"></i>
+        <h1>מערכת שטח</h1>
+        <div class="f-spinner"></div>
+        <p id="f-splash-text">טוען נתוני קהילה...</p>
     </div>
-</div>
 
-<!-- ══ MAP (מסך ראשי) ══ -->
-<div id="f-map"></div>
-
-<!-- ══ HUD ══ -->
-<div id="f-hud" class="hidden">
-    <div class="f-hud-inner">
-        <div class="f-hud-dest">
-            <span class="f-hud-label">יעד:</span>
-            <span id="f-hud-name">—</span>
-        </div>
-        <div class="f-hud-dist">
-            <i class="fas fa-route"></i>
-            <span id="f-hud-dist">—</span>
+    <div id="f-auth" class="f-auth hidden">
+        <div class="f-auth-card">
+            <i class="fas fa-user-shield"></i>
+            <h2>התחברות לשטח</h2>
+            <p>האפליקציה דורשת סנכרון מאובטח מול הדרייב.</p>
+            <div id="f-google-btn" style="display:flex; justify-content:center; margin: 20px 0;"></div>
+            <button class="f-btn-text" onclick="fieldApp.continueOffline()">המשך במצב אופליין (ללא סנכרון)</button>
         </div>
     </div>
-    <button class="f-hud-cancel" onclick="fieldApp.cancelNav()">
-        <i class="fas fa-times"></i>
-    </button>
-</div>
 
-<!-- ══ TOP BAR ══ -->
-<div id="f-topbar">
-    <button class="f-topbar-btn" onclick="fieldApp.openSearch()" aria-label="חיפוש">
-        <i class="fas fa-search"></i>
-    </button>
-    <div id="f-topbar-title">מפת קהילה</div>
-    <button class="f-topbar-btn" onclick="fieldApp.openOutboxStatus()" aria-label="תור עדכונים">
-        <i class="fas fa-inbox"></i>
-        <span id="f-outbox-badge" class="f-badge hidden">0</span>
-    </button>
-</div>
+    <div id="f-map" class="f-map"></div>
 
-<!-- ══ SEARCH SHEET ══ -->
-<div id="f-search-sheet" class="f-sheet hidden">
-    <div class="f-sheet-handle"></div>
-    <div class="f-search-header">
-        <i class="fas fa-search"></i>
-        <input id="f-search-input" type="text" placeholder="חיפוש שם, רחוב, טלפון..." autocomplete="off">
-        <button onclick="fieldApp.closeSearch()"><i class="fas fa-times"></i></button>
-    </div>
-    <div id="f-search-results"></div>
-</div>
-
-<!-- ══ ARRIVAL BOTTOM SHEET ══ -->
-<div id="f-arrival-sheet" class="f-sheet hidden">
-    <div class="f-sheet-handle"></div>
-
-    <div id="f-arrival-entry-code" class="f-entry-code hidden">
-        <i class="fas fa-door-open"></i>
-        <span id="f-entry-code-text"></span>
-    </div>
-
-    <div class="f-arrival-header">
-        <div id="f-arrival-name"></div>
-        <div id="f-arrival-addr"></div>
-    </div>
-
-    <!-- משימות פתוחות -->
-    <div id="f-arrival-tasks" class="f-tasks-section hidden">
-        <div class="f-section-label"><i class="fas fa-tasks"></i> משימות פתוחות</div>
-        <div id="f-tasks-list"></div>
-    </div>
-
-    <!-- פעולות מהירות -->
-    <div class="f-section-label"><i class="fas fa-bolt"></i> פעולה מהירה</div>
-    <div class="f-quick-actions">
-        <button class="f-qa-btn f-qa-done"   onclick="fieldApp.quickAction('done')">
-            <i class="fas fa-check-circle"></i><span>בוצע</span>
-        </button>
-        <button class="f-qa-btn f-qa-later"  onclick="fieldApp.quickAction('no_answer')">
-            <i class="fas fa-clock"></i><span>אין מענה</span>
-        </button>
-        <button class="f-qa-btn f-qa-no"     onclick="fieldApp.quickAction('not_interested')">
-            <i class="fas fa-hand-paper"></i><span>לא מעוניינים</span>
-        </button>
-        <button class="f-qa-btn f-qa-irrelevant" onclick="fieldApp.quickAction('not_relevant')">
-            <i class="fas fa-ban"></i><span>לא רלוונטי</span>
+    <div class="f-top-bar">
+        <div class="f-omnibar" onclick="fieldApp.openSearch()">
+            <i class="fas fa-search"></i>
+            <span>חיפוש משפחה, טלפון, רחוב...</span>
+        </div>
+        <button id="f-outbox-btn" class="f-outbox-btn hidden" onclick="fieldApp.openOutboxStatus()">
+            <i class="fas fa-cloud-upload-alt"></i> <span id="f-outbox-count">1</span>
         </button>
     </div>
 
-    <!-- תיעוד קולי + הערה -->
-    <div class="f-note-section">
-        <div class="f-section-label"><i class="fas fa-pen"></i> הערת ביקור</div>
-        <div class="f-note-row">
-            <textarea id="f-note-input" placeholder="הוסף הערה..."></textarea>
-            <button id="f-voice-btn" class="f-voice-btn" onclick="fieldApp.toggleVoice()" aria-label="הקלטה קולית">
-                <i class="fas fa-microphone"></i>
+    <div id="f-fab-menu" class="f-fab-menu">
+        <div class="f-fab-options hidden" id="f-fab-options">
+            <button class="f-fab-option" onclick="fieldApp.fabAction('new_family')">
+                <div class="f-fab-icon" style="background:var(--success);"><i class="fas fa-user-plus"></i></div>
+                <span>משפחה חדשה</span>
+            </button>
+            <button class="f-fab-option" onclick="fieldApp.fabAction('new_task')">
+                <div class="f-fab-icon" style="background:var(--accent);"><i class="fas fa-check"></i></div>
+                <span>משימה כללית</span>
+            </button>
+            <button class="f-fab-option" onclick="fieldApp.fabAction('nav_center')">
+                <div class="f-fab-icon" style="background:var(--warning);"><i class="fas fa-crosshairs"></i></div>
+                <span>מרכז אותי</span>
             </button>
         </div>
+        <button class="f-fab-main" id="f-fab-main" onclick="fieldApp.toggleFab()">
+            <i class="fas fa-plus"></i>
+        </button>
     </div>
 
-    <button class="f-manual-arrive" onclick="fieldApp.openArrivalSheet(fieldApp.currentTarget)">
-        <i class="fas fa-map-marker-alt"></i> הגעתי
-    </button>
-</div>
+    <div id="f-scrim" class="f-scrim hidden" onclick="fieldApp.closeSheet()"></div>
 
-<!-- ══ FAB SPEED DIAL ══ -->
-<div id="f-fab-backdrop" class="hidden" onclick="fieldApp.closeFab()"></div>
-<div id="f-fab-dial" class="hidden">
-    <button class="f-fab-option" onclick="fieldApp.fabAction('family')">
-        <span>משפחה חדשה</span>
-        <div class="f-fab-icon" style="background:#10b981;"><i class="fas fa-user-plus"></i></div>
-    </button>
-    <button class="f-fab-option" onclick="fieldApp.fabAction('task')">
-        <span>משימה חדשה</span>
-        <div class="f-fab-icon" style="background:#f59e0b;"><i class="fas fa-clipboard-list"></i></div>
-    </button>
-    <button class="f-fab-option" onclick="fieldApp.fabAction('log')">
-        <span>תיעוד מהיר</span>
-        <div class="f-fab-icon" style="background:#6366f1;"><i class="fas fa-bolt"></i></div>
-    </button>
-</div>
-<button id="f-fab" onclick="fieldApp.toggleFab()" aria-label="פעולות מהירות">
-    <i class="fas fa-plus" id="f-fab-icon"></i>
-</button>
-
-<!-- ══ OUTBOX STATUS SHEET ══ -->
-<div id="f-outbox-sheet" class="f-sheet hidden">
-    <div class="f-sheet-handle"></div>
-    <div class="f-sheet-title"><i class="fas fa-inbox"></i> עדכונים ממתינים</div>
-    <div id="f-outbox-list"></div>
-    <button class="f-flush-btn" onclick="fieldApp.flushOutbox()">
-        <i class="fas fa-cloud-upload-alt"></i> שלח הכל עכשיו
-    </button>
-</div>
-
-<!-- ══ NEW FAMILY SHEET ══ -->
-<div id="f-new-family-sheet" class="f-sheet hidden">
-    <div class="f-sheet-handle"></div>
-    <div class="f-sheet-title"><i class="fas fa-user-plus"></i> רישום משפחה חדשה</div>
-    <div class="f-form-group">
-        <label>שם המשפחה</label>
-        <input id="f-nf-name" type="text" placeholder="למשל: כהן">
-    </div>
-    <div class="f-form-group">
-        <label>כתובת</label>
-        <input id="f-nf-address" type="text" placeholder="רחוב ומספר">
-    </div>
-    <div class="f-form-group">
-        <label>מספר דירה</label>
-        <input id="f-nf-num" type="text" placeholder="4">
-    </div>
-    <div class="f-form-group">
-        <label>טלפון</label>
-        <input id="f-nf-phone" type="tel" placeholder="050-0000000">
-    </div>
-    <div class="f-form-group">
-        <label>הערה</label>
-        <textarea id="f-nf-notes" placeholder="הערות..."></textarea>
-    </div>
-    <button class="f-submit-btn" onclick="fieldApp.submitNewFamily()">
-        <i class="fas fa-check"></i> שמור ושלח
-    </button>
-    <button class="f-cancel-btn" onclick="fieldApp.closeSheet('f-new-family-sheet')">ביטול</button>
-</div>
-
-<!-- ══ TOAST ══ -->
-<div id="f-toast-container"></div>
-
-<script src="field-app.js"></script>
+    <script src="field-app.js"></script>
 </body>
 </html>
