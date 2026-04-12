@@ -19,16 +19,29 @@
     <script src="https://apis.google.com/js/api.js"></script>
 
     <link rel="stylesheet" href="style.css?v=5">
-
+    <link rel="stylesheet" href="nav.css?v=1">
+    <link rel="stylesheet" href="mobile.css">
 </head>
 <body>
 
 <div id="splash-screen"><i class="fas fa-globe-americas pulse-logo"></i><h2 style="margin:0;font-size:28px;">מערכת ניהול קהילה</h2><p style="color:#94a3b8;margin-top:10px;"><i class="fas fa-spinner fa-spin"></i> מתחבר לענן וטוען נתונים...</p></div>
 <div id="auth-overlay"><div class="auth-card"><i class="fas fa-cloud-upload-alt" style="font-size:50px;color:var(--accent);margin-bottom:20px;"></i><h2 style="margin:0 0 10px 0;">התחברות למערכת</h2><p style="color:var(--text-muted);font-size:14px;margin-bottom:25px;">המערכת מגובה בענן פרטי. אנא התחבר.</p><div id="google-btn" style="display:flex;justify-content:center;"></div><div style="margin-top:16px; text-align:center;"><button onclick="continueWithoutLogin()" style="background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer; text-decoration:underline; font-family:inherit;">המשך ללא התחברות (מצב מקומי בלבד)</button></div></div></div>
 <div id="toast-container"></div>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMobileMenu()"></div>
 
-
-
+<div class="mobile-header">
+    <h3 style="margin:0;"><i class="fas fa-users"></i> ניהול קהילה</h3>
+    <button onclick="toggleMobileMenu()" style="background:none;border:none;color:white;font-size:20px;"><i class="fas fa-bars"></i></button>
+</div>
+<div class="mobile-omnibar" id="mobileOmnibar">
+    <div class="mobile-omnibar-inner">
+        <button class="mobile-omnibar-menu-btn" onclick="toggleMobileMenu()" aria-label="תפריט">
+            <i class="fas fa-bars"></i>
+        </button>
+        <i class="fas fa-search" style="color:#94a3b8;font-size:14px;flex-shrink:0;"></i>
+        <input class="omnibar-search" id="omnibarInput" type="text" placeholder="חיפוש שם, טלפון, רחוב..." autocomplete="off">
+    </div>
+</div>
 
 <div id="sidebar">
     <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:15px; border-bottom:1px solid var(--border-light);">
@@ -40,18 +53,14 @@
         </div>
     </div>
     
-    <div style="background:var(--bg-body); padding:10px 15px; border-radius:12px; border:1px solid var(--border-light); font-size:13px; margin-bottom:5px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
+    <div style="background:var(--bg-body); padding:10px 15px; border-radius:12px; border:1px solid var(--border-light); font-size:13px; margin-bottom:5px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <span style="font-weight:600; color:var(--text-main);">Google Drive:</span>
             <span id="sync-status" style="display:flex; align-items:center; gap:5px; color:var(--warning); font-weight:600;"><i id="sync-icon" class="fas fa-spinner fa-spin"></i> <span id="sync-text">ממתין...</span></span>
         </div>
         <div class="gdrive-sync-row" style="display:flex; gap:6px;">
-            <button onclick="syncWithDrive()" class="btn btn-outline" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;">
-                <i class="fas fa-sync-alt"></i> סנכרן
-            </button>
-            <button onclick="forcePullFromDrive()" class="btn btn-warning" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;" title="טען מחדש את כל הנתונים מהענן (דורס נתונים מקומיים)">
-                <i class="fas fa-cloud-download-alt"></i> שחזר מענן
-            </button>
+            <button onclick="manualSync()" class="btn btn-outline" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;"><i class="fas fa-sync-alt"></i> סנכרן</button>
+            <button onclick="forcePullFromDrive()" class="btn btn-warning" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;"><i class="fas fa-cloud-download-alt"></i> שחזר מענן</button>
         </div>
     </div>
 
@@ -91,6 +100,7 @@
             <div class="main-tab" onclick="switchMainView('kanban')" id="tab-kanban"><i class="fas fa-project-diagram"></i> פרויקטים</div>
             <div class="main-tab" onclick="switchMainView('comm')" id="tab-comm"><i class="fas fa-bullhorn"></i> תקשורת</div>
             <div class="main-tab" onclick="switchMainView('tasks')" id="tab-tasks"><i class="fas fa-check-double"></i> מרכז משימות</div>
+            <div class="main-tab" onclick="NavModule.openRoutePlannerModal()" id="tab-nav" style="background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;"><i class="fas fa-route"></i> ניווט</div>
         </div>
     </div>
 
@@ -100,11 +110,9 @@
             <input type="text" id="smartSearch" placeholder="חיפוש מהיר (שם, טלפון, רחוב)..." autocomplete="off">
             <div id="searchDropdown"></div>
         </div>
-        <!-- dropdowns נשארים ברקע לתאימות עם הלוגיקה הקיימת -->
         <select id="fStyle" style="display:none" onchange="applyAdvFilters()"><option value="">כל הסגנונות</option></select>
         <select id="fTag" style="display:none" onchange="applyAdvFilters()"><option value="">כל התגיות</option></select>
         <select id="fStatus" style="display:none" onchange="applyAdvFilters()"><option value="">כל הסטטוסים</option><option value="green">קשר טרי (ירוק)</option><option value="orange">קשר בינוני (כתום)</option><option value="red">לטיפול (אדום/אפור)</option></select>
-        <!-- צ'יפים ויזואליים — מגדירים את ה-dropdowns ומפעילים applyAdvFilters -->
         <div id="chipFiltersContainer" class="filter-chips-wrapper"></div>
     </div>
 
@@ -118,14 +126,15 @@
             </select>
             <button class="map-ctrl-btn" onclick="toggleMapStyle()" title="החלף תצוגת לוויין/רחוב"><i class="fas fa-layer-group"></i></button>
             <button class="map-ctrl-btn" id="btnGoHome" onclick="flyToHome()" title="חזור למיקום המרכזי" style="display:none; color:var(--accent); margin-top:8px;"><i class="fas fa-home" id="homeIconBtn"></i></button>
+            <button class="map-ctrl-btn" onclick="NavModule.openRoutePlannerModal()" title="פתח מסלול ניווט" style="color:var(--accent); background:rgba(59,130,246,0.1); border-color:var(--accent); margin-top:8px;"><i class="fas fa-route"></i></button>
         </div>
     </div>
     
-    <div id="list-container">
-        <div id="list-inner" style="padding: 0; box-sizing: border-box;"></div>
+    <div id="list-container" style="display:none;">
+        <div id="list-inner" style="padding: 20px; box-sizing: border-box;"></div>
     </div>
     
-    <div id="kanban-container">
+    <div id="kanban-container" style="display:none;">
         <div class="kanban-hub-header">
             <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
                 <h2 style="margin:0;"><i class="fas fa-columns"></i> לוחות פרויקטים</h2>
@@ -243,71 +252,7 @@
     </div>
 </div>
 
-<!-- Speed Dial — modern bottom sheet panel -->
-<div class="fab-speed-dial" id="fabSpeedDial">
-    <div class="fab-scrim" onclick="closeFabDial()"></div>
-    <div class="fab-sheet">
-        <div class="fab-sheet-handle"></div>
-        <div class="fab-sheet-title">פעולה מהירה</div>
-        <div class="fab-sheet-grid">
-            <button class="fab-sheet-btn" onclick="fabAction('family')">
-                <div class="fab-sheet-icon" style="background:linear-gradient(135deg,#10b981,#059669)">
-                    <i class="fas fa-user-plus"></i>
-                </div>
-                <span>משפחה חדשה</span>
-            </button>
-            <button class="fab-sheet-btn" onclick="fabAction('task')">
-                <div class="fab-sheet-icon" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">
-                    <i class="fas fa-check-square"></i>
-                </div>
-                <span>משימה חדשה</span>
-            </button>
-            <button class="fab-sheet-btn" onclick="fabAction('donation')">
-                <div class="fab-sheet-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
-                    <i class="fas fa-donate"></i>
-                </div>
-                <span>רישום תרומה</span>
-            </button>
-            <button class="fab-sheet-btn" onclick="fabAction('nav')">
-                <div class="fab-sheet-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">
-                    <i class="fas fa-route"></i>
-                </div>
-                <span>ניווט מסלול</span>
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- Mobile Bottom Nav -->
-<nav class="bottom-nav" id="bottomNav">
-    <button class="bottom-nav-item" id="bn-tasks" onclick="switchMainView('tasks')">
-        <i class="fas fa-check-double"></i><span>משימות</span>
-    </button>
-    <button class="bottom-nav-item" id="bn-kanban" onclick="switchMainView('kanban')">
-        <i class="fas fa-project-diagram"></i><span>פרויקטים</span>
-    </button>
-    <!-- FAB slot -->
-    <div class="bn-fab-slot" id="bn-fab" aria-hidden="true">
-        <button class="super-fab" id="superFab" onclick="toggleFabDial()" aria-label="פעולות מהירות">
-            <i class="fas fa-plus"></i>
-        </button>
-    </div>
-    <button class="bottom-nav-item" id="bn-table" onclick="switchMainView('table')">
-        <i class="fas fa-list"></i><span>רשימה</span>
-    </button>
-    <button class="bottom-nav-item active" id="bn-map" onclick="switchMainView('map')">
-        <i class="fas fa-map-marker-alt"></i><span>מפה</span>
-    </button>
-</nav>
-
-<!-- Stage Picker Bottom Sheet (for mobile kanban) -->
-<div class="modal stage-picker-sheet" id="stagePickerModal" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
-    <div class="modal-content" style="padding:20px 18px;">
-        <h3 style="margin:0 0 16px 0; font-size:18px; font-weight:700;"><i class="fas fa-exchange-alt" style="color:var(--accent); margin-left:8px;"></i> העבר לשלב</h3>
-        <div class="stage-picker-list" id="stagePickerList"></div>
-        <button class="btn" style="width:100%; margin-top:12px; background:var(--bg-body); color:var(--text-muted);" onclick="document.getElementById('stagePickerModal').style.display='none'">ביטול</button>
-    </div>
-</div>
+<button class="fab-add" onclick="quickAddFamily()" title="הוסף משפחה חדשה מהר"><i class="fas fa-plus"></i></button>
 
 <div id="onboardingModal" class="modal" style="z-index: 100000;">
     <div class="modal-content modal-small" style="text-align:center;">
@@ -503,7 +448,6 @@
         <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
             <h4 style="margin:0 0 12px 0;"><i class="fas fa-map-marker-alt"></i> מיקום מרכזי במפה</h4>
             
-            <!-- אפשרות 1: בית חב"ד -->
             <div style="margin-bottom: 14px;">
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer; margin:0;">
@@ -521,7 +465,6 @@
                 </div>
             </div>
 
-            <!-- אפשרות 2: אחר -->
             <div>
                 <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer; margin-bottom:8px;">
                     <input type="radio" name="homeLocType" id="locTypeOther" value="other" onchange="toggleHomeLocUI()">
@@ -584,29 +527,8 @@
     </div>
 </div>
 
-<!-- ══ Desktop FAB ══ -->
-<div id="desktopFabBackdrop" onclick="closeDesktopFab()" style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(15,23,42,0.4); backdrop-filter:blur(3px);"></div>
-
-<div id="desktopFabDial" style="display:none; position:fixed; bottom:110px; left:30px; z-index:9001; display:none; flex-direction:column; gap:12px; align-items:flex-start;">
-    <button class="dfab-option" onclick="closeDesktopFab(); window.quickAddFamily()">
-        <div class="dfab-icon" style="background:linear-gradient(135deg,#10b981,#059669);"><i class="fas fa-user-plus"></i></div>
-        <span class="dfab-label">משפחה חדשה</span>
-    </button>
-    <button class="dfab-option" onclick="closeDesktopFab(); switchMainView('tasks'); setTimeout(()=>{const i=document.getElementById('globalTaskInput');if(i)i.focus();},350)">
-        <div class="dfab-icon" style="background:linear-gradient(135deg,#3b82f6,#2563eb);"><i class="fas fa-check-square"></i></div>
-        <span class="dfab-label">משימה חדשה</span>
-    </button>
-    <button class="dfab-option" onclick="closeDesktopFab(); showToast('פתח כרטיס משפחה ואז לשונית תרומות','info')">
-        <div class="dfab-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706);"><i class="fas fa-donate"></i></div>
-        <span class="dfab-label">רישום תרומה</span>
-    </button>
-</div>
-
-<button id="desktopFab" onclick="toggleDesktopFab()" title="פעולות מהירות" aria-label="פעולות מהירות">
-    <i class="fas fa-plus" id="desktopFabIcon"></i>
-</button>
-
 <script src="app.js?v=14"></script>
+<script src="nav.js?v=1"></script>
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
