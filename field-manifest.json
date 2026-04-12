@@ -1,0 +1,15 @@
+{
+    "name": "שטח CRM — אפליקציית שטח",
+    "short_name": "שטח",
+    "description": "אפליקציית ניווט ותיעוד לשטח",
+    "start_url": "field.html",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#2563eb",
+    "orientation": "portrait",
+    "lang": "he",
+    "dir": "rtl",
+    "icons": [
+        { "src": "favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
+    ]
+}

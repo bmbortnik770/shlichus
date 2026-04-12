@@ -545,6 +545,8 @@ async function syncWithDrive(forcePull = false) {
         if(!db.meta) db.meta = { lastModified: 0 };
         saveLocal();
         setSyncStatus('ok', 'מסונכרן');
+        // ── after main sync, absorb any field updates written by the mobile app ──
+        await mergeOutboxUpdates();
     } catch(e) {
         console.error('sync error', e);
         const msg = e?.message || String(e);
@@ -578,6 +580,132 @@ async function syncWithDrive(forcePull = false) {
 }
 
 
+// ════════════════════════════════════════════════════════
+// ── Outbox Consumer (שלב 2) ──
+// מחפש קבצי mobile_update_*.json ב-Drive, ממזג אותם
+// לתוך community_data_final.json, ואז מוחק (trash) אותם.
+// ════════════════════════════════════════════════════════
+
+async function mergeOutboxUpdates() {
+    if (!accessToken) return;
+    try {
+        const q = encodeURIComponent("name contains 'mobile_update_' and trashed = false");
+        const listRes = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!listRes.ok) return;
+        const { files } = await listRes.json();
+        if (!files || files.length === 0) return;
+
+        showToast(`נמצאו ${files.length} עדכוני שטח — ממזג...`, 'info');
+        let applied = 0;
+
+        for (const file of files) {
+            try {
+                const contentRes = await fetch(
+                    `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
+                    { headers: { Authorization: `Bearer ${accessToken}` } }
+                );
+                if (!contentRes.ok) continue;
+                const update = await contentRes.json();
+
+                if (applyOutboxEvent(update)) applied++;
+
+                // העבר לאשפה ב-Drive
+                await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
+                    method: 'PATCH',
+                    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trashed: true })
+                });
+            } catch (e) {
+                console.error('mergeOutbox: error processing file', file.name, e);
+            }
+        }
+
+        if (applied > 0) {
+            db.meta.lastModified = Date.now();
+            await pushToDrive();
+            saveLocal();
+            refreshMap();
+            handleOmniSearch();
+            showToast(`${applied} עדכוני שטח נמזגו בהצלחה! ✅`, 'success');
+        }
+    } catch (e) {
+        console.error('mergeOutboxUpdates error:', e);
+    }
+}
+
+/**
+ * מחיל event בודד מאפליקציית השטח על ה-db.
+ * סכמת event:
+ * {
+ *   type: 'task_done' | 'visit_log' | 'call_log' | 'stage_change' | 'quick_status',
+ *   bldg: <מפתח הבניין>,
+ *   aptName: <שם המשפחה>,
+ *   aptNum: <מספר דירה>,
+ *   payload: { ... },
+ *   timestamp: <ISO string>
+ * }
+ * מחזיר true אם הצליח לאתר ולעדכן את הדירה.
+ */
+function applyOutboxEvent(ev) {
+    if (!ev || !ev.type || !ev.bldg) return false;
+    const bldgData = db[ev.bldg];
+    if (!bldgData || !bldgData.apts) return false;
+
+    const apt = bldgData.apts.find(a =>
+        a.name === ev.aptName && String(a.num) === String(ev.aptNum)
+    );
+    if (!apt) return false;
+
+    const ts = ev.timestamp || new Date().toISOString();
+    const dateOnly = ts.split('T')[0];
+
+    switch (ev.type) {
+        case 'task_done': {
+            const task = (apt.tasks || []).find(t => t.text === ev.payload.taskText && !t.done);
+            if (task) { task.done = true; task.doneAt = ts; }
+            break;
+        }
+        case 'visit_log': {
+            if (!apt.interactions) apt.interactions = [];
+            apt.interactions.push({
+                date: dateOnly,
+                type: 'ביקור',
+                notes: escapeHTML(ev.payload.note || ''),
+                result: ev.payload.result || '',
+                source: 'field'
+            });
+            break;
+        }
+        case 'call_log': {
+            if (!apt.interactions) apt.interactions = [];
+            apt.interactions.push({
+                date: dateOnly,
+                type: 'שיחה',
+                notes: escapeHTML(ev.payload.note || ''),
+                source: 'field'
+            });
+            break;
+        }
+        case 'stage_change': {
+            if (!apt.boards) apt.boards = {};
+            apt.boards[ev.payload.boardId] = ev.payload.stage;
+            break;
+        }
+        case 'quick_status': {
+            apt.status = ev.payload.status;
+            break;
+        }
+        default:
+            console.warn('applyOutboxEvent: unknown type', ev.type);
+            return false;
+    }
+
+    apt.updatedAt = Date.now();
+    return true;
+}
 
 // ── Wrapper for manual sync button — re-auths if token expired ──
 window.manualSync = async function() {
@@ -677,10 +805,6 @@ window.switchMainView = function(viewName) {
     document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
     const dtab = document.getElementById('tab-' + viewName);
     if (dtab) dtab.classList.add('active');
-    // mobile bottom nav
-    document.querySelectorAll('.bottom-nav-item[id^="bn-"]').forEach(b => b.classList.remove('active'));
-    const mbtn = document.getElementById('bn-' + viewName);
-    if (mbtn) mbtn.classList.add('active');
 
     // body view class — CSS uses this to show/hide elements per view
     document.body.classList.remove('view-map','view-table','view-kanban','view-tasks','view-comm');
@@ -692,75 +816,13 @@ window.switchMainView = function(viewName) {
     document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
     document.getElementById('tasks-container').style.display = viewName==='tasks'?'flex':'none';
 
-    // Mobile: inject search strip for list + kanban
-    if (window.innerWidth <= 768) {
-        var strip = document.getElementById('mobileViewSearch');
-        if (viewName === 'table' || viewName === 'kanban') {
-            if (!strip) {
-                strip = document.createElement('div');
-                strip.id = 'mobileViewSearch';
-                strip.className = 'mobile-view-search';
-                strip.innerHTML = [
-                    '<div class="search-wrapper" style="display:flex;align-items:center;gap:10px;">',
-                    '  <i class="fas fa-search" style="color:#94a3b8;font-size:13px;flex-shrink:0;"></i>',
-                    '  <input type="text" id="mobileViewSearchInput" placeholder="חיפוש שם, טלפון, רחוב..." autocomplete="off"',
-                    '    style="flex:1;border:none;background:transparent;outline:none;font-size:15px;font-family:inherit;direction:rtl;text-align:right;">',
-                    '  <i class="fas fa-times" id="mobileViewSearchClear" style="color:#94a3b8;font-size:13px;flex-shrink:0;cursor:pointer;display:none;"',
-                    '    onclick="document.getElementById(\'mobileViewSearchInput\').value=\'\';',
-                    '    document.getElementById(\'smartSearch\').value=\'\';',
-                    '    document.getElementById(\'smartSearch\').dispatchEvent(new Event(\'input\',{bubbles:true}));',
-                    '    this.style.display=\'none\';"></i>',
-                    '</div>',
-                    '<div class="filter-chips-wrapper" id="mobileChipsContainer"></div>'
-                ].join('');
-                document.body.appendChild(strip);
-                var msi = document.getElementById('mobileViewSearchInput');
-                msi.addEventListener('input', function() {
-                    var real = document.getElementById('smartSearch');
-                    if (real) { real.value = this.value; real.dispatchEvent(new Event('input',{bubbles:true})); }
-                    var clr = document.getElementById('mobileViewSearchClear');
-                    if (clr) clr.style.display = this.value ? 'inline' : 'none';
-                });
-            }
-            strip.style.display = 'flex';
-            // Mirror filter chips
-            var desktopChips = document.getElementById('chipFiltersContainer');
-            var mobileChips = document.getElementById('mobileChipsContainer');
-            if (desktopChips && mobileChips) mobileChips.innerHTML = desktopChips.innerHTML;
-        } else {
-            if (strip) strip.style.display = 'none';
-        }
-    }
-
     if(viewName==='map') map.resize();
     if(viewName==='tasks') {
         document.getElementById('globalTaskDate').value = new Date().toISOString().split('T')[0];
         renderGlobalTasks();
     }
     handleOmniSearch();
-    if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
 };;
-
-// ── Mobile search strip: appears on list/kanban/tasks/comm, hidden on map ──
-window.updateMobileSearchStrip = function(viewName) {
-    if (window.innerWidth > 768) return;
-    var strip = document.getElementById('mobileViewSearch');
-    if (!strip) return;
-    var mapViews = ['map'];
-    if (mapViews.includes(viewName)) {
-        strip.style.display = 'none';
-    } else {
-        strip.style.display = 'flex';
-        strip.style.flexDirection = 'column';
-        // Adjust container top-padding to account for strip height (~100px total)
-        var extraPad = strip.offsetHeight || 50;
-        var containers = ['list-container','kanban-container','tasks-container','comm-container'];
-        containers.forEach(function(id) {
-            var el = document.getElementById(id);
-            if (el) el.style.paddingTop = (76 + extraPad) + 'px';
-        });
-    }
-};
 
 // ── Haptic ──
 window.haptic = function(type) {
@@ -771,84 +833,7 @@ window.haptic = function(type) {
 };
 
 
-// ── Omnibar sync: mobile search input mirrors #smartSearch ──
-(function initOmnibar() {
-    function sync() {
-        var omni = document.getElementById('omnibarInput');
-        var real = document.getElementById('smartSearch');
-        if (!omni || !real) return;
-
-        // omnibar → real search (triggers existing search logic)
-        omni.addEventListener('input', function() {
-            real.value = this.value;
-            real.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-
-        // real search → omnibar (keeps them in sync when changed elsewhere)
-        real.addEventListener('input', function() {
-            if (document.activeElement !== omni) omni.value = this.value;
-        });
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', sync);
-    } else {
-        sync();
-    }
-})();
-
-// ── Hide header on scroll ──
-(function() {
-    var last=0, tick=false;
-    function upd() {
-        var h=document.querySelector('.mobile-header');
-        if(!h||window.innerWidth>768){tick=false;return;}
-        var st=window.pageYOffset||document.documentElement.scrollTop;
-        h.classList.toggle('header-hidden', st>last && st>70);
-        last=Math.max(0,st); tick=false;
-    }
-    window.addEventListener('scroll',function(){if(!tick){requestAnimationFrame(upd);tick=true;}},{passive:true});
-})();
-
-// ── FAB Speed Dial ──
-window.toggleFabDial = function() {
-    var dial = document.getElementById('fabSpeedDial');
-    var fab  = document.getElementById('superFab');
-    if (!dial) return;
-    var open = dial.classList.toggle('open');
-    fab.classList.toggle('open', open);
-    // lock body scroll when sheet is open
-    document.body.style.overflow = open ? 'hidden' : '';
-};
-
-window.closeFabDial = function() {
-    var dial = document.getElementById('fabSpeedDial');
-    var fab  = document.getElementById('superFab');
-    if (dial) dial.classList.remove('open');
-    if (fab)  fab.classList.remove('open');
-    document.body.style.overflow = '';
-};
-
-window.fabAction = function(type) {
-    window.closeFabDial();
-    if (type === 'family') {
-        window.quickAddFamily();
-    } else if (type === 'task') {
-        switchMainView('tasks');
-        setTimeout(() => { var inp = document.getElementById('globalTaskInput'); if (inp) inp.focus(); }, 350);
-    } else if (type === 'donation') {
-        showToast('פתח כרטיס משפחה ואז לשונית תרומות כדי לרשום תרומה', 'info');
-    } else if (type === 'nav') {
-        // Open the route planner modal (NavModule)
-        setTimeout(function() {
-            if (window.NavModule && window.NavModule.openRoutePlannerModal) {
-                window.NavModule.openRoutePlannerModal();
-            } else {
-                showToast('מודול הניווט אינו זמין', 'warning');
-            }
-        }, 150); // slight delay so close animation finishes first
-    }
-};
+// ── FAB Speed Dial removed (mobile only) ──
 
 window.switchCommTab = function(tabName) {
     document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
@@ -1524,73 +1509,6 @@ window.renderKanbanView = (filteredRes = null) => {
     let arr = filteredRes || [];
     if(!filteredRes) Object.keys(db).forEach(b=>{ if(b!=='__BOARDS__' && b!=='__SETTINGS__' && b!=='meta' && db[b] && db[b].apts) db[b].apts.forEach((a,i)=>arr.push({bldg:b,idx:i,apt:a})) });
 
-    const isMobile = window.innerWidth <= 768;
-
-    if (isMobile) {
-        // ── MOBILE: grouped list by stage ──
-        activeBoard.columns.forEach(stage => {
-            const colCards = arr.filter(r => r.apt.boards && r.apt.boards[currentBoardId] === stage);
-
-            let groupHtml = `<div class="mobile-kanban-group">
-                <div class="mkg-header" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.classList.toggle('collapsed')">
-                    <div class="mkg-header-left">
-                        <span>${escapeHTML(stage)}</span>
-                        <span class="mkg-count">${colCards.length}</span>
-                    </div>
-                    <i class="fas fa-chevron-down mkg-toggle-icon"></i>
-                </div>
-                <div class="mkg-body">`;
-
-            if (colCards.length === 0) {
-                groupHtml += `<div style="padding:14px 16px; color:var(--text-muted); font-size:13px; text-align:center;">אין כרטיסיות בשלב זה</div>`;
-            } else {
-                colCards.forEach(r => {
-                    const safeName = escapeHTML(r.apt.name || 'ללא שם');
-                    const safeBldg = escapeHTML(r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg);
-                    const encBldg = encodeURIComponent(r.bldg);
-                    groupHtml += `<div class="mkg-card" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
-                        <div class="mkg-card-info">
-                            <div class="mkg-card-name">${safeName}</div>
-                            <div class="mkg-card-addr">${safeBldg}</div>
-                        </div>
-                        <button class="mkg-status-chip" onclick="event.stopPropagation(); openStagePicker('${encBldg}', ${r.idx}, '${currentBoardId}', '${escapeHTML(stage)}')">${escapeHTML(stage)} <i class="fas fa-chevron-down" style="font-size:10px;"></i></button>
-                    </div>`;
-                });
-            }
-
-            groupHtml += `</div></div>`;
-            c.innerHTML += groupHtml;
-        });
-
-        // cards not in any stage
-        const unassigned = arr.filter(r => !r.apt.boards || !r.apt.boards[currentBoardId]);
-        if (unassigned.length > 0) {
-            let groupHtml = `<div class="mobile-kanban-group">
-                <div class="mkg-header" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.classList.toggle('collapsed')">
-                    <div class="mkg-header-left"><span>לא משויך</span><span class="mkg-count" style="background:#94a3b8;">${unassigned.length}</span></div>
-                    <i class="fas fa-chevron-down mkg-toggle-icon"></i>
-                </div>
-                <div class="mkg-body">`;
-            unassigned.forEach(r => {
-                const encBldg = encodeURIComponent(r.bldg);
-                groupHtml += `<div class="mkg-card" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
-                    <div class="mkg-card-info">
-                        <div class="mkg-card-name">${escapeHTML(r.apt.name || 'ללא שם')}</div>
-                        <div class="mkg-card-addr">${escapeHTML(r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg)}</div>
-                    </div>
-                    <button class="mkg-status-chip" style="background:rgba(148,163,184,0.15); color:#64748b;" onclick="event.stopPropagation(); openStagePicker('${encBldg}', ${r.idx}, '${currentBoardId}', '')">שייך <i class="fas fa-chevron-down" style="font-size:10px;"></i></button>
-                </div>`;
-            });
-            groupHtml += `</div></div>`;
-            c.innerHTML += groupHtml;
-        }
-
-        // On mobile, force block layout (flex from switchMainView would make columns horizontal)
-        var kc = document.getElementById('kanban-container');
-        if (kc) { kc.style.display = 'block'; kc.style.overflowY = 'auto'; }
-        return; // skip desktop drag/drop setup
-    }
-
     // ── DESKTOP: original columns ──
     activeBoard.columns.forEach(stage => {
         let colCards = arr.filter(r => r.apt.boards && r.apt.boards[currentBoardId] === stage);
@@ -1950,7 +1868,6 @@ window.deleteSmartView = (viewId) => {
 
 window.renderListView = (filteredRes = null) => {
     const inner = document.getElementById('list-inner');
-    const isMobile = window.innerWidth <= 768;
 
     let arr = filteredRes || [];
     if (!filteredRes) {
@@ -1989,55 +1906,6 @@ window.renderListView = (filteredRes = null) => {
         }
         return 0;
     });
-
-    // ── MOBILE: smart card feed ──
-    if (isMobile) {
-        let feedHtml = `<div class="feed-toolbar">
-            <h2><i class="fas fa-users" style="color:var(--accent);margin-left:6px;"></i>קהילה (${arr.length})</h2>
-            <div class="feed-toolbar-actions">
-                <button class="btn-icon" onclick="exportTableToCSV()" title="ייצוא"><i class="fas fa-file-excel"></i></button>
-            </div>
-        </div>
-        <div class="mobile-feed">`;
-
-        if (arr.length === 0) {
-            feedHtml += `<div class="empty-state" style="margin:40px auto;"><i class="fas fa-search" style="font-size:48px;opacity:.3;"></i><h4>אין תוצאות</h4></div>`;
-        } else {
-            arr.forEach(r => {
-                const a = r.apt;
-                const bName = r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg;
-                const phones = getAllPhones(a);
-                const statusColor = getStatusColor(a);
-                let lastDate = '';
-                if (a.interactions && a.interactions.length > 0) {
-                    lastDate = [...a.interactions].sort((x,y) => new Date(y.date)-new Date(x.date))[0].date;
-                }
-                const cleanPhone = phones.length > 0 ? phones[0].replace(/\D/g,'') : '';
-                const waPhone = cleanPhone.startsWith('0') ? '972' + cleanPhone.substring(1) : cleanPhone;
-                const tagsHtml = (a.tags||[]).map(t => `<span class="mfc-tag">${escapeHTML(t)}</span>`).join('');
-                const encBldg = encodeURIComponent(r.bldg);
-
-                feedHtml += `<div class="mobile-family-card" style="--card-status-color:${statusColor}">
-                    <div class="mfc-body" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">
-                        <div class="mfc-name">${escapeHTML(a.name || '(ללא שם)')}</div>
-                        <div class="mfc-address"><i class="fas fa-map-marker-alt" style="color:var(--accent);font-size:11px;"></i>${escapeHTML(bName)}</div>
-                        ${tagsHtml ? `<div class="mfc-tags">${tagsHtml}</div>` : ''}
-                        ${lastDate ? `<div class="mfc-last-contact"><i class="far fa-clock"></i> ${lastDate}</div>` : ''}
-                    </div>
-                    <div class="mfc-actions">
-                        ${cleanPhone ? `<a class="mfc-action-btn call" href="tel:${cleanPhone}" onclick="event.stopPropagation()"><i class="fas fa-phone"></i><span>חייג</span></a>` : ''}
-                        ${waPhone ? `<a class="mfc-action-btn wa" href="https://wa.me/${waPhone}" target="_blank" onclick="event.stopPropagation()"><i class="fab fa-whatsapp"></i><span>וואטסאפ</span></a>` : ''}
-                        <button class="mfc-action-btn log" onclick="event.stopPropagation(); currentBldg='${r.bldg}'; openClientCard(${r.idx}); setTimeout(()=>{const t=document.getElementById('tabBtn-interactions'); if(t)t.click();},350)"><i class="fas fa-pen"></i><span>תיעוד</span></button>
-                        <button class="mfc-action-btn map-btn" onclick="event.stopPropagation(); flyToBuildingFromTable('${encBldg}')"><i class="fas fa-map"></i><span>מפה</span></button>
-                    </div>
-                </div>`;
-            });
-        }
-
-        feedHtml += `</div>`;
-        inner.innerHTML = feedHtml;
-        return;
-    }
 
     // ── DESKTOP: original table view ──
     const allTableCols = [
@@ -2364,7 +2232,7 @@ window.markTaskDoneFromDash = (bldgEnc, aptIdx, taskIdx) => {
 };
 
 window.toggleDarkMode=() => {document.body.classList.toggle('dark-mode');localStorage.setItem('darkMode',document.body.classList.contains('dark-mode'));document.getElementById('darkModeIcon').className=document.body.classList.contains('dark-mode')?'fas fa-sun':'fas fa-moon';if(chart)refreshMap();};
-function toggleMobileMenu(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('open');}
+// toggleMobileMenu removed — desktop-only sidebar is always visible
 
 window.openSettings=()=>{
     document.getElementById('setThemeColor').value=appSettings.themeColor; document.getElementById('setDefaultView').value=appSettings.defaultView;

@@ -19,44 +19,16 @@
     <script src="https://apis.google.com/js/api.js"></script>
 
     <link rel="stylesheet" href="style.css?v=5">
-    <link rel="stylesheet" href="nav.css?v=1">
-    <link rel="stylesheet" href="mobile.css">
+
 </head>
 <body>
 
 <div id="splash-screen"><i class="fas fa-globe-americas pulse-logo"></i><h2 style="margin:0;font-size:28px;">מערכת ניהול קהילה</h2><p style="color:#94a3b8;margin-top:10px;"><i class="fas fa-spinner fa-spin"></i> מתחבר לענן וטוען נתונים...</p></div>
 <div id="auth-overlay"><div class="auth-card"><i class="fas fa-cloud-upload-alt" style="font-size:50px;color:var(--accent);margin-bottom:20px;"></i><h2 style="margin:0 0 10px 0;">התחברות למערכת</h2><p style="color:var(--text-muted);font-size:14px;margin-bottom:25px;">המערכת מגובה בענן פרטי. אנא התחבר.</p><div id="google-btn" style="display:flex;justify-content:center;"></div><div style="margin-top:16px; text-align:center;"><button onclick="continueWithoutLogin()" style="background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer; text-decoration:underline; font-family:inherit;">המשך ללא התחברות (מצב מקומי בלבד)</button></div></div></div>
 <div id="toast-container"></div>
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMobileMenu()"></div>
 
-<!-- Static header (desktop only — hidden on mobile via CSS) -->
-<div class="mobile-header">
-    <h3 style="margin:0;"><i class="fas fa-users"></i> ניהול קהילה</h3>
-    <button onclick="toggleMobileMenu()" style="background:none;border:none;color:white;font-size:20px;"><i class="fas fa-bars"></i></button>
-</div>
 
-<!-- Floating Omni-bar (mobile only — shown above map/content) -->
-<div class="mobile-omnibar" id="mobileOmnibar">
-    <div class="mobile-omnibar-inner">
-        <i class="fas fa-search" style="color:#94a3b8; font-size:15px; flex-shrink:0;"></i>
-        <input class="omnibar-search" id="omnibarInput" type="text" placeholder="חיפוש שם, טלפון, רחוב..." autocomplete="off">
-        <button class="mobile-omnibar-menu-btn" onclick="toggleMobileMenu()" title="תפריט">
-            <i class="fas fa-bars"></i>
-        </button>
-    </div>
-</div>
 
-<!-- Mobile Search Strip: visible on list/kanban/tasks/comm, hidden on map -->
-<div class="mobile-view-search" id="mobileViewSearch" style="display:none;">
-    <div class="search-wrapper" style="position:relative;">
-        <i class="fas fa-search"></i>
-        <input type="text" id="mobileStripSearch" placeholder="חיפוש מהיר..." autocomplete="off"
-            oninput="document.getElementById('smartSearch').value=this.value; document.getElementById('smartSearch').dispatchEvent(new Event('input',{bubbles:true}))">
-    </div>
-    <div class="filter-chips-wrapper" id="mobileStripChips">
-        <!-- chips will be cloned here by JS -->
-    </div>
-</div>
 
 <div id="sidebar">
     <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:15px; border-bottom:1px solid var(--border-light);">
@@ -119,7 +91,6 @@
             <div class="main-tab" onclick="switchMainView('kanban')" id="tab-kanban"><i class="fas fa-project-diagram"></i> פרויקטים</div>
             <div class="main-tab" onclick="switchMainView('comm')" id="tab-comm"><i class="fas fa-bullhorn"></i> תקשורת</div>
             <div class="main-tab" onclick="switchMainView('tasks')" id="tab-tasks"><i class="fas fa-check-double"></i> מרכז משימות</div>
-            <div class="main-tab" onclick="NavModule.openRoutePlannerModal()" id="tab-nav" style="background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;"><i class="fas fa-route"></i> ניווט</div>
         </div>
     </div>
 
@@ -147,7 +118,6 @@
             </select>
             <button class="map-ctrl-btn" onclick="toggleMapStyle()" title="החלף תצוגת לוויין/רחוב"><i class="fas fa-layer-group"></i></button>
             <button class="map-ctrl-btn" id="btnGoHome" onclick="flyToHome()" title="חזור למיקום המרכזי" style="display:none; color:var(--accent); margin-top:8px;"><i class="fas fa-home" id="homeIconBtn"></i></button>
-            <button class="map-ctrl-btn" onclick="NavModule.openRoutePlannerModal()" title="פתח מסלול ניווט" style="color:var(--accent); background:rgba(59,130,246,0.1); border-color:var(--accent); margin-top:8px;"><i class="fas fa-route"></i></button>
         </div>
     </div>
     
@@ -615,7 +585,6 @@
 </div>
 
 <script src="app.js?v=14"></script>
-<script src="nav.js?v=1"></script>
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
