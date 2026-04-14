@@ -13,6 +13,170 @@
     
     --bottom-nav-h: 70px;
     --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+}
+
+body.dark-mode {
+    /* עיצוב לילה */
+    --bg-body: #020617;
+    --surface: #0f172a;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --border-light: rgba(255, 255, 255, 0.1);
+    --shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body, html {
+    height: 100%; width: 100%; font-family: 'Assistant', sans-serif;
+    background-color: var(--bg-body); color: var(--text-main);
+    overflow: hidden; direction: rtl; transition: background-color 0.3s, color 0.3s;
+}
+
+.f-splash {
+    position: fixed; inset: 0; z-index: 10000; background: var(--bg-body);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.5s;
+}
+.f-splash img { width: 80px; margin-bottom: 20px; animation: pulse 2s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+@keyframes pulse { 0% { opacity: 0.6; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1); } 100% { opacity: 0.6; transform: scale(0.95); } }
+
+.view-container {
+    position: absolute; top: 0; left: 0; right: 0;
+    bottom: calc(var(--bottom-nav-h) + var(--safe-b));
+    display: none; overflow-y: auto; background: var(--bg-body);
+}
+.view-container.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ניווט תחתון */
+.f-bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: calc(var(--bottom-nav-h) + var(--safe-b));
+    background: var(--surface); box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+    border-top: 1px solid var(--border-light);
+    display: flex; justify-content: space-around; align-items: center;
+    padding-bottom: var(--safe-b); z-index: 9000;
+    transition: background 0.3s;
+}
+
+.nav-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 12px; flex: 1; cursor: pointer; padding: 10px 0;
+}
+.nav-item i { font-size: 24px; margin-bottom: 4px; transition: 0.2s; }
+.nav-item.active { color: var(--accent); font-weight: bold; }
+.nav-item.active i { transform: translateY(-3px) scale(1.1); }
+
+/* כפתור FAB המשולש - הועבר לימין! */
+.f-fab-center {
+    position: fixed; bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 20px); right: 20px;
+    width: 64px; height: 64px; z-index: 9999;
+}
+
+.f-fab-main {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #1d4ed8);
+    color: white; border: none; font-size: 26px;
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
+    cursor: pointer; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.f-fab-menu {
+    position: absolute; bottom: 80px; right: 0;
+    display: flex; flex-direction: column; gap: 12px; align-items: flex-start;
+    pointer-events: none; z-index: 10000;
+}
+
+.f-fab-option {
+    background: var(--surface); color: var(--text-main);
+    padding: 12px 20px; border-radius: 30px; border: 1px solid var(--border-light);
+    display: flex; align-items: center; gap: 10px; white-space: nowrap;
+    box-shadow: var(--shadow); font-weight: 600;
+    opacity: 0; transform: translateY(20px) scale(0.8); transition: 0.25s;
+}
+.f-fab-option.mission { background: var(--accent); color: white; border: none; }
+
+.f-fab-center.open .f-fab-main { transform: rotate(45deg); background: var(--surface); color: var(--danger); border: 2px solid var(--border-light); }
+.f-fab-center.open .f-fab-menu { pointer-events: auto; }
+.f-fab-center.open .f-fab-option { opacity: 1; transform: translateY(0) scale(1); }
+
+/* עוגני התמרכזות - הועברו לשמאל למטה! */
+.map-anchors { 
+    position: absolute; left: 15px; bottom: 20px; 
+    display: flex; flex-direction: column; gap: 12px; z-index: 10; 
+}
+.map-anchor-btn {
+    width: 45px; height: 45px; border-radius: 50%; background: var(--surface);
+    color: var(--text-main); border: 1px solid var(--border-light);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    box-shadow: var(--shadow); cursor: pointer; transition: 0.2s;
+}
+
+/* כפתור מצב לילה - נפרד לשמאל למעלה! */
+.theme-anchor {
+    position: absolute; left: 15px; top: calc(var(--safe-t) + 15px);
+    width: 45px; height: 45px; border-radius: 50%; background: var(--surface);
+    color: var(--text-main); border: 1px solid var(--border-light);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    box-shadow: var(--shadow); cursor: pointer; transition: 0.2s; z-index: 10;
+}
+
+/* המגירה התחתונה */
+.f-sheet {
+    position: fixed; left: 10px; right: 10px; bottom: calc(var(--bottom-nav-h) + 15px);
+    background: var(--surface); border-radius: 24px;
+    padding: 24px; box-shadow: var(--shadow);
+    z-index: 9500; 
+    transform: translateY(150vh); 
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.4s cubic-bezier(0.1, 0.7, 0.1, 1), opacity 0.3s;
+    border: 1px solid var(--border-light);
+}
+.f-sheet.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.f-sheet-handle { width: 40px; height: 5px; background: var(--border-light); border-radius: 10px; margin: -10px auto 20px; }
+
+/* מחוון סנכרון - הועבר לימין למעלה! */
+.f-sync-indicator {
+    position: fixed;
+    top: calc(var(--safe-t) + 15px);
+    right: 15px;
+    background: var(--surface);
+    color: var(--text-muted);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-light);
+    z-index: 9500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+.f-sync-indicator.syncing { color: var(--accent); }
+.f-sync-indicator.syncing i { animation: spin 1s linear infinite; }
+.f-sync-indicator.success { color: var(--success); }
+.f-sync-indicator.offline { background: var(--danger); color: white; border-color: var(--danger); }
+@keyframes spin { 100% { transform: rotate(360deg); } }:root {
+    /* עיצוב יום - חי ותוסס! */
+    --accent: #2563eb;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --bg-body: #f8fafc;
+    --surface: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-light: #e2e8f0;
+    --shadow: 0 4px 15px rgba(0,0,0,0.1);
+    
+    --bottom-nav-h: 70px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
 }
 
 body.dark-mode {
