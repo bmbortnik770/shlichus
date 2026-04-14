@@ -6,6 +6,7 @@ const GEOFENCE_M  = 30;
 const DATA_KEY    = 'field_data';
 const VISITED_KEY = 'field_visited';
 const OUTBOX_KEY  = 'field_outbox'; 
+const SYNC_TIME_KEY = 'field_last_sync';
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
 mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.3.0/mapbox-gl-rtl-text.js', null, true);
@@ -18,112 +19,139 @@ const fieldApp = (function () {
     let isDark = false;
     let tokenClient = null;
 
+    let selectedBuildings = []; 
+    let buildingMarkers = [];   
+    let pressTimer = null;      
+
     const storageGet = (key) => { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } };
     const storageSet = (key, val) => localStorage.setItem(key, JSON.stringify(val));
-    
     const getVisited = () => storageGet(VISITED_KEY) || {};
     const markVisited = (id) => { const v = getVisited(); v[id] = new Date().toISOString(); storageSet(VISITED_KEY, v); };
     const isVisited = (id) => !!getVisited()[id];
 
+    // --- מערכת חיווי סנכרון ---
+    function setSyncStatus(state) {
+        const el = document.getElementById('f-sync-status');
+        if(!el) return;
+        const span = el.querySelector('span');
+        const icon = el.querySelector('i');
+        
+        el.className = 'f-sync-indicator'; 
+        
+        if (state === 'syncing') {
+            el.classList.add('syncing');
+            icon.className = 'fas fa-sync-alt';
+            span.innerText = 'מסנכרן...';
+        } else if (state === 'success') {
+            el.classList.add('success');
+            icon.className = 'fas fa-check-circle';
+            const timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+            span.innerText = `מעודכן ל- ${timeStr}`;
+            localStorage.setItem(SYNC_TIME_KEY, timeStr);
+        } else if (state === 'offline' || state === 'error') {
+            el.classList.add('offline');
+            icon.className = state === 'offline' ? 'fas fa-wifi-slash' : 'fas fa-exclamation-triangle';
+            const last = localStorage.getItem(SYNC_TIME_KEY);
+            span.innerText = last ? `אופליין (מ- ${last})` : 'לא מסונכרן';
+        }
+    }
+
+    function forceSync() {
+        if (!navigator.onLine) { showToast("אין חיבור לאינטרנט כרגע"); return; }
+        if (accessToken) {
+            loadDataFromDrive();
+        } else {
+            login();
+        }
+    }
+
     async function init() {
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('field-sw.js').catch(e=>console.log(e));
         
+        // האזנה אקטיבית לאינטרנט
+        window.addEventListener('offline', () => setSyncStatus('offline'));
+        window.addEventListener('online', forceSync);
+
         isDark = localStorage.getItem('field_theme') === 'dark';
-        if(isDark) {
-            document.body.classList.add('dark-mode');
-            document.getElementById('f-theme-btn').innerHTML = '<i class="fas fa-sun"></i>';
-        }
+        if(isDark) { document.body.classList.add('dark-mode'); document.getElementById('f-theme-btn').innerHTML = '<i class="fas fa-sun"></i>'; }
 
         if (!document.getElementById('f-toast-container')) {
             const tc = document.createElement('div'); tc.id = 'f-toast-container';
-            tc.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:10px; width:90%; pointer-events:none;';
+            tc.style.cssText = 'position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:10px; width:90%; pointer-events:none;';
             document.body.appendChild(tc);
         }
 
         if (typeof google !== 'undefined') {
-            tokenClient = google.accounts.oauth2.initTokenClient({ 
-                client_id: CLIENT_ID, 
-                scope: SCOPES, 
-                callback: handleGoogleAuthResponse 
-            });
-            
-            if (localStorage.getItem('field_has_logged_in') === 'true') {
-                tokenClient.requestAccessToken({ prompt: '' });
-            } else {
-                showAuthScreen();
-            }
-        } else {
-            continueOffline();
-        }
+            tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleGoogleAuthResponse });
+            if (localStorage.getItem('field_has_logged_in') === 'true') tokenClient.requestAccessToken({ prompt: '' });
+            else { showAuthScreen(); setSyncStatus('error'); }
+        } else continueOffline();
     }
 
     function showAuthScreen() { document.getElementById('f-splash').style.display = 'none'; document.getElementById('f-login').style.display = 'block'; }
-    
-    function login() {
-        if(tokenClient) tokenClient.requestAccessToken({ prompt: 'consent' });
-        else showToast("שירותי גוגל טרם נטענו, נסה שוב");
-    }
+    function login() { if(tokenClient) tokenClient.requestAccessToken({ prompt: 'consent' }); else showToast("שירותי גוגל טרם נטענו"); }
 
     async function handleGoogleAuthResponse(resp) {
-        if (resp.error) { showAuthScreen(); return; }
+        if (resp.error) { showAuthScreen(); setSyncStatus('error'); return; }
         accessToken = resp.access_token;
         localStorage.setItem('field_has_logged_in', 'true');
         document.getElementById('f-login').style.display = 'none';
-        document.getElementById('f-splash').style.display = 'flex'; // מחזירים מסך טעינה
-        showToast("מתחבר לדרייב ומושך נתונים...");
+        document.getElementById('f-splash').style.display = 'flex';
         await loadDataFromDrive();
         bootMap();
         startLocationTracking();
     }
 
     async function loadDataFromDrive() {
+        setSyncStatus('syncing');
         try {
-            // התיקון הקריטי: מחפש את הקובץ המעודכן ביותר כדי לא למשוך גרסת גיבוי ישנה וריקה
             const query = encodeURIComponent(`name='community_data_final.json' and trashed=false`);
-            const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&orderBy=modifiedTime desc&fields=files(id,name)`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            const searchUrl = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder,drive&q=${query}&orderBy=modifiedTime desc&fields=files(id,name)`;
+            
+            const searchRes = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const searchData = await searchRes.json();
             
             if (!searchData.files || searchData.files.length === 0) { 
-                showToast("⚠️ לא נמצא קובץ נתונים בדרייב");
+                showToast("⚠️ לא נמצא קובץ נתונים (בדוק אם המערכת השולחנית סונכרנה)");
+                setSyncStatus('error');
                 continueOffline(); return; 
             }
             
             const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${searchData.files[0].id}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            const textData = await dlRes.text(); // משיכה כטקסט למניעת קריסה
+            const textData = await dlRes.text();
             
             try {
                 db = JSON.parse(textData);
-                
-                // ולידציה בסיסית שומרת על יציבות
                 if(!db.families) db.families = [];
                 if(!db.meta) db.meta = {};
-                
                 storageSet(DATA_KEY, db);
+                setSyncStatus('success');
                 showToast(`✅ סונכרן! נטענו ${db.families.length} משפחות.`);
-            } catch(e) {
-                showToast("❌ הקובץ בדרייב פגום. עובר לאופליין.");
-                continueOffline();
-                return;
+                
+                // רענון המסכים אם הם כבר פתוחים
+                if(map) { renderMarkers(); renderTasks(); renderCommunity(); }
+
+            } catch(e) { 
+                setSyncStatus('error');
+                continueOffline(); 
             }
         } catch (e) { 
-            showToast("❌ תקלת תקשורת מגוגל.");
+            setSyncStatus('offline');
             continueOffline(); 
         }
     }
 
     function continueOffline() {
         isOfflineMode = true; db = storageGet(DATA_KEY);
+        setSyncStatus('offline');
         if (db) { document.getElementById('f-login').style.display = 'none'; bootMap(); startLocationTracking(); }
         else { showToast("❌ חובה חיבור רשת לאיפוס ראשוני"); showAuthScreen(); }
     }
 
     function bootMap() {
+        if(map) return; // לא לאתחל מחדש אם כבר קיים
         setTimeout(() => document.getElementById('f-splash').style.display = 'none', 500);
-        
-        let centerCoords = [34.8878, 31.9928];
-        if(db?.meta?.homeLocation?.lng) {
-            centerCoords = [db.meta.homeLocation.lng, db.meta.homeLocation.lat];
-        }
+        let centerCoords = db?.meta?.homeLocation?.lng ? [db.meta.homeLocation.lng, db.meta.homeLocation.lat] : [34.8878, 31.9928];
 
         map = new mapboxgl.Map({
             container: 'f-map',
@@ -136,8 +164,138 @@ const fieldApp = (function () {
             renderMarkers();
             renderTasks();
             renderCommunity();
+            initLongPressLogic();
         });
     }
+
+    // ==========================================
+    // זיהוי כתובת בלחיצה ארוכה
+    // ==========================================
+    function initLongPressLogic() {
+        map.on('touchstart', (e) => { pressTimer = setTimeout(() => handleLongPress(e), 600); });
+        map.on('touchend', () => clearTimeout(pressTimer));
+        map.on('touchmove', () => clearTimeout(pressTimer));
+        
+        map.on('mousedown', (e) => { pressTimer = setTimeout(() => handleLongPress(e), 600); });
+        map.on('mouseup', () => clearTimeout(pressTimer));
+        map.on('mousemove', () => clearTimeout(pressTimer));
+    }
+
+    async function handleLongPress(e) {
+        if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
+        
+        const coords = [e.lngLat.lng, e.lngLat.lat];
+        let addressName = "טוען כתובת...";
+
+        const el = document.createElement('div');
+        el.style.cssText = 'width:30px; height:30px; background:var(--danger); border:3px solid white; border-radius:50%; box-shadow:0 0 15px rgba(239, 68, 68, 0.8); display:flex; align-items:center; justify-content:center; color:white; font-size:12px; cursor:pointer; z-index:10;';
+        el.innerHTML = '<i class="fas fa-building"></i>';
+        
+        const popup = new mapboxgl.Popup({ offset: 25, closeButton: false, className: 'f-custom-popup' }).setText(addressName);
+        const marker = new mapboxgl.Marker(el).setLngLat(coords).setPopup(popup).addTo(map);
+        marker.togglePopup();
+        buildingMarkers.push(marker);
+
+        try {
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?access_token=${mapboxgl.accessToken}&language=he&types=address,poi`;
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if (data.features && data.features.length > 0) {
+                addressName = data.features[0].place_name_he || data.features[0].place_name;
+                addressName = addressName.split(',').slice(0, 2).join(','); 
+            } else {
+                addressName = "בניין לא ידוע";
+            }
+        } catch (err) {
+            addressName = "כתובת לא זמינה";
+        }
+
+        popup.setText(addressName);
+        selectedBuildings.push({ lng: coords[0], lat: coords[1], address: addressName });
+        document.getElementById('f-bldg-count').innerText = selectedBuildings.length;
+
+        showToast(`📍 סומן: ${addressName}`);
+        openRouteMenu();
+    }
+
+    // ==========================================
+    // יצירת מסלול חכם 
+    // ==========================================
+    function openRouteMenu() {
+        if (fabIsOpen) toggleFab();
+        switchView('map', document.querySelector('.nav-item')); 
+        document.getElementById('f-route-sheet').classList.add('open'); 
+        document.getElementById('f-scrim').style.display = 'block';
+    }
+
+    async function buildRoute(sourceType) {
+        closeSheet(); 
+        showToast("🗺️ מייצר מסלול ניווט...");
+        
+        let waypoints = [];
+
+        if (sourceType === 'buildings') {
+            if (selectedBuildings.length === 0) { showToast("לא סימנת בניינים במפה."); return; }
+            waypoints = selectedBuildings.map(b => [b.lng, b.lat]); 
+        } 
+        else if (sourceType === 'tasks') {
+            if (!db?.meta?.generalTasks) return;
+            waypoints = db.families.filter(f => f.lng).slice(0, 3).map(f => [f.lng, f.lat]); 
+        }
+        else if (sourceType === 'community') {
+            if (!db?.families) return;
+            waypoints = db.families.filter(f => f.lng).slice(0, 5).map(f => [f.lng, f.lat]);
+        }
+
+        if (waypoints.length === 0) { showToast("לא נמצאו יעדים למסלול."); return; }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const start = [pos.coords.longitude, pos.coords.latitude];
+                drawMultiStopRoute(start, waypoints);
+            }, () => {
+                const start = db?.meta?.homeLocation?.lng ? [db.meta.homeLocation.lng, db.meta.homeLocation.lat] : [34.8878, 31.9928];
+                drawMultiStopRoute(start, waypoints);
+            });
+        }
+    }
+
+    async function drawMultiStopRoute(startCoords, waypointsArray) {
+        try {
+            const allPoints = [startCoords, ...waypointsArray.slice(0, 23)];
+            const coordsString = allPoints.map(c => `${c[0]},${c[1]}`).join(';');
+            
+            const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
+            const res = await fetch(url);
+            const json = await res.json();
+            
+            if (!json.routes?.[0]) { showToast("לא ניתן לייצר מסלול לנקודות אלו."); return; }
+            
+            const geojson = { type: 'Feature', geometry: json.routes[0].geometry };
+            
+            if (map.getSource('route')) {
+                map.getSource('route').setData(geojson);
+            } else {
+                map.addLayer({
+                    id: 'route', type: 'line', source: { type: 'geojson', data: geojson },
+                    paint: { 'line-color': '#2563eb', 'line-width': 6, 'line-opacity': 0.8 }
+                });
+            }
+            
+            const bounds = new mapboxgl.LngLatBounds(allPoints[0], allPoints[0]);
+            allPoints.forEach(coord => bounds.extend(coord));
+            map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 50, right: 50 }, duration: 2000 });
+
+            showToast("🚗 מסלול נוצר בהצלחה!");
+        } catch (e) {
+            showToast("שגיאה ביצירת מסלול מול שרתי הניווט.");
+        }
+    }
+
+    // ==========================================
+    // פונקציות תשתית UI 
+    // ==========================================
 
     function add3DLayer() {
         if (map.getLayer('3d-buildings')) return;
@@ -172,8 +330,7 @@ const fieldApp = (function () {
     }
 
     function toggleDarkMode() {
-        isDark = !isDark;
-        document.body.classList.toggle('dark-mode', isDark);
+        isDark = !isDark; document.body.classList.toggle('dark-mode', isDark);
         localStorage.setItem('field_theme', isDark ? 'dark' : 'light');
         document.getElementById('f-theme-btn').innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
         if (map) { map.setStyle(isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12'); map.once('style.load', () => { add3DLayer(); renderMarkers(); }); }
@@ -218,7 +375,6 @@ const fieldApp = (function () {
         if (fabIsOpen && navigator.vibrate) navigator.vibrate(20);
     }
 
-    function startMissionMode() { toggleFab(); switchView('map', document.querySelector('.nav-item')); showToast("🔍 מחפש מסלולים..."); }
     function openAddFamily() { toggleFab(); showToast("פתיחת טופס משפחה..."); }
     function openAddTask() { toggleFab(); showToast("פתיחת טופס משימה..."); }
 
@@ -249,16 +405,17 @@ const fieldApp = (function () {
             </div>
         `;
         sheet.classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
         if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
     }
 
-    function openArrivalSheetByIndex(idx) {
-        if(db && db.families && db.families[idx]) {
-            openArrivalSheet(db.families[idx]);
-        }
-    }
+    function openArrivalSheetByIndex(idx) { if(db && db.families && db.families[idx]) openArrivalSheet(db.families[idx]); }
 
-    function closeSheet() { document.getElementById('f-sheet')?.classList.remove('open'); if (fabIsOpen) toggleFab(); }
+    function closeSheet() { 
+        document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open'));
+        document.getElementById('f-scrim').style.display = 'none';
+        if (fabIsOpen) toggleFab(); 
+    }
 
     function showToast(msg) {
         const c = document.getElementById('f-toast-container'); if (!c) return;
@@ -269,9 +426,7 @@ const fieldApp = (function () {
     }
 
     function renderTasks() {
-        const c = document.getElementById('f-tasks-list'); 
-        if (!c || !db?.meta?.generalTasks) return;
-        
+        const c = document.getElementById('f-tasks-list'); if (!c || !db?.meta?.generalTasks) return;
         c.innerHTML = db.meta.generalTasks.map((t, index) => {
             if (t.done) return ''; 
             return `
@@ -280,13 +435,9 @@ const fieldApp = (function () {
                     <i class="fas fa-check"></i>
                 </div>
                 <div class="task-item-front" data-index="${index}" style="position:relative; background:var(--surface); border:1px solid var(--border-light); padding:16px; border-radius:16px; display:flex; justify-content:space-between; align-items:center; z-index:2; transition: transform 0.2s ease;">
-                    <div>
-                        <div style="font-weight:600; font-size:16px;">${t.text}</div>
-                        <div style="font-size:13px; color:var(--text-muted); margin-top:4px;"><i class="far fa-calendar"></i> ${t.date || 'ללא מועד'}</div>
-                    </div>
+                    <div><div style="font-weight:600; font-size:16px;">${t.text}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;"><i class="far fa-calendar"></i> ${t.date || 'ללא מועד'}</div></div>
                 </div>
-            </div>
-            `;
+            </div>`;
         }).join('');
         initSwipeLogic();
     }
@@ -296,10 +447,7 @@ const fieldApp = (function () {
         items.forEach(item => {
             let startX = 0; let currentX = 0; let isDragging = false;
             item.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; isDragging = true; item.style.transition = 'none'; }, {passive: true});
-            item.addEventListener('touchmove', (e) => {
-                if (!isDragging) return; currentX = e.touches[0].clientX; let diff = currentX - startX;
-                if (diff < 0) item.style.transform = `translateX(${diff}px)`;
-            }, {passive: true});
+            item.addEventListener('touchmove', (e) => { if (!isDragging) return; currentX = e.touches[0].clientX; let diff = currentX - startX; if (diff < 0) item.style.transform = `translateX(${diff}px)`; }, {passive: true});
             item.addEventListener('touchend', (e) => {
                 if (!isDragging) return; isDragging = false; item.style.transition = 'transform 0.3s ease';
                 let diff = currentX - startX;
@@ -311,26 +459,17 @@ const fieldApp = (function () {
     function completeTask(item) {
         item.style.transform = 'translateX(-100%)';
         if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
-        
         const taskIndex = item.getAttribute('data-index');
-        db.meta.generalTasks[taskIndex].done = true;
-        storageSet(DATA_KEY, db);
-        
+        db.meta.generalTasks[taskIndex].done = true; storageSet(DATA_KEY, db);
         const outbox = storageGet(OUTBOX_KEY) || [];
         outbox.push({ type: 'task_complete', taskIndex: taskIndex, timestamp: new Date().toISOString() });
         storageSet(OUTBOX_KEY, outbox);
-
         showToast("✅ המשימה הושלמה!");
-        setTimeout(() => {
-            const container = item.closest('.task-swipe-container'); container.style.opacity = '0';
-            setTimeout(() => container.remove(), 300);
-        }, 300);
+        setTimeout(() => { const container = item.closest('.task-swipe-container'); container.style.opacity = '0'; setTimeout(() => container.remove(), 300); }, 300);
     }
 
     function renderCommunity() {
-        const c = document.getElementById('f-community-list'); 
-        if (!c || !db?.families) return;
-        // התיקון הקריטי: שולחים רק את האינדקס לכפתור, ולא את כל האובייקט, כדי למנוע קריסה ממרכאות כפולות!
+        const c = document.getElementById('f-community-list'); if (!c || !db?.families) return;
         c.innerHTML = db.families.slice(0, 50).map((f, index) => `
             <div style="background:var(--surface); border:1px solid var(--border-light); padding:16px; border-radius:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow);">
                 <div><div style="font-weight:600; font-size:16px;">משפחת ${f.familyName || 'ללא שם'}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${f.address || 'ללא כתובת'}</div></div>
@@ -346,7 +485,7 @@ const fieldApp = (function () {
     function recenter() { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => map.flyTo({ center: [p.coords.longitude, p.coords.latitude], zoom: 17, pitch: 60 })); }
     function callFamily() { const p = currentTarget?.fatherPhone || currentTarget?.motherPhone || currentTarget?.phone; if (p) window.location.href = `tel:${p}`; else showToast("אין מספר רשום"); }
 
-    return { init, login, switchView, toggleFab, startMissionMode, openAddFamily, openAddTask, openArrivalSheet, openArrivalSheetByIndex, closeSheet, jumpToCenter, recenter, callFamily, toggleDarkMode };
+    return { init, login, switchView, toggleFab, openRouteMenu, buildRoute, openAddFamily, openAddTask, openArrivalSheet, openArrivalSheetByIndex, closeSheet, jumpToCenter, recenter, callFamily, toggleDarkMode, forceSync };
 })();
 
 window.addEventListener('DOMContentLoaded', () => fieldApp.init());
