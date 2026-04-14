@@ -3,26 +3,19 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0f172a">
     <title>שטח CRM</title>
-
     <link rel="manifest" href="field-manifest.json">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-
-    <link rel="stylesheet" href="field-style.css?v=7">
-</head>
+    <link rel="stylesheet" href="field-style.css?v=9"> </head>
 <body>
     <div id="f-splash" class="f-splash">
-        <i class="fas fa-paper-plane fa-3x" style="color: var(--accent);"></i>
-        <h2 style="margin-top:15px; letter-spacing: 2px;">שליחות CRM</h2>
-        <div style="margin-top:20px; font-size: 14px; color: var(--text-muted);">טוען סביבת שטח...</div>
+        <img src="favicon.ico" alt="Logo">
+        <h2 style="margin-top:15px; letter-spacing: 1px; color: var(--accent);">שליחות CRM</h2>
     </div>
 
     <div id="f-login" class="view-container" style="display:none; padding:40px 20px; text-align:center; height: 100vh; background: var(--bg-body); z-index: 9998; position: fixed; inset: 0;">
@@ -37,8 +30,9 @@
     <div id="view-map" class="view-container active">
         <div id="f-map" style="width: 100%; height: 100%; position: absolute;"></div>
         <div class="map-anchors">
-            <div class="map-anchor-btn" onclick="fieldApp.jumpToCenter()"><i class="fas fa-home" style="color:var(--accent)"></i></div>
-            <div class="map-anchor-btn" onclick="fieldApp.recenter()"><i class="fas fa-crosshairs"></i></div>
+            <div class="map-anchor-btn" onclick="fieldApp.toggleDarkMode()" id="f-theme-btn"><i class="fas fa-moon"></i></div>
+            <div class="map-anchor-btn" onclick="fieldApp.jumpToCenter()"><img src="favicon.ico" style="width:20px;"></div>
+            <div class="map-anchor-btn" onclick="fieldApp.recenter()"><i class="fas fa-location-arrow"></i></div>
         </div>
     </div>
 
@@ -58,42 +52,24 @@
     </div>
 
     <nav class="f-bottom-nav">
-        <div class="nav-item active" onclick="fieldApp.switchView('map', this)">
-            <i class="fas fa-map-marked-alt"></i>
-            <span>מפה</span>
-        </div>
-
-        <div class="f-fab-center" id="f-fab-wrapper">
-            <button class="f-fab-main" onclick="fieldApp.toggleFab()">
-                <i class="fas fa-plus"></i>
-            </button>
-            <div class="f-fab-menu">
-                <div class="f-fab-option mission" onclick="fieldApp.startMissionMode()">
-                    <i class="fas fa-route"></i> צא למבצעים
-                </div>
-                <div class="f-fab-option" onclick="fieldApp.openAddFamily()">
-                    <i class="fas fa-user-plus"></i> הוסף משפחה
-                </div>
-                <div class="f-fab-option" onclick="fieldApp.openAddTask()">
-                    <i class="fas fa-tasks"></i> הוסף משימה
-                </div>
-            </div>
-        </div>
-
-        <div class="nav-item" onclick="fieldApp.switchView('tasks', this)">
-            <i class="fas fa-clipboard-list"></i>
-            <span>משימות</span>
-        </div>
-        <div class="nav-item" onclick="fieldApp.switchView('community', this)">
-            <i class="fas fa-address-book"></i>
-            <span>קהילה</span>
-        </div>
+        <div class="nav-item active" onclick="fieldApp.switchView('map', this)"><i class="fas fa-map-marked-alt"></i><span>מפה</span></div>
+        <div class="nav-item" onclick="fieldApp.switchView('tasks', this)"><i class="fas fa-clipboard-list"></i><span>משימות</span></div>
+        <div class="nav-item" onclick="fieldApp.switchView('community', this)"><i class="fas fa-address-book"></i><span>קהילה</span></div>
     </nav>
 
-    <div id="f-scrim" style="position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(5px); z-index:1000; display:none;" onclick="fieldApp.toggleFab()"></div>
+    <div id="f-scrim" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(3px); z-index:9998; display:none;" onclick="fieldApp.toggleFab()"></div>
+
+    <div class="f-fab-center" id="f-fab-wrapper">
+        <button class="f-fab-main" onclick="fieldApp.toggleFab()"><i class="fas fa-plus"></i></button>
+        <div class="f-fab-menu">
+            <div class="f-fab-option mission" onclick="fieldApp.startMissionMode()"><i class="fas fa-route"></i> צא למבצעים</div>
+            <div class="f-fab-option" onclick="fieldApp.openAddFamily()"><i class="fas fa-user-plus"></i> הוסף משפחה</div>
+            <div class="f-fab-option" onclick="fieldApp.openAddTask()"><i class="fas fa-tasks"></i> הוסף משימה</div>
+        </div>
+    </div>
 
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="field-app.js?v=7"></script>
+    <script src="field-app.js?v=9"></script>
 </body>
 </html>
