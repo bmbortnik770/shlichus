@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <link rel="stylesheet" href="field-style.css?v=16"> 
+    <link rel="stylesheet" href="field-style.css?v=17"> 
 </head>
 <body>
     <div id="f-splash" class="f-splash">
@@ -83,7 +83,8 @@
         <div class="nav-item" onclick="fieldApp.switchView('community', this)"><i class="fas fa-address-book"></i><span>קהילה</span></div>
     </nav>
 
-    <div id="f-scrim" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(3px); z-index:9998; display:none;" onclick="fieldApp.toggleFab()"></div>
+    <!-- תוקן: onclick קורא closeSheet שסוגר הכל כמו שצריך -->
+    <div id="f-scrim" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(3px); z-index:9998; display:none;" onclick="fieldApp.closeSheet()"></div>
 
     <div class="f-fab-center" id="f-fab-wrapper">
         <button class="f-fab-main" onclick="fieldApp.toggleFab()"><i class="fas fa-plus"></i></button>
@@ -96,6 +97,6 @@
 
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="field-app.js?v=16"></script>
+    <script src="field-app.js?v=17"></script>
 </body>
 </html>

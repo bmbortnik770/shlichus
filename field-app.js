@@ -1,7 +1,8 @@
 'use strict';
 
 const CLIENT_ID   = '348261974014-242r9b0dvctlka7rj3aetu81v96ere46.apps.googleusercontent.com';
-const SCOPES      = 'email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata';
+// תוקן: drive.readonly במקום drive.file — נותן גישה לכל הקבצים בדרייב
+const SCOPES      = 'email profile https://www.googleapis.com/auth/drive.readonly';
 const GEOFENCE_M  = 30;   
 const DATA_KEY    = 'field_data';
 const VISITED_KEY = 'field_visited';
@@ -106,7 +107,8 @@ const fieldApp = (function () {
         setSyncStatus('syncing');
         try {
             const query = encodeURIComponent(`name='community_data_final.json' and trashed=false`);
-            const searchUrl = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder,drive&q=${query}&orderBy=modifiedTime desc&fields=files(id,name)`;
+            // תוקן: הוסרו spaces=appDataFolder — חיפוש בכל הדרייב בלבד
+            const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&orderBy=modifiedTime desc&fields=files(id,name)`;
             
             const searchRes = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const searchData = await searchRes.json();
@@ -414,7 +416,11 @@ const fieldApp = (function () {
     function closeSheet() { 
         document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open'));
         document.getElementById('f-scrim').style.display = 'none';
-        if (fabIsOpen) toggleFab(); 
+        // תוקן: closeSheet כבר מנהל את ה-scrim — אין צורך לסגור FAB שוב
+        if (fabIsOpen) { 
+            fabIsOpen = false;
+            document.getElementById('f-fab-wrapper')?.classList.remove('open');
+        }
     }
 
     function showToast(msg) {
