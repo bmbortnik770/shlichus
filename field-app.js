@@ -67,7 +67,7 @@ const fieldApp = (function () {
 
         if (!document.getElementById('f-toast-container')) {
             const tc = document.createElement('div'); tc.id = 'f-toast-container';
-            tc.style.cssText = 'position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:10px; width:90%; pointer-events:none;';
+            tc.style.cssText = 'position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:6000; display:flex; flex-direction:column; gap:10px; width:90%; pointer-events:none;';
             document.body.appendChild(tc);
         }
 
@@ -110,7 +110,7 @@ const fieldApp = (function () {
             const searchData = await searchRes.json();
             
             if (!searchData.files || searchData.files.length === 0) { 
-                showToast("⚠️ לא נמצא קובץ נתונים (בדוק אם סונכרן במערכת)"); setSyncStatus('error'); continueOffline(); return; 
+                showToast("⚠️ לא נמצא קובץ נתונים"); setSyncStatus('error'); continueOffline(); return; 
             }
             
             const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${searchData.files[0].id}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
@@ -184,16 +184,43 @@ const fieldApp = (function () {
         showToast(`📍 סומן: ${addressName}`); openRouteMenu();
     }
 
+    // הפונקציה המרכזית שסוגרת את כל השכבות הפתוחות (גם FAB וגם מגירות)
+    function closeOverlays() {
+        document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open'));
+        if (fabIsOpen) {
+            fabIsOpen = false;
+            document.getElementById('f-fab-wrapper')?.classList.remove('open');
+        }
+        document.getElementById('f-scrim').style.display = 'none';
+    }
+
+    function toggleFab() {
+        fabIsOpen = !fabIsOpen;
+        document.getElementById('f-fab-wrapper')?.classList.toggle('open', fabIsOpen);
+        const scrim = document.getElementById('f-scrim');
+        if (fabIsOpen) {
+            // אם פותחים את ה-FAB, סגור מגירות קודם
+            document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open'));
+            scrim.style.display = 'block';
+            if (navigator.vibrate) navigator.vibrate(20);
+        } else {
+            scrim.style.display = 'none';
+        }
+    }
+
     function openRouteMenu() {
-        if (fabIsOpen) toggleFab();
+        closeOverlays(); // מנקה הכל קודם
         switchView('map', document.querySelector('.nav-item')); 
         document.getElementById('f-route-sheet').classList.add('open'); 
         document.getElementById('f-scrim').style.display = 'block';
     }
 
     async function buildRoute(sourceType) {
-        closeSheet(); showToast("🗺️ מייצר מסלול ניווט...");
+        closeOverlays(); 
+        showToast("🗺️ מייצר מסלול ניווט...");
+        
         let waypoints = [];
+
         if (sourceType === 'buildings') {
             if (selectedBuildings.length === 0) { showToast("לא סימנת בניינים במפה."); return; }
             waypoints = selectedBuildings.map(b => [b.lng, b.lat]); 
@@ -314,22 +341,15 @@ const fieldApp = (function () {
         if (element) { document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); element.classList.add('active'); }
         document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
         document.getElementById('view-' + viewId).classList.add('active');
-        if (fabIsOpen) toggleFab();
+        closeOverlays();
         if (viewId === 'map' && map) setTimeout(() => map.resize(), 100);
     }
 
-    function toggleFab() {
-        fabIsOpen = !fabIsOpen;
-        document.getElementById('f-fab-wrapper')?.classList.toggle('open', fabIsOpen);
-        const scrim = document.getElementById('f-scrim');
-        if (scrim) scrim.style.display = fabIsOpen ? 'block' : 'none';
-        if (fabIsOpen && navigator.vibrate) navigator.vibrate(20);
-    }
-
-    function openAddFamily() { toggleFab(); showToast("פתיחת טופס משפחה..."); }
-    function openAddTask() { toggleFab(); showToast("פתיחת טופס משימה..."); }
+    function openAddFamily() { closeOverlays(); showToast("פתיחת טופס משפחה..."); }
+    function openAddTask() { closeOverlays(); showToast("פתיחת טופס משימה..."); }
 
     function openArrivalSheet(bldg, aptIdx) {
+        closeOverlays(); // מנקה קודם הכל
         currentTarget = { bldg, aptIdx };
         const fam = db[bldg].apts[aptIdx];
         const sheet = document.getElementById('f-sheet');
@@ -355,7 +375,7 @@ const fieldApp = (function () {
                 </div>
             </div>
             <div style="margin-top: 20px; display: flex; gap: 10px;">
-                <button style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px;" onclick="fieldApp.closeSheet()">
+                <button style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px;" onclick="fieldApp.closeOverlays()">
                     <i class="fas fa-check"></i> הגעתי / סיום
                 </button>
                 <button style="width:50px; background: var(--bg-body); color: var(--text-main); border: 1px solid var(--border-light); border-radius: 12px; cursor:pointer;" onclick="fieldApp.callFamily()">
@@ -368,11 +388,7 @@ const fieldApp = (function () {
         if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
     }
 
-    function closeSheet() { 
-        document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open'));
-        document.getElementById('f-scrim').style.display = 'none';
-        if (fabIsOpen) { fabIsOpen = false; document.getElementById('f-fab-wrapper')?.classList.remove('open'); }
-    }
+    function openArrivalSheetByIndex(idx) { if(db && db.families && db.families[idx]) openArrivalSheet(db.families[idx]); }
 
     function showToast(msg) {
         const c = document.getElementById('f-toast-container'); if (!c) return;
@@ -496,14 +512,13 @@ const fieldApp = (function () {
 
     function openArrivalSheetEncoded(bEnc, idx) { openArrivalSheet(decodeURIComponent(bEnc), idx); }
     
-    // פונקציית ההגנה שתוקנה לחלוטין:
     function escapeHTML(str) { 
         return String(str).replace(/[&<>"']/g, function(m) {
             return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m];
         }); 
     }
 
-    return { init, login, switchView, toggleFab, openRouteMenu, buildRoute, openAddFamily, openAddTask, openArrivalSheet: openArrivalSheetEncoded, closeSheet, jumpToCenter, recenter, callFamily, toggleDarkMode, forceSync };
+    return { init, login, switchView, toggleFab, closeOverlays, openRouteMenu, buildRoute, openAddFamily, openAddTask, openArrivalSheet: openArrivalSheetEncoded, jumpToCenter, recenter, callFamily, toggleDarkMode, forceSync };
 })();
 
 window.addEventListener('DOMContentLoaded', () => fieldApp.init());
