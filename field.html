@@ -11,7 +11,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <link rel="stylesheet" href="field-style.css?v=9"> </head>
+    <link rel="stylesheet" href="field-style.css?v=11"> 
+</head>
 <body>
     <div id="f-splash" class="f-splash">
         <img src="favicon.ico" alt="Logo">
@@ -23,7 +24,9 @@
             <i class="fas fa-user-shield fa-4x" style="color: var(--accent); margin-bottom: 20px;"></i>
             <h2>שלום לשליח</h2>
             <p style="color:var(--text-muted); margin: 10px 0 30px;">התחבר כדי לסנכרן נתונים מהדרייב</p>
-            <div id="f-btn-login" style="display: flex; justify-content: center;"></div>
+            <button onclick="fieldApp.login()" class="map-anchor-btn" style="width: 100%; border-radius: 15px; background: var(--accent); color: white; font-weight: bold; height: 50px; font-family: Assistant;">
+                <i class="fab fa-google" style="margin-left: 10px;"></i> התחבר ל-Google Drive
+            </button>
         </div>
     </div>
 
@@ -70,6 +73,6 @@
 
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="field-app.js?v=9"></script>
+    <script src="field-app.js?v=11"></script>
 </body>
 </html>
