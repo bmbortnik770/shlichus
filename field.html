@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <link rel="stylesheet" href="field-style.css?v=23"> 
+    <link rel="stylesheet" href="field-style.css?v=25"> 
 </head>
 <body>
     <div id="f-splash" class="f-splash">
@@ -55,24 +55,18 @@
 
     <div id="f-scrim" onclick="fieldApp.closeOverlays()"></div>
 
-    <div id="f-sheet" class="f-sheet">
-        <div class="f-sheet-handle"></div>
-        <div id="f-sheet-content"></div>
-    </div>
+    <div id="f-sheet" class="f-sheet"><div class="f-sheet-handle"></div><div id="f-sheet-content"></div></div>
 
     <div id="f-route-sheet" class="f-sheet">
         <div class="f-sheet-handle"></div>
         <h3 style="margin: 0 0 15px 0; font-size: 20px;"><i class="fas fa-route" style="color:var(--accent);"></i> בניית מסלול חכם</h3>
         <div style="display:flex; flex-direction:column; gap:12px;">
-            <button class="f-fab-option" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('tasks')">
-                <i class="fas fa-check-double"></i> מסלול מהמשימות הפתוחות
+            <button id="btn-office-route" class="f-fab-option" style="width:100%; justify-content:center; display:none; background: var(--warning); color: white; border: none; font-size: 16px;" onclick="fieldApp.buildRoute('office')">
+                <i class="fas fa-star"></i> טען מסלול מהמשרד (<span id="f-office-route-count">0</span>)
             </button>
-            <button class="f-fab-option" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('community')">
-                <i class="fas fa-users"></i> מסלול מ-10 משפחות קרובות
-            </button>
-            <button class="f-fab-option mission" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('buildings')">
-                <i class="fas fa-map-pin"></i> מסלול מבניינים שסומנו ידנית (<span id="f-bldg-count">0</span>)
-            </button>
+            <button class="f-fab-option" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('tasks')"><i class="fas fa-check-double"></i> מסלול משימות פתוחות</button>
+            <button class="f-fab-option" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('community')"><i class="fas fa-users"></i> מסלול 10 קרובות</button>
+            <button class="f-fab-option mission" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('buildings')"><i class="fas fa-map-pin"></i> מסלול בניינים נבחרים (<span id="f-bldg-count">0</span>)</button>
         </div>
     </div>
 
@@ -84,34 +78,48 @@
         </div>
         <p style="color:var(--text-muted); font-size:14px; margin-bottom:15px;">דבר עכשיו או הקלד, הסיכום והסטטוס יישמרו במערכת.</p>
         <textarea id="f-voice-result" rows="3" style="width:100%; border-radius:12px; border:1px solid var(--border-light); padding:10px; font-family:inherit; font-size:16px; margin-bottom:15px; background:var(--bg-body); color:var(--text-main);" placeholder="הקלטה תופיע כאן..."></textarea>
-        <div style="display:flex; justify-content:center; margin-bottom:20px;">
-            <button id="f-mic-btn" onclick="fieldApp.toggleVoiceRecording()" style="width:60px; height:60px; border-radius:50%; background:var(--text-muted); color:white; border:none; font-size:24px; box-shadow:var(--shadow); cursor:pointer; transition:0.3s;">
-                <i class="fas fa-microphone"></i>
-            </button>
-        </div>
-        <button style="width: 100%; padding: 14px; background: var(--success); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveVisitLog()">
-            <i class="fas fa-save"></i> שמור ביקור
-        </button>
+        <div style="display:flex; justify-content:center; margin-bottom:20px;"><button id="f-mic-btn" onclick="fieldApp.toggleVoiceRecording()" style="width:60px; height:60px; border-radius:50%; background:var(--text-muted); color:white; border:none; font-size:24px; box-shadow:var(--shadow); cursor:pointer; transition:0.3s;"><i class="fas fa-microphone"></i></button></div>
+        <button style="width: 100%; padding: 14px; background: var(--success); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveVisitLog()"><i class="fas fa-save"></i> שמור ביקור</button>
     </div>
 
-    <div id="f-add-family-sheet" class="f-sheet">
+    <div id="f-task-confirm-sheet" class="f-sheet">
         <div class="f-sheet-handle"></div>
-        <h3 style="margin: 0 0 15px 0; font-size: 20px;"><i class="fas fa-user-plus" style="color:var(--accent);"></i> הוספת משפחה</h3>
-        <input type="text" id="f-add-fam-name" placeholder="שם המשפחה (לדוגמה: כהן)" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
-        <input type="text" id="f-add-fam-address" placeholder="כתובת (רחוב ומספר)" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
-        <input type="tel" id="f-add-fam-phone" placeholder="טלפון" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
-        <button style="width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveNewFamily()">
-            <i class="fas fa-save"></i> הוסף למערכת
-        </button>
+        <h3 style="margin: 0 0 10px 0; font-size: 20px;"><i class="fas fa-robot" style="color:var(--accent);"></i> זוהתה משימה!</h3>
+        <p style="color:var(--text-muted); font-size:14px; margin-bottom:15px;">המערכת זיהתה משימת המשך מהסיכום. לשמור למשפחה?</p>
+        <textarea id="f-auto-task-text" rows="2" style="width:100%; border-radius:8px; border:1px solid var(--border-light); padding:10px; font-family:inherit; font-size:16px; margin-bottom:10px; background:var(--bg-body); color:var(--text-main);"></textarea>
+        <input type="date" id="f-auto-task-date" style="width:100%; padding:10px; margin-bottom:20px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+        <div style="display:flex; gap:10px;">
+            <button style="flex:1; padding:12px; background:var(--bg-body); color:var(--text-main); border:1px solid var(--border-light); border-radius:12px; font-weight:bold;" onclick="fieldApp.closeOverlays(); fieldApp.showToast('הביקור נשמר ללא משימה נוספת')">דלג</button>
+            <button style="flex:1; padding:12px; background:var(--accent); color:white; border:none; border-radius:12px; font-weight:bold;" onclick="fieldApp.confirmAutoTask()">שמור משימה</button>
+        </div>
+    </div>
+
+    <div id="f-add-family-sheet" class="f-sheet" style="max-height: 85vh; overflow-y: auto;">
+        <div class="f-sheet-handle"></div>
+        <h3 style="margin: 0 0 15px 0; font-size: 20px;" id="f-add-fam-title"><i class="fas fa-user-plus" style="color:var(--accent);"></i> פרטי משפחה</h3>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
+            <input type="text" id="f-add-fam-name" placeholder="שם משפחה *" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px; grid-column: span 2;">
+            <input type="text" id="f-add-fam-father" placeholder="שם הבעל" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+            <input type="text" id="f-add-fam-mother" placeholder="שם האישה" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+            <input type="tel" id="f-add-fam-phone" placeholder="טלפון נייד *" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+            <input type="tel" id="f-add-fam-homephone" placeholder="טלפון בית" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+        </div>
+        <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;">כתובת (בניין):</div>
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px; margin-bottom:10px;">
+            <input type="text" id="f-add-fam-address" placeholder="לדוגמה: הרצל 12 *" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+            <input type="text" id="f-add-fam-apt" placeholder="מס' דירה" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+        </div>
+        <input type="text" id="f-add-fam-intercom" placeholder="קוד אינטרקום / קומה" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+        <button id="f-add-fam-savebtn" style="width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveFamilyForm()"><i class="fas fa-save"></i> שמור נתונים</button>
     </div>
 
     <div id="f-add-task-sheet" class="f-sheet">
         <div class="f-sheet-handle"></div>
-        <h3 style="margin: 0 0 15px 0; font-size: 20px;"><i class="fas fa-tasks" style="color:var(--accent);"></i> הוספת משימה כללית</h3>
-        <input type="text" id="f-add-task-text" placeholder="מה צריך לעשות?" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
-        <button style="width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveNewTask()">
-            <i class="fas fa-plus"></i> צור משימה
-        </button>
+        <h3 style="margin: 0 0 15px 0; font-size: 20px;"><i class="fas fa-tasks" style="color:var(--accent);"></i> משימה חדשה</h3>
+        <input type="text" id="f-add-task-text" placeholder="מה צריך לעשות? *" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+        <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;">שייך למשפחה (אופציונלי):</div>
+        <select id="f-add-task-family-select" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;"></select>
+        <button style="width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveNewTask()"><i class="fas fa-plus"></i> צור משימה</button>
     </div>
 
     <nav class="f-bottom-nav">
@@ -124,13 +132,13 @@
         <button class="f-fab-main" onclick="fieldApp.toggleFab()"><i class="fas fa-plus"></i></button>
         <div class="f-fab-menu">
             <div class="f-fab-option mission" onclick="fieldApp.openRouteMenu()"><i class="fas fa-route"></i> צא למבצעים</div>
-            <div class="f-fab-option" onclick="fieldApp.openAddFamily()"><i class="fas fa-user-plus"></i> הוסף משפחה</div>
+            <div class="f-fab-option" onclick="fieldApp.openFamilyForm()"><i class="fas fa-user-plus"></i> הוסף משפחה</div>
             <div class="f-fab-option" onclick="fieldApp.openAddTask()"><i class="fas fa-tasks"></i> הוסף משימה</div>
         </div>
     </div>
 
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="field-app.js?v=23"></script>
+    <script src="field-app.js?v=25"></script>
 </body>
 </html>
