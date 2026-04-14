@@ -1,69 +1,37 @@
-/**
- * field-sw.js  —  Service Worker לאפליקציית השטח
- * מטמין את קבצי האפליקציה לעבודה אופליין.
- * עדכוני Outbox שמורים ב-localStorage עד לחזרת הקליטה.
- */
-
-const CACHE_NAME = 'field-crm-v1';
-const STATIC_FILES = [
-    'field.html',
-    'field-style.css',
-    'field-app.js',
-    'field-manifest.json',
-    'favicon.ico',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-    'https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap'
+const CACHE_NAME = 'field-app-cache-v1';
+const ASSETS_TO_CACHE = [
+  './field.html',
+  './field-style.css',
+  './field-app.js',
+  './field-manifest.json',
+  './favicon.ico',
+  'https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+  'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js',
+  'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css'
 ];
 
-// Install — cache static assets
-self.addEventListener('install', event => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => {
-            return Promise.allSettled(
-                STATIC_FILES.map(url => cache.add(url).catch(() => {}))
-            );
-        })
-    );
-    self.skipWaiting();
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE)));
+  self.skipWaiting();
 });
 
-// Activate — clean old caches
-self.addEventListener('activate', event => {
-    event.waitUntil(
-        caches.keys().then(keys =>
-            Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-        )
-    );
-    self.clients.claim();
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.keys().then((cacheNames) => {
+    return Promise.all(cacheNames.map((cache) => { if (cache !== CACHE_NAME) return caches.delete(cache); }));
+  }));
+  self.clients.claim();
 });
 
-// Fetch — network-first for Drive API, cache-first for static
-self.addEventListener('fetch', event => {
-    const url = event.request.url;
-
-    // Always go to network for Drive API calls
-    if (url.includes('googleapis.com') || url.includes('mapbox')) {
-        event.respondWith(
-            fetch(event.request).catch(() =>
-                new Response(JSON.stringify({ error: 'offline' }), {
-                    headers: { 'Content-Type': 'application/json' }
-                })
-            )
-        );
-        return;
-    }
-
-    // Cache-first for everything else
-    event.respondWith(
-        caches.match(event.request).then(cached => {
-            if (cached) return cached;
-            return fetch(event.request).then(response => {
-                if (response && response.status === 200) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-                }
-                return response;
-            }).catch(() => cached);
-        })
-    );
+self.addEventListener('fetch', (event) => {
+  if (event.request.url.includes('googleapis.com')) return;
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      return cachedResponse || fetch(event.request).then((response) => {
+        return caches.open(CACHE_NAME).then((cache) => { cache.put(event.request, response.clone()); return response; });
+      });
+    }).catch(() => {
+      if (event.request.mode === 'navigate') return caches.match('./field.html');
+    })
+  );
 });
