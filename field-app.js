@@ -1,6 +1,5 @@
 'use strict';
 
-// חזרנו להרשאות המקוריות והבטוחות של המערכת השולחנית
 const CLIENT_ID   = '348261974014-242r9b0dvctlka7rj3aetu81v96ere46.apps.googleusercontent.com';
 const SCOPES      = 'email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata';
 const GEOFENCE_M  = 30;   
@@ -93,7 +92,6 @@ const fieldApp = (function () {
         startLocationTracking();
     }
 
-    // הפונקציה הקריטית שמחשבת את מספר המשפחות בשיטה של המערכת המרכזית
     function getFamilyCount() {
         let count = 0;
         Object.keys(db).forEach(k => {
@@ -106,13 +104,13 @@ const fieldApp = (function () {
         setSyncStatus('syncing');
         try {
             const query = encodeURIComponent(`name='community_data_final.json' and trashed=false`);
-            const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&spaces=drive&orderBy=modifiedTime desc&fields=files(id,name)`;
+            const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&spaces=appDataFolder,drive&orderBy=modifiedTime desc&fields=files(id,name)`;
             
             const searchRes = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const searchData = await searchRes.json();
             
             if (!searchData.files || searchData.files.length === 0) { 
-                showToast("⚠️ לא נמצא קובץ נתונים"); setSyncStatus('error'); continueOffline(); return; 
+                showToast("⚠️ לא נמצא קובץ נתונים (בדוק אם סונכרן במערכת)"); setSyncStatus('error'); continueOffline(); return; 
             }
             
             const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${searchData.files[0].id}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
@@ -140,7 +138,7 @@ const fieldApp = (function () {
         if(map) return;
         setTimeout(() => document.getElementById('f-splash').style.display = 'none', 500);
         
-        let centerCoords = [34.8878, 31.9928]; // Default
+        let centerCoords = [34.8878, 31.9928]; 
         if(db?.__SETTINGS__?.homeLocation?.coords) centerCoords = db.__SETTINGS__.homeLocation.coords;
 
         map = new mapboxgl.Map({
@@ -254,7 +252,6 @@ const fieldApp = (function () {
         if (!map || !db) return;
         markers.forEach(m => m.remove()); markers = [];
 
-        // סמן בית חב"ד (שואב מתוך Settings)
         if(db.__SETTINGS__?.homeLocation?.coords) {
             const homeCoords = db.__SETTINGS__.homeLocation.coords;
             const homeEl = document.createElement('div');
@@ -264,7 +261,6 @@ const fieldApp = (function () {
             markers.push(homeMarker);
         }
 
-        // סמני בניינים (כמות המשפחות בבניין)
         Object.keys(db).forEach(bldg => {
             if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta' || bldg === NO_ADDRESS_KEY) return;
             if(!db[bldg].apts || db[bldg].apts.length === 0) return;
@@ -276,7 +272,7 @@ const fieldApp = (function () {
             el.innerText = db[bldg].apts.length;
 
             const marker = new mapboxgl.Marker(el).setLngLat(coords).addTo(map);
-            el.addEventListener('click', () => openArrivalSheet(bldg, 0)); // פותח את המשפחה הראשונה בבניין
+            el.addEventListener('click', () => openArrivalSheet(bldg, 0)); 
             markers.push(marker);
         });
     }
@@ -350,12 +346,12 @@ const fieldApp = (function () {
         document.getElementById('f-sheet-content').innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div>
-                    <h3 style="margin: 0 0 5px 0; font-size: 22px;">משפחת ${safeName}</h3>
+                    <h3 style="margin: 0 0 5px 0; font-size: 22px;">משפחת ${escapeHTML(safeName)}</h3>
                     <div style="color: var(--text-muted); font-size: 14px;"><i class="fas fa-map-marker-alt"></i> ${addressStr} ${aptStr}</div>
                 </div>
                 <div style="background: var(--bg-body); padding: 5px 10px; border-radius: 8px; text-align: center; border: 1px solid var(--border-light);">
                     <div style="font-size: 11px; color: var(--text-muted);">אינטרקום</div>
-                    <div style="font-weight: 800; font-size: 16px; color: var(--success);">${bldgCode}</div>
+                    <div style="font-weight: 800; font-size: 16px; color: var(--success);">${escapeHTML(bldgCode)}</div>
                 </div>
             </div>
             <div style="margin-top: 20px; display: flex; gap: 10px;">
@@ -479,7 +475,7 @@ const fieldApp = (function () {
 
         c.innerHTML = allFams.slice(0, 50).map((f) => `
             <div style="background:var(--surface); border:1px solid var(--border-light); padding:16px; border-radius:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow);">
-                <div><div style="font-weight:600; font-size:16px;">משפחת ${f.apt.name || 'ללא שם'}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${f.address}</div></div>
+                <div><div style="font-weight:600; font-size:16px;">משפחת ${escapeHTML(f.apt.name || 'ללא שם')}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${escapeHTML(f.address)}</div></div>
                 <button style="background:var(--accent); border:none; width:40px; height:40px; border-radius:50%; color:white; cursor:pointer; box-shadow:0 4px 10px rgba(37,99,235,0.3);" onclick="fieldApp.openArrivalSheet('${encodeURIComponent(f.bldg)}', ${f.aptIdx})"><i class="fas fa-map-marker-alt"></i></button>
             </div>`).join('');
     }
@@ -498,10 +494,14 @@ const fieldApp = (function () {
         if (phones.length > 0) window.location.href = `tel:${phones[0]}`; else showToast("אין מספר רשום"); 
     }
 
-    // הוספתי "wrapper" קטן כדי לפענח את הקידוד בלחיצה מהקהילה
     function openArrivalSheetEncoded(bEnc, idx) { openArrivalSheet(decodeURIComponent(bEnc), idx); }
-
-    function escapeHTML(str) { return String(str).replace(/[&<>"']/g, m => ({'&':'&','<':'<','>':'>','"':'"',"'":'''}[m])); }
+    
+    // פונקציית ההגנה שתוקנה לחלוטין:
+    function escapeHTML(str) { 
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m];
+        }); 
+    }
 
     return { init, login, switchView, toggleFab, openRouteMenu, buildRoute, openAddFamily, openAddTask, openArrivalSheet: openArrivalSheetEncoded, closeSheet, jumpToCenter, recenter, callFamily, toggleDarkMode, forceSync };
 })();
