@@ -3,141 +3,97 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#2563eb">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="שטח CRM">
-    <title>אפליקציית שטח</title>
+    <meta name="theme-color" content="#0f172a">
+    <title>שטח CRM</title>
+
     <link rel="manifest" href="field-manifest.json">
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="apple-touch-icon" href="favicon.ico">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <script src="https://accounts.google.com/gsi/client"></script>
-    <script src="https://apis.google.com/js/api.js"></script>
-    <link rel="stylesheet" href="field-style.css">
+
+    <link rel="stylesheet" href="field-style.css?v=7">
 </head>
 <body>
     <div id="f-splash" class="f-splash">
-        <i class="fas fa-map-marked-alt pulse-logo"></i>
-        <h1>מערכת שטח</h1>
-        <div class="f-spinner"></div>
-        <p id="f-splash-text">טוען נתוני קהילה...</p>
+        <i class="fas fa-paper-plane fa-3x" style="color: var(--accent);"></i>
+        <h2 style="margin-top:15px; letter-spacing: 2px;">שליחות CRM</h2>
+        <div style="margin-top:20px; font-size: 14px; color: var(--text-muted);">טוען סביבת שטח...</div>
     </div>
-    <div id="f-auth" class="f-auth hidden">
-        <div class="f-auth-card">
-            <i class="fas fa-user-shield"></i>
-            <h2>התחברות לשטח</h2>
-            <p>האפליקציה דורשת סנכרון מאובטח מול הדרייב.</p>
-            <div id="f-google-btn" style="display:flex; justify-content:center; margin:20px 0;"></div>
-            <button class="f-btn-text" onclick="fieldApp.continueOffline()">המשך במצב אופליין (ללא סנכרון)</button>
+
+    <div id="f-login" class="view-container" style="display:none; padding:40px 20px; text-align:center; height: 100vh; background: var(--bg-body); z-index: 9998; position: fixed; inset: 0;">
+        <div style="margin-top: 20vh;">
+            <i class="fas fa-user-shield fa-4x" style="color: var(--accent); margin-bottom: 20px;"></i>
+            <h2>שלום לשליח</h2>
+            <p style="color:var(--text-muted); margin: 10px 0 30px;">התחבר כדי לסנכרן נתונים מהדרייב</p>
+            <div id="f-btn-login" style="display: flex; justify-content: center;"></div>
         </div>
     </div>
-    <div id="f-map" class="f-map"></div>
-    <div class="f-top-bar">
-        <div class="f-omnibar">
-            <i class="fas fa-search"></i>
-            <span>חיפוש משפחה, טלפון, רחוב...</span>
+
+    <div id="view-map" class="view-container active">
+        <div id="f-map" style="width: 100%; height: 100%; position: absolute;"></div>
+        <div class="map-anchors">
+            <div class="map-anchor-btn" onclick="fieldApp.jumpToCenter()"><i class="fas fa-home" style="color:var(--accent)"></i></div>
+            <div class="map-anchor-btn" onclick="fieldApp.recenter()"><i class="fas fa-crosshairs"></i></div>
         </div>
-        <button id="f-outbox-btn" class="f-outbox-btn hidden" onclick="fieldApp.openOutboxStatus && fieldApp.openOutboxStatus()">
-            <i class="fas fa-cloud-upload-alt"></i>
-            <span id="f-outbox-count">0</span>
-        </button>
     </div>
-    <div id="f-fab-menu" class="f-fab-menu">
-        <div class="f-fab-options hidden" id="f-fab-options">
-            <button class="f-fab-option" onclick="fieldApp.fabAction && fieldApp.fabAction('new_family')">
-                <div class="f-fab-icon" style="background:var(--success);"><i class="fas fa-user-plus"></i></div>
-                <span>משפחה חדשה</span>
-            </button>
-            <button class="f-fab-option" onclick="fieldApp.fabAction && fieldApp.fabAction('new_task')">
-                <div class="f-fab-icon" style="background:var(--accent);"><i class="fas fa-check"></i></div>
-                <span>משימה כללית</span>
-            </button>
-            <button class="f-fab-option" onclick="fieldApp.fabAction && fieldApp.fabAction('nav_center')">
-                <div class="f-fab-icon" style="background:var(--warning);"><i class="fas fa-crosshairs"></i></div>
-                <span>מרכז אותי</span>
-            </button>
-        </div>
-        <button class="f-fab-main" id="f-fab-main" onclick="fieldApp.toggleFab()">
-            <i class="fas fa-plus"></i>
-        </button>
+
+    <div id="view-tasks" class="view-container" style="padding:20px;">
+        <h2 style="margin-bottom:20px;"><i class="fas fa-check-double" style="color:var(--accent)"></i> משימות להיום</h2>
+        <div id="f-tasks-list"></div>
     </div>
-    <div id="f-scrim" class="f-scrim hidden" onclick="fieldApp.closeSheet()"></div>
-    <!-- כרטיס משפחה -->
-    <div id="f-family-sheet" class="f-sheet hidden">
+
+    <div id="view-community" class="view-container" style="padding:20px;">
+        <h2 style="margin-bottom:20px;"><i class="fas fa-users" style="color:var(--success)"></i> קהילה</h2>
+        <div id="f-community-list"></div>
+    </div>
+
+    <div id="f-sheet" class="f-sheet">
         <div class="f-sheet-handle"></div>
-        <h2 id="fs-name" style="margin-top:0; color:var(--text);">משפחה</h2>
-        <p id="fs-address" style="color:var(--muted); margin-bottom:20px; font-weight:600; font-size:15px;"></p>
-        <div style="display:flex; gap:12px;">
-            <button onclick="fieldApp.logVisit()" style="flex:1; background:var(--success); color:white; border:none; padding:14px; border-radius:16px; font-size:16px; font-weight:bold; box-shadow:0 4px 15px rgba(16,185,129,0.3);">
-                <i class="fas fa-check-circle"></i> הגעתי / בוצע
-            </button>
-            <button onclick="fieldApp.startWazeNavigation()" style="flex:1; background:var(--accent); color:white; border:none; padding:14px; border-radius:16px; font-size:16px; font-weight:bold; box-shadow:0 4px 15px rgba(37,99,235,0.3);">
-                <i class="fab fa-waze"></i> פתח ב-Waze
-            </button>
-        </div>
+        <div id="f-sheet-content"></div>
     </div>
-    <!-- כרטיס הגעה -->
-    <div id="f-arrival-sheet" class="f-sheet hidden">
-        <div class="f-sheet-handle"></div>
-        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div>
-                <h2 id="fa-name" style="margin:0; color:var(--text);">משפחה</h2>
-                <p id="fa-details" style="color:var(--muted); margin:4px 0 10px 0; font-size:15px;"></p>
-                <div id="fa-contact-actions" class="hidden" style="display:flex; gap:10px; margin-bottom:15px;">
-                    <button onclick="fieldApp.callFamily()" style="background:var(--success); color:white; width:40px; height:40px; border-radius:50%; border:none; display:flex; align-items:center; justify-content:center; font-size:15px;">
-                        <i class="fas fa-phone"></i>
-                    </button>
-                    <button onclick="fieldApp.whatsappFamily()" style="background:#25D366; color:white; width:40px; height:40px; border-radius:50%; border:none; display:flex; align-items:center; justify-content:center; font-size:18px;">
-                        <i class="fab fa-whatsapp"></i>
-                    </button>
+
+    <nav class="f-bottom-nav">
+        <div class="nav-item active" onclick="fieldApp.switchView('map', this)">
+            <i class="fas fa-map-marked-alt"></i>
+            <span>מפה</span>
+        </div>
+
+        <div class="f-fab-center" id="f-fab-wrapper">
+            <button class="f-fab-main" onclick="fieldApp.toggleFab()">
+                <i class="fas fa-plus"></i>
+            </button>
+            <div class="f-fab-menu">
+                <div class="f-fab-option mission" onclick="fieldApp.startMissionMode()">
+                    <i class="fas fa-route"></i> צא למבצעים
+                </div>
+                <div class="f-fab-option" onclick="fieldApp.openAddFamily()">
+                    <i class="fas fa-user-plus"></i> הוסף משפחה
+                </div>
+                <div class="f-fab-option" onclick="fieldApp.openAddTask()">
+                    <i class="fas fa-tasks"></i> הוסף משימה
                 </div>
             </div>
-            <div id="fa-code-badge" class="hidden" style="background:var(--bg); padding:8px 14px; border-radius:12px; border:1px solid var(--border); text-align:center;">
-                <div style="font-size:10px; color:var(--muted); font-weight:bold;">קוד כניסה</div>
-                <div id="fa-code-val" style="font-size:22px; font-weight:800; color:var(--accent); letter-spacing:2px;"></div>
-            </div>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px;">
-            <button onclick="fieldApp.logVisit()" style="background:var(--success); color:white; border:none; padding:14px; border-radius:16px; font-weight:bold; font-size:15px;">
-                <i class="fas fa-check-circle"></i> הגעתי / בוצע
-            </button>
-            <button onclick="fieldApp.toggleVoice()" style="background:var(--accent); color:white; border:none; padding:14px; border-radius:16px; font-weight:bold; font-size:15px;">
-                <i class="fas fa-microphone"></i> תיעוד קולי
-            </button>
+
+        <div class="nav-item" onclick="fieldApp.switchView('tasks', this)">
+            <i class="fas fa-clipboard-list"></i>
+            <span>משימות</span>
         </div>
-    </div>
-    <!-- כרטיס תיעוד קולי -->
-    <div id="f-voice-sheet" class="f-sheet hidden">
-        <div class="f-sheet-handle"></div>
-        <h2 style="margin:0 0 16px 0; color:var(--text); text-align:center;">תיעוד קולי</h2>
-        <div class="f-quick-chips-wrapper">
-            <button class="f-quick-chip" onclick="fieldApp.addQuickText('אין תשובה')">אין תשובה</button>
-            <button class="f-quick-chip" onclick="fieldApp.addQuickText('הושאר חומר בדלת')">הושאר חומר</button>
-            <button class="f-quick-chip" onclick="fieldApp.addQuickText('ביקשו לחזור שוב')">לחזור שוב</button>
-            <button class="f-quick-chip" onclick="fieldApp.addQuickText('שיחה קצרה בדלת')">שיחה קצרה</button>
-            <button class="f-quick-chip" onclick="fieldApp.addQuickText('הביאו תרומה')">הביאו תרומה</button>
+        <div class="nav-item" onclick="fieldApp.switchView('community', this)">
+            <i class="fas fa-address-book"></i>
+            <span>קהילה</span>
         </div>
-        <div style="text-align:center; padding:12px 0;">
-            <div class="f-mic-pulse"><i class="fas fa-microphone"></i></div>
-            <p style="margin-top:12px; color:var(--accent); font-weight:bold; font-size:14px;">מקשיב לך...</p>
-        </div>
-        <textarea id="f-voice-result" rows="4" placeholder="הטקסט יופיע כאן..." style="width:100%; border-radius:12px; border:1.5px solid var(--border); padding:12px; font-family:inherit; font-size:16px; margin-bottom:15px; background:var(--bg); color:var(--text); resize:none; outline:none;"></textarea>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-            <button onclick="fieldApp.stopVoiceAndSave()" style="background:var(--success); color:white; padding:14px; border-radius:16px; font-weight:bold; border:none; font-size:15px;">
-                <i class="fas fa-save"></i> שמור
-            </button>
-            <button onclick="fieldApp.cancelVoice()" style="background:var(--border); color:var(--text); padding:14px; border-radius:16px; font-weight:bold; border:none; font-size:15px;">
-                ביטול
-            </button>
-        </div>
-    </div>
-    <div id="f-toast-container"></div>
-    <script src="field-app.js"></script>
+    </nav>
+
+    <div id="f-scrim" style="position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(5px); z-index:1000; display:none;" onclick="fieldApp.toggleFab()"></div>
+
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="field-app.js?v=7"></script>
 </body>
 </html>
