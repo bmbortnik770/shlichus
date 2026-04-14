@@ -424,20 +424,118 @@ const fieldApp = (function () {
         }
     }
 
-    // [תיקון 6] FAB עם ניהול מצב מסודר
+    // ==========================================
+    // לוגיקת ממשק מודרני V7 (לשוניות, FAB ומגירה)
+    // ==========================================
+
+    // 1. מעבר בין הלשוניות (מפה, משימות, קהילה)
+    function switchView(viewId, element) {
+        // שינוי צבע הלשונית הפעילה בסרגל התחתון
+        if (element) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        // החלפת המסך שמוצג
+        document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+        document.getElementById('view-' + viewId).classList.add('active');
+
+        // אם תפריט הפלוס פתוח - סגור אותו
+        if (fabIsOpen) toggleFab();
+
+        // קריטי: רענון המפה של Mapbox כשחוזרים אליה כדי שלא תחתך
+        if (viewId === 'map' && typeof map !== 'undefined') {
+            setTimeout(() => map.resize(), 100);
+        }
+    }
+
+    // 2. פתיחת התפריט המשולש (Triple FAB) — V7
     function toggleFab() {
         fabIsOpen = !fabIsOpen;
-        document.getElementById('f-fab-options').classList.toggle('hidden', !fabIsOpen);
-        document.getElementById('f-fab-main').style.transform = fabIsOpen ? 'rotate(45deg)' : 'rotate(0deg)';
-        document.getElementById('f-scrim').classList.toggle('hidden', !fabIsOpen);
+        const wrapper = document.getElementById('f-fab-wrapper');
+        const scrim   = document.getElementById('f-scrim');
+
+        if (wrapper) {
+            wrapper.classList.toggle('open', fabIsOpen);
+        } else {
+            // fallback למבנה HTML ישן
+            document.getElementById('f-fab-options')?.classList.toggle('hidden', !fabIsOpen);
+            document.getElementById('f-fab-main') && (document.getElementById('f-fab-main').style.transform = fabIsOpen ? 'rotate(45deg)' : 'rotate(0deg)');
+        }
+
+        if (scrim) {
+            fabIsOpen
+                ? (scrim.style.display = 'block')
+                : (scrim.style.display = 'none');
+        }
+
+        if (fabIsOpen && navigator.vibrate) navigator.vibrate(20);
+    }
+
+    // 3. לוגיקת "צא למבצעים"
+    function startMissionMode() {
+        toggleFab();
+        switchView('map', document.querySelector('.nav-item'));
+        alert("מחפש מסלולים מוכנים בדרייב...");
+        setTimeout(() => {
+            openArrivalSheet("משפחת כהן", "הרצל 12, קומה 2", "1234");
+        }, 2000);
+    }
+
+    function openAddFamily() {
+        toggleFab();
+        alert("כאן תיפתח כרטיסיית Card Morphing להוספת משפחה.");
+    }
+
+    function openAddTask() {
+        toggleFab();
+        alert("כאן ייפתח מסך הוספת משימה מהירה.");
+    }
+
+    // 4. מגירת הגעה תחתונה (Bottom Sheet) — V7
+    function openArrivalSheet(familyName, address, intercom) {
+        const sheet   = document.getElementById('f-sheet');
+        const content = document.getElementById('f-sheet-content');
+
+        if (!sheet || !content) return;
+
+        content.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h3 style="margin: 0 0 5px 0; font-size: 22px;">${familyName}</h3>
+                    <div style="color: var(--text-muted); font-size: 14px;">
+                        <i class="fas fa-map-marker-alt"></i> ${address}
+                    </div>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 8px; text-align: center; border: 1px solid var(--border-light);">
+                    <div style="font-size: 11px; color: var(--text-muted);">קוד אינטרקום</div>
+                    <div style="font-weight: 800; font-size: 16px; color: var(--success);">${intercom}</div>
+                </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px;" onclick="fieldApp.closeSheet()">
+                    <i class="fas fa-check"></i> הגעתי / סיום
+                </button>
+            </div>
+        `;
+
+        sheet.classList.add('open');
+        if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
     }
 
     return {
         init,
         continueOffline,
         closeSheet,
-        stopLocationTracking,       // [תיקון 2] חשיפה לשימוש חיצוני אם נדרש
+        stopLocationTracking,
+
+        // חשיפות V7:
+        switchView,
         toggleFab,
+        startMissionMode,
+        openAddFamily,
+        openAddTask,
+
         startWazeNavigation: () => {
             if (!currentTarget) return;
             window.location.href = `https://waze.com/ul?ll=${currentTarget.lat},${currentTarget.lng}&navigate=yes`;
