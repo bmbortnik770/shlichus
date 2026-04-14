@@ -36,12 +36,11 @@ const fieldApp = (function () {
 
         if (!document.getElementById('f-toast-container')) {
             const tc = document.createElement('div'); tc.id = 'f-toast-container';
-            tc.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:10px; width:90%;';
+            tc.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:10px; width:90%; pointer-events:none;';
             document.body.appendChild(tc);
         }
 
         if (typeof google !== 'undefined') {
-            // אתחול לקוח ההרשאות החזק של גוגל
             tokenClient = google.accounts.oauth2.initTokenClient({ 
                 client_id: CLIENT_ID, 
                 scope: SCOPES, 
@@ -61,11 +60,8 @@ const fieldApp = (function () {
     function showAuthScreen() { document.getElementById('f-splash').style.display = 'none'; document.getElementById('f-login').style.display = 'block'; }
     
     function login() {
-        if(tokenClient) {
-            tokenClient.requestAccessToken({ prompt: 'consent' });
-        } else {
-            showToast("שירותי גוגל טרם נטענו, נסה שוב");
-        }
+        if(tokenClient) tokenClient.requestAccessToken({ prompt: 'consent' });
+        else showToast("שירותי גוגל טרם נטענו, נסה שוב");
     }
 
     async function handleGoogleAuthResponse(resp) {
@@ -73,6 +69,7 @@ const fieldApp = (function () {
         accessToken = resp.access_token;
         localStorage.setItem('field_has_logged_in', 'true');
         document.getElementById('f-login').style.display = 'none';
+        document.getElementById('f-splash').style.display = 'flex'; // מחזירים מסך טעינה
         showToast("מתחבר לדרייב ומושך נתונים...");
         await loadDataFromDrive();
         bootMap();
@@ -81,14 +78,37 @@ const fieldApp = (function () {
 
     async function loadDataFromDrive() {
         try {
-            const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`name='community_data_final.json' and trashed=false`)}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            // התיקון הקריטי: מחפש את הקובץ המעודכן ביותר כדי לא למשוך גרסת גיבוי ישנה וריקה
+            const query = encodeURIComponent(`name='community_data_final.json' and trashed=false`);
+            const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&orderBy=modifiedTime desc&fields=files(id,name)`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const searchData = await searchRes.json();
-            if (!searchData.files || searchData.files.length === 0) { continueOffline(); return; }
+            
+            if (!searchData.files || searchData.files.length === 0) { 
+                showToast("⚠️ לא נמצא קובץ נתונים בדרייב");
+                continueOffline(); return; 
+            }
+            
             const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${searchData.files[0].id}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            db = await dlRes.json();
-            storageSet(DATA_KEY, db);
-            showToast("הנתונים סונכרנו בהצלחה!");
-        } catch (e) { continueOffline(); }
+            const textData = await dlRes.text(); // משיכה כטקסט למניעת קריסה
+            
+            try {
+                db = JSON.parse(textData);
+                
+                // ולידציה בסיסית שומרת על יציבות
+                if(!db.families) db.families = [];
+                if(!db.meta) db.meta = {};
+                
+                storageSet(DATA_KEY, db);
+                showToast(`✅ סונכרן! נטענו ${db.families.length} משפחות.`);
+            } catch(e) {
+                showToast("❌ הקובץ בדרייב פגום. עובר לאופליין.");
+                continueOffline();
+                return;
+            }
+        } catch (e) { 
+            showToast("❌ תקלת תקשורת מגוגל.");
+            continueOffline(); 
+        }
     }
 
     function continueOffline() {
@@ -100,7 +120,7 @@ const fieldApp = (function () {
     function bootMap() {
         setTimeout(() => document.getElementById('f-splash').style.display = 'none', 500);
         
-        let centerCoords = [34.8878, 31.9928]; // ברירת מחדל אם אין נתונים
+        let centerCoords = [34.8878, 31.9928];
         if(db?.meta?.homeLocation?.lng) {
             centerCoords = [db.meta.homeLocation.lng, db.meta.homeLocation.lat];
         }
@@ -132,7 +152,6 @@ const fieldApp = (function () {
         if (!map || !db?.families) return;
         markers.forEach(m => m.remove()); markers = [];
 
-        // הוספת סמן ה-770 לפי קואורדינטות המערכת
         if(db?.meta?.homeLocation?.lng) {
             const homeCoords = [db.meta.homeLocation.lng, db.meta.homeLocation.lat];
             const homeEl = document.createElement('div');
@@ -142,7 +161,6 @@ const fieldApp = (function () {
             markers.push(homeMarker);
         }
 
-        // הוספת משפחות
         db.families.forEach((fam) => {
             if (!fam.lng || !fam.lat) return;
             const el = document.createElement('div');
@@ -234,20 +252,22 @@ const fieldApp = (function () {
         if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
     }
 
+    function openArrivalSheetByIndex(idx) {
+        if(db && db.families && db.families[idx]) {
+            openArrivalSheet(db.families[idx]);
+        }
+    }
+
     function closeSheet() { document.getElementById('f-sheet')?.classList.remove('open'); if (fabIsOpen) toggleFab(); }
 
     function showToast(msg) {
         const c = document.getElementById('f-toast-container'); if (!c) return;
         const t = document.createElement('div');
-        t.style.cssText = 'background:var(--surface); color:var(--text-main); padding:14px 20px; border-radius:20px; box-shadow:var(--shadow); font-weight:bold; border:1px solid var(--border-light);';
+        t.style.cssText = 'background:var(--surface); color:var(--text-main); padding:14px 20px; border-radius:20px; box-shadow:var(--shadow); font-weight:bold; border:1px solid var(--border-light); pointer-events:none;';
         t.innerHTML = msg; c.appendChild(t);
         setTimeout(() => { t.style.transition='opacity 0.3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 3000);
     }
 
-    // ==========================================
-    // פיצ'ר 1: מחוות החלקה (Swipe) למשימות
-    // ==========================================
-    
     function renderTasks() {
         const c = document.getElementById('f-tasks-list'); 
         if (!c || !db?.meta?.generalTasks) return;
@@ -268,39 +288,22 @@ const fieldApp = (function () {
             </div>
             `;
         }).join('');
-
         initSwipeLogic();
     }
 
     function initSwipeLogic() {
         const items = document.querySelectorAll('.task-item-front');
-        
         items.forEach(item => {
-            let startX = 0;
-            let currentX = 0;
-            let isDragging = false;
-            
-            item.addEventListener('touchstart', (e) => {
-                startX = e.touches[0].clientX;
-                isDragging = true;
-                item.style.transition = 'none'; 
-            }, {passive: true});
-
+            let startX = 0; let currentX = 0; let isDragging = false;
+            item.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; isDragging = true; item.style.transition = 'none'; }, {passive: true});
             item.addEventListener('touchmove', (e) => {
-                if (!isDragging) return;
-                currentX = e.touches[0].clientX;
-                let diff = currentX - startX;
+                if (!isDragging) return; currentX = e.touches[0].clientX; let diff = currentX - startX;
                 if (diff < 0) item.style.transform = `translateX(${diff}px)`;
             }, {passive: true});
-
             item.addEventListener('touchend', (e) => {
-                if (!isDragging) return;
-                isDragging = false;
-                item.style.transition = 'transform 0.3s ease';
+                if (!isDragging) return; isDragging = false; item.style.transition = 'transform 0.3s ease';
                 let diff = currentX - startX;
-                
-                if (diff < -80) completeTask(item);
-                else item.style.transform = 'translateX(0)';
+                if (diff < -80) completeTask(item); else item.style.transform = 'translateX(0)';
             });
         });
     }
@@ -319,18 +322,19 @@ const fieldApp = (function () {
 
         showToast("✅ המשימה הושלמה!");
         setTimeout(() => {
-            const container = item.closest('.task-swipe-container');
-            container.style.opacity = '0';
+            const container = item.closest('.task-swipe-container'); container.style.opacity = '0';
             setTimeout(() => container.remove(), 300);
         }, 300);
     }
 
     function renderCommunity() {
-        const c = document.getElementById('f-community-list'); if (!c || !db?.families) return;
-        c.innerHTML = db.families.slice(0, 50).map(f => `
+        const c = document.getElementById('f-community-list'); 
+        if (!c || !db?.families) return;
+        // התיקון הקריטי: שולחים רק את האינדקס לכפתור, ולא את כל האובייקט, כדי למנוע קריסה ממרכאות כפולות!
+        c.innerHTML = db.families.slice(0, 50).map((f, index) => `
             <div style="background:var(--surface); border:1px solid var(--border-light); padding:16px; border-radius:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow);">
-                <div><div style="font-weight:600; font-size:16px;">משפחת ${f.familyName}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${f.address || 'ללא כתובת'}</div></div>
-                <button style="background:var(--accent); border:none; width:40px; height:40px; border-radius:50%; color:white; cursor:pointer; box-shadow:0 4px 10px rgba(37,99,235,0.3);" onclick="fieldApp.openArrivalSheet(${JSON.stringify(f).replace(/"/g, '&quot;')})"><i class="fas fa-map-marker-alt"></i></button>
+                <div><div style="font-weight:600; font-size:16px;">משפחת ${f.familyName || 'ללא שם'}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${f.address || 'ללא כתובת'}</div></div>
+                <button style="background:var(--accent); border:none; width:40px; height:40px; border-radius:50%; color:white; cursor:pointer; box-shadow:0 4px 10px rgba(37,99,235,0.3);" onclick="fieldApp.openArrivalSheetByIndex(${index})"><i class="fas fa-map-marker-alt"></i></button>
             </div>`).join('');
     }
 
@@ -342,7 +346,7 @@ const fieldApp = (function () {
     function recenter() { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => map.flyTo({ center: [p.coords.longitude, p.coords.latitude], zoom: 17, pitch: 60 })); }
     function callFamily() { const p = currentTarget?.fatherPhone || currentTarget?.motherPhone || currentTarget?.phone; if (p) window.location.href = `tel:${p}`; else showToast("אין מספר רשום"); }
 
-    return { init, login, switchView, toggleFab, startMissionMode, openAddFamily, openAddTask, openArrivalSheet, closeSheet, jumpToCenter, recenter, callFamily, toggleDarkMode };
+    return { init, login, switchView, toggleFab, startMissionMode, openAddFamily, openAddTask, openArrivalSheet, openArrivalSheetByIndex, closeSheet, jumpToCenter, recenter, callFamily, toggleDarkMode };
 })();
 
 window.addEventListener('DOMContentLoaded', () => fieldApp.init());
