@@ -45,11 +45,18 @@
 
     <div id="view-tasks" class="view-container" style="padding: 80px 20px 20px 20px;">
         <h2 style="margin-bottom:20px;"><i class="fas fa-check-double" style="color:var(--accent)"></i> משימות להיום</h2>
+        <div style="display:flex; gap:10px; margin-bottom:20px;">
+            <input type="text" id="f-quick-task-input" placeholder="מה צריך לעשות?" style="flex:1; padding:12px; border-radius:12px; border:1px solid var(--border-light); background:var(--surface); color:var(--text-main); font-family:inherit; font-size:16px;">
+            <button onclick="fieldApp.saveQuickTask()" style="background:var(--accent); color:white; border:none; border-radius:12px; padding:0 20px; font-weight:bold; cursor:pointer;"><i class="fas fa-plus"></i></button>
+        </div>
         <div id="f-tasks-list"></div>
     </div>
 
     <div id="view-community" class="view-container" style="padding: 80px 20px 20px 20px;">
         <h2 style="margin-bottom:20px;"><i class="fas fa-users" style="color:var(--success)"></i> קהילה</h2>
+        <button onclick="fieldApp.openFamilyForm()" style="width:100%; margin-bottom:20px; padding:14px; background:rgba(59,130,246,0.1); color:var(--accent); border:1px dashed var(--accent); border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer;">
+            <i class="fas fa-user-plus"></i> הוסף משפחה חדשה
+        </button>
         <div id="f-community-list"></div>
     </div>
 
@@ -106,9 +113,12 @@
         </div>
         <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;">כתובת (בניין):</div>
         <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px; margin-bottom:10px;">
-            <input type="text" id="f-add-fam-address" placeholder="לדוגמה: הרצל 12 *" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+            <div style="position:relative; width:100%;">
+                <input type="text" id="f-add-fam-address" placeholder="הקלד כתובת לחיפוש..." autocomplete="off" oninput="fieldApp.searchAddressInput(this.value)" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+                <div id="address-suggestions" style="position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--accent); border-radius:8px; z-index:9999; display:none; max-height:150px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.2);"></div>
+            </div>
             <input type="text" id="f-add-fam-apt" placeholder="מס' דירה" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
-        </div>
+            </div>
         <input type="text" id="f-add-fam-intercom" placeholder="קוד אינטרקום / קומה" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
         <button id="f-add-fam-savebtn" style="width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveFamilyForm()"><i class="fas fa-save"></i> שמור נתונים</button>
     </div>
@@ -122,13 +132,18 @@
         <button style="width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveNewTask()"><i class="fas fa-plus"></i> צור משימה</button>
     </div>
 
+    <div id="f-route-action-bar" style="position:fixed; bottom:80px; left:10px; right:10px; background:var(--accent); color:white; border-radius:16px; padding:12px 20px; display:none; justify-content:space-between; align-items:center; z-index:9000; box-shadow:0 10px 20px rgba(59,130,246,0.4);">
+        <div style="font-weight:bold;"><i class="fas fa-route"></i> נבחרו <span id="f-route-counter">0</span> יעדים</div>
+        <button onclick="fieldApp.startCustomRoute()" style="background:white; color:var(--accent); border:none; padding:8px 16px; border-radius:10px; font-weight:bold; cursor:pointer;">נווט עכשיו</button>
+    </div>
+
     <nav class="f-bottom-nav">
         <div class="nav-item active" onclick="fieldApp.switchView('map', this)"><i class="fas fa-map-marked-alt"></i><span>מפה</span></div>
         <div class="nav-item" onclick="fieldApp.switchView('tasks', this)"><i class="fas fa-clipboard-list"></i><span>משימות</span></div>
         <div class="nav-item" onclick="fieldApp.switchView('community', this)"><i class="fas fa-address-book"></i><span>קהילה</span></div>
     </nav>
 
-    <div class="f-fab-center" id="f-fab-wrapper">
+    <div class="f-fab-center" id="f-fab-wrapper" style="display:none;">
         <button class="f-fab-main" onclick="fieldApp.toggleFab()"><i class="fas fa-plus"></i></button>
         <div class="f-fab-menu">
             <div class="f-fab-option mission" onclick="fieldApp.openRouteMenu()"><i class="fas fa-route"></i> צא למבצעים</div>
@@ -140,5 +155,14 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="field-app.js?v=25"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./field-sw.js')
+            .then(reg => console.log('SW רשום:', reg.scope))
+            .catch(err => console.warn('SW נכשל:', err));
+        });
+      }
+    </script>
 </body>
 </html>

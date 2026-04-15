@@ -1,18 +1,18 @@
-const CACHE_NAME = 'field-app-cache-v1';
+const CACHE_NAME = 'field-app-cache-v2';
 const ASSETS_TO_CACHE = [
   './field.html',
   './field-style.css',
   './field-app.js',
   './field-manifest.json',
-  './favicon.ico',
-  'https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js',
-  'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css'
+  './favicon.ico'
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE)));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return Promise.allSettled(ASSETS_TO_CACHE.map(url => cache.add(url).catch(e => console.warn('Cache miss:', url, e))));
+    })
+  );
   self.skipWaiting();
 });
 

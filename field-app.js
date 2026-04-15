@@ -122,6 +122,7 @@ const fieldApp = (function () {
             try { 
                 db = JSON.parse(textData); if(!db.meta) db.meta = {}; storageSet(DATA_KEY, db); setSyncStatus('success'); 
                 showToast(`✅ סונכרן! נטענו ${getFamilyCount()} משפחות.`); 
+                document.getElementById('f-fab-wrapper').style.display = 'block';
                 checkForOfficeRoute();
                 if(map) { renderMarkers(); renderTasks(); renderCommunity(); } 
             } catch(e) { setSyncStatus('error'); continueOffline(); }
@@ -130,7 +131,7 @@ const fieldApp = (function () {
 
     function continueOffline() {
         isOfflineMode = true; db = storageGet(DATA_KEY); setSyncStatus('offline');
-        if (db) { document.getElementById('f-login').style.display = 'none'; bootMap(); startLocationTracking(); checkForOfficeRoute(); }
+        if (db) { document.getElementById('f-login').style.display = 'none'; document.getElementById('f-fab-wrapper').style.display = 'block'; bootMap(); startLocationTracking(); checkForOfficeRoute(); }
         else { showToast("❌ חובה חיבור רשת לאיפוס ראשוני"); showAuthScreen(); }
     }
 
@@ -167,7 +168,8 @@ const fieldApp = (function () {
 
     async function handleLongPress(e) {
         if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
-        const features = map.queryRenderedFeatures(e.point, { layers: ['3d-buildings'] });
+        const bbox = [[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]];
+        const features = map.queryRenderedFeatures(bbox, { layers: ['3d-buildings'] });
         if (features.length === 0) return; 
         const feature = features[0]; const geomString = JSON.stringify(feature.geometry);
         const existingIdx = highlightedFeatures.findIndex(f => JSON.stringify(f.geometry) === geomString);
@@ -304,6 +306,7 @@ const fieldApp = (function () {
     // טפסי משפחות מאוחדים (עריכה / הוספה)
     function openFamilyForm(bldg = null, aptIdx = null) {
         closeOverlays();
+        document.getElementById('f-fab-wrapper').style.display = 'none';
         const sheet = document.getElementById('f-add-family-sheet');
         const titleIcon = document.getElementById('f-add-fam-title');
         const saveBtn = document.getElementById('f-add-fam-savebtn');
@@ -321,21 +324,109 @@ const fieldApp = (function () {
         sheet.classList.add('open'); document.getElementById('f-scrim').style.display = 'block';
     }
 
+    let selectedCoords = null;
+
+    async function searchAddressInput(query) {
+        const suggBox = document.getElementById('address-suggestions');
+        if (query.length < 3) { suggBox.style.display = 'none'; selectedCoords = null; return; }
+        try {
+            const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxgl.accessToken}&language=he&country=il&types=address`);
+            const data = await res.json();
+            if (data.features && data.features.length > 0) {
+                suggBox.innerHTML = data.features.map(f => `<div style="padding:10px; border-bottom:1px solid var(--border-light); cursor:pointer;" onclick="fieldApp.selectAddressOption('${f.place_name.replace(/'/g,'')}', ${f.center[0]}, ${f.center[1]})">${f.place_name_he || f.place_name}</div>`).join('');
+                suggBox.style.display = 'block';
+            } else { suggBox.style.display = 'none'; }
+        } catch(e) { suggBox.style.display = 'none'; }
+    }
+
+    function selectAddressOption(name, lng, lat) {
+        document.getElementById('f-add-fam-address').value = name.split(',').slice(0,2).join(',');
+        selectedCoords = [lng, lat];
+        document.getElementById('address-suggestions').style.display = 'none';
+    }
+
+    let customRouteWaypoints = [];
+
+    function toggleTargetForRoute(el, lng, lat) {
+        if (!lng || !lat || isNaN(lng)) { showToast("למשפחה זו אין מיקום מוגדר במפה."); return; }
+        const coordsStr = `${lng},${lat}`;
+        const existingIdx = customRouteWaypoints.findIndex(c => `${c[0]},${c[1]}` === coordsStr);
+        if (existingIdx >= 0) {
+            customRouteWaypoints.splice(existingIdx, 1);
+            el.style.border = "1px solid var(--border-light)";
+            el.style.background = "var(--surface)";
+        } else {
+            customRouteWaypoints.push([lng, lat]);
+            el.style.border = "2px solid var(--accent)";
+            el.style.background = "rgba(59,130,246,0.05)";
+        }
+        const bar = document.getElementById('f-route-action-bar');
+        if (customRouteWaypoints.length > 0) {
+            bar.style.display = 'flex';
+            document.getElementById('f-route-counter').innerText = customRouteWaypoints.length;
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    function startCustomRoute() {
+        if (customRouteWaypoints.length === 0) return;
+        switchView('map', document.querySelectorAll('.nav-item')[0]);
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], customRouteWaypoints),
+                () => drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], customRouteWaypoints)
+            );
+        }
+        customRouteWaypoints = [];
+        document.getElementById('f-route-action-bar').style.display = 'none';
+        renderCommunity(); renderTasks();
+    }
+
+    function saveQuickTask() {
+        const text = document.getElementById('f-quick-task-input').value.trim();
+        if(!text) return;
+        const todayStr = new Date().toLocaleDateString('he-IL');
+        const newTask = { text: text, date: todayStr, done: false };
+        if(!db.meta) db.meta = {};
+        if(!db.meta.generalTasks) db.meta.generalTasks = [];
+        db.meta.generalTasks.push(newTask);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'add_general_task', timestamp: new Date().toISOString(), payload: { text, date: todayStr } });
+        storageSet(DATA_KEY, db); storageSet(OUTBOX_KEY, outbox);
+        document.getElementById('f-quick-task-input').value = '';
+        renderTasks(); showToast("✅ משימה נוספה!");
+    }
+
     async function saveFamilyForm() {
         const name = document.getElementById('f-add-fam-name').value.trim();
+        const fatherName = document.getElementById('f-add-fam-father').value.trim();
+        const motherName = document.getElementById('f-add-fam-mother').value.trim();
         let address = document.getElementById('f-add-fam-address').value.trim();
-        const phone = document.getElementById('f-add-fam-phone').value.trim();
-        if(!name || !address || !phone) { showToast("נא למלא שם, כתובת וטלפון נייד (שדות חובה)"); return; }
-        
-        const fatherName = document.getElementById('f-add-fam-father').value.trim(); const motherName = document.getElementById('f-add-fam-mother').value.trim(); const aptNum = document.getElementById('f-add-fam-apt').value.trim(); const homePhone = document.getElementById('f-add-fam-homephone').value.trim(); const intercom = document.getElementById('f-add-fam-intercom').value.trim();
 
-        showToast("בודק ומאמת נתונים...");
-        let finalCoords = null;
-        try {
-            const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${mapboxgl.accessToken}&language=he&country=il&types=address`);
-            const data = await res.json();
-            if (data.features && data.features.length > 0) { address = data.features[0].place_name_he || data.features[0].place_name; address = address.split(',').slice(0, 2).join(','); finalCoords = data.features[0].center; }
-        } catch(e) { console.log("Geocoding failed"); }
+        if(!name || (!fatherName && !motherName)) { showToast("⚠️ חובה להזין שם משפחה ולפחות שם של הורה אחד."); return; }
+
+        const phone = document.getElementById('f-add-fam-phone').value.trim();
+        const aptNum = document.getElementById('f-add-fam-apt').value.trim();
+        const homePhone = document.getElementById('f-add-fam-homephone').value.trim();
+        const intercom = document.getElementById('f-add-fam-intercom').value.trim();
+
+        let finalCoords = selectedCoords;
+        if (!address) { address = NO_ADDRESS_KEY; finalCoords = []; }
+
+        showToast("שומר נתונים...");
+
+        // אם אין קואורדינטות מהבחירה האוטומטית, ננסה geocoding
+        if (address !== NO_ADDRESS_KEY && !finalCoords) {
+            try {
+                const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${mapboxgl.accessToken}&language=he&country=il&types=address`);
+                const data = await res.json();
+                if (data.features && data.features.length > 0) { 
+                    address = (data.features[0].place_name_he || data.features[0].place_name).split(',').slice(0,2).join(',');
+                    finalCoords = data.features[0].center;
+                }
+            } catch(e) { console.log("Geocoding failed"); }
+        }
 
         const familyData = { name, fatherName, motherName, phone, homePhone, num: aptNum };
         const outbox = storageGet(OUTBOX_KEY) || [];
@@ -364,6 +455,7 @@ const fieldApp = (function () {
 
     function openAddTask() {
         closeOverlays();
+        document.getElementById('f-fab-wrapper').style.display = 'none';
         document.getElementById('f-add-task-text').value = '';
         const select = document.getElementById('f-add-task-family-select');
         let optionsHtml = '<option value="">-- משימה כללית (ללא שיוך) --</option>';
@@ -417,11 +509,12 @@ const fieldApp = (function () {
         let allFams = []; Object.keys(db).forEach(bldg => { if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return; (db[bldg].apts || []).forEach((apt, aptIdx) => { allFams.push({ bldg, aptIdx, apt, address: bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : bldg }); }); });
         c.innerHTML = allFams.slice(0, 50).map((f) => {
             const phone = f.apt.fatherPhone || f.apt.motherPhone || f.apt.phone || ''; const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '972')}` : '#'; const disableStyle = !phone ? 'opacity:0.3; pointer-events:none;' : '';
-            return `<div style="background:var(--surface); border:1px solid var(--border-light); padding:16px; border-radius:16px; margin-bottom:12px; box-shadow:var(--shadow);"><div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px;"><div><div style="font-weight:600; font-size:16px;">משפחת ${escapeHTML(f.apt.name || 'ללא שם')}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${escapeHTML(f.address)} ${f.apt.num ? 'דירה '+f.apt.num : ''}</div></div></div><div style="display:flex; gap:8px; border-top: 1px solid var(--border-light); padding-top: 12px;"><button style="flex:1; background:var(--bg-body); border:1px solid var(--border-light); padding:10px; border-radius:10px; color:var(--text-main); font-size:16px; ${disableStyle}" onclick="fieldApp.callFamilyNumber('${phone}')"><i class="fas fa-phone"></i></button><button style="flex:1; background:#25D366; border:none; padding:10px; border-radius:10px; color:white; font-size:16px; ${disableStyle}" onclick="window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp"></i></button><button style="flex:2; background:var(--accent); border:none; padding:10px; border-radius:10px; color:white; font-weight:bold;" onclick="fieldApp.openFamilyCard('${encodeURIComponent(f.bldg)}', ${f.aptIdx}); fieldApp.switchView('map');">כרטיס מלא</button></div></div>`;
+            const coords = db[f.bldg]?.info?.coords; const lng = coords?.[0]; const lat = coords?.[1];
+            return `<div style="background:var(--surface); border:1px solid var(--border-light); padding:16px; border-radius:16px; margin-bottom:12px; box-shadow:var(--shadow); cursor:pointer;" onclick="fieldApp.toggleTargetForRoute(this, ${lng || 0}, ${lat || 0})"><div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px;"><div><div style="font-weight:600; font-size:16px;">משפחת ${escapeHTML(f.apt.name || 'ללא שם')}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${escapeHTML(f.address)} ${f.apt.num ? 'דירה '+f.apt.num : ''}</div></div></div><div style="display:flex; gap:8px; border-top: 1px solid var(--border-light); padding-top: 12px;"><button style="flex:1; background:var(--bg-body); border:1px solid var(--border-light); padding:10px; border-radius:10px; color:var(--text-main); font-size:16px; ${disableStyle}" onclick="event.stopPropagation(); fieldApp.callFamilyNumber('${phone}')"><i class="fas fa-phone"></i></button><button style="flex:1; background:#25D366; border:none; padding:10px; border-radius:10px; color:white; font-size:16px; ${disableStyle}" onclick="event.stopPropagation(); window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp"></i></button><button style="flex:2; background:var(--accent); border:none; padding:10px; border-radius:10px; color:white; font-weight:bold;" onclick="event.stopPropagation(); fieldApp.openFamilyCard('${encodeURIComponent(f.bldg)}', ${f.aptIdx}); fieldApp.switchView('map');">כרטיס מלא</button></div></div>`;
         }).join('');
     }
 
-    function openRouteMenu() { closeOverlays(); switchView('map', document.querySelector('.nav-item')); document.getElementById('f-route-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block'; }
+    function openRouteMenu() { closeOverlays(); document.getElementById('f-fab-wrapper').style.display = 'none'; switchView('map', document.querySelector('.nav-item')); document.getElementById('f-route-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block'; }
 
     async function buildRoute(sourceType) {
         closeOverlays(); isMissionActive = true; showToast("🗺️ מצב מבצעים הופעל! מייצר מסלול...");
@@ -465,7 +558,7 @@ const fieldApp = (function () {
         );
     }
 
-    function closeOverlays() { stopVoiceRecording(); document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open')); if (fabIsOpen) { fabIsOpen = false; document.getElementById('f-fab-wrapper')?.classList.remove('open'); } document.getElementById('f-scrim').style.display = 'none'; }
+    function closeOverlays() { stopVoiceRecording(); document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open')); if (fabIsOpen) { fabIsOpen = false; document.getElementById('f-fab-wrapper')?.classList.remove('open'); } document.getElementById('f-scrim').style.display = 'none'; if(db) document.getElementById('f-fab-wrapper').style.display = 'block'; }
     function toggleFab() { fabIsOpen = !fabIsOpen; document.getElementById('f-fab-wrapper')?.classList.toggle('open', fabIsOpen); const scrim = document.getElementById('f-scrim'); if (fabIsOpen) { document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open')); scrim.style.display = 'block'; if (navigator.vibrate) navigator.vibrate(20); } else { scrim.style.display = 'none'; } }
     function switchView(viewId, element) { if (element) { document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); element.classList.add('active'); } document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active')); document.getElementById('view-' + viewId).classList.add('active'); closeOverlays(); if (viewId === 'map' && map) setTimeout(() => map.resize(), 100); }
 
@@ -511,7 +604,7 @@ const fieldApp = (function () {
     function calculateDistance(coord1, coord2) { const R = 6371e3; const r1 = coord1[1] * Math.PI/180; const r2 = coord2[1] * Math.PI/180; const dLat = (coord2[1]-coord1[1]) * Math.PI/180; const dLon = (coord2[0]-coord1[0]) * Math.PI/180; const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(r1) * Math.cos(r2) * Math.sin(dLon/2) * Math.sin(dLon/2); const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c; }
     function openArrivalSheetEncoded(bEnc, idx) { openFamilyCard(bEnc, idx); }
 
-    return { init, login, switchView, toggleFab, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm, openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded, openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter, callFamilyNumber, toggleDarkMode, forceSync, openExternalNav };
+    return { init, login, switchView, toggleFab, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm, openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded, openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter, callFamilyNumber, toggleDarkMode, forceSync, openExternalNav, searchAddressInput, selectAddressOption, toggleTargetForRoute, startCustomRoute, saveQuickTask };
 })();
 
 window.addEventListener('DOMContentLoaded', () => fieldApp.init());
