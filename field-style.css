@@ -31,7 +31,6 @@ body, html {
     overflow: hidden; direction: rtl; transition: background-color 0.3s, color 0.3s;
 }
 
-/* שכבות המערכת - מסודר מהנמוך לגבוה! */
 .view-container {
     position: absolute; top: 0; left: 0; right: 0;
     bottom: calc(var(--bottom-nav-h) + var(--safe-b));
@@ -60,18 +59,16 @@ body, html {
 .nav-item.active { color: var(--accent); font-weight: bold; }
 .nav-item.active i { transform: translateY(-3px) scale(1.1); }
 
-/* רקע מטושטש מתחת למגירות ותפריטים */
 #f-scrim {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
     backdrop-filter: blur(3px); z-index: 2000; display: none;
 }
 
-/* המגירה התחתונה */
 .f-sheet {
     position: fixed; left: 10px; right: 10px; bottom: calc(var(--bottom-nav-h) + 15px);
     background: var(--surface); border-radius: 24px;
     padding: 24px; box-shadow: var(--shadow);
-    z-index: 3000; /* מעל הטשטוש */
+    z-index: 3000; 
     transform: translateY(150vh); opacity: 0; pointer-events: none;
     transition: transform 0.4s cubic-bezier(0.1, 0.7, 0.1, 1), opacity 0.3s;
     border: 1px solid var(--border-light);
@@ -79,10 +76,9 @@ body, html {
 .f-sheet.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
 .f-sheet-handle { width: 40px; height: 5px; background: var(--border-light); border-radius: 10px; margin: -10px auto 20px; }
 
-/* כפתור ה-FAB */
 .f-fab-center {
     position: fixed; bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 20px); right: 20px;
-    width: 64px; height: 64px; z-index: 4000; /* מעל המגירה */
+    width: 64px; height: 64px; z-index: 4000; 
 }
 .f-fab-main {
     width: 100%; height: 100%; border-radius: 50%;
@@ -108,7 +104,6 @@ body, html {
 .f-fab-center.open .f-fab-menu { pointer-events: auto; }
 .f-fab-center.open .f-fab-option { opacity: 1; transform: translateY(0) scale(1); }
 
-/* חיווי סנכרון */
 .f-sync-indicator {
     position: fixed; top: calc(var(--safe-t) + 15px); right: 15px;
     background: var(--surface); color: var(--text-muted);
@@ -120,10 +115,7 @@ body, html {
 .f-sync-indicator.syncing i { animation: spin 1s linear infinite; }
 .f-sync-indicator.success { color: var(--success); }
 .f-sync-indicator.offline { background: var(--danger); color: white; border-color: var(--danger); }
-@keyframes spin { 100% { transform: rotate(360deg); } }
-@keyframes celebratePulse { from { transform: scale(1) rotate(-5deg); } to { transform: scale(1.15) rotate(5deg); } }
 
-/* מסך התחברות וטעינה */
 #f-login { z-index: 9998; }
 .f-splash {
     position: fixed; inset: 0; z-index: 10000; background: var(--bg-body);
@@ -131,7 +123,6 @@ body, html {
 }
 .f-splash img { width: 80px; margin-bottom: 20px; animation: pulse 2s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
 
-/* עוגני התמרכזות והלילה */
 .map-anchors { position: absolute; left: 15px; bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
 .map-anchor-btn, .theme-anchor {
     width: 45px; height: 45px; border-radius: 50%; background: var(--surface);
@@ -140,23 +131,37 @@ body, html {
     box-shadow: var(--shadow); cursor: pointer; transition: 0.2s;
 }
 .theme-anchor { position: absolute; left: 15px; top: calc(var(--safe-t) + 15px); }
-/* עיצוב סיכת בית חב"ד על המפה באפליקציית השטח */
+
+/* עיצוב סיכת בית חב"ד בשטח */
 .chabad-pin-wrapper { width:50px; height:65px; z-index:1000; }
 .chabad-pin-container { display:flex; flex-direction:column; align-items:center; width:100%; height:100%; cursor:pointer; filter:drop-shadow(0 4px 6px rgba(0,0,0,0.4)); transition:transform 0.2s ease-out; transform-origin:bottom center; }
 .chabad-pin-container:hover { transform:scale(1.15); }
 .chabad-pin-circle { width:50px; height:50px; background-color:white; border-radius:50%; border:3px solid white; box-sizing:border-box; overflow:hidden; display:flex; align-items:center; justify-content:center; }
 .chabad-pin-image { width:100%; height:100%; background-image:url('770.jpg'); background-size:cover; background-position:center; background-repeat:no-repeat; }
 .chabad-pin-arrow { width:0; height:0; border-left:10px solid transparent; border-right:10px solid transparent; border-top:18px solid white; margin-top:-3px; }
+
 /* כפתור סגירה (X) למגירות */
 .sheet-close-btn { position: absolute; left: 15px; top: 15px; background: var(--bg-body); border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 
-/* כרטיסיות אקורדיון (קהילה ומשימות) */
+/* כרטיסיות אקורדיון בקהילה */
 .expandable-card { background: var(--surface); border: 1px solid var(--border-light); border-radius: 16px; margin-bottom: 12px; box-shadow: var(--shadow); overflow: hidden; transition: 0.3s; }
 .expandable-card-header { padding: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
 .expandable-card-body { max-height: 0; padding: 0 16px; opacity: 0; transition: 0.3s ease-in-out; background: var(--bg-body); pointer-events: none; }
 .expandable-card.expanded .expandable-card-body { max-height: 400px; padding: 16px; opacity: 1; border-top: 1px solid var(--border-light); pointer-events: auto; }
 
-/* כפתורי פעולה בכרטיסיה */
+/* כפתורי פעולה בקהילה */
 .card-action-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border-light); border-radius: 12px; padding: 10px 5px; color: var(--text-main); font-size: 12px; font-weight: 600; gap: 6px; cursor: pointer; transition: 0.2s; }
 .card-action-btn:active { background: var(--border-light); }
 .card-action-btn i { font-size: 18px; }
+
+/* עורך מסלול (Drag & Drop ויזואלי) */
+.route-editor-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.route-editor-item {
+    background: var(--surface); border: 1px solid var(--border-light); border-left: 4px solid var(--accent);
+    border-radius: 12px; padding: 12px; display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s;
+}
+.route-editor-item .content { flex: 1; padding: 0 10px; }
+.route-editor-item .actions { display: flex; gap: 8px; flex-direction: column; }
+.route-editor-item .actions button { background: var(--bg-body); border: 1px solid var(--border-light); color: var(--text-main); font-size: 14px; cursor: pointer; padding: 5px 12px; border-radius: 6px; }
+.route-editor-item .actions button.delete-btn { color: var(--danger); border-color: rgba(239,68,68,0.3); }
