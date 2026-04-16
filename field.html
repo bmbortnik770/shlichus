@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <link rel="stylesheet" href="field-style.css?v=25"> 
+    <link rel="stylesheet" href="field-style.css?v=26"> 
 </head>
 <body>
     <div id="f-splash" class="f-splash">
@@ -68,20 +68,33 @@
 
     <div id="f-route-sheet" class="f-sheet">
         <div class="f-sheet-handle"></div>
-        <h3 style="margin: 0 0 15px 0; font-size: 20px;"><i class="fas fa-route" style="color:var(--accent);"></i> בניית מסלול חכם</h3>
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+        <h3 style="margin: 0 0 15px 0; font-size: 20px; padding-right:30px;"><i class="fas fa-route" style="color:var(--accent);"></i> בניית מסלול חכם</h3>
         <div style="display:flex; flex-direction:column; gap:12px;">
             <button id="btn-office-route" class="f-fab-option" style="width:100%; justify-content:center; display:none; background: var(--warning); color: white; border: none; font-size: 16px;" onclick="fieldApp.buildRoute('office')">
                 <i class="fas fa-star"></i> טען מסלול מהמשרד (<span id="f-office-route-count">0</span>)
             </button>
             <button class="f-fab-option" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('tasks')"><i class="fas fa-check-double"></i> מסלול משימות פתוחות</button>
             <button class="f-fab-option" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('community')"><i class="fas fa-users"></i> מסלול 10 קרובות</button>
-            <button class="f-fab-option mission" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('buildings')"><i class="fas fa-map-pin"></i> מסלול בניינים נבחרים (<span id="f-bldg-count">0</span>)</button>
+            <button class="f-fab-option mission" style="width:100%; justify-content:center;" onclick="fieldApp.toggleRouteBuilderMode()"><i class="fas fa-hand-pointer"></i> הרכב מסלול ידנית במפה</button>
         </div>
+    </div>
+
+    <div id="f-route-editor-sheet" class="f-sheet" style="max-height: 85vh; overflow-y: auto;">
+        <div class="f-sheet-handle"></div>
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+        <h3 style="margin: 0 0 5px 0; font-size: 20px; padding-right:30px;"><i class="fas fa-edit" style="color:var(--accent);"></i> עריכת מסלול</h3>
+        <p style="color:var(--text-muted); font-size:13px; margin-bottom:15px; padding-right:30px;">שנה את סדר התחנות או הסר יעדים.</p>
+        <div id="f-route-editor-list" class="route-editor-list"></div>
+        <button onclick="fieldApp.saveAndStartEditedRoute()" style="width:100%; margin-top:20px; padding:16px; background:var(--accent); color:white; border:none; border-radius:14px; font-size:17px; font-weight:800; cursor:pointer; font-family:inherit; box-shadow:0 6px 20px rgba(37,99,235,0.4);">
+            <i class="fas fa-check"></i> שמור וסיים עריכה
+        </button>
     </div>
 
     <div id="f-voice-sheet" class="f-sheet">
         <div class="f-sheet-handle"></div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding-right:30px;">
             <h3 style="margin: 0; font-size: 20px;"><i class="fas fa-microphone" style="color:var(--danger);"></i> סיכום ביקור</h3>
             <span id="f-voice-status-badge" style="background:var(--border-light); color:var(--text-main); padding:4px 10px; border-radius:12px; font-size:13px; font-weight:bold;">סטטוס</span>
         </div>
@@ -105,7 +118,8 @@
 
     <div id="f-add-family-sheet" class="f-sheet" style="max-height: 85vh; overflow-y: auto;">
         <div class="f-sheet-handle"></div>
-        <h3 style="margin: 0 0 15px 0; font-size: 20px;" id="f-add-fam-title"><i class="fas fa-user-plus" style="color:var(--accent);"></i> פרטי משפחה</h3>
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+        <h3 style="margin: 0 0 15px 0; font-size: 20px; padding-right:30px;" id="f-add-fam-title"><i class="fas fa-user-plus" style="color:var(--accent);"></i> פרטי משפחה</h3>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
             <input type="text" id="f-add-fam-name" placeholder="שם משפחה *" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px; grid-column: span 2;">
             <input type="text" id="f-add-fam-father" placeholder="שם הבעל" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
@@ -127,7 +141,8 @@
 
     <div id="f-add-task-sheet" class="f-sheet">
         <div class="f-sheet-handle"></div>
-        <h3 style="margin: 0 0 15px 0; font-size: 20px;"><i class="fas fa-tasks" style="color:var(--accent);"></i> משימה חדשה</h3>
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+        <h3 style="margin: 0 0 15px 0; font-size: 20px; padding-right:30px;"><i class="fas fa-tasks" style="color:var(--accent);"></i> משימה חדשה</h3>
         <input type="text" id="f-add-task-text" placeholder="מה צריך לעשות? *" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
         <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;">שייך למשפחה (אופציונלי):</div>
         <select id="f-add-task-family-select" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;"></select>
@@ -136,16 +151,13 @@
 
     <div id="f-route-action-bar" style="position:fixed; bottom:80px; left:10px; right:10px; background:var(--accent); color:white; border-radius:16px; padding:12px 20px; display:none; justify-content:space-between; align-items:center; z-index:9000; box-shadow:0 10px 20px rgba(59,130,246,0.4);">
         <div style="font-weight:bold;"><i class="fas fa-route"></i> נבחרו <span id="f-route-counter">0</span> יעדים</div>
-        <button onclick="fieldApp.startCustomRoute()" style="background:white; color:var(--accent); border:none; padding:8px 16px; border-radius:10px; font-weight:bold; cursor:pointer;">נווט עכשיו</button>
+        <button onclick="fieldApp.startCustomRoute()" id="f-route-action-btn" style="background:white; color:var(--accent); border:none; padding:8px 16px; border-radius:10px; font-weight:bold; cursor:pointer;">צור מסלול</button>
     </div>
 
-    <!-- =================== MISSION HUD =================== -->
     <div id="f-mission-hud" style="display:none; position:fixed; inset:0; z-index:8000; flex-direction:column; pointer-events:none;">
-        <!-- Progress bar top -->
         <div style="position:absolute; top:0; left:0; right:0; height:4px; background:rgba(255,255,255,0.2); z-index:8001;">
             <div id="f-mission-progress-bar" style="height:100%; background:var(--accent); transition:width 0.5s ease; width:0%;"></div>
         </div>
-        <!-- Top HUD bar -->
         <div style="pointer-events:auto; position:absolute; top:calc(var(--safe-t) + 10px); left:10px; right:10px; background:var(--surface); border-radius:16px; padding:10px 15px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow); border:1px solid var(--border-light);">
             <div style="font-weight:700; font-size:14px; color:var(--accent);"><i class="fas fa-rocket"></i> מצב מבצע</div>
             <div id="f-mission-progress-text" style="font-size:13px; color:var(--text-muted); font-weight:600;">יעד 1 מתוך 1</div>
@@ -155,10 +167,7 @@
                 <button onclick="fieldApp.finishMission()" style="width:34px; height:34px; border-radius:50%; background:var(--danger); color:white; border:none; font-size:14px; cursor:pointer;"><i class="fas fa-flag-checkered"></i></button>
             </div>
         </div>
-
-        <!-- Bottom mission sheet -->
         <div style="pointer-events:auto; position:absolute; bottom:10px; left:10px; right:10px; background:var(--surface); border-radius:24px; padding:0; box-shadow:var(--shadow); border:1px solid var(--border-light); max-height:55vh; display:flex; flex-direction:column; overflow:hidden;">
-            <!-- Target header -->
             <div style="padding:16px 20px 0; flex-shrink:0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                     <div>
@@ -174,18 +183,15 @@
                     <span id="f-mission-fam-count" style="font-size:13px; color:var(--text-muted);"></span>
                     <button onclick="fieldApp.markAllDoneInBuilding()" style="background:rgba(16,185,129,0.1); color:var(--success); border:1px solid rgba(16,185,129,0.3); padding:6px 12px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer;"><i class="fas fa-check-double"></i> סמן הכל כבוצע</button>
                 </div>
-                <!-- Tabs -->
                 <div style="display:flex; gap:8px; margin-bottom:12px;">
                     <button id="f-mission-tab-fam" onclick="fieldApp.switchMissionTab('fam')" style="flex:1; padding:8px; border-radius:10px; border:none; background:var(--accent); color:white; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px;">משפחות</button>
                     <button id="f-mission-tab-tasks" onclick="fieldApp.switchMissionTab('tasks')" style="flex:1; padding:8px; border-radius:10px; border:none; background:var(--bg-body); color:var(--text-muted); font-weight:700; cursor:pointer; font-family:inherit; font-size:14px;">משימות</button>
                 </div>
             </div>
-            <!-- Tab content -->
             <div style="padding:0 20px; overflow-y:auto; flex:1; padding-bottom:10px;">
                 <div id="f-mission-families-list" style="display:flex; flex-direction:column; gap:8px;"></div>
                 <div id="f-mission-tasks-list" style="display:none; flex-direction:column; gap:8px;"></div>
             </div>
-            <!-- Navigation arrows -->
             <div style="padding:12px 20px; display:flex; gap:10px; border-top:1px solid var(--border-light); flex-shrink:0;">
                 <button onclick="fieldApp.prevMissionTarget()" style="flex:1; padding:12px; background:var(--bg-body); border:1px solid var(--border-light); border-radius:12px; color:var(--text-main); font-weight:700; cursor:pointer; font-family:inherit;"><i class="fas fa-arrow-right"></i> קודם</button>
                 <button onclick="fieldApp.nextMissionTarget()" style="flex:2; padding:12px; background:var(--accent); border:none; border-radius:12px; color:white; font-weight:800; cursor:pointer; font-family:inherit; font-size:16px;">הבא <i class="fas fa-arrow-left"></i></button>
@@ -193,7 +199,6 @@
         </div>
     </div>
 
-    <!-- =================== MISSION SUMMARY =================== -->
     <div id="f-mission-summary" style="display:none; position:fixed; inset:0; z-index:9500; background:var(--bg-body); flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px 30px;">
         <div style="font-size:80px; margin-bottom:20px; animation: celebratePulse 0.8s ease infinite alternate;">🎉</div>
         <h1 style="font-size:28px; font-weight:800; color:var(--text-main); margin-bottom:10px;">אשריך!</h1>
@@ -217,7 +222,6 @@
         </button>
     </div>
 
-    <!-- =================== ROUTE DIALOG =================== -->
     <div id="f-route-dialog" style="display:none; position:fixed; inset:0; z-index:9200; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); align-items:flex-end; justify-content:center; padding:20px;">
         <div style="background:var(--surface); border-radius:24px; padding:28px; width:100%; max-width:480px; box-shadow:var(--shadow);">
             <div style="text-align:center; margin-bottom:24px;">
@@ -232,15 +236,18 @@
                 <button onclick="fieldApp.routeDialogSaveLater()" style="width:100%; padding:16px; background:var(--bg-body); color:var(--text-main); border:1px solid var(--border-light); border-radius:14px; font-size:16px; font-weight:700; cursor:pointer; font-family:inherit;">
                     <i class="fas fa-save"></i> שמור למאוחר יותר
                 </button>
+                <button onclick="fieldApp.openRouteEditor()" style="width:100%; padding:16px; background:var(--bg-body); color:var(--accent); border:1px solid var(--accent); border-radius:14px; font-size:16px; font-weight:700; cursor:pointer; font-family:inherit;">
+                    <i class="fas fa-edit"></i> ערוך וסדר מסלול
+                </button>
                 <button onclick="document.getElementById('f-route-dialog').style.display='none'" style="width:100%; padding:12px; background:none; color:var(--text-muted); border:none; font-size:14px; cursor:pointer; font-family:inherit;">ביטול</button>
             </div>
         </div>
     </div>
 
-    <!-- =================== SAVED ROUTES SHEET =================== -->
     <div id="f-saved-routes-sheet" class="f-sheet">
         <div class="f-sheet-handle"></div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; padding-right:30px;">
             <h3 style="margin:0; font-size:20px;"><i class="fas fa-bookmark" style="color:var(--accent);"></i> מסלולים שמורים</h3>
         </div>
         <div id="f-saved-routes-list"></div>
@@ -264,15 +271,6 @@
 
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="field-app.js?v=25"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./field-sw.js')
-            .then(reg => console.log('SW רשום:', reg.scope))
-            .catch(err => console.warn('SW נכשל:', err));
-        });
-      }
-    </script>
+    <script src="field-app.js?v=26"></script>
 </body>
 </html>
