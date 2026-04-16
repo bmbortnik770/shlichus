@@ -481,16 +481,51 @@ const fieldApp = (function () {
         closeOverlays(); renderTasks(); switchView('tasks', document.querySelectorAll('.nav-item')[1]); showToast("✅ משימה חדשה תועדה!");
     }
 
-    function renderMarkers() {
+  function renderMarkers() {
         if (!map || !db) return;
         markers.forEach(m => m.remove()); markers = [];
 
-        if(db.__SETTINGS__?.homeLocation?.coords) {
+        // עדכון בית חב"ד עם הסיכה המיוחדת
+        if(db.__SETTINGS__?.homeLocation?.coords && db.__SETTINGS__?.homeLocation?.isChabad) {
+            const homeCoords = db.__SETTINGS__.homeLocation.coords;
+            const homeEl = document.createElement('div');
+            homeEl.className = 'chabad-pin-wrapper'; // שימוש במחלקה החדשה מה-CSS
+            homeEl.innerHTML = `
+                <div class="chabad-pin-container">
+                    <div class="chabad-pin-circle"><div class="chabad-pin-image"></div></div>
+                    <div class="chabad-pin-arrow"></div>
+                </div>`;
+            
+            // יצירת הסמן עם תמיכה בהצבעה נכונה של החץ
+            const homeMarker = new mapboxgl.Marker({ element: homeEl, anchor: 'bottom' })
+                .setLngLat(homeCoords)
+                .addTo(map);
+                
+            homeEl.addEventListener('click', () => { 
+                showToast("מרכז בית חב״ד"); 
+                map.flyTo({ center: homeCoords, zoom: 18, pitch: 60 }); 
+            }); 
+            markers.push(homeMarker);
+        } else if (db.__SETTINGS__?.homeLocation?.coords) {
+             // שומר על תאימות למקרה שזה לא בית חב"ד (אבל כן הוגדר מיקום מרכזי)
             const homeCoords = db.__SETTINGS__.homeLocation.coords;
             const homeEl = document.createElement('div'); homeEl.className = 'f-pin-marker'; homeEl.innerHTML = `<img src="https://raw.githubusercontent.com/bmbortnik770/shlichus/refs/heads/main/favicon.ico">`;
             const homeMarker = new mapboxgl.Marker(homeEl).setLngLat(homeCoords).addTo(map);
-            homeEl.addEventListener('click', () => { showToast("מרכז בית חב״ד"); map.flyTo({ center: homeCoords, zoom: 18, pitch: 60 }); }); markers.push(homeMarker);
+            homeEl.addEventListener('click', () => { showToast("המיקום המרכזי"); map.flyTo({ center: homeCoords, zoom: 18, pitch: 60 }); }); markers.push(homeMarker);
         }
+
+        // ציור שאר הבניינים
+        Object.keys(db).forEach(bldg => {
+            if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta' || bldg === NO_ADDRESS_KEY) return;
+            if(!db[bldg].apts || db[bldg].apts.length === 0) return;
+            const coords = db[bldg].info?.coords; if(!coords || isNaN(coords[0])) return;
+            const el = document.createElement('div');
+            el.style.cssText = 'width:28px; height:28px; background:var(--accent); border:2px solid white; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; box-shadow:0 2px 6px rgba(0,0,0,0.4); cursor:pointer;';
+            el.innerText = db[bldg].apts.length;
+            const marker = new mapboxgl.Marker(el).setLngLat(coords).addTo(map);
+            el.addEventListener('click', (e) => { e.stopPropagation(); openBuildingCard(bldg); }); markers.push(marker);
+        });
+    }
 
         Object.keys(db).forEach(bldg => {
             if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta' || bldg === NO_ADDRESS_KEY) return;
