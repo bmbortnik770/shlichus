@@ -147,3 +147,16 @@ body, html {
 .chabad-pin-circle { width:50px; height:50px; background-color:white; border-radius:50%; border:3px solid white; box-sizing:border-box; overflow:hidden; display:flex; align-items:center; justify-content:center; }
 .chabad-pin-image { width:100%; height:100%; background-image:url('770.jpg'); background-size:cover; background-position:center; background-repeat:no-repeat; }
 .chabad-pin-arrow { width:0; height:0; border-left:10px solid transparent; border-right:10px solid transparent; border-top:18px solid white; margin-top:-3px; }
+/* כפתור סגירה (X) למגירות */
+.sheet-close-btn { position: absolute; left: 15px; top: 15px; background: var(--bg-body); border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+
+/* כרטיסיות אקורדיון (קהילה ומשימות) */
+.expandable-card { background: var(--surface); border: 1px solid var(--border-light); border-radius: 16px; margin-bottom: 12px; box-shadow: var(--shadow); overflow: hidden; transition: 0.3s; }
+.expandable-card-header { padding: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.expandable-card-body { max-height: 0; padding: 0 16px; opacity: 0; transition: 0.3s ease-in-out; background: var(--bg-body); pointer-events: none; }
+.expandable-card.expanded .expandable-card-body { max-height: 400px; padding: 16px; opacity: 1; border-top: 1px solid var(--border-light); pointer-events: auto; }
+
+/* כפתורי פעולה בכרטיסיה */
+.card-action-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border-light); border-radius: 12px; padding: 10px 5px; color: var(--text-main); font-size: 12px; font-weight: 600; gap: 6px; cursor: pointer; transition: 0.2s; }
+.card-action-btn:active { background: var(--border-light); }
+.card-action-btn i { font-size: 18px; }
