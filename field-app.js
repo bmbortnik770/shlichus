@@ -517,15 +517,42 @@ const fieldApp = (function () {
     function openRouteMenu() { closeOverlays(); document.getElementById('f-fab-wrapper').style.display = 'none'; switchView('map', document.querySelector('.nav-item')); document.getElementById('f-route-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block'; }
 
     async function buildRoute(sourceType) {
-        closeOverlays(); isMissionActive = true; showToast("🗺️ מצב מבצעים הופעל! מייצר מסלול...");
+        closeOverlays(); showToast("🗺️ בונה מסלול חכם...");
         let waypoints = [];
         if (sourceType === 'buildings') {
             if (highlightedFeatures.length === 0) { showToast("לא סימנת בניינים במפה."); return; }
             waypoints = highlightedFeatures.map(f => { let coords = f.geometry.coordinates[0][0]; if(Array.isArray(coords[0])) coords = coords[0]; return coords; });
         } else if (sourceType === 'tasks' || sourceType === 'community') {
-            let allCoords = [];
-            Object.keys(db).forEach(bldg => { if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta' || bldg === NO_ADDRESS_KEY) return; const coords = db[bldg].info?.coords; if(coords && !isNaN(coords[0]) && db[bldg].apts.length > 0) allCoords.push(coords); });
-            waypoints = allCoords.slice(0, sourceType==='tasks'?3:5);
+            if (sourceType === 'tasks') {
+                // Task-Aware Routing: תעדוף לפי דחיפות ותאריך יעד
+                const todayStr = new Date().toLocaleDateString('he-IL');
+                let scoredBuildings = [];
+                Object.keys(db).forEach(bldg => {
+                    if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta' || bldg === NO_ADDRESS_KEY) return;
+                    const coords = db[bldg].info?.coords; if(!coords || isNaN(coords[0])) return;
+                    let score = 0;
+                    (db[bldg].apts || []).forEach(apt => {
+                        (apt.tasks || []).forEach(t => {
+                            if (t.done) return;
+                            score += 10; // כל משימה פתוחה
+                            if (t.date === todayStr) score += 50; // משימה להיום = עדיפות גבוהה
+                            if (t.text && (t.text.includes('דחוף') || t.text.includes('חשוב'))) score += 30;
+                        });
+                    });
+                    if (score > 0) scoredBuildings.push({ coords, score });
+                });
+                scoredBuildings.sort((a, b) => b.score - a.score);
+                waypoints = scoredBuildings.slice(0, 5).map(b => b.coords);
+                if (waypoints.length === 0) {
+                    showToast("אין בניינים עם משימות פתוחות.");
+                    return;
+                }
+                showToast(`🎯 מסלול נבנה לפי ${waypoints.length} בניינים עם משימות דחופות!`);
+            } else {
+                let allCoords = [];
+                Object.keys(db).forEach(bldg => { if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta' || bldg === NO_ADDRESS_KEY) return; const coords = db[bldg].info?.coords; if(coords && !isNaN(coords[0]) && db[bldg].apts.length > 0) allCoords.push(coords); });
+                waypoints = allCoords.slice(0, 5);
+            }
         } else if (sourceType === 'office') {
             if (!db.meta || !db.meta.assignedRoute || db.meta.assignedRoute.length === 0) { showToast("אין מסלול פעיל מהמשרד."); return; }
             waypoints = db.meta.assignedRoute.map(item => item.coords);
@@ -533,7 +560,9 @@ const fieldApp = (function () {
         }
 
         if (waypoints.length === 0) { showToast("לא נמצאו יעדים למסלול."); return; }
-        if (navigator.geolocation) { navigator.geolocation.getCurrentPosition( pos => drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], waypoints), () => drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], waypoints) ); }
+
+        // הצג דיאלוג: "צא עכשיו" או "שמור למאוחר יותר"
+        showRouteDialog(waypoints);
     }
 
     function startLocationTracking() {
@@ -602,9 +631,395 @@ const fieldApp = (function () {
     function showToast(msg) { const c = document.getElementById('f-toast-container'); if (!c) return; const t = document.createElement('div'); t.style.cssText = 'background:var(--surface); color:var(--text-main); padding:14px 20px; border-radius:20px; box-shadow:var(--shadow); font-weight:bold; border:1px solid var(--border-light); pointer-events:none;'; t.innerHTML = msg; c.appendChild(t); setTimeout(() => { t.style.transition='opacity 0.3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 3000); }
     function escapeHTML(str) { return String(str).replace(/[&<>"']/g, function(m) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m]; }); }
     function calculateDistance(coord1, coord2) { const R = 6371e3; const r1 = coord1[1] * Math.PI/180; const r2 = coord2[1] * Math.PI/180; const dLat = (coord2[1]-coord1[1]) * Math.PI/180; const dLon = (coord2[0]-coord1[0]) * Math.PI/180; const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(r1) * Math.cos(r2) * Math.sin(dLon/2) * Math.sin(dLon/2); const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c; }
+    // ==========================================
+    // MISSION HUD & FOCUS MODE
+    // ==========================================
+    let missionWaypoints = [];
+    let missionCurrentIdx = 0;
+    let missionPaused = false;
+    let taskLayerVisible = false;
+    let taskMarkers = [];
+    const SAVED_ROUTES_KEY = 'field_saved_routes';
+
+    function startMissionMode(waypoints) {
+        missionWaypoints = waypoints || [];
+        missionCurrentIdx = 0;
+        missionPaused = false;
+        isMissionActive = true;
+
+        // הצג HUD
+        document.getElementById('f-mission-hud').style.display = 'flex';
+        document.getElementById('f-bottom-nav-bar').style.display = 'none';
+        document.getElementById('f-fab-wrapper').style.display = 'none';
+        document.getElementById('f-sync-status').style.display = 'none';
+
+        updateMissionHUD();
+        showToast("🚀 מצב מבצע פעיל! נווט ליעד הראשון.");
+        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+    }
+
+    function updateMissionHUD() {
+        if (!isMissionActive || missionWaypoints.length === 0) return;
+        const total = missionWaypoints.length;
+        const current = missionCurrentIdx + 1;
+        document.getElementById('f-mission-progress-text').innerText = `יעד ${current} מתוך ${total}`;
+        document.getElementById('f-mission-progress-bar').style.width = `${(current / total) * 100}%`;
+
+        // מצא את הבניין הקרוב ביותר לנקודת ה-waypoint הנוכחית
+        const targetCoords = missionWaypoints[missionCurrentIdx];
+        let targetBldg = null, minDist = Infinity;
+        Object.keys(db).forEach(bldg => {
+            if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            const c = db[bldg].info?.coords; if(!c) return;
+            const d = calculateDistance(targetCoords, c);
+            if (d < minDist) { minDist = d; targetBldg = bldg; }
+        });
+
+        if (targetBldg) {
+            const bldgData = db[targetBldg];
+            document.getElementById('f-mission-target-name').innerText = targetBldg;
+            document.getElementById('f-mission-target-code').innerText = bldgData.info?.code || '—';
+            const apts = bldgData.apts || [];
+            document.getElementById('f-mission-fam-count').innerText = `${apts.length} משפחות`;
+
+            // לשונית משפחות
+            let famsHtml = apts.map((fam, idx) => `
+                <div style="background:var(--bg-body); padding:10px 12px; border-radius:10px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="fieldApp.openFamilyCard('${encodeURIComponent(targetBldg)}', ${idx})">
+                    <div>
+                        <div style="font-weight:600; font-size:14px;">משפחת ${escapeHTML(fam.name||'')}</div>
+                        ${fam.num ? `<div style="font-size:12px; color:var(--text-muted);">דירה ${fam.num}</div>` : ''}
+                    </div>
+                    <i class="fas fa-chevron-left" style="color:var(--text-muted); font-size:12px;"></i>
+                </div>
+            `).join('');
+            document.getElementById('f-mission-families-list').innerHTML = famsHtml || '<div style="color:var(--text-muted); font-size:13px; text-align:center; padding:10px;">אין משפחות</div>';
+
+            // לשונית משימות
+            let tasksHtml = '';
+            apts.forEach((fam, aptIdx) => {
+                (fam.tasks || []).filter(t => !t.done).forEach((t, tIdx) => {
+                    tasksHtml += `<div style="background:rgba(37,99,235,0.08); border:1px solid rgba(37,99,235,0.2); padding:10px 12px; border-radius:10px; display:flex; gap:10px; align-items:center;">
+                        <input type="checkbox" onchange="fieldApp.completeMissionTask('${encodeURIComponent(targetBldg)}', ${aptIdx}, ${tIdx}, this)" style="width:18px; height:18px; accent-color:var(--accent); flex-shrink:0;">
+                        <div>
+                            <div style="font-size:14px; font-weight:600;">${escapeHTML(t.text)}</div>
+                            <div style="font-size:12px; color:var(--text-muted);">משפחת ${escapeHTML(fam.name||'')} · ${t.date||''}</div>
+                        </div>
+                    </div>`;
+                });
+            });
+            document.getElementById('f-mission-tasks-list').innerHTML = tasksHtml || '<div style="color:var(--text-muted); font-size:13px; text-align:center; padding:10px;">אין משימות פתוחות</div>';
+
+            currentTarget = { bldg: targetBldg, aptIdx: 0 };
+        }
+    }
+
+    function completeMissionTask(bldgEnc, aptIdx, taskIdx, checkbox) {
+        const bldg = decodeURIComponent(bldgEnc);
+        db[bldg].apts[aptIdx].tasks[taskIdx].done = true;
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'task_done', bldg, aptIdx, taskIdx, timestamp: new Date().toISOString() });
+        storageSet(OUTBOX_KEY, outbox);
+        if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+        setTimeout(() => checkbox.closest('div[style]').style.opacity = '0.4', 100);
+        showToast("✅ משימה הושלמה!");
+    }
+
+    function switchMissionTab(tab) {
+        const famTab = document.getElementById('f-mission-tab-fam');
+        const taskTab = document.getElementById('f-mission-tab-tasks');
+        const famContent = document.getElementById('f-mission-families-list');
+        const taskContent = document.getElementById('f-mission-tasks-list');
+
+        if (tab === 'fam') {
+            famTab.style.background = 'var(--accent)'; famTab.style.color = 'white';
+            taskTab.style.background = 'var(--bg-body)'; taskTab.style.color = 'var(--text-muted)';
+            famContent.style.display = 'flex'; famContent.style.flexDirection = 'column'; famContent.style.gap = '8px';
+            taskContent.style.display = 'none';
+        } else {
+            taskTab.style.background = 'var(--accent)'; taskTab.style.color = 'white';
+            famTab.style.background = 'var(--bg-body)'; famTab.style.color = 'var(--text-muted)';
+            taskContent.style.display = 'flex'; taskContent.style.flexDirection = 'column'; taskContent.style.gap = '8px';
+            famContent.style.display = 'none';
+        }
+    }
+
+    function nextMissionTarget() {
+        if (missionCurrentIdx < missionWaypoints.length - 1) {
+            missionCurrentIdx++;
+            updateMissionHUD();
+            const coords = missionWaypoints[missionCurrentIdx];
+            if (map) map.flyTo({ center: coords, zoom: 18, pitch: 75, duration: 1500 });
+            if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+        } else {
+            // הגענו לסוף!
+            showMissionSummary();
+        }
+    }
+
+    function prevMissionTarget() {
+        if (missionCurrentIdx > 0) {
+            missionCurrentIdx--;
+            updateMissionHUD();
+            const coords = missionWaypoints[missionCurrentIdx];
+            if (map) map.flyTo({ center: coords, zoom: 18, pitch: 75, duration: 1500 });
+        }
+    }
+
+    function pauseMission() {
+        missionPaused = !missionPaused;
+        const btn = document.getElementById('f-mission-pause-btn');
+        if (missionPaused) {
+            btn.innerHTML = '<i class="fas fa-play"></i>';
+            btn.style.background = 'var(--success)';
+            showToast("⏸ מבצע מושהה. לחץ שוב להמשך.");
+        } else {
+            btn.innerHTML = '<i class="fas fa-pause"></i>';
+            btn.style.background = 'var(--warning)';
+            showToast("▶️ ממשיך במבצע!");
+        }
+    }
+
+    function refreshMissionRoute() {
+        showToast("🔄 מחשב מסלול מחדש...");
+        if (navigator.vibrate) navigator.vibrate(30);
+        const remaining = missionWaypoints.slice(missionCurrentIdx);
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], remaining),
+                () => drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], remaining)
+            );
+        }
+    }
+
+    function finishMission() {
+        showMissionSummary();
+    }
+
+    function showMissionSummary() {
+        isMissionActive = false;
+        if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+
+        // חשב כמה בוצע
+        let visitedCount = Object.keys(getVisited()).length;
+        let completedTasks = 0;
+        Object.keys(db).forEach(bldg => {
+            if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg].apts || []).forEach(apt => {
+                (apt.tasks || []).forEach(t => { if(t.done) completedTasks++; });
+            });
+        });
+
+        document.getElementById('f-mission-hud').style.display = 'none';
+        document.getElementById('f-mission-summary').style.display = 'flex';
+        document.getElementById('f-summary-families').innerText = visitedCount;
+        document.getElementById('f-summary-tasks').innerText = completedTasks;
+        document.getElementById('f-summary-stops').innerText = missionWaypoints.length;
+
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+    }
+
+    function closeMissionSummary() {
+        document.getElementById('f-mission-summary').style.display = 'none';
+        document.getElementById('f-bottom-nav-bar').style.display = 'flex';
+        document.getElementById('f-fab-wrapper').style.display = 'block';
+        document.getElementById('f-sync-status').style.display = 'flex';
+        missionWaypoints = []; missionCurrentIdx = 0; isMissionActive = false;
+        // נקה מסלול מהמפה
+        if (map && map.getLayer('route')) map.removeLayer('route');
+        if (map && map.getSource('route')) map.removeSource('route');
+        renderTasks();
+    }
+
+    function markAllDoneInBuilding() {
+        if (!currentTarget) return;
+        const bldg = currentTarget.bldg;
+        const apts = db[bldg].apts || [];
+        let count = 0;
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        apts.forEach((fam, aptIdx) => {
+            (fam.tasks || []).forEach((t, tIdx) => {
+                if (!t.done) {
+                    t.done = true; count++;
+                    outbox.push({ type: 'task_done', bldg, aptIdx, tIdx, timestamp: new Date().toISOString() });
+                }
+            });
+        });
+        storageSet(DATA_KEY, db); storageSet(OUTBOX_KEY, outbox);
+        if (navigator.vibrate) navigator.vibrate([30, 20, 30, 20, 60]);
+        showToast(`✅ ${count} משימות סומנו כבוצעו!`);
+        updateMissionHUD();
+    }
+
+    // ==========================================
+    // TASK LAYER ON MAP
+    // ==========================================
+    function toggleTaskLayer() {
+        taskLayerVisible = !taskLayerVisible;
+        const btn = document.getElementById('f-task-layer-btn');
+        if (taskLayerVisible) {
+            renderTaskMarkers();
+            btn.style.background = 'var(--accent)'; btn.style.color = 'white';
+        } else {
+            taskMarkers.forEach(m => m.remove()); taskMarkers = [];
+            btn.style.background = 'var(--surface)'; btn.style.color = 'var(--text-main)';
+        }
+    }
+
+    function renderTaskMarkers() {
+        taskMarkers.forEach(m => m.remove()); taskMarkers = [];
+        Object.keys(db).forEach(bldg => {
+            if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta' || bldg === NO_ADDRESS_KEY) return;
+            const coords = db[bldg].info?.coords; if(!coords || isNaN(coords[0])) return;
+            let openTasks = 0;
+            (db[bldg].apts || []).forEach(apt => { (apt.tasks || []).forEach(t => { if(!t.done) openTasks++; }); });
+            if (openTasks === 0) return;
+
+            const el = document.createElement('div');
+            el.style.cssText = `
+                width: 32px; height: 32px; background: var(--warning);
+                border: 2px solid white; border-radius: 50%;
+                display: flex; align-items: center; justify-content: center;
+                color: white; font-weight: bold; font-size: 13px;
+                box-shadow: 0 2px 8px rgba(245,158,11,0.6); cursor: pointer;
+                position: relative;
+            `;
+            el.innerHTML = `<i class="fas fa-exclamation" style="font-size:14px;"></i>`;
+
+            // badge עם מספר
+            const badge = document.createElement('div');
+            badge.style.cssText = `position:absolute; top:-6px; right:-6px; background:var(--danger); color:white; border-radius:50%; width:16px; height:16px; font-size:10px; font-weight:bold; display:flex; align-items:center; justify-content:center; border:1px solid white;`;
+            badge.innerText = openTasks;
+            el.appendChild(badge);
+
+            const marker = new mapboxgl.Marker(el).setLngLat(coords).addTo(map);
+            el.addEventListener('click', (e) => { e.stopPropagation(); openBuildingCard(bldg); });
+            taskMarkers.push(marker);
+        });
+    }
+
+    // ==========================================
+    // SAVED ROUTES
+    // ==========================================
+    function saveRoute(waypoints, name) {
+        const saved = storageGet(SAVED_ROUTES_KEY) || [];
+        const route = {
+            id: Date.now(),
+            name: name || `מסלול ${new Date().toLocaleDateString('he-IL')}`,
+            waypoints,
+            status: 'שמור',
+            created: new Date().toISOString()
+        };
+        saved.push(route);
+        storageSet(SAVED_ROUTES_KEY, saved);
+        return route;
+    }
+
+    function loadSavedRoutes() {
+        return storageGet(SAVED_ROUTES_KEY) || [];
+    }
+
+    function deleteSavedRoute(id) {
+        let saved = storageGet(SAVED_ROUTES_KEY) || [];
+        saved = saved.filter(r => r.id !== id);
+        storageSet(SAVED_ROUTES_KEY, saved);
+        renderSavedRoutesSheet();
+    }
+
+    function renderSavedRoutesSheet() {
+        const container = document.getElementById('f-saved-routes-list');
+        if (!container) return;
+        const routes = loadSavedRoutes();
+        if (routes.length === 0) {
+            container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px; font-size:14px;">אין מסלולים שמורים</div>';
+            return;
+        }
+        container.innerHTML = routes.reverse().map(r => `
+            <div style="background:var(--bg-body); border:1px solid var(--border-light); border-radius:12px; padding:14px; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div>
+                    <div style="font-weight:700; font-size:15px;">${escapeHTML(r.name)}</div>
+                    <div style="font-size:12px; color:var(--text-muted); margin-top:3px;"><i class="fas fa-map-pin"></i> ${r.waypoints.length} יעדים · ${new Date(r.created).toLocaleDateString('he-IL')}</div>
+                    <div style="font-size:12px; margin-top:3px;"><span style="background:rgba(37,99,235,0.1); color:var(--accent); padding:2px 8px; border-radius:8px; font-weight:600;">${r.status}</span></div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="fieldApp.closeOverlays(); fieldApp.buildRouteFromSaved(${r.id})" style="background:var(--accent); color:white; border:none; padding:8px 14px; border-radius:10px; font-weight:bold; cursor:pointer; font-size:13px;"><i class="fas fa-play"></i> פתח</button>
+                    <button onclick="fieldApp.deleteSavedRoute(${r.id})" style="background:var(--danger); color:white; border:none; padding:8px 10px; border-radius:10px; cursor:pointer; font-size:13px;"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function buildRouteFromSaved(id) {
+        const routes = loadSavedRoutes();
+        const route = routes.find(r => r.id === id);
+        if (!route) return;
+        // עדכן סטטוס
+        route.status = 'בתהליך';
+        const saved = routes.map(r => r.id === id ? route : r);
+        storageSet(SAVED_ROUTES_KEY, saved);
+
+        isMissionActive = true;
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => {
+                    drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], route.waypoints);
+                    startMissionMode(route.waypoints);
+                },
+                () => {
+                    drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], route.waypoints);
+                    startMissionMode(route.waypoints);
+                }
+            );
+        }
+    }
+
+    function openSavedRoutesSheet() {
+        closeOverlays();
+        renderSavedRoutesSheet();
+        document.getElementById('f-saved-routes-sheet').classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
+    }
+
+    // ==========================================
+    // ROUTE DIALOG (שמור / צא עכשיו)
+    // ==========================================
+    let pendingRouteWaypoints = [];
+
+    function showRouteDialog(waypoints) {
+        pendingRouteWaypoints = waypoints;
+        document.getElementById('f-route-dialog').style.display = 'flex';
+    }
+
+    function routeDialogGoNow() {
+        document.getElementById('f-route-dialog').style.display = 'none';
+        if (pendingRouteWaypoints.length === 0) return;
+        closeOverlays();
+        isMissionActive = true;
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => {
+                    drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], pendingRouteWaypoints);
+                    startMissionMode(pendingRouteWaypoints);
+                },
+                () => {
+                    drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], pendingRouteWaypoints);
+                    startMissionMode(pendingRouteWaypoints);
+                }
+            );
+        }
+    }
+
+    function routeDialogSaveLater() {
+        document.getElementById('f-route-dialog').style.display = 'none';
+        const name = `מסלול ${new Date().toLocaleDateString('he-IL')} ${new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'})}`;
+        saveRoute(pendingRouteWaypoints, name);
+        showToast("💾 המסלול נשמר! תוכל להפעיל אותו מאוחר יותר.");
+        pendingRouteWaypoints = [];
+    }
+
     function openArrivalSheetEncoded(bEnc, idx) { openFamilyCard(bEnc, idx); }
 
-    return { init, login, switchView, toggleFab, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm, openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded, openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter, callFamilyNumber, toggleDarkMode, forceSync, openExternalNav, searchAddressInput, selectAddressOption, toggleTargetForRoute, startCustomRoute, saveQuickTask };
+    return { init, login, switchView, toggleFab, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm, openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded, openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter, callFamilyNumber, toggleDarkMode, forceSync, openExternalNav, searchAddressInput, selectAddressOption, toggleTargetForRoute, startCustomRoute, saveQuickTask, showToast, finishMission, pauseMission, refreshMissionRoute, markAllDoneInBuilding, saveRoute, loadSavedRoutes, deleteSavedRoute, toggleTaskLayer, completeMissionTask, switchMissionTab, nextMissionTarget, prevMissionTarget, closeMissionSummary, buildRouteFromSaved, openSavedRoutesSheet, routeDialogGoNow, routeDialogSaveLater };
 })();
 
 window.addEventListener('DOMContentLoaded', () => fieldApp.init());

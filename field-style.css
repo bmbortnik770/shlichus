@@ -121,6 +121,7 @@ body, html {
 .f-sync-indicator.success { color: var(--success); }
 .f-sync-indicator.offline { background: var(--danger); color: white; border-color: var(--danger); }
 @keyframes spin { 100% { transform: rotate(360deg); } }
+@keyframes celebratePulse { from { transform: scale(1) rotate(-5deg); } to { transform: scale(1.15) rotate(5deg); } }
 
 /* מסך התחברות וטעינה */
 #f-login { z-index: 9998; }
