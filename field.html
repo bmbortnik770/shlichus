@@ -76,7 +76,7 @@
             </button>
             <button class="f-fab-option" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('tasks')"><i class="fas fa-check-double"></i> מסלול משימות פתוחות</button>
             <button class="f-fab-option" style="width:100%; justify-content:center;" onclick="fieldApp.buildRoute('community')"><i class="fas fa-users"></i> מסלול 10 קרובות</button>
-            <button class="f-fab-option mission" style="width:100%; justify-content:center;" onclick="fieldApp.toggleRouteBuilderMode()"><i class="fas fa-hand-pointer"></i> הרכב מסלול ידנית במפה</button>
+            <button class="f-fab-option mission" style="width:100%; justify-content:center;" onclick="fieldApp.toggleRouteBuilderMode()"><i class="fas fa-hand-pointer"></i> הרכב מסלול נבחרים (<span id="f-bldg-count">0</span>)</button>
         </div>
     </div>
 
@@ -85,6 +85,7 @@
         <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
         <h3 style="margin: 0 0 5px 0; font-size: 20px; padding-right:30px;"><i class="fas fa-edit" style="color:var(--accent);"></i> עריכת מסלול</h3>
         <p style="color:var(--text-muted); font-size:13px; margin-bottom:15px; padding-right:30px;">שנה את סדר התחנות או הסר יעדים.</p>
+        <input type="text" id="f-route-name-input" placeholder="שם המסלול (לדוגמה: מסלול ערב)" style="width:100%; padding:12px; margin-bottom:15px; border-radius:12px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
         <div id="f-route-editor-list" class="route-editor-list"></div>
         <button onclick="fieldApp.saveAndStartEditedRoute()" style="width:100%; margin-top:20px; padding:16px; background:var(--accent); color:white; border:none; border-radius:14px; font-size:17px; font-weight:800; cursor:pointer; font-family:inherit; box-shadow:0 6px 20px rgba(37,99,235,0.4);">
             <i class="fas fa-check"></i> שמור וסיים עריכה
@@ -134,7 +135,7 @@
                 <div id="address-suggestions" style="position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--accent); border-radius:8px; z-index:9999; display:none; max-height:150px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.2);"></div>
             </div>
             <input type="text" id="f-add-fam-apt" placeholder="מס' דירה" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
-            </div>
+        </div>
         <input type="text" id="f-add-fam-intercom" placeholder="קוד אינטרקום / קומה" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
         <button id="f-add-fam-savebtn" style="width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveFamilyForm()"><i class="fas fa-save"></i> שמור נתונים</button>
     </div>
@@ -271,6 +272,6 @@
 
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="field-app.js?v=26"></script>
+    <script src="field-app.js?v=27"></script>
 </body>
 </html>
