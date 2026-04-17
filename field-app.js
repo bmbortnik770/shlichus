@@ -273,7 +273,7 @@ const fieldApp = (function () {
         if (selectedRouteBuildings.length === 0) return;
         pendingRouteWaypoints = selectedRouteBuildings.map(b => b.coords);
         document.getElementById('f-route-action-bar').style.display = 'none';
-        document.getElementById('f-route-dialog').style.display = 'flex'; // Fix Flex display
+        document.getElementById('f-route-dialog').style.display = 'flex';
     }
 
     function openRouteEditor() {
@@ -732,7 +732,14 @@ const fieldApp = (function () {
     function recenter() { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => map.flyTo({ center: [p.coords.longitude, p.coords.latitude], zoom: 17, pitch: 60 })); }
     function toggleDarkMode() { isDark = !isDark; document.body.classList.toggle('dark-mode', isDark); localStorage.setItem('field_theme', isDark ? 'dark' : 'light'); document.getElementById('f-theme-btn').innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>'; if (map) { map.setStyle(isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12'); map.once('style.load', () => { add3DLayer(); renderMarkers(); }); } }
     function showToast(msg) { const c = document.getElementById('f-toast-container'); if (!c) return; const t = document.createElement('div'); t.style.cssText = 'background:var(--surface); color:var(--text-main); padding:14px 20px; border-radius:20px; box-shadow:var(--shadow); font-weight:bold; border:1px solid var(--border-light); pointer-events:none;'; t.innerHTML = msg; c.appendChild(t); setTimeout(() => { t.style.transition='opacity 0.3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 3000); }
-    function escapeHTML(str) { return String(str).replace(/[&<>"']/g, function(m) { return {'&': '&', '<': '<', '>': '>', '"': '"', "'": '''}[m]; }); }
+    
+    function escapeHTML(str) { 
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, function(m) { 
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; 
+        }); 
+    }
+    
     function calculateDistance(coord1, coord2) { const R = 6371e3; const r1 = coord1[1] * Math.PI/180; const r2 = coord2[1] * Math.PI/180; const dLat = (coord2[1]-coord1[1]) * Math.PI/180; const dLon = (coord2[0]-coord1[0]) * Math.PI/180; const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(r1) * Math.cos(r2) * Math.sin(dLon/2) * Math.sin(dLon/2); const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c; }
 
     function startLocationTracking() {
