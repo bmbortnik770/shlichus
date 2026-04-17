@@ -15,7 +15,7 @@ mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl
 
 const fieldApp = (function () {
     // ==========================================
-    // ריכוז משתנים - הכל מוגדר פעם אחת בלבד!
+    // ריכוז משתנים
     // ==========================================
     let map = null, markers = [], db = null;
     let accessToken = null, isOfflineMode = false, currentTarget = null;
@@ -56,9 +56,26 @@ const fieldApp = (function () {
         }); 
     }
 
-    function calculateDistance(coord1, coord2) { const R = 6371e3; const r1 = coord1[1] * Math.PI/180; const r2 = coord2[1] * Math.PI/180; const dLat = (coord2[1]-coord1[1]) * Math.PI/180; const dLon = (coord2[0]-coord1[0]) * Math.PI/180; const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(r1) * Math.cos(r2) * Math.sin(dLon/2) * Math.sin(dLon/2); const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c; }
+    function calculateDistance(coord1, coord2) {
+        const R = 6371e3;
+        const r1 = coord1[1] * Math.PI/180;
+        const r2 = coord2[1] * Math.PI/180;
+        const dLat = (coord2[1]-coord1[1]) * Math.PI/180;
+        const dLon = (coord2[0]-coord1[0]) * Math.PI/180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(r1) * Math.cos(r2) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
 
-    function showToast(msg) { const c = document.getElementById('f-toast-container'); if (!c) return; const t = document.createElement('div'); t.style.cssText = 'background:var(--surface); color:var(--text-main); padding:14px 20px; border-radius:20px; box-shadow:var(--shadow); font-weight:bold; border:1px solid var(--border-light); pointer-events:none;'; t.innerHTML = msg; c.appendChild(t); setTimeout(() => { t.style.transition='opacity 0.3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 3000); }
+    function showToast(msg) {
+        const c = document.getElementById('f-toast-container');
+        if (!c) return;
+        const t = document.createElement('div');
+        t.style.cssText = 'background:var(--surface); color:var(--text-main); padding:14px 20px; border-radius:20px; box-shadow:var(--shadow); font-weight:bold; border:1px solid var(--border-light); pointer-events:none;';
+        t.innerHTML = msg;
+        c.appendChild(t);
+        setTimeout(() => { t.style.transition='opacity 0.3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 3000);
+    }
 
     function setSyncStatus(state) {
         const el = document.getElementById('f-sync-status'); if(!el) return;
@@ -211,8 +228,12 @@ const fieldApp = (function () {
             } catch(err) { console.error(err); }
         });
         
-        map.on('mousedown', handlePointerDown); map.on('mousemove', () => isDraggingMap = true); map.on('mouseup', handlePointerUp);
-        map.on('touchstart', handlePointerDown, {passive: true}); map.on('touchmove', () => isDraggingMap = true, {passive: true}); map.on('touchend', handlePointerUp, {passive: true});
+        map.on('mousedown', handlePointerDown);
+        map.on('mousemove', () => isDraggingMap = true);
+        map.on('mouseup', handlePointerUp);
+        map.on('touchstart', handlePointerDown, {passive: true});
+        map.on('touchmove', () => isDraggingMap = true, {passive: true});
+        map.on('touchend', handlePointerUp, {passive: true});
     }
 
     function handlePointerDown(e) { isDraggingMap = false; pressTimer = setTimeout(() => { if(!isDraggingMap) { if(navigator.vibrate) navigator.vibrate([30,50,30]); openRouteMenu(); } }, 500); }
@@ -254,10 +275,216 @@ const fieldApp = (function () {
     }
 
     // ==========================================
+    // *** עדכון מרכזי: openBuildingCard עם תמונת Street View ***
+    // ==========================================
+    function openBuildingCard(bldg, isFromRouteMode = false) {
+        closeOverlays();
+        const sheet = document.getElementById('f-sheet');
+        const info = db[bldg].info || {};
+        const coords = info.coords;
+        const bldgCode = info.code || 'אין';
+        const apts = db[bldg].apts || [];
+
+        if (coords && !isNaN(coords[0])) map.flyTo({ center: coords, zoom: 18, pitch: 60, duration: 1500 });
+
+        // Street View thumbnail — fallback לסמל favicon אם אין מפתח
+        // להחלפה: שנה YOUR_GOOGLE_KEY למפתח אמיתי
+        const GOOGLE_KEY = ''; // ← הכנס כאן מפתח Google API אם יש
+        const streetViewUrl = (coords && GOOGLE_KEY)
+            ? `https://maps.googleapis.com/maps/api/streetview?size=400x400&location=${coords[1]},${coords[0]}&fov=90&key=${GOOGLE_KEY}`
+            : null;
+
+        // ID ייחודי לקידוד בטוח ב-onclick
+        const safeBldgEnc = encodeURIComponent(bldg);
+
+        let html = `<button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>`;
+
+        html += `
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light); padding-bottom:15px; margin-bottom:15px; margin-top:5px;">
+            <div style="flex:1; padding-left:10px;">
+                <h3 style="margin:0 0 5px 0; font-size:20px;"><i class="fas fa-building" style="color:var(--accent);"></i> ${escapeHTML(bldg)}</h3>
+                <div style="color:var(--text-muted); font-size:13px;">${apts.length} משפחות · קוד אינטרקום: <span style="color:var(--success); font-weight:800;">${escapeHTML(bldgCode)}</span></div>
+            </div>
+            ${streetViewUrl
+                ? `<img src="${streetViewUrl}" class="bldg-profile-img" 
+                    onerror="this.style.display='none'" 
+                    onclick="fieldApp.openFullImage('${streetViewUrl.replace(/'/g, "&#39;")}')" 
+                    alt="תמונת בניין">`
+                : `<div style="width:60px;height:60px;border-radius:12px;background:var(--bg-body);border:2px solid var(--border-light);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:24px;flex-shrink:0;"><i class="fas fa-building"></i></div>`
+            }
+        </div>`;
+
+        if (!isFromRouteMode) {
+            html += `<button onclick="fieldApp.promptAddToRoute('${safeBldgEnc}')" style="width:100%; margin-bottom:15px; padding:12px; background:var(--accent); color:white; border:none; border-radius:12px; font-weight:bold; font-size:15px; cursor:pointer;"><i class="fas fa-plus"></i> הוסף למסלול מהיר</button>`;
+        }
+
+        html += `<div style="max-height:30vh; overflow-y:auto;">`;
+        apts.forEach((fam, idx) => {
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-body); padding:12px; border-radius:12px; margin-bottom:10px; cursor:pointer;" 
+                onclick="fieldApp.openFamilyCard('${safeBldgEnc}', ${idx})">
+                <div>
+                    <div style="font-weight:bold; font-size:15px;">משפחת ${escapeHTML(fam.name || 'ללא שם')}</div>
+                    <div style="font-size:12px; color:var(--text-muted);">${fam.num ? 'דירה ' + escapeHTML(String(fam.num)) : ''}</div>
+                </div>
+                <i class="fas fa-chevron-left" style="color:var(--text-muted);"></i>
+            </div>`;
+        });
+        html += `</div>`;
+
+        document.getElementById('f-sheet-content').innerHTML = html;
+        sheet.classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
+    }
+
+    // ==========================================
+    // *** חדש: הגדלת תמונה מלאה ***
+    // ==========================================
+    function openFullImage(url) {
+        let el = document.getElementById('f-full-img');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'f-full-img';
+            el.className = 'full-img-overlay';
+            el.onclick = () => { el.style.display = 'none'; };
+            document.body.appendChild(el);
+        }
+        el.innerHTML = `
+            <img src="${escapeHTML(url)}" alt="תמונת בניין" onerror="this.alt='לא ניתן לטעון תמונה'">
+            <div class="close-hint"><i class="fas fa-times-circle"></i> לחץ לסגירה</div>
+        `;
+        el.style.display = 'flex';
+    }
+
+    // ==========================================
+    // *** חדש: כרטיס משפחה מלא ***
+    // ==========================================
+    function openFullFamilyCard(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const fam = db[bldg].apts[aptIdx];
+        if (!fam) return;
+
+        const sheet = document.getElementById('f-sheet');
+        sheet.style.height = '90vh';
+
+        let html = `
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays(); document.getElementById('f-sheet').style.height=''">
+            <i class="fas fa-times"></i>
+        </button>
+        <div style="margin-top:20px; overflow-y:auto; max-height:calc(90vh - 80px);">
+            <h2 style="margin-bottom:5px;">משפחת ${escapeHTML(fam.name || 'ללא שם')}</h2>
+            <p style="color:var(--text-muted); margin-bottom:20px;">${escapeHTML(bldg)} ${fam.num ? '· דירה ' + escapeHTML(String(fam.num)) : ''}</p>
+
+            <div style="display:flex; border-bottom:1px solid var(--border-light); margin-bottom:15px; gap:0;">
+                <div style="padding:10px 15px; border-bottom:3px solid var(--accent); font-weight:bold; color:var(--accent);">מידע כללי</div>
+                <div style="padding:10px 15px; color:var(--text-muted);">משימות (${(fam.tasks || []).filter(t=>!t.done).length})</div>
+                <div style="padding:10px 15px; color:var(--text-muted);">היסטוריה (${(fam.history || []).length})</div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+                <div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">שם האב</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.fatherName || '-')}</div>
+                </div>
+                <div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">שם האם</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.motherName || '-')}</div>
+                </div>
+                <div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">טלפון</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px;">${escapeHTML(fam.phone || fam.fatherPhone || fam.motherPhone || '-')}</div>
+                </div>
+                <div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">טלפון בית</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px;">${escapeHTML(fam.homePhone || '-')}</div>
+                </div>
+                <div style="grid-column:span 2;">
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px;">תגיות</label>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        ${(fam.tags || []).length > 0
+                            ? (fam.tags).map(t => `<span style="background:var(--accent); color:white; padding:4px 12px; border-radius:15px; font-size:12px; font-weight:600;">${escapeHTML(t)}</span>`).join('')
+                            : '<span style="color:var(--text-muted); font-size:13px;">אין תגיות</span>'
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="fieldApp.openFamilyForm('${bldgEnc}', ${aptIdx}); document.getElementById('f-sheet').style.height='';" 
+                style="width:100%; padding:15px; background:var(--text-main); color:white; border:none; border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer; font-family:inherit;">
+                <i class="fas fa-edit"></i> ערוך פרטי משפחה
+            </button>
+        </div>`;
+
+        document.getElementById('f-sheet-content').innerHTML = html;
+        // וודא שהחלונית פתוחה (closeOverlays סגרה אותה קודם)
+        sheet.classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
+    }
+
+    function openFamilyCard(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc); currentTarget = { bldg, aptIdx }; const fam = db[bldg].apts[aptIdx];
+        if (!fam) return;
+        const safeName = escapeHTML(fam.name || 'ללא שם');
+        const parents = [fam.fatherName, fam.motherName].filter(Boolean).join(' ו-');
+        const parentsHTML = parents ? `<div style="font-size:14px; color:var(--text-muted); margin-bottom:5px;">${escapeHTML(parents)}</div>` : '';
+        const phone = fam.fatherPhone || fam.motherPhone || fam.phone || '';
+        const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '972')}` : '#';
+        const disableStyle = !phone ? 'opacity:0.3; pointer-events:none;' : '';
+        const activeTask = (fam.tasks || []).find(t => !t.done);
+        const taskHTML = activeTask ? `<div style="background:rgba(37, 99, 235, 0.1); border:1px solid rgba(37, 99, 235, 0.3); padding:10px; border-radius:8px; margin-bottom:15px;"><div style="font-size:12px; color:var(--accent); font-weight:bold; margin-bottom:4px;"><i class="fas fa-thumbtack"></i> משימה פתוחה:</div><div style="font-size:15px; color:var(--text-main);">${escapeHTML(activeTask.text)}</div></div>` : '';
+        const coords = db[bldg].info?.coords;
+        const safeBldgEnc = encodeURIComponent(bldg);
+
+        const historyList = fam.history || []; let historyHTML = '';
+        if (historyList.length > 0) {
+            historyHTML = `<div style="margin-top: 20px; border-top: 1px solid var(--border-light); padding-top: 15px;"><div style="font-size:14px; font-weight:bold; color:var(--text-muted); margin-bottom:10px;"><i class="fas fa-history"></i> היסטוריית ביקורים (${historyList.length}):</div><div style="max-height: 130px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px;">`;
+            [...historyList].reverse().forEach(visit => {
+                let statusColor = 'var(--text-muted)'; if (visit.status === 'בוצע') statusColor = 'var(--success)'; if (visit.status === 'אין מענה') statusColor = 'var(--warning)'; if (visit.status === 'לא מעוניינים') statusColor = 'var(--danger)';
+                historyHTML += `<div style="background: var(--bg-body); padding: 10px; border-radius: 8px; border-right: 4px solid ${statusColor};"><div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px;"><strong style="color: var(--text-main);">${escapeHTML(visit.date)}</strong><span style="color: ${statusColor}; font-weight: bold;">${escapeHTML(visit.status)}</span></div><div style="color: var(--text-muted); font-size: 13px;">${escapeHTML(visit.content || 'ללא הערה')}</div></div>`;
+            });
+            historyHTML += `</div></div>`;
+        } else { historyHTML = `<div style="margin-top: 20px; border-top: 1px solid var(--border-light); padding-top: 15px; font-size:13px; color:var(--text-muted); text-align:center;">אין היסטוריית ביקורים קודמת.</div>`; }
+
+        let html = `<button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>`;
+        html += `<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; padding-right:35px;"><div><h3 style="margin: 0 0 2px 0; font-size: 22px;">משפחת ${safeName}</h3>${parentsHTML}<div style="color: var(--text-muted); font-size: 14px;"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(bldg)} ${fam.num ? 'דירה '+escapeHTML(String(fam.num)) : ''}</div></div><div style="display:flex; gap:8px;"><button onclick="fieldApp.openFamilyForm('${safeBldgEnc}', ${aptIdx})" style="background:none; border:none; color:var(--accent); font-size:20px; cursor:pointer;"><i class="fas fa-edit"></i></button><button style="width:40px; height:40px; border-radius:50%; background:var(--bg-body); border:1px solid var(--border-light); color:var(--text-main); font-size:16px; cursor:pointer; ${disableStyle}" onclick="fieldApp.callFamilyNumber('${phone}')"><i class="fas fa-phone"></i></button><button style="width:40px; height:40px; border-radius:50%; background:#25D366; border:none; color:white; font-size:16px; cursor:pointer; ${disableStyle}" onclick="window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp"></i></button></div></div>${taskHTML}`;
+        html += `<div style="font-size:14px; font-weight:bold; color:var(--text-muted); margin-bottom:10px;">דווח סטטוס ביקור:</div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"><button style="padding: 12px; background: var(--success); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('בוצע')"><i class="fas fa-check"></i> בוצע</button><button style="padding: 12px; background: var(--warning); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('אין מענה')"><i class="fas fa-door-closed"></i> אין מענה</button><button style="padding: 12px; background: var(--text-muted); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('לא רלוונטי')"><i class="fas fa-ban"></i> לא רלוונטי</button><button style="padding: 12px; background: var(--danger); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('לא מעוניינים')"><i class="fas fa-times-circle"></i> לא מעוניינים</button></div>`;
+        if (coords) html += `<div style="display:flex; gap:10px; margin-top:15px;"><button onclick="fieldApp.openExternalNav(${coords[0]}, ${coords[1]}, 'waze')" style="flex:1; padding:8px; background:#33ccff; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;"><i class="fab fa-waze"></i> Waze</button><button onclick="fieldApp.openExternalNav(${coords[0]}, ${coords[1]}, 'google')" style="flex:1; padding:8px; background:#ea4335; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;"><i class="fas fa-map-marker-alt"></i> Google</button></div>`;
+        
+        // *** כפתור כרטיס מלא ***
+        html += `<button onclick="fieldApp.openFullFamilyCard('${safeBldgEnc}', ${aptIdx})" style="width:100%; margin-top:15px; padding:12px; background:rgba(37,99,235,0.08); color:var(--accent); border:1px solid rgba(37,99,235,0.4); border-radius:12px; font-weight:bold; cursor:pointer; font-family:inherit;"><i class="fas fa-id-card"></i> פתח כרטיס משפחה מלא</button>`;
+        
+        html += historyHTML;
+
+        document.getElementById('f-sheet-content').innerHTML = html;
+        document.getElementById('f-sheet').classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
+    }
+
+    // ==========================================
     // עריכה ובניית מסלולים
     // ==========================================
+
+    // *** עדכון: toggleRouteBuilderMode עם דיאלוג הוראות ***
     function toggleRouteBuilderMode() {
-        isRouteBuilderMode = true; closeOverlays(); showToast("מצב בניית מסלול פעיל! לחץ על בניינים במפה או בקהילה."); updateRouteVisuals();
+        isRouteBuilderMode = true;
+        closeOverlays();
+
+        const dialogHtml = `
+        <div style="text-align:center; padding:10px;">
+            <div style="font-size:48px; margin-bottom:15px;">📍</div>
+            <h3 style="margin-bottom:10px; font-size:20px;">מצב בניית מסלול הופעל</h3>
+            <p style="color:var(--text-muted); font-size:14px; margin-bottom:25px; line-height:1.6;">
+                לחץ על בניינים במפה כדי להוסיף אותם למסלול.<br>
+                ניתן גם לבחור משפחות מרשימת הקהילה.
+            </p>
+            <button onclick="fieldApp.closeOverlays(); fieldApp.updateRouteVisuals();" 
+                style="width:100%; padding:14px; background:var(--accent); color:white; border:none; border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer; font-family:inherit;">
+                <i class="fas fa-map-marked-alt"></i> הבנתי, בוא נתחיל
+            </button>
+        </div>`;
+
+        document.getElementById('f-sheet-content').innerHTML = dialogHtml;
+        document.getElementById('f-sheet').classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
     }
 
     function updateRouteVisuals() {
@@ -269,7 +496,7 @@ const fieldApp = (function () {
             const marker = new mapboxgl.Marker(el).setLngLat(bldg.coords).addTo(map);
             routeStepMarkers.push(marker);
         });
-        
+
         const bar = document.getElementById('f-route-action-bar');
         const bldgCountEl = document.getElementById('f-bldg-count');
         if (bldgCountEl) bldgCountEl.innerText = selectedRouteBuildings.length;
@@ -286,7 +513,7 @@ const fieldApp = (function () {
         if (!lng || !lat || isNaN(lng)) { showToast("למשפחה זו אין מיקום מוגדר במפה."); return; }
         const coordsStr = `${lng},${lat}`;
         const existingIdx = selectedRouteBuildings.findIndex(c => `${c.coords[0]},${c.coords[1]}` === coordsStr);
-        
+
         if (existingIdx >= 0) {
             selectedRouteBuildings.splice(existingIdx, 1);
             el.style.border = "1px solid var(--border-light)";
@@ -317,7 +544,7 @@ const fieldApp = (function () {
         if(existingIdx === -1) selectedRouteBuildings.push({ address: bldg, coords: coords });
         showToast("נוסף למסלול בהצלחה"); closeOverlays(); updateRouteVisuals();
     }
-    
+
     function removeSingleFromRoute(bldgEnc) {
         const bldg = decodeURIComponent(bldgEnc);
         const existingIdx = selectedRouteBuildings.findIndex(b => b.address === bldg);
@@ -371,17 +598,17 @@ const fieldApp = (function () {
         closeOverlays();
         if (selectedRouteBuildings.length === 0) { isRouteBuilderMode = false; return; }
         pendingRouteWaypoints = selectedRouteBuildings.map(b => b.coords);
-        
+
         const nameInput = document.getElementById('f-route-name-input');
         let name = nameInput ? nameInput.value.trim() : '';
         if (!name) name = `מסלול מותאם - ${new Date().toLocaleDateString('he-IL')}`;
-        
-        saveRoute(pendingRouteWaypoints, name); 
-        showToast("המסלול נשמר בהצלחה!"); 
-        
+
+        saveRoute(pendingRouteWaypoints, name);
+        showToast("המסלול נשמר בהצלחה!");
+
         const dialog = document.getElementById('f-route-dialog');
-        if(dialog) dialog.style.display = 'flex'; 
-        
+        if(dialog) dialog.style.display = 'flex';
+
         isRouteBuilderMode = false;
         selectedRouteBuildings.forEach(b => { if(b.featureId) map.setFeatureState({source: 'composite', sourceLayer: 'building', id: b.featureId}, { selected: false }); });
         selectedRouteBuildings = []; updateRouteVisuals();
@@ -402,8 +629,8 @@ const fieldApp = (function () {
                     (db[bldg].apts || []).forEach(apt => {
                         (apt.tasks || []).forEach(t => {
                             if (t.done) return;
-                            score += 10; 
-                            if (t.date === todayStr) score += 50; 
+                            score += 10;
+                            if (t.date === todayStr) score += 50;
                             if (t.text && (t.text.includes('דחוף') || t.text.includes('חשוב'))) score += 30;
                         });
                     });
@@ -430,77 +657,58 @@ const fieldApp = (function () {
     // ==========================================
     // UI, חלונות וניווט
     // ==========================================
-    function closeOverlays() { stopVoiceRecording(); document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open')); if (fabIsOpen) { fabIsOpen = false; document.getElementById('f-fab-wrapper')?.classList.remove('open'); } document.getElementById('f-scrim').style.display = 'none'; if(db) document.getElementById('f-fab-wrapper').style.display = 'block'; if (activeBuildingFeatureId && map) { map.setFeatureState({source: 'composite', sourceLayer: 'building', id: activeBuildingFeatureId}, { active: false }); activeBuildingFeatureId = null; } }
-    function toggleFab() { fabIsOpen = !fabIsOpen; document.getElementById('f-fab-wrapper')?.classList.toggle('open', fabIsOpen); const scrim = document.getElementById('f-scrim'); if (fabIsOpen) { document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open')); scrim.style.display = 'block'; if (navigator.vibrate) navigator.vibrate(20); } else { scrim.style.display = 'none'; } }
-    function switchView(viewId, element) { if (element) { document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); element.classList.add('active'); } document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active')); document.getElementById('view-' + viewId).classList.add('active'); closeOverlays(); if (viewId === 'map' && map) setTimeout(() => map.resize(), 100); }
-    function openRouteMenu() { closeOverlays(); document.getElementById('f-fab-wrapper').style.display = 'none'; switchView('map', document.querySelector('.nav-item')); document.getElementById('f-route-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block'; }
-
-    function openBuildingCard(bldg, isFromRouteMode = false) {
-        closeOverlays();
-        const sheet = document.getElementById('f-sheet');
-        const coords = db[bldg].info?.coords; if(coords && !isNaN(coords[0])) map.flyTo({ center: coords, zoom: 18, pitch: 60, duration: 1500 });
-        const apts = db[bldg].apts || []; const bldgCode = db[bldg].info?.code || 'אין';
-        
-        let html = `<button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>`;
-        html += `<div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border-light); padding-bottom: 15px; margin-bottom: 15px; padding-right:35px;"><div><h3 style="margin: 0 0 5px 0; font-size: 20px;"><i class="fas fa-building" style="color:var(--accent);"></i> ${bldg}</h3><div style="color: var(--text-muted); font-size: 13px;">${apts.length} משפחות בבניין</div></div><div style="background: var(--bg-body); padding: 5px 10px; border-radius: 8px; text-align: center; border: 1px solid var(--border-light);"><div style="font-size: 11px; color: var(--text-muted);">אינטרקום</div><div style="font-weight: 800; font-size: 16px; color: var(--success);">${escapeHTML(bldgCode)}</div></div></div>`;
-        
-        if (!isFromRouteMode) {
-             html += `<button onclick="fieldApp.promptAddToRoute('${encodeURIComponent(bldg)}')" style="width:100%; margin-bottom:15px; padding:12px; background:var(--accent); color:white; border:none; border-radius:12px; font-weight:bold; font-size:15px; cursor:pointer;"><i class="fas fa-plus"></i> הוסף למסלול מהיר</button>`;
-        }
-        
-        html += `<div style="max-height: 30vh; overflow-y: auto; padding-right: 5px;">`;
-        apts.forEach((fam, idx) => { html += `<div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-body); padding:12px; border-radius:12px; margin-bottom:10px; cursor:pointer;" onclick="fieldApp.openFamilyCard('${encodeURIComponent(bldg)}', ${idx})"><div><div style="font-weight:bold; font-size:15px;">משפחת ${escapeHTML(fam.name || 'ללא שם')}</div><div style="font-size:12px; color:var(--text-muted);">${fam.num ? 'דירה ' + escapeHTML(fam.num) : ''}</div></div><i class="fas fa-chevron-left" style="color:var(--text-muted);"></i></div>`; });
-        html += `</div>`;
-        document.getElementById('f-sheet-content').innerHTML = html;
-        sheet.classList.add('open'); document.getElementById('f-scrim').style.display = 'block';
+    function closeOverlays() {
+        stopVoiceRecording();
+        document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open'));
+        if (fabIsOpen) { fabIsOpen = false; document.getElementById('f-fab-wrapper')?.classList.remove('open'); }
+        document.getElementById('f-scrim').style.display = 'none';
+        if(db) document.getElementById('f-fab-wrapper').style.display = 'block';
+        if (activeBuildingFeatureId && map) { map.setFeatureState({source: 'composite', sourceLayer: 'building', id: activeBuildingFeatureId}, { active: false }); activeBuildingFeatureId = null; }
     }
 
-    function openFamilyCard(bldgEnc, aptIdx) {
-        const bldg = decodeURIComponent(bldgEnc); currentTarget = { bldg, aptIdx }; const fam = db[bldg].apts[aptIdx];
-        const safeName = escapeHTML(fam.name || 'ללא שם');
-        const parents = [fam.fatherName, fam.motherName].filter(Boolean).join(' ו-');
-        const parentsHTML = parents ? `<div style="font-size:14px; color:var(--text-muted); margin-bottom:5px;">${escapeHTML(parents)}</div>` : '';
-        const phone = fam.fatherPhone || fam.motherPhone || fam.phone || '';
-        const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '972')}` : '#';
-        const disableStyle = !phone ? 'opacity:0.3; pointer-events:none;' : '';
-        const activeTask = (fam.tasks || []).find(t => !t.done);
-        const taskHTML = activeTask ? `<div style="background:rgba(37, 99, 235, 0.1); border:1px solid rgba(37, 99, 235, 0.3); padding:10px; border-radius:8px; margin-bottom:15px;"><div style="font-size:12px; color:var(--accent); font-weight:bold; margin-bottom:4px;"><i class="fas fa-thumbtack"></i> משימה פתוחה:</div><div style="font-size:15px; color:var(--text-main);">${escapeHTML(activeTask.text)}</div></div>` : '';
-        const coords = db[bldg].info?.coords;
+    function toggleFab() {
+        fabIsOpen = !fabIsOpen;
+        document.getElementById('f-fab-wrapper')?.classList.toggle('open', fabIsOpen);
+        const scrim = document.getElementById('f-scrim');
+        if (fabIsOpen) { document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open')); scrim.style.display = 'block'; if (navigator.vibrate) navigator.vibrate(20); }
+        else { scrim.style.display = 'none'; }
+    }
 
-        const historyList = fam.history || []; let historyHTML = '';
-        if (historyList.length > 0) {
-            historyHTML = `<div style="margin-top: 20px; border-top: 1px solid var(--border-light); padding-top: 15px;"><div style="font-size:14px; font-weight:bold; color:var(--text-muted); margin-bottom:10px;"><i class="fas fa-history"></i> היסטוריית ביקורים (${historyList.length}):</div><div style="max-height: 130px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px;">`;
-            [...historyList].reverse().forEach(visit => {
-                let statusColor = 'var(--text-muted)'; if (visit.status === 'בוצע') statusColor = 'var(--success)'; if (visit.status === 'אין מענה') statusColor = 'var(--warning)'; if (visit.status === 'לא מעוניינים') statusColor = 'var(--danger)';
-                historyHTML += `<div style="background: var(--bg-body); padding: 10px; border-radius: 8px; border-right: 4px solid ${statusColor};"><div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px;"><strong style="color: var(--text-main);">${escapeHTML(visit.date)}</strong><span style="color: ${statusColor}; font-weight: bold;">${escapeHTML(visit.status)}</span></div><div style="color: var(--text-muted); font-size: 13px;">${escapeHTML(visit.content || 'ללא הערה')}</div></div>`;
-            });
-            historyHTML += `</div></div>`;
-        } else { historyHTML = `<div style="margin-top: 20px; border-top: 1px solid var(--border-light); padding-top: 15px; font-size:13px; color:var(--text-muted); text-align:center;">אין היסטוריית ביקורים קודמת.</div>`; }
+    function switchView(viewId, element) {
+        if (element) { document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); element.classList.add('active'); }
+        document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+        document.getElementById('view-' + viewId).classList.add('active');
+        closeOverlays();
+        if (viewId === 'map' && map) setTimeout(() => map.resize(), 100);
+    }
 
-        let html = `<button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>`;
-        html += `<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; padding-right:35px;"><div><h3 style="margin: 0 0 2px 0; font-size: 22px;">משפחת ${safeName}</h3>${parentsHTML}<div style="color: var(--text-muted); font-size: 14px;"><i class="fas fa-map-marker-alt"></i> ${bldg} ${fam.num ? 'דירה '+escapeHTML(fam.num) : ''}</div></div><div style="display:flex; gap:8px;"><button onclick="fieldApp.openFamilyForm('${encodeURIComponent(bldg)}', ${aptIdx})" style="background:none; border:none; color:var(--accent); font-size:20px; cursor:pointer;"><i class="fas fa-edit"></i></button><button style="width:40px; height:40px; border-radius:50%; background:var(--bg-body); border:1px solid var(--border-light); color:var(--text-main); font-size:16px; cursor:pointer; ${disableStyle}" onclick="fieldApp.callFamilyNumber('${phone}')"><i class="fas fa-phone"></i></button><button style="width:40px; height:40px; border-radius:50%; background:#25D366; border:none; color:white; font-size:16px; cursor:pointer; ${disableStyle}" onclick="window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp"></i></button></div></div>${taskHTML}`;
-        html += `<div style="font-size:14px; font-weight:bold; color:var(--text-muted); margin-bottom:10px;">דווח סטטוס ביקור:</div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"><button style="padding: 12px; background: var(--success); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('בוצע')"><i class="fas fa-check"></i> בוצע</button><button style="padding: 12px; background: var(--warning); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('אין מענה')"><i class="fas fa-door-closed"></i> אין מענה</button><button style="padding: 12px; background: var(--text-muted); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('לא רלוונטי')"><i class="fas fa-ban"></i> לא רלוונטי</button><button style="padding: 12px; background: var(--danger); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('לא מעוניינים')"><i class="fas fa-times-circle"></i> לא מעוניינים</button></div>`;
-        if (coords) html += `<div style="display:flex; gap:10px; margin-top:15px;"><button onclick="fieldApp.openExternalNav(${coords[0]}, ${coords[1]}, 'waze')" style="flex:1; padding:8px; background:#33ccff; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;"><i class="fab fa-waze"></i> Waze</button><button onclick="fieldApp.openExternalNav(${coords[0]}, ${coords[1]}, 'google')" style="flex:1; padding:8px; background:#ea4335; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;"><i class="fas fa-map-marker-alt"></i> Google</button></div>`;
-        html += historyHTML;
-        
-        document.getElementById('f-sheet-content').innerHTML = html;
-        document.getElementById('f-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block';
+    function openRouteMenu() {
+        closeOverlays();
+        document.getElementById('f-fab-wrapper').style.display = 'none';
+        switchView('map', document.querySelector('.nav-item'));
+        document.getElementById('f-route-sheet').classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
     }
 
     function renderCommunity() {
         const c = document.getElementById('f-community-list'); if (!c) return;
-        let allFams = []; Object.keys(db).forEach(bldg => { if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return; (db[bldg].apts || []).forEach((apt, aptIdx) => { allFams.push({ bldg, aptIdx, apt, address: bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : bldg }); }); });
-        
+        let allFams = [];
+        Object.keys(db).forEach(bldg => {
+            if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg].apts || []).forEach((apt, aptIdx) => { allFams.push({ bldg, aptIdx, apt, address: bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : bldg }); });
+        });
+
         c.innerHTML = allFams.slice(0, 50).map((f) => {
-            const phone = f.apt.fatherPhone || f.apt.motherPhone || f.apt.phone || ''; 
-            const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '972')}` : '#'; 
+            const phone = f.apt.fatherPhone || f.apt.motherPhone || f.apt.phone || '';
+            const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '972')}` : '#';
             const disableStyle = !phone ? 'opacity:0.3; pointer-events:none;' : '';
             const coords = db[f.bldg]?.info?.coords; const lng = coords?.[0]; const lat = coords?.[1];
             const parents = [f.apt.fatherName, f.apt.motherName].filter(Boolean).join(' ו-');
             const tags = (f.apt.tags || []).map(t => `<span style="background:var(--accent);color:white;padding:2px 6px;border-radius:4px;font-size:11px;">${escapeHTML(t)}</span>`).join(' ');
+            const safeBldgEnc = encodeURIComponent(f.bldg);
 
             return `
-            <div class="expandable-card" oncontextmenu="event.preventDefault();" ontouchstart="fieldApp.handleCardTouchStart(event, '${encodeURIComponent(f.bldg)}', ${f.aptIdx})" ontouchend="fieldApp.handleCardTouchEnd()" onmousedown="fieldApp.handleCardTouchStart(event, '${encodeURIComponent(f.bldg)}', ${f.aptIdx})" onmouseup="fieldApp.handleCardTouchEnd()" onmouseleave="fieldApp.handleCardTouchEnd()">
+            <div class="expandable-card" oncontextmenu="event.preventDefault();" ontouchstart="fieldApp.handleCardTouchStart(event, '${safeBldgEnc}', ${f.aptIdx})" ontouchend="fieldApp.handleCardTouchEnd()" onmousedown="fieldApp.handleCardTouchStart(event, '${safeBldgEnc}', ${f.aptIdx})" onmouseup="fieldApp.handleCardTouchEnd()" onmouseleave="fieldApp.handleCardTouchEnd()">
                 <div class="expandable-card-header" onclick="this.parentElement.classList.toggle('expanded')">
                     <div>
                         <div style="font-weight:700; font-size:16px;">משפחת ${escapeHTML(f.apt.name || 'ללא שם')}</div>
@@ -510,7 +718,7 @@ const fieldApp = (function () {
                 </div>
                 <div class="expandable-card-body">
                     <div style="font-size:13px; color:var(--text-main); margin-bottom:10px;">
-                        <div><i class="fas fa-map-marker-alt"></i> ${escapeHTML(f.address)} ${f.apt.num ? 'דירה '+escapeHTML(f.apt.num) : ''}</div>
+                        <div><i class="fas fa-map-marker-alt"></i> ${escapeHTML(f.address)} ${f.apt.num ? 'דירה '+escapeHTML(String(f.apt.num)) : ''}</div>
                         ${phone ? `<div style="margin-top:5px;"><i class="fas fa-phone"></i> <span dir="ltr">${phone}</span></div>` : ''}
                         ${tags ? `<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">${tags}</div>` : ''}
                     </div>
@@ -518,7 +726,7 @@ const fieldApp = (function () {
                         <button class="card-action-btn" style="${disableStyle}" onclick="event.stopPropagation(); fieldApp.callFamilyNumber('${phone}')"><i class="fas fa-phone" style="color:var(--success);"></i>חייג</button>
                         <button class="card-action-btn" style="${disableStyle}" onclick="event.stopPropagation(); window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp" style="color:#25D366;"></i>הודעה</button>
                         <button class="card-action-btn" onclick="event.stopPropagation(); fieldApp.toggleTargetForRoute(this, ${lng || 0}, ${lat || 0})"><i class="fas fa-map-pin" style="color:var(--warning);"></i>בחר יעדים</button>
-                        <button class="card-action-btn" onclick="event.stopPropagation(); fieldApp.openFamilyCard('${encodeURIComponent(f.bldg)}', ${f.aptIdx});"><i class="fas fa-id-card" style="color:var(--accent);"></i>כרטיס</button>
+                        <button class="card-action-btn" onclick="event.stopPropagation(); fieldApp.openFamilyCard('${safeBldgEnc}', ${f.aptIdx});"><i class="fas fa-id-card" style="color:var(--accent);"></i>כרטיס</button>
                     </div>
                 </div>
             </div>`;
@@ -539,7 +747,9 @@ const fieldApp = (function () {
             <button onclick="fieldApp.addSingleToRoute('${bldgEnc}')" style="width:100%; padding:14px; background:var(--accent); color:white; border:none; border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer;"><i class="fas fa-plus"></i> הוסף למסלול פעיל</button>
             <button onclick="fieldApp.removeSingleFromRoute('${bldgEnc}')" style="width:100%; padding:14px; background:var(--bg-body); color:var(--danger); border:1px solid var(--danger); border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i> הסר ממסלול פעיל</button>
         </div>`;
-        document.getElementById('f-sheet-content').innerHTML = html; document.getElementById('f-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block';
+        document.getElementById('f-sheet-content').innerHTML = html;
+        document.getElementById('f-sheet').classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
     }
 
     // ==========================================
@@ -547,15 +757,27 @@ const fieldApp = (function () {
     // ==========================================
     function openFamilyForm(bldg = null, aptIdx = null) {
         closeOverlays(); document.getElementById('f-fab-wrapper').style.display = 'none';
+        // איפוס גובה חלונית אם נפתחה מ-openFullFamilyCard
+        document.getElementById('f-sheet').style.height = '';
         const sheet = document.getElementById('f-add-family-sheet'); const titleIcon = document.getElementById('f-add-fam-title'); const saveBtn = document.getElementById('f-add-fam-savebtn');
         if (bldg !== null && aptIdx !== null) {
-            editingFamilyContext = { bldg, aptIdx }; const fam = db[bldg].apts[aptIdx];
-            document.getElementById('f-add-fam-name').value = fam.name || ''; document.getElementById('f-add-fam-father').value = fam.fatherName || ''; document.getElementById('f-add-fam-mother').value = fam.motherName || ''; document.getElementById('f-add-fam-address').value = bldg === NO_ADDRESS_KEY ? '' : bldg; document.getElementById('f-add-fam-apt').value = fam.num || ''; document.getElementById('f-add-fam-phone').value = fam.phone || fam.fatherPhone || fam.motherPhone || ''; document.getElementById('f-add-fam-homephone').value = fam.homePhone || ''; document.getElementById('f-add-fam-intercom').value = db[bldg].info?.code || '';
-            titleIcon.innerHTML = '<i class="fas fa-user-edit" style="color:var(--accent);"></i> עריכת פרטי משפחה'; saveBtn.innerHTML = '<i class="fas fa-save"></i> עדכן נתונים';
+            const bldgDecoded = typeof bldg === 'string' && bldg.includes('%') ? decodeURIComponent(bldg) : bldg;
+            editingFamilyContext = { bldg: bldgDecoded, aptIdx }; const fam = db[bldgDecoded].apts[aptIdx];
+            document.getElementById('f-add-fam-name').value = fam.name || '';
+            document.getElementById('f-add-fam-father').value = fam.fatherName || '';
+            document.getElementById('f-add-fam-mother').value = fam.motherName || '';
+            document.getElementById('f-add-fam-address').value = bldgDecoded === NO_ADDRESS_KEY ? '' : bldgDecoded;
+            document.getElementById('f-add-fam-apt').value = fam.num || '';
+            document.getElementById('f-add-fam-phone').value = fam.phone || fam.fatherPhone || fam.motherPhone || '';
+            document.getElementById('f-add-fam-homephone').value = fam.homePhone || '';
+            document.getElementById('f-add-fam-intercom').value = db[bldgDecoded].info?.code || '';
+            titleIcon.innerHTML = '<i class="fas fa-user-edit" style="color:var(--accent);"></i> עריכת פרטי משפחה';
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> עדכן נתונים';
         } else {
             editingFamilyContext = null;
             ['name', 'father', 'mother', 'address', 'apt', 'phone', 'homephone', 'intercom'].forEach(id => { document.getElementById('f-add-fam-' + id).value = ''; });
-            titleIcon.innerHTML = '<i class="fas fa-user-plus" style="color:var(--accent);"></i> הוספת משפחה חדשה'; saveBtn.innerHTML = '<i class="fas fa-save"></i> הוסף למערכת';
+            titleIcon.innerHTML = '<i class="fas fa-user-plus" style="color:var(--accent);"></i> הוספת משפחה חדשה';
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> הוסף למערכת';
         }
         sheet.classList.add('open'); document.getElementById('f-scrim').style.display = 'block';
     }
@@ -599,7 +821,7 @@ const fieldApp = (function () {
             try {
                 const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${mapboxgl.accessToken}&language=he&country=il&types=address`);
                 const data = await res.json();
-                if (data.features && data.features.length > 0) { 
+                if (data.features && data.features.length > 0) {
                     address = (data.features[0].place_name_he || data.features[0].place_name).split(',').slice(0,2).join(',');
                     finalCoords = data.features[0].center;
                 }
@@ -668,12 +890,39 @@ const fieldApp = (function () {
 
     function renderTasks() {
         const c = document.getElementById('f-tasks-list'); if (!c) return;
-        let allTasks = []; (db.meta?.generalTasks || []).forEach((t, i) => { if(!t.done) allTasks.push({...t, isGeneral: true, idx: i}); }); Object.keys(db).forEach(bldg => { if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return; (db[bldg].apts || []).forEach((apt, aptIdx) => { (apt.tasks || []).forEach((t, tIdx) => { if(!t.done) allTasks.push({...t, isGeneral: false, bldg, aptIdx, tIdx, famName: apt.name}); }); }); });
+        let allTasks = [];
+        (db.meta?.generalTasks || []).forEach((t, i) => { if(!t.done) allTasks.push({...t, isGeneral: true, idx: i}); });
+        Object.keys(db).forEach(bldg => {
+            if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg].apts || []).forEach((apt, aptIdx) => { (apt.tasks || []).forEach((t, tIdx) => { if(!t.done) allTasks.push({...t, isGeneral: false, bldg, aptIdx, tIdx, famName: apt.name}); }); });
+        });
         if(allTasks.length === 0) { c.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-muted);"><i class="fas fa-glass-cheers" style="font-size:40px; color:var(--accent); opacity:0.5; margin-bottom:15px;"></i><h3>אין משימות פתוחות!</h3></div>`; return; }
-        c.innerHTML = allTasks.map((t, i) => { const dataAttr = t.isGeneral ? `data-general="true" data-idx="${t.idx}"` : `data-general="false" data-bldg="${encodeURIComponent(t.bldg)}" data-apt="${t.aptIdx}" data-task="${t.tIdx}"`; const titlePrefix = t.isGeneral ? '' : `משפחת ${t.famName}: `; return `<div class="task-swipe-container" style="position:relative; margin-bottom:12px; overflow:hidden; border-radius:16px; box-shadow:var(--shadow);"><div class="task-bg-success" style="position:absolute; top:0; left:0; width:100%; height:100%; background:var(--success); color:white; display:flex; align-items:center; padding-left:20px; font-size:20px; font-weight:bold; z-index:1;"><i class="fas fa-check"></i></div><div class="task-item-front" ${dataAttr} style="position:relative; background:var(--surface); border:1px solid var(--border-light); padding:16px; border-radius:16px; display:flex; justify-content:space-between; align-items:center; z-index:2; transition: transform 0.2s ease;"><div><div style="font-weight:600; font-size:16px;">${escapeHTML(titlePrefix + t.text)}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;"><i class="far fa-calendar"></i> ${t.date || 'ללא מועד'}</div></div></div></div>`; }).join(''); 
-        
-        // החלת ארועי החלקה (Swipe)
-        const items = document.querySelectorAll('.task-item-front'); items.forEach(item => { let startX = 0; let currentX = 0; let isDragging = false; item.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; isDragging = true; item.style.transition = 'none'; }, {passive: true}); item.addEventListener('touchmove', (e) => { if (!isDragging) return; currentX = e.touches[0].clientX; let diff = currentX - startX; if (diff < 0) item.style.transform = `translateX(${diff}px)`; }, {passive: true}); item.addEventListener('touchend', (e) => { if (!isDragging) return; isDragging = false; item.style.transition = 'transform 0.3s ease'; let diff = currentX - startX; if (diff < -80) { item.style.transform = 'translateX(-100%)'; if (navigator.vibrate) navigator.vibrate([20, 30, 20]); const isGeneral = item.getAttribute('data-general') === 'true'; let payload = null; if (isGeneral) { const idx = item.getAttribute('data-idx'); db.meta.generalTasks[idx].done = true; payload = { type: 'general_task_complete', taskIndex: idx }; } else { const bldg = decodeURIComponent(item.getAttribute('data-bldg')); const aptIdx = item.getAttribute('data-apt'); const taskIdx = item.getAttribute('data-task'); const taskObj = db[bldg].apts[aptIdx].tasks[taskIdx]; taskObj.done = true; payload = { type: 'task_done', bldg, aptName: db[bldg].apts[aptIdx].name, aptNum: db[bldg].apts[aptIdx].num, payload: { taskText: taskObj.text } }; } storageSet(DATA_KEY, db); const outbox = storageGet(OUTBOX_KEY) || []; outbox.push({ ...payload, timestamp: new Date().toISOString() }); storageSet(OUTBOX_KEY, outbox); showToast("✅ המשימה הושלמה!"); setTimeout(() => { const container = item.closest('.task-swipe-container'); container.style.opacity = '0'; setTimeout(() => container.remove(), 300); }, 300); } else item.style.transform = 'translateX(0)'; }); });
+        c.innerHTML = allTasks.map((t, i) => {
+            const dataAttr = t.isGeneral ? `data-general="true" data-idx="${t.idx}"` : `data-general="false" data-bldg="${encodeURIComponent(t.bldg)}" data-apt="${t.aptIdx}" data-task="${t.tIdx}"`;
+            const titlePrefix = t.isGeneral ? '' : `משפחת ${t.famName}: `;
+            return `<div class="task-swipe-container" style="position:relative; margin-bottom:12px; overflow:hidden; border-radius:16px; box-shadow:var(--shadow);"><div class="task-bg-success" style="position:absolute; top:0; left:0; width:100%; height:100%; background:var(--success); color:white; display:flex; align-items:center; padding-left:20px; font-size:20px; font-weight:bold; z-index:1;"><i class="fas fa-check"></i></div><div class="task-item-front" ${dataAttr} style="position:relative; background:var(--surface); border:1px solid var(--border-light); padding:16px; border-radius:16px; display:flex; justify-content:space-between; align-items:center; z-index:2; transition: transform 0.2s ease;"><div><div style="font-weight:600; font-size:16px;">${escapeHTML(titlePrefix + t.text)}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;"><i class="far fa-calendar"></i> ${t.date || 'ללא מועד'}</div></div></div></div>`;
+        }).join('');
+
+        const items = document.querySelectorAll('.task-item-front');
+        items.forEach(item => {
+            let startX = 0; let currentX = 0; let isDragging = false;
+            item.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; isDragging = true; item.style.transition = 'none'; }, {passive: true});
+            item.addEventListener('touchmove', (e) => { if (!isDragging) return; currentX = e.touches[0].clientX; let diff = currentX - startX; if (diff < 0) item.style.transform = `translateX(${diff}px)`; }, {passive: true});
+            item.addEventListener('touchend', (e) => {
+                if (!isDragging) return; isDragging = false; item.style.transition = 'transform 0.3s ease'; let diff = currentX - startX;
+                if (diff < -80) {
+                    item.style.transform = 'translateX(-100%)';
+                    if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+                    const isGeneral = item.getAttribute('data-general') === 'true';
+                    let payload = null;
+                    if (isGeneral) { const idx = item.getAttribute('data-idx'); db.meta.generalTasks[idx].done = true; payload = { type: 'general_task_complete', taskIndex: idx }; }
+                    else { const bldg = decodeURIComponent(item.getAttribute('data-bldg')); const aptIdx = item.getAttribute('data-apt'); const taskIdx = item.getAttribute('data-task'); const taskObj = db[bldg].apts[aptIdx].tasks[taskIdx]; taskObj.done = true; payload = { type: 'task_done', bldg, aptName: db[bldg].apts[aptIdx].name, aptNum: db[bldg].apts[aptIdx].num, payload: { taskText: taskObj.text } }; }
+                    storageSet(DATA_KEY, db);
+                    const outbox = storageGet(OUTBOX_KEY) || []; outbox.push({ ...payload, timestamp: new Date().toISOString() }); storageSet(OUTBOX_KEY, outbox);
+                    showToast("✅ המשימה הושלמה!"); setTimeout(() => { const container = item.closest('.task-swipe-container'); container.style.opacity = '0'; setTimeout(() => container.remove(), 300); }, 300);
+                } else item.style.transform = 'translateX(0)';
+            });
+        });
     }
 
     // ==========================================
@@ -681,8 +930,8 @@ const fieldApp = (function () {
     // ==========================================
     function openVoiceSummary(status) {
         closeOverlays();
-        if(currentTarget) currentTarget.status = status; 
-        document.getElementById('f-voice-status-badge').innerText = status; 
+        if(currentTarget) currentTarget.status = status;
+        document.getElementById('f-voice-status-badge').innerText = status;
         document.getElementById('f-voice-sheet').classList.add('open');
         document.getElementById('f-scrim').style.display = 'block';
         document.getElementById('f-voice-result').value = '';
@@ -706,13 +955,21 @@ const fieldApp = (function () {
 
         const bldg = currentTarget.bldg; const aptIdx = currentTarget.aptIdx; const status = currentTarget.status || 'כללי'; const famName = db[bldg].apts[aptIdx].name;
 
+        // שמירת היסטוריה
+        if (!db[bldg].apts[aptIdx].history) db[bldg].apts[aptIdx].history = [];
+        db[bldg].apts[aptIdx].history.push({
+            date: new Date().toLocaleDateString('he-IL'),
+            status,
+            content: text
+        });
+        storageSet(DATA_KEY, db);
+
         const outbox = storageGet(OUTBOX_KEY) || [];
         outbox.push({ type: 'visit_log', bldg, aptName: famName, status, timestamp: new Date().toISOString(), content: text });
         storageSet(OUTBOX_KEY, outbox);
-        
+
         const taskKeywords = ['צריך', 'לזכור', 'לבדוק', 'להביא', 'לחזור', 'למסור', 'לברר', 'חשוב', 'דחוף', 'לוודא', 'לקחת', 'לדבר', 'להתקשר', 'לשלוח', 'לתת'];
         const sentences = text.split(/[.,;\n]/); let extractedTask = '';
-
         sentences.forEach(s => { s = s.trim(); if (taskKeywords.some(kw => s.startsWith(kw) || s.includes(' ' + kw + ' ')) && s.length > 5) extractedTask += s + ' '; });
         extractedTask = extractedTask.trim();
 
@@ -746,25 +1003,25 @@ const fieldApp = (function () {
         outbox.push({ type: 'add_family_task', bldg, aptName: famName, timestamp: new Date().toISOString(), payload: { taskText, taskDate: formattedDate } });
         storageSet(OUTBOX_KEY, outbox);
 
-        pendingAutoTaskContext = null; closeOverlays(); showToast("✅ הביקור והמשימה תועדו ביומן!"); renderTasks(); 
+        pendingAutoTaskContext = null; closeOverlays(); showToast("✅ הביקור והמשימה תועדו ביומן!"); renderTasks();
     }
 
     // ==========================================
     // ניווט, כלים, ומצב המבצע (HUD)
     // ==========================================
-    async function drawMultiStopRoute(startCoords, waypointsArray) { 
-        try { 
-            const allPoints = [startCoords, ...waypointsArray.slice(0, 23)]; const coordsString = allPoints.map(c => `${c[0]},${c[1]}`).join(';'); 
-            const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&access_token=${mapboxgl.accessToken}`; 
-            const res = await fetch(url); const json = await res.json(); 
-            if (!json.routes?.[0]) { showToast("לא ניתן לייצר מסלול לנקודות אלו."); return; } 
-            const geojson = { type: 'Feature', geometry: json.routes[0].geometry }; 
-            if (map.getSource('route')) map.getSource('route').setData(geojson); 
-            else map.addLayer({ id: 'route', type: 'line', source: { type: 'geojson', data: geojson }, paint: { 'line-color': '#2563eb', 'line-width': 6, 'line-opacity': 0.8 } }); 
-            
+    async function drawMultiStopRoute(startCoords, waypointsArray) {
+        try {
+            const allPoints = [startCoords, ...waypointsArray.slice(0, 23)];
+            const coordsString = allPoints.map(c => `${c[0]},${c[1]}`).join(';');
+            const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
+            const res = await fetch(url); const json = await res.json();
+            if (!json.routes?.[0]) { showToast("לא ניתן לייצר מסלול לנקודות אלו."); return; }
+            const geojson = { type: 'Feature', geometry: json.routes[0].geometry };
+            if (map.getSource('route')) map.getSource('route').setData(geojson);
+            else map.addLayer({ id: 'route', type: 'line', source: { type: 'geojson', data: geojson }, paint: { 'line-color': '#2563eb', 'line-width': 6, 'line-opacity': 0.8 } });
             map.flyTo({ center: startCoords, zoom: 19.5, pitch: 75, bearing: 0, duration: 3000, essential: true });
-            showToast("🚗 מסלול נוצר, מתחילים ניווט תלת-ממדי!"); 
-        } catch (e) { showToast("שגיאה ביצירת מסלול."); } 
+            showToast("🚗 מסלול נוצר, מתחילים ניווט תלת-ממדי!");
+        } catch (e) { showToast("שגיאה ביצירת מסלול."); }
     }
 
     function callFamilyNumber(p) { if(p) window.location.href = `tel:${p}`; else showToast("אין מספר"); }
@@ -777,7 +1034,7 @@ const fieldApp = (function () {
         if (!navigator.geolocation) return;
         watchId = navigator.geolocation.watchPosition(
             (pos) => {
-                if (!db || !isMissionActive) return; 
+                if (!db || !isMissionActive) return;
                 const user = [pos.coords.longitude, pos.coords.latitude];
                 if (!isDraggingMap && map) { map.easeTo({ center: user, pitch: 75, zoom: 19.5, bearing: pos.coords.heading !== null && !isNaN(pos.coords.heading) ? pos.coords.heading : map.getBearing(), duration: 1000 }); }
                 Object.keys(db).forEach(bldg => {
@@ -786,20 +1043,26 @@ const fieldApp = (function () {
                     const coords = db[bldg].info?.coords; if(!coords || isNaN(coords[0])) return;
                     if (calculateDistance(user, coords) < GEOFENCE_M && !isVisited(bldg)) { markVisited(bldg); openBuildingCard(bldg); }
                 });
-            }, (err) => console.error(err), { enableHighAccuracy: true }
+            },
+            (err) => console.error(err),
+            { enableHighAccuracy: true }
         );
     }
 
     function startMissionMode(waypoints) {
         missionWaypoints = waypoints || []; missionCurrentIdx = 0; missionPaused = false; isMissionActive = true;
-        document.getElementById('f-mission-hud').style.display = 'flex'; document.getElementById('f-bottom-nav-bar').style.display = 'none'; document.getElementById('f-fab-wrapper').style.display = 'none'; document.getElementById('f-sync-status').style.display = 'none';
+        document.getElementById('f-mission-hud').style.display = 'flex';
+        document.getElementById('f-bottom-nav-bar').style.display = 'none';
+        document.getElementById('f-fab-wrapper').style.display = 'none';
+        document.getElementById('f-sync-status').style.display = 'none';
         updateMissionHUD(); showToast("🚀 מצב מבצע פעיל! נווט ליעד הראשון."); if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
     }
 
     function updateMissionHUD() {
         if (!isMissionActive || missionWaypoints.length === 0) return;
         const total = missionWaypoints.length; const current = missionCurrentIdx + 1;
-        document.getElementById('f-mission-progress-text').innerText = `יעד ${current} מתוך ${total}`; document.getElementById('f-mission-progress-bar').style.width = `${(current / total) * 100}%`;
+        document.getElementById('f-mission-progress-text').innerText = `יעד ${current} מתוך ${total}`;
+        document.getElementById('f-mission-progress-bar').style.width = `${(current / total) * 100}%`;
         const targetCoords = missionWaypoints[missionCurrentIdx]; let targetBldg = null, minDist = Infinity;
         Object.keys(db).forEach(bldg => {
             if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
@@ -808,8 +1071,11 @@ const fieldApp = (function () {
         });
 
         if (targetBldg) {
-            const bldgData = db[targetBldg]; document.getElementById('f-mission-target-name').innerText = targetBldg; document.getElementById('f-mission-target-code').innerText = bldgData.info?.code || '—';
-            const apts = bldgData.apts || []; document.getElementById('f-mission-fam-count').innerText = `${apts.length} משפחות`;
+            const bldgData = db[targetBldg];
+            document.getElementById('f-mission-target-name').innerText = targetBldg;
+            document.getElementById('f-mission-target-code').innerText = bldgData.info?.code || '—';
+            const apts = bldgData.apts || [];
+            document.getElementById('f-mission-fam-count').innerText = `${apts.length} משפחות`;
 
             let famsHtml = apts.map((fam, idx) => `<div style="background:var(--bg-body); padding:10px 12px; border-radius:10px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="fieldApp.openFamilyCard('${encodeURIComponent(targetBldg)}', ${idx})"><div><div style="font-weight:600; font-size:14px;">משפחת ${escapeHTML(fam.name||'')}</div>${fam.num ? `<div style="font-size:12px; color:var(--text-muted);">דירה ${fam.num}</div>` : ''}</div><i class="fas fa-chevron-left" style="color:var(--text-muted); font-size:12px;"></i></div>`).join('');
             document.getElementById('f-mission-families-list').innerHTML = famsHtml || '<div style="color:var(--text-muted); font-size:13px; text-align:center; padding:10px;">אין משפחות</div>';
@@ -830,9 +1096,15 @@ const fieldApp = (function () {
     }
 
     function switchMissionTab(tab) {
-        const famTab = document.getElementById('f-mission-tab-fam'); const taskTab = document.getElementById('f-mission-tab-tasks'); const famContent = document.getElementById('f-mission-families-list'); const taskContent = document.getElementById('f-mission-tasks-list');
-        if (tab === 'fam') { famTab.style.background = 'var(--accent)'; famTab.style.color = 'white'; taskTab.style.background = 'var(--bg-body)'; taskTab.style.color = 'var(--text-muted)'; famContent.style.display = 'flex'; famContent.style.flexDirection = 'column'; famContent.style.gap = '8px'; taskContent.style.display = 'none';
-        } else { taskTab.style.background = 'var(--accent)'; taskTab.style.color = 'white'; famTab.style.background = 'var(--bg-body)'; famTab.style.color = 'var(--text-muted)'; taskContent.style.display = 'flex'; taskContent.style.flexDirection = 'column'; taskContent.style.gap = '8px'; famContent.style.display = 'none'; }
+        const famTab = document.getElementById('f-mission-tab-fam'); const taskTab = document.getElementById('f-mission-tab-tasks');
+        const famContent = document.getElementById('f-mission-families-list'); const taskContent = document.getElementById('f-mission-tasks-list');
+        if (tab === 'fam') {
+            famTab.style.background = 'var(--accent)'; famTab.style.color = 'white'; taskTab.style.background = 'var(--bg-body)'; taskTab.style.color = 'var(--text-muted)';
+            famContent.style.display = 'flex'; famContent.style.flexDirection = 'column'; famContent.style.gap = '8px'; taskContent.style.display = 'none';
+        } else {
+            taskTab.style.background = 'var(--accent)'; taskTab.style.color = 'white'; famTab.style.background = 'var(--bg-body)'; famTab.style.color = 'var(--text-muted)';
+            taskContent.style.display = 'flex'; taskContent.style.flexDirection = 'column'; taskContent.style.gap = '8px'; famContent.style.display = 'none';
+        }
     }
 
     function nextMissionTarget() { if (missionCurrentIdx < missionWaypoints.length - 1) { missionCurrentIdx++; updateMissionHUD(); const coords = missionWaypoints[missionCurrentIdx]; if (map) map.flyTo({ center: coords, zoom: 18, pitch: 75, duration: 1500 }); if (navigator.vibrate) navigator.vibrate([30, 20, 30]); } else { showMissionSummary(); } }
@@ -840,17 +1112,30 @@ const fieldApp = (function () {
     function pauseMission() { missionPaused = !missionPaused; const btn = document.getElementById('f-mission-pause-btn'); if (missionPaused) { btn.innerHTML = '<i class="fas fa-play"></i>'; btn.style.background = 'var(--success)'; showToast("⏸ מבצע מושהה."); } else { btn.innerHTML = '<i class="fas fa-pause"></i>'; btn.style.background = 'var(--warning)'; showToast("▶️ ממשיך במבצע!"); } }
     function refreshMissionRoute() { showToast("🔄 מחשב מסלול מחדש..."); if (navigator.vibrate) navigator.vibrate(30); const remaining = missionWaypoints.slice(missionCurrentIdx); if (navigator.geolocation) { navigator.geolocation.getCurrentPosition( pos => drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], remaining), () => drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], remaining) ); } }
     function finishMission() { showMissionSummary(); }
-    
+
     function showMissionSummary() {
         isMissionActive = false; if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
         let visitedCount = Object.keys(getVisited()).length; let completedTasks = 0;
         Object.keys(db).forEach(bldg => { if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return; (db[bldg].apts || []).forEach(apt => { (apt.tasks || []).forEach(t => { if(t.done) completedTasks++; }); }); });
-        document.getElementById('f-mission-hud').style.display = 'none'; document.getElementById('f-mission-summary').style.display = 'flex'; document.getElementById('f-summary-families').innerText = visitedCount; document.getElementById('f-summary-tasks').innerText = completedTasks; document.getElementById('f-summary-stops').innerText = missionWaypoints.length;
+        document.getElementById('f-mission-hud').style.display = 'none';
+        document.getElementById('f-mission-summary').style.display = 'flex';
+        document.getElementById('f-summary-families').innerText = visitedCount;
+        document.getElementById('f-summary-tasks').innerText = completedTasks;
+        document.getElementById('f-summary-stops').innerText = missionWaypoints.length;
         if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
     }
 
-    function closeMissionSummary() { document.getElementById('f-mission-summary').style.display = 'none'; document.getElementById('f-bottom-nav-bar').style.display = 'flex'; document.getElementById('f-fab-wrapper').style.display = 'block'; document.getElementById('f-sync-status').style.display = 'flex'; missionWaypoints = []; missionCurrentIdx = 0; isMissionActive = false; if (map && map.getLayer('route')) map.removeLayer('route'); if (map && map.getSource('route')) map.removeSource('route'); renderTasks(); }
-    
+    function closeMissionSummary() {
+        document.getElementById('f-mission-summary').style.display = 'none';
+        document.getElementById('f-bottom-nav-bar').style.display = 'flex';
+        document.getElementById('f-fab-wrapper').style.display = 'block';
+        document.getElementById('f-sync-status').style.display = 'flex';
+        missionWaypoints = []; missionCurrentIdx = 0; isMissionActive = false;
+        if (map && map.getLayer('route')) map.removeLayer('route');
+        if (map && map.getSource('route')) map.removeSource('route');
+        renderTasks();
+    }
+
     function markAllDoneInBuilding() {
         if (!currentTarget) return; const bldg = currentTarget.bldg; const apts = db[bldg].apts || []; let count = 0; const outbox = storageGet(OUTBOX_KEY) || [];
         apts.forEach((fam, aptIdx) => { (fam.tasks || []).forEach((t, tIdx) => { if (!t.done) { t.done = true; count++; outbox.push({ type: 'task_done', bldg, aptIdx, tIdx, timestamp: new Date().toISOString() }); } }); });
@@ -859,7 +1144,8 @@ const fieldApp = (function () {
 
     function toggleTaskLayer() {
         taskLayerVisible = !taskLayerVisible; const btn = document.getElementById('f-task-layer-btn');
-        if (taskLayerVisible) { renderTaskMarkers(); btn.style.background = 'var(--accent)'; btn.style.color = 'white'; } else { taskMarkers.forEach(m => m.remove()); taskMarkers = []; btn.style.background = 'var(--surface)'; btn.style.color = 'var(--text-main)'; }
+        if (taskLayerVisible) { renderTaskMarkers(); btn.style.background = 'var(--accent)'; btn.style.color = 'white'; }
+        else { taskMarkers.forEach(m => m.remove()); taskMarkers = []; btn.style.background = 'var(--surface)'; btn.style.color = 'var(--text-main)'; }
     }
 
     function renderTaskMarkers() {
@@ -868,13 +1154,23 @@ const fieldApp = (function () {
             if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta' || bldg === NO_ADDRESS_KEY) return;
             const coords = db[bldg].info?.coords; if(!coords || isNaN(coords[0])) return;
             let openTasks = 0; (db[bldg].apts || []).forEach(apt => { (apt.tasks || []).forEach(t => { if(!t.done) openTasks++; }); }); if (openTasks === 0) return;
-            const el = document.createElement('div'); el.style.cssText = `width: 32px; height: 32px; background: var(--warning); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; box-shadow: 0 2px 8px rgba(245,158,11,0.6); cursor: pointer; position: relative;`; el.innerHTML = `<i class="fas fa-exclamation" style="font-size:14px;"></i>`;
-            const badge = document.createElement('div'); badge.style.cssText = `position:absolute; top:-6px; right:-6px; background:var(--danger); color:white; border-radius:50%; width:16px; height:16px; font-size:10px; font-weight:bold; display:flex; align-items:center; justify-content:center; border:1px solid white;`; badge.innerText = openTasks; el.appendChild(badge);
-            const marker = new mapboxgl.Marker(el).setLngLat(coords).addTo(map); el.addEventListener('click', (e) => { e.stopPropagation(); openBuildingCard(bldg); }); taskMarkers.push(marker);
+            const el = document.createElement('div');
+            el.style.cssText = `width: 32px; height: 32px; background: var(--warning); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 13px; box-shadow: 0 2px 8px rgba(245,158,11,0.6); cursor: pointer; position: relative;`;
+            el.innerHTML = `<i class="fas fa-exclamation" style="font-size:14px;"></i>`;
+            const badge = document.createElement('div');
+            badge.style.cssText = `position:absolute; top:-6px; right:-6px; background:var(--danger); color:white; border-radius:50%; width:16px; height:16px; font-size:10px; font-weight:bold; display:flex; align-items:center; justify-content:center; border:1px solid white;`;
+            badge.innerText = openTasks; el.appendChild(badge);
+            const marker = new mapboxgl.Marker(el).setLngLat(coords).addTo(map);
+            el.addEventListener('click', (e) => { e.stopPropagation(); openBuildingCard(bldg); });
+            taskMarkers.push(marker);
         });
     }
 
-    function saveRoute(waypoints, name) { const saved = storageGet(SAVED_ROUTES_KEY) || []; const route = { id: Date.now(), name: name || `מסלול ${new Date().toLocaleDateString('he-IL')}`, waypoints, status: 'שמור', created: new Date().toISOString() }; saved.push(route); storageSet(SAVED_ROUTES_KEY, saved); return route; }
+    function saveRoute(waypoints, name) {
+        const saved = storageGet(SAVED_ROUTES_KEY) || [];
+        const route = { id: Date.now(), name: name || `מסלול ${new Date().toLocaleDateString('he-IL')}`, waypoints, status: 'שמור', created: new Date().toISOString() };
+        saved.push(route); storageSet(SAVED_ROUTES_KEY, saved); return route;
+    }
     function loadSavedRoutes() { return storageGet(SAVED_ROUTES_KEY) || []; }
     function deleteSavedRoute(id) { let saved = storageGet(SAVED_ROUTES_KEY) || []; saved = saved.filter(r => r.id !== id); storageSet(SAVED_ROUTES_KEY, saved); renderSavedRoutesSheet(); }
 
@@ -885,7 +1181,8 @@ const fieldApp = (function () {
     }
 
     function buildRouteFromSaved(id) {
-        const routes = loadSavedRoutes(); const route = routes.find(r => r.id === id); if (!route) return; route.status = 'בתהליך'; const saved = routes.map(r => r.id === id ? route : r); storageSet(SAVED_ROUTES_KEY, saved); isMissionActive = true;
+        const routes = loadSavedRoutes(); const route = routes.find(r => r.id === id); if (!route) return;
+        route.status = 'בתהליך'; const saved = routes.map(r => r.id === id ? route : r); storageSet(SAVED_ROUTES_KEY, saved); isMissionActive = true;
         if (navigator.geolocation) { navigator.geolocation.getCurrentPosition( pos => { drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], route.waypoints); startMissionMode(route.waypoints); }, () => { drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], route.waypoints); startMissionMode(route.waypoints); } ); }
     }
 
@@ -898,7 +1195,9 @@ const fieldApp = (function () {
     }
 
     function routeDialogSaveLater() {
-        document.getElementById('f-route-dialog').style.display = 'none'; const name = `מסלול ${new Date().toLocaleDateString('he-IL')} ${new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'})}`; saveRoute(pendingRouteWaypoints, name); showToast("💾 המסלול נשמר! תוכל להפעיל אותו מאוחר יותר."); pendingRouteWaypoints = [];
+        document.getElementById('f-route-dialog').style.display = 'none';
+        const name = `מסלול ${new Date().toLocaleDateString('he-IL')} ${new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'})}`;
+        saveRoute(pendingRouteWaypoints, name); showToast("💾 המסלול נשמר! תוכל להפעיל אותו מאוחר יותר."); pendingRouteWaypoints = [];
     }
 
     function openArrivalSheetEncoded(bEnc, idx) { openFamilyCard(bEnc, idx); }
@@ -907,15 +1206,18 @@ const fieldApp = (function () {
     // חשיפת הפונקציות החוצה
     // ==========================================
     return { 
-        init, login, switchView, toggleFab, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm, 
-        openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded, openVoiceSummary, 
-        toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter, callFamilyNumber, toggleDarkMode, forceSync, 
-        openExternalNav, searchAddressInput, selectAddressOption, toggleTargetForRoute, startCustomRoute, saveQuickTask, showToast, 
-        finishMission, pauseMission, refreshMissionRoute, markAllDoneInBuilding, saveRoute, loadSavedRoutes, deleteSavedRoute, 
-        toggleTaskLayer, completeMissionTask, switchMissionTab, nextMissionTarget, prevMissionTarget, closeMissionSummary, 
-        buildRouteFromSaved, openSavedRoutesSheet, routeDialogGoNow, routeDialogSaveLater,
+        init, login, switchView, toggleFab, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm,
+        openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded,
+        openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter,
+        callFamilyNumber, toggleDarkMode, forceSync, openExternalNav, searchAddressInput, selectAddressOption,
+        toggleTargetForRoute, startCustomRoute, saveQuickTask, showToast,
+        finishMission, pauseMission, refreshMissionRoute, markAllDoneInBuilding, saveRoute, loadSavedRoutes,
+        deleteSavedRoute, toggleTaskLayer, completeMissionTask, switchMissionTab, nextMissionTarget, prevMissionTarget,
+        closeMissionSummary, buildRouteFromSaved, openSavedRoutesSheet, routeDialogGoNow, routeDialogSaveLater,
         toggleRouteBuilderMode, promptAddToRoute, openRouteEditor, moveRouteItem, removeRouteItem, saveAndStartEditedRoute,
-        handleCardTouchStart, handleCardTouchEnd, addSingleToRoute, removeSingleFromRoute
+        handleCardTouchStart, handleCardTouchEnd, addSingleToRoute, removeSingleFromRoute,
+        // *** פונקציות חדשות חשופות ***
+        openFullImage, openFullFamilyCard
     };
 })();
 

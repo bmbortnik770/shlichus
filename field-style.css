@@ -59,16 +59,19 @@ body, html {
 .nav-item.active { color: var(--accent); font-weight: bold; }
 .nav-item.active i { transform: translateY(-3px) scale(1.1); }
 
+/* ==========================================
+   Z-INDEX מעודכן — חלוניות מעל כל הניווט
+   ========================================== */
 #f-scrim {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
-    backdrop-filter: blur(3px); z-index: 2000; display: none;
+    backdrop-filter: blur(3px); z-index: 9500; display: none;
 }
 
 .f-sheet {
     position: fixed; left: 10px; right: 10px; bottom: calc(var(--bottom-nav-h) + 15px);
     background: var(--surface); border-radius: 24px;
     padding: 24px; box-shadow: var(--shadow);
-    z-index: 3000; 
+    z-index: 9600; 
     transform: translateY(150vh); opacity: 0; pointer-events: none;
     transition: transform 0.4s cubic-bezier(0.1, 0.7, 0.1, 1), opacity 0.3s;
     border: 1px solid var(--border-light);
@@ -116,12 +119,17 @@ body, html {
 .f-sync-indicator.success { color: var(--success); }
 .f-sync-indicator.offline { background: var(--danger); color: white; border-color: var(--danger); }
 
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 #f-login { z-index: 9998; }
 .f-splash {
     position: fixed; inset: 0; z-index: 10000; background: var(--bg-body);
     display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.5s;
 }
 .f-splash img { width: 80px; margin-bottom: 20px; animation: pulse 2s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes celebratePulse { from { transform: scale(1); } to { transform: scale(1.1); } }
 
 .map-anchors { position: absolute; left: 15px; bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
 .map-anchor-btn, .theme-anchor {
@@ -165,3 +173,37 @@ body, html {
 .route-editor-item .actions { display: flex; gap: 8px; flex-direction: column; }
 .route-editor-item .actions button { background: var(--bg-body); border: 1px solid var(--border-light); color: var(--text-main); font-size: 14px; cursor: pointer; padding: 5px 12px; border-radius: 6px; }
 .route-editor-item .actions button.delete-btn { color: var(--danger); border-color: rgba(239,68,68,0.3); }
+
+/* ==========================================
+   תמונת פרופיל של בניין
+   ========================================== */
+.bldg-profile-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 2px solid var(--border-light);
+    cursor: pointer;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+    background: var(--bg-body);
+}
+.bldg-profile-img:active { transform: scale(0.9); }
+
+/* תצוגת תמונה מלאה */
+.full-img-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    z-index: 10000; display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 15px;
+}
+.full-img-overlay img {
+    max-width: 90%; max-height: 80vh;
+    border-radius: 16px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    object-fit: contain;
+}
+.full-img-overlay .close-hint {
+    color: rgba(255,255,255,0.7);
+    font-size: 14px;
+    font-weight: 600;
+}
