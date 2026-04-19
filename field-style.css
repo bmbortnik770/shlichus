@@ -108,15 +108,11 @@ body, html {
 .f-fab-center.open .f-fab-option { opacity: 1; transform: translateY(0) scale(1); }
 
 .f-sync-indicator {
-    position: fixed; 
-    bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 10px); 
-    left: 50%; 
-    transform: translateX(-50%);
+    position: fixed; top: calc(var(--safe-t) + 15px); right: 15px;
     background: var(--surface); color: var(--text-muted);
-    padding: 5px 14px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700;
     box-shadow: var(--shadow); border: 1px solid var(--border-light);
-    z-index: 999; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.3s ease;
-    white-space: nowrap;
+    z-index: 5000; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.3s ease;
 }
 .f-sync-indicator.syncing { color: var(--accent); }
 .f-sync-indicator.syncing i { animation: spin 1s linear infinite; }
@@ -142,7 +138,7 @@ body, html {
     display: flex; align-items: center; justify-content: center; font-size: 18px;
     box-shadow: var(--shadow); cursor: pointer; transition: 0.2s;
 }
-.theme-anchor { position: absolute; left: 15px; top: calc(var(--safe-t) + 15px); }
+.theme-anchor { position: absolute; left: 15px; top: calc(var(--safe-t) + 65px); }
 
 /* עיצוב סיכת בית חב"ד בשטח */
 .chabad-pin-wrapper { width:50px; height:65px; z-index:1000; }
