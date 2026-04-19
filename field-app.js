@@ -935,6 +935,8 @@ const fieldApp = (function () {
             searchInput.addEventListener('input', () => renderTasks());
         }
     }
+
+    function renderTasks() {
         const activeList = document.getElementById('f-tasks-list');
         const completedList = document.getElementById('f-completed-tasks-list');
         if (!activeList) return;
@@ -1486,7 +1488,6 @@ const fieldApp = (function () {
         document.getElementById('f-mission-hud').style.display = 'flex';
         document.getElementById('f-bottom-nav-bar').style.display = 'none';
         document.getElementById('f-fab-wrapper').style.display = 'none';
-        document.getElementById('f-sync-status').style.display = 'none';
         updateMissionHUD(); showToast("🚀 מצב מבצע פעיל! נווט ליעד הראשון."); if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
     }
 
@@ -1561,7 +1562,6 @@ const fieldApp = (function () {
         document.getElementById('f-mission-summary').style.display = 'none';
         document.getElementById('f-bottom-nav-bar').style.display = 'flex';
         document.getElementById('f-fab-wrapper').style.display = 'block';
-        document.getElementById('f-sync-status').style.display = 'flex';
         missionWaypoints = []; missionCurrentIdx = 0; isMissionActive = false;
         if (map && map.getLayer('route')) map.removeLayer('route');
         if (map && map.getSource('route')) map.removeSource('route');
