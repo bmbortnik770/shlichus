@@ -888,41 +888,196 @@ const fieldApp = (function () {
         document.getElementById('f-quick-task-input').value = ''; renderTasks(); showToast("✅ משימה נוספה!");
     }
 
-    function renderTasks() {
-        const c = document.getElementById('f-tasks-list'); if (!c) return;
-        let allTasks = [];
-        (db.meta?.generalTasks || []).forEach((t, i) => { if(!t.done) allTasks.push({...t, isGeneral: true, idx: i}); });
-        Object.keys(db).forEach(bldg => {
-            if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
-            (db[bldg].apts || []).forEach((apt, aptIdx) => { (apt.tasks || []).forEach((t, tIdx) => { if(!t.done) allTasks.push({...t, isGeneral: false, bldg, aptIdx, tIdx, famName: apt.name}); }); });
-        });
-        if(allTasks.length === 0) { c.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-muted);"><i class="fas fa-glass-cheers" style="font-size:40px; color:var(--accent); opacity:0.5; margin-bottom:15px;"></i><h3>אין משימות פתוחות!</h3></div>`; return; }
-        c.innerHTML = allTasks.map((t, i) => {
-            const dataAttr = t.isGeneral ? `data-general="true" data-idx="${t.idx}"` : `data-general="false" data-bldg="${encodeURIComponent(t.bldg)}" data-apt="${t.aptIdx}" data-task="${t.tIdx}"`;
-            const titlePrefix = t.isGeneral ? '' : `משפחת ${t.famName}: `;
-            return `<div class="task-swipe-container" style="position:relative; margin-bottom:12px; overflow:hidden; border-radius:16px; box-shadow:var(--shadow);"><div class="task-bg-success" style="position:absolute; top:0; left:0; width:100%; height:100%; background:var(--success); color:white; display:flex; align-items:center; padding-left:20px; font-size:20px; font-weight:bold; z-index:1;"><i class="fas fa-check"></i></div><div class="task-item-front" ${dataAttr} style="position:relative; background:var(--surface); border:1px solid var(--border-light); padding:16px; border-radius:16px; display:flex; justify-content:space-between; align-items:center; z-index:2; transition: transform 0.2s ease;"><div><div style="font-weight:600; font-size:16px;">${escapeHTML(titlePrefix + t.text)}</div><div style="font-size:13px; color:var(--text-muted); margin-top:4px;"><i class="far fa-calendar"></i> ${t.date || 'ללא מועד'}</div></div></div></div>`;
-        }).join('');
+    // ==========================================
+    // משתני מסך משימות מתקדם
+    // ==========================================
+    let showingAllTasks = false;
+    let isCompletedExpanded = false;
+    let currentEditTaskRef = null;
 
-        const items = document.querySelectorAll('.task-item-front');
-        items.forEach(item => {
-            let startX = 0; let currentX = 0; let isDragging = false;
-            item.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; isDragging = true; item.style.transition = 'none'; }, {passive: true});
-            item.addEventListener('touchmove', (e) => { if (!isDragging) return; currentX = e.touches[0].clientX; let diff = currentX - startX; if (diff < 0) item.style.transform = `translateX(${diff}px)`; }, {passive: true});
-            item.addEventListener('touchend', (e) => {
-                if (!isDragging) return; isDragging = false; item.style.transition = 'transform 0.3s ease'; let diff = currentX - startX;
-                if (diff < -80) {
-                    item.style.transform = 'translateX(-100%)';
-                    if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
-                    const isGeneral = item.getAttribute('data-general') === 'true';
-                    let payload = null;
-                    if (isGeneral) { const idx = item.getAttribute('data-idx'); db.meta.generalTasks[idx].done = true; payload = { type: 'general_task_complete', taskIndex: idx }; }
-                    else { const bldg = decodeURIComponent(item.getAttribute('data-bldg')); const aptIdx = item.getAttribute('data-apt'); const taskIdx = item.getAttribute('data-task'); const taskObj = db[bldg].apts[aptIdx].tasks[taskIdx]; taskObj.done = true; payload = { type: 'task_done', bldg, aptName: db[bldg].apts[aptIdx].name, aptNum: db[bldg].apts[aptIdx].num, payload: { taskText: taskObj.text } }; }
-                    storageSet(DATA_KEY, db);
-                    const outbox = storageGet(OUTBOX_KEY) || []; outbox.push({ ...payload, timestamp: new Date().toISOString() }); storageSet(OUTBOX_KEY, outbox);
-                    showToast("✅ המשימה הושלמה!"); setTimeout(() => { const container = item.closest('.task-swipe-container'); container.style.opacity = '0'; setTimeout(() => container.remove(), 300); }, 300);
-                } else item.style.transform = 'translateX(0)';
+    function initTaskDateFilter() {
+        const d = document.getElementById('f-task-date-filter');
+        if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
+    }
+
+    function renderTasks() {
+        initTaskDateFilter();
+        const activeList = document.getElementById('f-tasks-list');
+        const completedList = document.getElementById('f-completed-tasks-list');
+        if (!activeList) return;
+
+        const searchQ = (document.getElementById('f-task-search')?.value || '').toLowerCase();
+        const filterDate = document.getElementById('f-task-date-filter')?.value || '';
+
+        // איסוף כל המשימות
+        let allTasks = [];
+        (db.meta?.generalTasks || []).forEach((t, i) => {
+            allTasks.push({ ...t, isGeneral: true, idx: i, famName: 'משימה כללית' });
+        });
+        Object.keys(db).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg].apts || []).forEach((apt, aptIdx) => {
+                (apt.tasks || []).forEach((t, tIdx) => {
+                    allTasks.push({ ...t, isGeneral: false, bldg, aptIdx, tIdx, famName: apt.name || bldg });
+                });
             });
         });
+
+        // סינון
+        const todayStr = new Date().toISOString().split('T')[0];
+        const filtered = allTasks.filter(t => {
+            const matchSearch = !searchQ ||
+                (t.text || '').toLowerCase().includes(searchQ) ||
+                (t.famName || '').toLowerCase().includes(searchQ) ||
+                (t.tags || []).some(tag => tag.toLowerCase().includes(searchQ));
+            if (showingAllTasks) return matchSearch;
+            const tDate = t.date ? new Date(t.date.split('.').reverse().join('-')).toISOString().split('T')[0] : null;
+            const matchDate = !filterDate || tDate === filterDate || (!tDate && filterDate === todayStr);
+            return matchSearch && matchDate;
+        });
+
+        const active = filtered.filter(t => !t.done);
+        const completed = filtered.filter(t => t.done);
+
+        // ציור
+        activeList.innerHTML = active.length
+            ? active.map(t => buildTaskCard(t)).join('')
+            : `<div style="text-align:center; padding:30px; color:var(--text-muted);"><i class="fas fa-check-circle" style="font-size:36px; opacity:0.3; display:block; margin-bottom:10px;"></i>אין משימות פתוחות לחתך זה</div>`;
+
+        completedList.innerHTML = completed.length
+            ? completed.map(t => buildTaskCard(t)).join('')
+            : `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:14px;">אין משימות שבוצעו לחתך זה</div>`;
+
+        document.getElementById('f-completed-count').innerText = `(${completed.length})`;
+
+        attachTaskSwipe();
+    }
+
+    function buildTaskCard(t) {
+        const doneClass = t.done ? 'is-done' : '';
+        const tagsHtml = (t.tags || []).length
+            ? `<div class="task-tags">${t.tags.map(tag => `<span class="task-tag">${escapeHTML(tag)}</span>`).join('')}</div>`
+            : '';
+        const idxData = t.isGeneral
+            ? `data-general="true" data-idx="${t.idx}"`
+            : `data-general="false" data-bldg="${encodeURIComponent(t.bldg)}" data-apt="${t.aptIdx}" data-task="${t.tIdx}"`;
+        const swipeHint = t.done
+            ? `<div style="position:absolute;top:0;bottom:0;right:0;left:0;background:var(--warning);display:flex;align-items:center;justify-content:flex-end;padding-left:20px;border-radius:14px;z-index:1;"><span style="color:white;font-weight:bold;font-size:13px;"><i class="fas fa-undo"></i> בטל</span></div>`
+            : `<div style="position:absolute;top:0;bottom:0;right:0;left:0;background:var(--success);display:flex;align-items:center;padding-right:20px;border-radius:14px;z-index:1;"><span style="color:white;font-weight:bold;font-size:13px;"><i class="fas fa-check"></i> בוצע</span></div>`;
+
+        return `<div style="position:relative;overflow:hidden;border-radius:14px;margin-bottom:11px;">
+            ${swipeHint}
+            <div class="task-card-full ${doneClass} task-swipe-front" ${idxData} onclick="fieldApp.openTaskEdit(this)">
+                <div class="task-text">${escapeHTML(t.isGeneral ? '' : `משפחת ${t.famName}: `)}${escapeHTML(t.text)}</div>
+                <div class="task-meta">
+                    <span><i class="far fa-user" style="margin-left:4px;"></i>${escapeHTML(t.famName)}</span>
+                    <span><i class="far fa-calendar-alt" style="margin-left:4px;"></i>${t.date || 'ללא תאריך'}</span>
+                </div>
+                ${tagsHtml}
+            </div>
+        </div>`;
+    }
+
+    function attachTaskSwipe() {
+        document.querySelectorAll('.task-swipe-front').forEach(item => {
+            let startX = 0, curX = 0, dragging = false;
+            item.addEventListener('touchstart', e => { startX = e.touches[0].clientX; dragging = true; item.style.transition = 'none'; }, { passive: true });
+            item.addEventListener('touchmove', e => {
+                if (!dragging) return;
+                curX = e.touches[0].clientX;
+                const diff = curX - startX;
+                const isDone = item.classList.contains('is-done');
+                if (!isDone && diff > 0) item.style.transform = `translateX(${diff}px)`;
+                if (isDone && diff < 0) item.style.transform = `translateX(${diff}px)`;
+            }, { passive: true });
+            item.addEventListener('touchend', () => {
+                if (!dragging) return; dragging = false;
+                item.style.transition = 'transform 0.3s ease';
+                item.style.transform = 'translateX(0)';
+                const diff = curX - startX;
+                const isDone = item.classList.contains('is-done');
+                if (!isDone && diff > 80) toggleTaskDone(item);
+                else if (isDone && diff < -80) toggleTaskDone(item);
+            });
+        });
+    }
+
+    function toggleTaskDone(item) {
+        const isGeneral = item.getAttribute('data-general') === 'true';
+        let taskRef;
+        if (isGeneral) {
+            taskRef = db.meta.generalTasks[item.getAttribute('data-idx')];
+        } else {
+            const bldg = decodeURIComponent(item.getAttribute('data-bldg'));
+            taskRef = db[bldg].apts[item.getAttribute('data-apt')].tasks[item.getAttribute('data-task')];
+        }
+        taskRef.done = !taskRef.done;
+        if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: taskRef.done ? 'task_done' : 'task_undone', timestamp: new Date().toISOString() });
+        storageSet(OUTBOX_KEY, outbox);
+        showToast(taskRef.done ? '✅ המשימה הושלמה!' : '↩️ המשימה הוחזרה לפעילה');
+        renderTasks();
+    }
+
+    function toggleViewAllTasks() {
+        showingAllTasks = !showingAllTasks;
+        const btn = document.getElementById('f-btn-view-all');
+        const dateInput = document.getElementById('f-task-date-filter');
+        btn.classList.toggle('active', showingAllTasks);
+        dateInput.disabled = showingAllTasks;
+        renderTasks();
+    }
+
+    function toggleCompletedTasks() {
+        isCompletedExpanded = !isCompletedExpanded;
+        document.getElementById('f-completed-tasks-list').style.display = isCompletedExpanded ? 'block' : 'none';
+        document.getElementById('f-completed-icon').className = isCompletedExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    }
+
+    function openTaskEdit(el) {
+        const isGeneral = el.getAttribute('data-general') === 'true';
+        if (isGeneral) {
+            currentEditTaskRef = db.meta.generalTasks[el.getAttribute('data-idx')];
+        } else {
+            const bldg = decodeURIComponent(el.getAttribute('data-bldg'));
+            currentEditTaskRef = db[bldg].apts[el.getAttribute('data-apt')].tasks[el.getAttribute('data-task')];
+        }
+        document.getElementById('f-task-edit-text').value = currentEditTaskRef.text || '';
+        // נרמל תאריך לפורמט ISO אם צריך
+        let dateVal = currentEditTaskRef.date || '';
+        if (dateVal && dateVal.includes('.')) {
+            const parts = dateVal.split('.');
+            if (parts.length === 3) dateVal = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+        }
+        document.getElementById('f-task-edit-date').value = dateVal;
+        document.getElementById('f-task-edit-tags').value = (currentEditTaskRef.tags || []).join(', ');
+        document.getElementById('f-task-edit-sheet').classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
+        document.getElementById('f-fab-wrapper').style.display = 'none';
+    }
+
+    function saveEditedTask() {
+        if (!currentEditTaskRef) return;
+        currentEditTaskRef.text = document.getElementById('f-task-edit-text').value.trim();
+        const rawDate = document.getElementById('f-task-edit-date').value;
+        // שמור בפורמט המקורי אם האפליקציה משתמשת ב-he-IL
+        if (rawDate) {
+            const d = new Date(rawDate);
+            currentEditTaskRef.date = d.toLocaleDateString('he-IL');
+        } else {
+            currentEditTaskRef.date = '';
+        }
+        const tagsRaw = document.getElementById('f-task-edit-tags').value;
+        currentEditTaskRef.tags = tagsRaw.split(',').map(s => s.trim()).filter(Boolean);
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'edit_task', timestamp: new Date().toISOString() });
+        storageSet(OUTBOX_KEY, outbox);
+        closeOverlays();
+        showToast('✅ המשימה עודכנה!');
+        renderTasks();
     }
 
     // ==========================================
@@ -1217,7 +1372,9 @@ const fieldApp = (function () {
         toggleRouteBuilderMode, promptAddToRoute, openRouteEditor, moveRouteItem, removeRouteItem, saveAndStartEditedRoute,
         handleCardTouchStart, handleCardTouchEnd, addSingleToRoute, removeSingleFromRoute,
         // *** פונקציות חדשות חשופות ***
-        openFullImage, openFullFamilyCard
+        openFullImage, openFullFamilyCard,
+        // *** מסך משימות מתקדם ***
+        toggleViewAllTasks, toggleCompletedTasks, openTaskEdit, saveEditedTask
     };
 })();
 
