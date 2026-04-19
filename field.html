@@ -45,13 +45,54 @@
         </div>
     </div>
 
-    <div id="view-tasks" class="view-container" style="padding: 80px 20px 20px 20px;">
-        <h2 style="margin-bottom:20px;"><i class="fas fa-check-double" style="color:var(--accent)"></i> משימות להיום</h2>
-        <div style="display:flex; gap:10px; margin-bottom:20px;">
-            <input type="text" id="f-quick-task-input" placeholder="מה צריך לעשות?" style="flex:1; padding:12px; border-radius:12px; border:1px solid var(--border-light); background:var(--surface); color:var(--text-main); font-family:inherit; font-size:16px;">
-            <button onclick="fieldApp.saveQuickTask()" style="background:var(--accent); color:white; border:none; border-radius:12px; padding:0 20px; font-weight:bold; cursor:pointer;"><i class="fas fa-plus"></i></button>
+    <div id="view-tasks" class="view-container" style="padding-top:0;">
+        <div class="f-tasks-toolbar">
+            <div style="display:flex; gap:10px; align-items:center;">
+                <div class="f-tasks-search-box" style="flex:1;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="f-task-search" placeholder="חיפוש משימה, תיוג או שם..." oninput="fieldApp.renderTasks()">
+                </div>
+                <input type="text" id="f-quick-task-input" placeholder="משימה חדשה..." style="flex:1; padding:10px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:15px;">
+                <button onclick="fieldApp.saveQuickTask()" style="background:var(--accent); color:white; border:none; border-radius:10px; padding:10px 16px; font-weight:bold; cursor:pointer; flex-shrink:0;"><i class="fas fa-plus"></i></button>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <input type="date" id="f-task-date-filter" onchange="fieldApp.renderTasks()" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; text-align:center;">
+                <button id="f-btn-view-all" onclick="fieldApp.toggleViewAllTasks()" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-weight:600; cursor:pointer; white-space:nowrap;">
+                    <i class="fas fa-layer-group"></i> הצג הכל
+                </button>
+            </div>
         </div>
-        <div id="f-tasks-list"></div>
+        <div style="padding: 15px 20px 80px 20px;">
+            <div id="f-tasks-list"></div>
+            <div id="f-completed-divider" onclick="fieldApp.toggleCompletedTasks()" style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; margin:15px 0 5px; background:var(--surface); border:1px solid var(--border-light); border-radius:10px; font-weight:600; color:var(--text-muted); cursor:pointer;">
+                <span>משימות שבוצעו <span id="f-completed-count">(0)</span></span>
+                <i class="fas fa-chevron-down" id="f-completed-icon"></i>
+            </div>
+            <div id="f-completed-tasks-list" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div id="f-task-edit-sheet" class="f-sheet">
+        <div class="f-sheet-handle"></div>
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+        <h3 style="margin:0 0 20px 0; font-size:20px; padding-right:30px;"><i class="fas fa-edit" style="color:var(--accent);"></i> עריכת משימה</h3>
+        <div style="display:flex; flex-direction:column; gap:15px;">
+            <div>
+                <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:5px;">תיאור המשימה</label>
+                <input type="text" id="f-task-edit-text" placeholder="מה צריך לעשות?" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:15px;">
+            </div>
+            <div>
+                <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:5px;">תאריך יעד</label>
+                <input type="date" id="f-task-edit-date" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:15px;">
+            </div>
+            <div>
+                <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:5px;">תיוגים (מופרדים בפסיק)</label>
+                <input type="text" id="f-task-edit-tags" placeholder="דחוף, טלפון, מכתב..." style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:15px;">
+            </div>
+            <button onclick="fieldApp.saveEditedTask()" style="width:100%; padding:14px; background:var(--accent); color:white; border:none; border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer; font-family:inherit;">
+                <i class="fas fa-save"></i> שמור שינויים
+            </button>
+        </div>
     </div>
 
     <div id="view-community" class="view-container" style="padding: 80px 20px 20px 20px;">
