@@ -207,3 +207,95 @@ body, html {
     font-size: 14px;
     font-weight: 600;
 }
+
+/* ==========================================
+   סרגל כלים משימות
+   ========================================== */
+.f-tasks-toolbar {
+    background: var(--surface);
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-light);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: background 0.3s;
+}
+.f-tasks-search-box {
+    position: relative;
+    flex: 1;
+}
+.f-tasks-search-box input {
+    width: 100%;
+    padding: 10px 10px 10px 35px;
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    background: var(--bg-body);
+    color: var(--text-main);
+    font-family: 'Assistant', sans-serif;
+    font-size: 15px;
+    outline: none;
+}
+.f-tasks-search-box i {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+#f-btn-view-all.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* כרטיס משימה מלא */
+.task-card-full {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-right: 4px solid var(--accent);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease-out;
+}
+.task-card-full.is-done {
+    border-right-color: var(--success);
+    opacity: 0.7;
+}
+.task-card-full .task-text {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 6px;
+}
+.task-card-full.is-done .task-text {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+.task-card-full .task-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+.task-card-full .task-tags {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+.task-tag {
+    background: rgba(37,99,235,0.12);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
