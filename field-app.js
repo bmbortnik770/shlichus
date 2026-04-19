@@ -355,95 +355,168 @@ const fieldApp = (function () {
         el.style.display = 'flex';
     }
 
-    // ==========================================
-    // *** חדש: כרטיס משפחה מלא ***
-    // ==========================================
     function openFullFamilyCard(bldgEnc, aptIdx) {
         const bldg = decodeURIComponent(bldgEnc);
         const fam = db[bldg].apts[aptIdx];
         if (!fam) return;
 
         const sheet = document.getElementById('f-sheet');
-        sheet.style.height = '90vh';
+        sheet.style.height = '92vh';
+
+        const openTasks = (fam.tasks || []).filter(t => !t.done).length;
+        const interactions = fam.interactions || fam.history || [];
+        const donations = fam.donations || [];
+        const boards = fam.boards || {};
+        const phone1 = fam.fatherPhone || fam.phone || '';
+        const phone2 = fam.motherPhone || '';
+        const safeBldgEnc = encodeURIComponent(bldg);
+
+        // helper לשורת מידע
+        const row = (label, val) => val ? `
+            <div>
+                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">${label}</label>
+                <div style="padding:9px 11px;background:var(--bg-body);border-radius:8px;font-size:14px;">${escapeHTML(val)}</div>
+            </div>` : '';
+
+        // --- תוכן טאב פרטים ---
+        let detailsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">
+            ${row('שם האב', fam.father || fam.fatherName)}
+            ${row('שם האם', fam.mother || fam.motherName)}
+            ${row('טלפון אב', phone1)}
+            ${row('טלפון אם', phone2)}
+            ${row('מייל אב', fam.fatherEmail)}
+            ${row('מייל אם', fam.motherEmail)}
+            ${fam.style ? row('סגנון', fam.style) : ''}
+            ${fam.notes ? `<div style="grid-column:span 2;">${row('הערות', fam.notes)}</div>` : ''}
+        </div>`;
+
+        if ((fam.childrenList || []).length > 0) {
+            detailsHtml += `<div style="margin-bottom:15px;">
+                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;"><i class="fas fa-child"></i> ילדים</label>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    ${fam.childrenList.map(c => `<span style="background:rgba(16,185,129,0.1);color:var(--success);border:1px solid rgba(16,185,129,0.3);padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;">${escapeHTML(c.name||'')}${c.dob?' · '+escapeHTML(c.dob):''}</span>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        if ((fam.tags || []).length > 0) {
+            detailsHtml += `<div style="margin-bottom:15px;">
+                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;"><i class="fas fa-tags"></i> תגיות</label>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    ${fam.tags.map(t => `<span style="background:var(--accent);color:white;padding:4px 12px;border-radius:15px;font-size:12px;font-weight:600;">${escapeHTML(t)}</span>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        // פרויקטים
+        const boardHtml = Object.entries(boards).map(([bid, status]) => {
+            const board = (db.__BOARDS__ || []).find(b => b.id === bid);
+            return board ? `<span style="background:rgba(37,99,235,0.1);color:var(--accent);border:1px solid rgba(37,99,235,0.3);padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;">${escapeHTML(board.name)}: ${escapeHTML(status)}</span>` : '';
+        }).join('');
+        if (boardHtml) {
+            detailsHtml += `<div style="margin-bottom:15px;">
+                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;"><i class="fas fa-project-diagram"></i> פרויקטים</label>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">${boardHtml}</div>
+            </div>`;
+        }
+
+        // --- תוכן טאב משימות ---
+        const allTasks = fam.tasks || [];
+        const activeTasks = allTasks.filter(t => !t.done);
+        const doneTasks = allTasks.filter(t => t.done);
+        let tasksHtml = activeTasks.length === 0
+            ? `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-check-circle" style="font-size:30px;opacity:0.3;display:block;margin-bottom:8px;"></i>אין משימות פתוחות</div>`
+            : activeTasks.map(t => `<div style="background:rgba(37,99,235,0.06);border:1px solid rgba(37,99,235,0.2);padding:10px 12px;border-radius:10px;margin-bottom:8px;">
+                <div style="font-weight:600;font-size:14px;">${escapeHTML(t.text)}</div>
+                ${t.date ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px;"><i class="far fa-calendar-alt"></i> ${escapeHTML(t.date)}</div>` : ''}
+            </div>`).join('');
+        if (doneTasks.length > 0) {
+            tasksHtml += `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin:12px 0 8px;">הושלמו (${doneTasks.length})</div>`;
+            tasksHtml += doneTasks.map(t => `<div style="background:var(--bg-body);border:1px solid var(--border-light);padding:9px 12px;border-radius:10px;margin-bottom:6px;opacity:0.6;">
+                <div style="font-size:13px;text-decoration:line-through;">${escapeHTML(t.text)}</div>
+            </div>`).join('');
+        }
+
+        // --- תוכן טאב קשר ---
+        let logsHtml = interactions.length === 0
+            ? `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-comments" style="font-size:30px;opacity:0.3;display:block;margin-bottom:8px;"></i>אין היסטוריית קשר</div>`
+            : [...interactions].reverse().map(l => {
+                const type = l.type || l.status || 'כללי';
+                const text = l.text || l.notes || l.content || '';
+                const colorMap = {'ביקור':'var(--success)','שיחה':'var(--accent)','בוצע':'var(--success)','אין מענה':'var(--warning)','לא מעוניינים':'var(--danger)'};
+                const color = colorMap[type] || 'var(--text-muted)';
+                return `<div style="background:var(--bg-body);border-right:4px solid ${color};border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                        <span style="font-weight:700;font-size:13px;color:${color};">${escapeHTML(type)}</span>
+                        <span style="font-size:12px;color:var(--text-muted);">${escapeHTML(l.date||'')}</span>
+                    </div>
+                    ${text ? `<div style="font-size:13px;color:var(--text-main);">${escapeHTML(text)}</div>` : ''}
+                </div>`;
+            }).join('');
+
+        // --- תוכן טאב תרומות ---
+        const donationsTotal = donations.reduce((s, d) => s + Number(d.amount || 0), 0);
+        let donationsHtml = donations.length === 0
+            ? `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-hand-holding-heart" style="font-size:30px;opacity:0.3;display:block;margin-bottom:8px;"></i>אין תרומות</div>`
+            : `<div style="text-align:center;background:rgba(16,185,129,0.1);color:var(--success);padding:12px;border-radius:10px;font-size:18px;font-weight:bold;margin-bottom:12px;">סה"כ: ₪${donationsTotal}</div>` +
+              [...donations].reverse().map(d => `<div style="background:var(--bg-body);padding:10px 12px;border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:600;font-size:14px;">₪${escapeHTML(String(d.amount))}</div>
+                    <div style="font-size:12px;color:var(--text-muted);">${escapeHTML(d.reason||'')} · ${escapeHTML(d.date||'')}</div>
+                </div>
+              </div>`).join('');
 
         let html = `
         <button class="sheet-close-btn" onclick="fieldApp.closeOverlays(); document.getElementById('f-sheet').style.height=''">
             <i class="fas fa-times"></i>
         </button>
-        <div style="margin-top:20px; overflow-y:auto; max-height:calc(90vh - 80px);">
-            <h2 style="margin-bottom:5px;">משפחת ${escapeHTML(fam.name || 'ללא שם')}</h2>
-            <p style="color:var(--text-muted); margin-bottom:20px;">${escapeHTML(bldg)} ${fam.num ? '· דירה ' + escapeHTML(String(fam.num)) : ''}</p>
-
-            <div style="display:flex; border-bottom:1px solid var(--border-light); margin-bottom:15px; gap:0;">
-                <div style="padding:10px 15px; border-bottom:3px solid var(--accent); font-weight:bold; color:var(--accent);">מידע כללי</div>
-                <div style="padding:10px 15px; color:var(--text-muted);">משימות (${(fam.tasks || []).filter(t=>!t.done).length})</div>
-                <div style="padding:10px 15px; color:var(--text-muted);">היסטוריה (${(fam.history || []).length})</div>
-            </div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+        <div style="overflow-y:auto; max-height:calc(92vh - 50px); padding-bottom:20px; margin-top:15px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-left:5px;">
                 <div>
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">שם האב</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.father || fam.fatherName || '-')}</div>
-                </div>
-                <div>
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">שם האם</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.mother || fam.motherName || '-')}</div>
-                </div>
-                <div>
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">טלפון אב</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; direction:ltr; text-align:right;">${escapeHTML(fam.fatherPhone || fam.phone || '-')}</div>
-                </div>
-                <div>
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">טלפון אם</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; direction:ltr; text-align:right;">${escapeHTML(fam.motherPhone || '-')}</div>
-                </div>
-                ${fam.fatherEmail || fam.motherEmail ? `
-                <div>
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">מייל אב</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-size:13px; direction:ltr; text-align:right;">${escapeHTML(fam.fatherEmail || '-')}</div>
-                </div>
-                <div>
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">מייל אם</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-size:13px; direction:ltr; text-align:right;">${escapeHTML(fam.motherEmail || '-')}</div>
-                </div>` : ''}
-                ${(fam.childrenList || []).length > 0 ? `
-                <div style="grid-column:span 2;">
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px;"><i class="fas fa-child"></i> ילדים (${fam.childrenList.length})</label>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        ${fam.childrenList.map(c => `<span style="background:rgba(16,185,129,0.1); color:var(--success); border:1px solid rgba(16,185,129,0.3); padding:4px 10px; border-radius:12px; font-size:12px; font-weight:600;">${escapeHTML(c.name || '')}${c.dob ? ' · ' + escapeHTML(c.dob) : ''}</span>`).join('')}
+                    <h2 style="margin:0 0 3px 0;font-size:20px;">משפחת ${escapeHTML(fam.name || 'ללא שם')}</h2>
+                    <div style="font-size:13px;color:var(--text-muted);">
+                        <i class="fas fa-map-marker-alt"></i> ${escapeHTML(bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : bldg)}
+                        ${fam.num ? ' · דירה ' + escapeHTML(String(fam.num)) : ''}
                     </div>
-                </div>` : ''}
-                ${fam.style ? `
-                <div>
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">סגנון</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.style)}</div>
-                </div>` : ''}
-                ${fam.notes ? `
-                <div style="grid-column:span 2;">
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">הערות</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-size:13px; line-height:1.5;">${escapeHTML(fam.notes)}</div>
-                </div>` : ''}
-                <div style="grid-column:span 2;">
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px;">תגיות</label>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        ${(fam.tags || []).length > 0
-                            ? fam.tags.map(t => `<span style="background:var(--accent); color:white; padding:4px 12px; border-radius:15px; font-size:12px; font-weight:600;">${escapeHTML(t)}</span>`).join('')
-                            : '<span style="color:var(--text-muted); font-size:13px;">אין תגיות</span>'
-                        }
-                    </div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    ${phone1 ? `<button onclick="fieldApp.callFamilyNumber('${phone1}')" style="width:38px;height:38px;border-radius:50%;background:var(--bg-body);border:1px solid var(--border-light);color:var(--success);font-size:15px;cursor:pointer;"><i class="fas fa-phone"></i></button>` : ''}
+                    ${phone1 ? `<button onclick="window.open('https://wa.me/${phone1.replace(/\\D/g,'').replace(/^0/,'972')}','_blank')" style="width:38px;height:38px;border-radius:50%;background:#25D366;border:none;color:white;font-size:15px;cursor:pointer;"><i class="fab fa-whatsapp"></i></button>` : ''}
                 </div>
             </div>
 
-            <button onclick="fieldApp.openFamilyForm('${bldgEnc}', ${aptIdx}); document.getElementById('f-sheet').style.height='';" 
-                style="width:100%; padding:15px; background:var(--text-main); color:white; border:none; border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer; font-family:inherit;">
+            <!-- טאבים -->
+            <div id="ffc-tabs" style="display:flex;border-bottom:1px solid var(--border-light);margin-bottom:15px;overflow-x:auto;gap:0;">
+                <div id="ffc-tab-details" onclick="fieldApp._ffcTab('details')" style="padding:9px 13px;border-bottom:3px solid var(--accent);font-weight:bold;color:var(--accent);cursor:pointer;white-space:nowrap;font-size:13px;">פרטים</div>
+                <div id="ffc-tab-tasks" onclick="fieldApp._ffcTab('tasks')" style="padding:9px 13px;border-bottom:3px solid transparent;color:var(--text-muted);cursor:pointer;white-space:nowrap;font-size:13px;">משימות (${openTasks})</div>
+                <div id="ffc-tab-logs" onclick="fieldApp._ffcTab('logs')" style="padding:9px 13px;border-bottom:3px solid transparent;color:var(--text-muted);cursor:pointer;white-space:nowrap;font-size:13px;">קשר (${interactions.length})</div>
+                <div id="ffc-tab-donations" onclick="fieldApp._ffcTab('donations')" style="padding:9px 13px;border-bottom:3px solid transparent;color:var(--text-muted);cursor:pointer;white-space:nowrap;font-size:13px;">תרומות (${donations.length})</div>
+            </div>
+
+            <div id="ffc-content-details">${detailsHtml}</div>
+            <div id="ffc-content-tasks" style="display:none;">${tasksHtml}</div>
+            <div id="ffc-content-logs" style="display:none;">${logsHtml}</div>
+            <div id="ffc-content-donations" style="display:none;">${donationsHtml}</div>
+
+            <button onclick="fieldApp.openFamilyForm('${safeBldgEnc}', ${aptIdx}); document.getElementById('f-sheet').style.height='';"
+                style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-weight:bold;font-size:15px;cursor:pointer;font-family:inherit;margin-top:10px;">
                 <i class="fas fa-edit"></i> ערוך פרטי משפחה
             </button>
         </div>`;
 
         document.getElementById('f-sheet-content').innerHTML = html;
-        // וודא שהחלונית פתוחה (closeOverlays סגרה אותה קודם)
         sheet.classList.add('open');
         document.getElementById('f-scrim').style.display = 'block';
+    }
+
+
+        function _ffcTab(tab) {
+        ['details','tasks','logs','donations'].forEach(t => {
+            const btn = document.getElementById('ffc-tab-' + t);
+            const content = document.getElementById('ffc-content-' + t);
+            if (btn) { btn.style.borderBottomColor = t === tab ? 'var(--accent)' : 'transparent'; btn.style.color = t === tab ? 'var(--accent)' : 'var(--text-muted)'; btn.style.fontWeight = t === tab ? 'bold' : 'normal'; }
+            if (content) content.style.display = t === tab ? 'block' : 'none';
+        });
     }
 
     function openFamilyCard(bldgEnc, aptIdx) {
@@ -753,7 +826,7 @@ const fieldApp = (function () {
                         <button class="card-action-btn" style="${disableStyle}" onclick="event.stopPropagation(); fieldApp.callFamilyNumber('${phone}')"><i class="fas fa-phone" style="color:var(--success);"></i>חייג</button>
                         <button class="card-action-btn" style="${disableStyle}" onclick="event.stopPropagation(); window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp" style="color:#25D366;"></i>הודעה</button>
                         <button class="card-action-btn" onclick="event.stopPropagation(); fieldApp.toggleTargetForRoute(this, ${lng || 0}, ${lat || 0})"><i class="fas fa-map-pin" style="color:var(--warning);"></i>בחר יעדים</button>
-                        <button class="card-action-btn" onclick="event.stopPropagation(); fieldApp.openFamilyCard('${safeBldgEnc}', ${f.aptIdx});"><i class="fas fa-id-card" style="color:var(--accent);"></i>כרטיס</button>
+                        <button class="card-action-btn" onclick="event.stopPropagation(); fieldApp.openFullFamilyCard('${safeBldgEnc}', ${f.aptIdx});"><i class="fas fa-id-card" style="color:var(--accent);"></i>כרטיס</button>
                     </div>
                 </div>
             </div>`;
@@ -951,7 +1024,7 @@ const fieldApp = (function () {
             if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
             (db[bldg].apts || []).forEach((apt, aptIdx) => {
                 (apt.tasks || []).forEach((t, tIdx) => {
-                    allTasks.push({ ...t, isGeneral: false, bldg, aptIdx, tIdx, famName: apt.name || bldg });
+                    allTasks.push({ ...t, isGeneral: false, bldg, aptIdx, tIdx, famName: apt.name || bldg, address: bldg });
                 });
             });
         });
@@ -963,6 +1036,7 @@ const fieldApp = (function () {
             const matchSearch = !searchQ ||
                 (t.text || '').toLowerCase().includes(searchQ) ||
                 (t.famName || '').toLowerCase().includes(searchQ) ||
+                (t.address || '').toLowerCase().includes(searchQ) ||
                 (t.tags || []).some(tag => tag.toLowerCase().includes(searchQ));
             if (!matchSearch) return false;
             if (taskFilterMode === 'all') return true;
@@ -1649,7 +1723,7 @@ const fieldApp = (function () {
         toggleRouteBuilderMode, promptAddToRoute, openRouteEditor, moveRouteItem, removeRouteItem, saveAndStartEditedRoute,
         handleCardTouchStart, handleCardTouchEnd, addSingleToRoute, removeSingleFromRoute,
         // *** פונקציות חדשות חשופות ***
-        openFullImage, openFullFamilyCard,
+        openFullImage, openFullFamilyCard, _ffcTab,
         // *** מסך משימות מתקדם ***
         toggleViewAllTasks, toggleCompletedTasks, setTaskFilter, openTaskEdit, saveEditedTask,
         deleteCurrentTask, addEditTag, removeEditTag, toggleChipTag, onTagAtInput, onTagAtKey, selectDropdownTag,
