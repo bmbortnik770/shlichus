@@ -86,8 +86,27 @@
                 <input type="date" id="f-task-edit-date" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:15px;">
             </div>
             <div>
-                <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:5px;">תיוגים (מופרדים בפסיק)</label>
-                <input type="text" id="f-task-edit-tags" placeholder="דחוף, טלפון, מכתב..." style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:15px;">
+                <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:8px;">תיוגים מהירים</label>
+                <!-- צ'יפים מהDB -->
+                <div id="f-tag-chips-bar" style="display:flex; gap:7px; flex-wrap:wrap; margin-bottom:12px; min-height:32px;"></div>
+
+                <!-- שדה @ לחיפוש חופשי -->
+                <div style="position:relative;">
+                    <div style="display:flex; align-items:center; background:var(--bg-body); border:1px solid var(--border-light); border-radius:10px; padding:10px 12px; gap:6px;">
+                        <span style="color:var(--accent); font-weight:800; font-size:16px;">@</span>
+                        <input type="text" id="f-tag-at-input"
+                            placeholder="חפש שם / בניין..."
+                            style="flex:1; border:none; background:transparent; color:var(--text-main); font-family:inherit; font-size:15px; outline:none;"
+                            oninput="fieldApp.onTagAtInput(this.value)"
+                            onkeydown="fieldApp.onTagAtKey(event)">
+                        <i class="fas fa-at" style="color:var(--text-muted); font-size:13px;"></i>
+                    </div>
+                    <!-- Dropdown הצעות -->
+                    <div id="f-tag-at-dropdown" style="display:none; position:absolute; top:calc(100% + 5px); right:0; left:0; background:var(--surface); border:1px solid var(--border-light); border-radius:12px; box-shadow:var(--shadow); z-index:200; max-height:180px; overflow-y:auto;"></div>
+                </div>
+
+                <!-- תגים שנבחרו -->
+                <div id="f-task-edit-tags-display" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; min-height:10px;"></div>
             </div>
             <button onclick="fieldApp.saveEditedTask()" style="width:100%; padding:14px; background:var(--accent); color:white; border:none; border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer; font-family:inherit;">
                 <i class="fas fa-save"></i> שמור שינויים
