@@ -902,13 +902,10 @@ const fieldApp = (function () {
     }
 
     function renderTasks() {
-        initTaskDateFilter();
         const activeList = document.getElementById('f-tasks-list');
         const completedList = document.getElementById('f-completed-tasks-list');
         if (!activeList) return;
-
         const searchQ = (document.getElementById('f-task-search')?.value || '').toLowerCase();
-        const filterDate = document.getElementById('f-task-date-filter')?.value || '';
 
         // איסוף כל המשימות
         let allTasks = [];
@@ -924,17 +921,24 @@ const fieldApp = (function () {
             });
         });
 
-        // סינון
-        const todayStr = new Date().toISOString().split('T')[0];
+        // סינון לפי מצב
+        const todayISO = new Date().toISOString().split('T')[0];
+        const filterDate = document.getElementById('f-task-date-filter')?.value || todayISO;
         const filtered = allTasks.filter(t => {
             const matchSearch = !searchQ ||
                 (t.text || '').toLowerCase().includes(searchQ) ||
                 (t.famName || '').toLowerCase().includes(searchQ) ||
                 (t.tags || []).some(tag => tag.toLowerCase().includes(searchQ));
-            if (showingAllTasks) return matchSearch;
-            const tDate = t.date ? new Date(t.date.split('.').reverse().join('-')).toISOString().split('T')[0] : null;
-            const matchDate = !filterDate || tDate === filterDate || (!tDate && filterDate === todayStr);
-            return matchSearch && matchDate;
+            if (!matchSearch) return false;
+            if (taskFilterMode === 'all') return true;
+            // המרת תאריך המשימה מעברית ל-ISO
+            let tISO = null;
+            if (t.date) {
+                const parts = t.date.split('.');
+                if (parts.length === 3) tISO = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+            }
+            const compareDate = taskFilterMode === 'date' ? filterDate : todayISO;
+            return tISO === compareDate || (!tISO && compareDate === todayISO);
         });
 
         const active = filtered.filter(t => !t.done);
@@ -957,36 +961,29 @@ const fieldApp = (function () {
     function buildTaskCard(t) {
         const doneClass = t.done ? 'is-done' : '';
         const tagsHtml = (t.tags || []).length
-            ? `<div class="task-tags" style="margin-top:6px; display:flex; gap:5px; flex-wrap:wrap;">${t.tags.map(tag => `<span class="task-tag">${escapeHTML(tag)}</span>`).join('')}</div>`
+            ? `<div class="task-tags">${t.tags.map(tag => `<span class="task-tag">${escapeHTML(tag)}</span>`).join('')}</div>`
             : '';
         const idxData = t.isGeneral
             ? `data-general="true" data-idx="${t.idx}"`
             : `data-general="false" data-bldg="${encodeURIComponent(t.bldg)}" data-apt="${t.aptIdx}" data-task="${t.tIdx}"`;
 
-        // רקע החלקה — ירוק לביצוע, כתום לביטול
-        const bgColor = t.done ? 'var(--warning)' : 'var(--success)';
-        const bgIcon  = t.done ? '<i class="fas fa-undo"></i> בטל' : '<i class="fas fa-check"></i> בוצע';
-        const bgAlign = t.done ? 'flex-end; padding-left:20px;' : 'flex-start; padding-right:20px;';
-
-        const cardId = `tc-${t.isGeneral ? 'g' + t.idx : t.bldg + t.aptIdx + t.tIdx}`.replace(/[^a-zA-Z0-9-]/g,'_');
+        // סמן קטן בפינה ימנית עליונה בלבד (לא כיסוי מלא)
+        const cornerDot = t.done
+            ? `<div style="position:absolute;top:0;right:0;width:6px;height:100%;background:var(--success);border-radius:0 14px 14px 0;"></div>`
+            : `<div style="position:absolute;top:0;right:0;width:6px;height:100%;background:var(--accent);border-radius:0 14px 14px 0;"></div>`;
 
         return `
-        <div id="${cardId}" style="position:relative; overflow:hidden; border-radius:14px; margin-bottom:11px;">
-            <div style="position:absolute;top:0;bottom:0;right:0;left:0;
-                        background:${bgColor}; display:flex; align-items:center;
-                        justify-content:${bgAlign}
-                        z-index:1; border-radius:14px;">
-                <span style="color:white;font-weight:bold;font-size:14px;">${bgIcon}</span>
-            </div>
+        <div style="position:relative; overflow:hidden; border-radius:14px; margin-bottom:10px; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            ${cornerDot}
             <div class="task-card-full ${doneClass}" ${idxData}
-                 style="position:relative; z-index:2; cursor:pointer;"
+                 style="border-right:none; margin-bottom:0; box-shadow:none;"
                  onclick="fieldApp.openTaskEdit(this)">
-                <div style="font-size:16px; font-weight:700; color:var(--text-main); margin-bottom:5px; ${t.done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
+                <div style="font-size:15px; font-weight:700; color:var(--text-main); margin-bottom:5px; ${t.done ? 'text-decoration:line-through; opacity:0.55;' : ''}">
                     ${escapeHTML(t.text) || '(ללא תיאור)'}
                 </div>
                 <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
-                    <span><i class="far fa-user" style="margin-left:4px;"></i>${escapeHTML(t.famName)}</span>
-                    <span><i class="far fa-calendar-alt" style="margin-left:4px;"></i>${t.date || 'ללא תאריך'}</span>
+                    <span><i class="far fa-user" style="margin-left:3px;"></i>${escapeHTML(t.famName)}</span>
+                    <span><i class="far fa-calendar-alt" style="margin-left:3px;"></i>${t.date || 'ללא תאריך'}</span>
                 </div>
                 ${tagsHtml}
             </div>
@@ -1040,13 +1037,103 @@ const fieldApp = (function () {
         renderTasks();
     }
 
-    function toggleViewAllTasks() {
-        showingAllTasks = !showingAllTasks;
-        const btn = document.getElementById('f-btn-view-all');
-        const dateInput = document.getElementById('f-task-date-filter');
-        btn.classList.toggle('active', showingAllTasks);
-        dateInput.disabled = showingAllTasks;
+    let taskFilterMode = 'today'; // 'today' | 'date' | 'all'
+
+    function setTaskFilter(mode) {
+        taskFilterMode = mode;
+        // עדכן מראה כפתורים
+        ['today','date','all'].forEach(m => {
+            const btn = document.getElementById('f-filter-' + m);
+            if (!btn) return;
+            const active = m === mode;
+            btn.style.background = active ? 'var(--accent)' : 'var(--bg-body)';
+            btn.style.color = active ? 'white' : 'var(--text-main)';
+            btn.style.borderColor = active ? 'var(--accent)' : 'var(--border-light)';
+        });
+        const dateRow = document.getElementById('f-date-row');
+        if (dateRow) dateRow.style.display = mode === 'date' ? 'block' : 'none';
+        // אם עוברים למצב תאריך — פתח את הpicker אוטומטית
+        if (mode === 'date') {
+            const dp = document.getElementById('f-task-date-filter');
+            if (dp) { if (!dp.value) dp.value = new Date().toISOString().split('T')[0]; setTimeout(() => dp.showPicker?.(), 50); }
+        }
         renderTasks();
+    }
+
+    function toggleViewAllTasks() { setTaskFilter(taskFilterMode === 'all' ? 'today' : 'all'); }
+
+    function initTaskDateFilter() {
+        const d = document.getElementById('f-task-date-filter');
+        if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
+    }
+
+    function deleteCurrentTask() {
+        if (!currentEditTaskRef) return;
+        if (!confirm('למחוק את המשימה?')) return;
+        // מצא והסר
+        if (currentEditTaskRef._isGeneral !== undefined ? currentEditTaskRef._isGeneral : false) {
+            // נמצא לפי reference
+        }
+        // חפש בכל מקום ומחק
+        let deleted = false;
+        const gi = (db.meta?.generalTasks || []).indexOf(currentEditTaskRef);
+        if (gi > -1) { db.meta.generalTasks.splice(gi, 1); deleted = true; }
+        if (!deleted) {
+            Object.keys(db).forEach(bldg => {
+                if (deleted || bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+                (db[bldg].apts || []).forEach(apt => {
+                    const ti = (apt.tasks || []).indexOf(currentEditTaskRef);
+                    if (ti > -1) { apt.tasks.splice(ti, 1); deleted = true; }
+                });
+            });
+        }
+        if (deleted) {
+            storageSet(DATA_KEY, db);
+            const outbox = storageGet(OUTBOX_KEY) || [];
+            outbox.push({ type: 'delete_task', timestamp: new Date().toISOString() });
+            storageSet(OUTBOX_KEY, outbox);
+            closeOverlays();
+            showToast('🗑️ המשימה נמחקה');
+            renderTasks();
+        }
+    }
+
+    let voiceSearchActive = false;
+    let voiceSearchRecognition = null;
+
+    function toggleVoiceSearch() {
+        const btn = document.getElementById('f-voice-search-btn');
+        const input = document.getElementById('f-task-search');
+        if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+            showToast('הקלטה קולית אינה נתמכת בדפדפן זה');
+            return;
+        }
+        if (voiceSearchActive) {
+            voiceSearchRecognition?.stop();
+            voiceSearchActive = false;
+            if (btn) { btn.style.background = 'var(--bg-body)'; btn.style.color = 'var(--text-muted)'; btn.querySelector('i').className = 'fas fa-microphone'; }
+            return;
+        }
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        voiceSearchRecognition = new SR();
+        voiceSearchRecognition.lang = 'he-IL';
+        voiceSearchRecognition.interimResults = true;
+        voiceSearchRecognition.onstart = () => {
+            voiceSearchActive = true;
+            if (btn) { btn.style.background = 'var(--danger)'; btn.style.color = 'white'; btn.querySelector('i').className = 'fas fa-stop'; }
+            showToast('🎤 מקשיב...');
+        };
+        voiceSearchRecognition.onresult = (e) => {
+            let transcript = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+            if (input) { input.value = transcript; renderTasks(); }
+        };
+        voiceSearchRecognition.onend = () => {
+            voiceSearchActive = false;
+            if (btn) { btn.style.background = 'var(--bg-body)'; btn.style.color = 'var(--text-muted)'; btn.querySelector('i').className = 'fas fa-microphone'; }
+        };
+        voiceSearchRecognition.onerror = () => { voiceSearchActive = false; };
+        voiceSearchRecognition.start();
     }
 
     function toggleCompletedTasks() {
@@ -1054,8 +1141,6 @@ const fieldApp = (function () {
         document.getElementById('f-completed-tasks-list').style.display = isCompletedExpanded ? 'block' : 'none';
         document.getElementById('f-completed-icon').className = isCompletedExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
     }
-
-    function openTaskEdit(el) {
         const isGeneral = el.getAttribute('data-general') === 'true';
         if (isGeneral) {
             currentEditTaskRef = db.meta.generalTasks[el.getAttribute('data-idx')];
@@ -1531,8 +1616,9 @@ const fieldApp = (function () {
         // *** פונקציות חדשות חשופות ***
         openFullImage, openFullFamilyCard,
         // *** מסך משימות מתקדם ***
-        toggleViewAllTasks, toggleCompletedTasks, openTaskEdit, saveEditedTask,
-        addEditTag, removeEditTag, toggleChipTag, onTagAtInput, onTagAtKey, selectDropdownTag
+        toggleViewAllTasks, toggleCompletedTasks, setTaskFilter, openTaskEdit, saveEditedTask,
+        deleteCurrentTask, addEditTag, removeEditTag, toggleChipTag, onTagAtInput, onTagAtKey, selectDropdownTag,
+        toggleVoiceSearch
     };
 })();
 
