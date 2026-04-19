@@ -64,7 +64,7 @@ body, html {
    ========================================== */
 #f-scrim {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
-    backdrop-filter: blur(3px); z-index: 9500; display: none;
+    backdrop-filter: blur(3px); z-index: 9400; display: none;
 }
 
 .f-sheet {
@@ -81,7 +81,7 @@ body, html {
 
 .f-fab-center {
     position: fixed; bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 20px); right: 20px;
-    width: 64px; height: 64px; z-index: 4000; 
+    width: 64px; height: 64px; z-index: 9700; 
 }
 .f-fab-main {
     width: 100%; height: 100%; border-radius: 50%;
@@ -93,7 +93,7 @@ body, html {
 .f-fab-menu {
     position: absolute; bottom: 80px; right: 0;
     display: flex; flex-direction: column; gap: 12px; align-items: flex-start;
-    pointer-events: none; z-index: 4001;
+    pointer-events: none; z-index: 9700;
 }
 .f-fab-option {
     background: var(--surface); color: var(--text-main);
@@ -108,7 +108,7 @@ body, html {
 .f-fab-center.open .f-fab-option { opacity: 1; transform: translateY(0) scale(1); }
 
 .f-sync-indicator {
-    position: fixed; top: calc(var(--safe-t) + 15px); right: 15px;
+    position: fixed; top: calc(var(--safe-t) + 15px); left: 15px;
     background: var(--surface); color: var(--text-muted);
     padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700;
     box-shadow: var(--shadow); border: 1px solid var(--border-light);
@@ -138,7 +138,7 @@ body, html {
     display: flex; align-items: center; justify-content: center; font-size: 18px;
     box-shadow: var(--shadow); cursor: pointer; transition: 0.2s;
 }
-.theme-anchor { position: absolute; left: 15px; top: calc(var(--safe-t) + 65px); }
+.theme-anchor { position: absolute; right: 15px; top: calc(var(--safe-t) + 15px); }
 
 /* עיצוב סיכת בית חב"ד בשטח */
 .chabad-pin-wrapper { width:50px; height:65px; z-index:1000; }
