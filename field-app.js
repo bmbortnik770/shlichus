@@ -895,6 +895,9 @@ const fieldApp = (function () {
     let showingAllTasks = false;
     let isCompletedExpanded = false;
     let currentEditTaskRef = null;
+    let currentEditTags = [];
+    let tagDropdownItems = [];
+    let tagDropdownFocus = -1;
 
     function initTaskDateFilter() {
         const d = document.getElementById('f-task-date-filter');
@@ -1141,6 +1144,8 @@ const fieldApp = (function () {
         document.getElementById('f-completed-tasks-list').style.display = isCompletedExpanded ? 'block' : 'none';
         document.getElementById('f-completed-icon').className = isCompletedExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
     }
+
+    function openTaskEdit(el) {
         const isGeneral = el.getAttribute('data-general') === 'true';
         if (isGeneral) {
             currentEditTaskRef = db.meta.generalTasks[el.getAttribute('data-idx')];
@@ -1166,9 +1171,6 @@ const fieldApp = (function () {
         document.getElementById('f-fab-wrapper').style.display = 'none';
     }
 
-    let currentEditTags = [];
-    let tagDropdownItems = [];
-    let tagDropdownFocus = -1;
 
     function buildTagChipsBar() {
         const bar = document.getElementById('f-tag-chips-bar');
