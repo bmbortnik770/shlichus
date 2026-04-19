@@ -78,12 +78,34 @@ const fieldApp = (function () {
     }
 
     function setSyncStatus(state) {
-        const el = document.getElementById('f-sync-status'); if(!el) return;
-        const span = el.querySelector('span'); const icon = el.querySelector('i');
-        el.className = 'f-sync-indicator'; 
-        if (state === 'syncing') { el.classList.add('syncing'); icon.className = 'fas fa-sync-alt'; span.innerText = 'מסנכרן...'; } 
-        else if (state === 'success') { el.classList.add('success'); icon.className = 'fas fa-check-circle'; const timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }); span.innerText = `מעודכן ל- ${timeStr}`; localStorage.setItem(SYNC_TIME_KEY, timeStr); } 
-        else if (state === 'offline' || state === 'error') { el.classList.add('offline'); icon.className = state === 'offline' ? 'fas fa-wifi-slash' : 'fas fa-exclamation-triangle'; span.innerText = 'לא מסונכרן'; }
+        const el = document.getElementById('f-sync-status'); 
+        if(!el) return;
+        const span = el.querySelector('span'); 
+        const icon = el.querySelector('i');
+        
+        // איפוס אנימציות וצבעים
+        icon.className = 'fas fa-sync-alt';
+        icon.style.color = 'var(--text-muted)';
+        
+        if (state === 'syncing') { 
+            icon.classList.add('fa-spin'); 
+            span.innerText = 'מסנכרן נתונים...'; 
+        } 
+        else if (state === 'success') { 
+            icon.className = 'fas fa-check-circle'; 
+            icon.style.color = 'var(--success)';
+            const timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }); 
+            span.innerText = `מעודכן ל- ${timeStr}`; 
+            localStorage.setItem(SYNC_TIME_KEY, timeStr); 
+        } 
+        else if (state === 'offline' || state === 'error') { 
+            icon.className = state === 'offline' ? 'fas fa-wifi-slash' : 'fas fa-exclamation-triangle'; 
+            icon.style.color = 'var(--danger)';
+            span.innerText = state === 'offline' ? 'אין חיבור רשת' : 'שגיאת סנכרון'; 
+            
+            // הקפצת התראה רק במקרה של בעיה!
+            showToast(state === 'offline' ? "⚠️ אין חיבור אינטרנט, עובד במצב לא מקוון" : "❌ שגיאה בסנכרון הנתונים מול הענן");
+        }
     }
 
     // ==========================================
@@ -1528,7 +1550,6 @@ const fieldApp = (function () {
         document.getElementById('f-mission-summary').style.display = 'none';
         document.getElementById('f-bottom-nav-bar').style.display = 'flex';
         document.getElementById('f-fab-wrapper').style.display = 'block';
-        document.getElementById('f-sync-status').style.display = 'flex';
         missionWaypoints = []; missionCurrentIdx = 0; isMissionActive = false;
         if (map && map.getLayer('route')) map.removeLayer('route');
         if (map && map.getSource('route')) map.removeSource('route');
