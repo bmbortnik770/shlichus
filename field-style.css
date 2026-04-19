@@ -107,18 +107,6 @@ body, html {
 .f-fab-center.open .f-fab-menu { pointer-events: auto; }
 .f-fab-center.open .f-fab-option { opacity: 1; transform: translateY(0) scale(1); }
 
-.f-sync-indicator {
-    position: fixed; top: calc(var(--safe-t) + 15px); left: 15px;
-    background: var(--surface); color: var(--text-muted);
-    padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700;
-    box-shadow: var(--shadow); border: 1px solid var(--border-light);
-    z-index: 5000; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.3s ease;
-}
-.f-sync-indicator.syncing { color: var(--accent); }
-.f-sync-indicator.syncing i { animation: spin 1s linear infinite; }
-.f-sync-indicator.success { color: var(--success); }
-.f-sync-indicator.offline { background: var(--danger); color: white; border-color: var(--danger); }
-
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 #f-login { z-index: 9998; }
