@@ -19,10 +19,6 @@
         <h2 style="margin-top:15px; letter-spacing: 1px; color: var(--accent);">שליחות CRM</h2>
     </div>
 
-    <div id="f-sync-status" class="f-sync-indicator" onclick="fieldApp.forceSync()">
-        <i class="fas fa-cloud-download-alt"></i> <span>ממתין לסנכרון</span>
-    </div>
-
     <div id="f-login" class="view-container" style="display:none; padding:40px 20px; text-align:center; height: 100vh; background: var(--bg-body); position: fixed; inset: 0; z-index: 9998;">
         <div style="margin-top: 20vh;">
             <i class="fas fa-user-shield fa-4x" style="color: var(--accent); margin-bottom: 20px;"></i>
@@ -354,6 +350,9 @@
             <div class="f-fab-option" onclick="fieldApp.openSavedRoutesSheet()"><i class="fas fa-bookmark"></i> מסלולים שמורים</div>
             <div class="f-fab-option" onclick="fieldApp.openFamilyForm()"><i class="fas fa-user-plus"></i> הוסף משפחה</div>
             <div class="f-fab-option" onclick="fieldApp.openAddTask()"><i class="fas fa-tasks"></i> הוסף משימה</div>
+            <div id="f-sync-status" style="padding: 12px; text-align: center; font-size: 13px; color: var(--text-muted); border-top: 1px solid var(--border-light); margin-top: 5px; cursor: default;">
+                <i class="fas fa-sync-alt"></i> <span>בודק סנכרון...</span>
+            </div>
         </div>
     </div>
 
