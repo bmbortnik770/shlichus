@@ -78,34 +78,12 @@ const fieldApp = (function () {
     }
 
     function setSyncStatus(state) {
-        const el = document.getElementById('f-sync-status'); 
-        if(!el) return;
-        const span = el.querySelector('span'); 
-        const icon = el.querySelector('i');
-        
-        // איפוס אנימציות וצבעים
-        icon.className = 'fas fa-sync-alt';
-        icon.style.color = 'var(--text-muted)';
-        
-        if (state === 'syncing') { 
-            icon.classList.add('fa-spin'); 
-            span.innerText = 'מסנכרן נתונים...'; 
-        } 
-        else if (state === 'success') { 
-            icon.className = 'fas fa-check-circle'; 
-            icon.style.color = 'var(--success)';
-            const timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }); 
-            span.innerText = `מעודכן ל- ${timeStr}`; 
-            localStorage.setItem(SYNC_TIME_KEY, timeStr); 
-        } 
-        else if (state === 'offline' || state === 'error') { 
-            icon.className = state === 'offline' ? 'fas fa-wifi-slash' : 'fas fa-exclamation-triangle'; 
-            icon.style.color = 'var(--danger)';
-            span.innerText = state === 'offline' ? 'אין חיבור רשת' : 'שגיאת סנכרון'; 
-            
-            // הקפצת התראה רק במקרה של בעיה!
-            showToast(state === 'offline' ? "⚠️ אין חיבור אינטרנט, עובד במצב לא מקוון" : "❌ שגיאה בסנכרון הנתונים מול הענן");
-        }
+        const el = document.getElementById('f-sync-status'); if(!el) return;
+        const span = el.querySelector('span'); const icon = el.querySelector('i');
+        el.className = 'f-sync-indicator'; 
+        if (state === 'syncing') { el.classList.add('syncing'); icon.className = 'fas fa-sync-alt'; span.innerText = 'מסנכרן...'; } 
+        else if (state === 'success') { el.classList.add('success'); icon.className = 'fas fa-check-circle'; const timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }); span.innerText = `מעודכן ל- ${timeStr}`; localStorage.setItem(SYNC_TIME_KEY, timeStr); } 
+        else if (state === 'offline' || state === 'error') { el.classList.add('offline'); icon.className = state === 'offline' ? 'fas fa-wifi-slash' : 'fas fa-exclamation-triangle'; span.innerText = 'לא מסונכרן'; }
     }
 
     // ==========================================
@@ -405,25 +383,51 @@ const fieldApp = (function () {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
                 <div>
                     <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">שם האב</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.fatherName || '-')}</div>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.father || fam.fatherName || '-')}</div>
                 </div>
                 <div>
                     <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">שם האם</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.motherName || '-')}</div>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.mother || fam.motherName || '-')}</div>
                 </div>
                 <div>
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">טלפון</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px;">${escapeHTML(fam.phone || fam.fatherPhone || fam.motherPhone || '-')}</div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">טלפון אב</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; direction:ltr; text-align:right;">${escapeHTML(fam.fatherPhone || fam.phone || '-')}</div>
                 </div>
                 <div>
-                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">טלפון בית</label>
-                    <div style="padding:10px; background:var(--bg-body); border-radius:8px;">${escapeHTML(fam.homePhone || '-')}</div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">טלפון אם</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; direction:ltr; text-align:right;">${escapeHTML(fam.motherPhone || '-')}</div>
                 </div>
+                ${fam.fatherEmail || fam.motherEmail ? `
+                <div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">מייל אב</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-size:13px; direction:ltr; text-align:right;">${escapeHTML(fam.fatherEmail || '-')}</div>
+                </div>
+                <div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">מייל אם</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-size:13px; direction:ltr; text-align:right;">${escapeHTML(fam.motherEmail || '-')}</div>
+                </div>` : ''}
+                ${(fam.childrenList || []).length > 0 ? `
+                <div style="grid-column:span 2;">
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px;"><i class="fas fa-child"></i> ילדים (${fam.childrenList.length})</label>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        ${fam.childrenList.map(c => `<span style="background:rgba(16,185,129,0.1); color:var(--success); border:1px solid rgba(16,185,129,0.3); padding:4px 10px; border-radius:12px; font-size:12px; font-weight:600;">${escapeHTML(c.name || '')}${c.dob ? ' · ' + escapeHTML(c.dob) : ''}</span>`).join('')}
+                    </div>
+                </div>` : ''}
+                ${fam.style ? `
+                <div>
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">סגנון</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-weight:600;">${escapeHTML(fam.style)}</div>
+                </div>` : ''}
+                ${fam.notes ? `
+                <div style="grid-column:span 2;">
+                    <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">הערות</label>
+                    <div style="padding:10px; background:var(--bg-body); border-radius:8px; font-size:13px; line-height:1.5;">${escapeHTML(fam.notes)}</div>
+                </div>` : ''}
                 <div style="grid-column:span 2;">
                     <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px;">תגיות</label>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
                         ${(fam.tags || []).length > 0
-                            ? (fam.tags).map(t => `<span style="background:var(--accent); color:white; padding:4px 12px; border-radius:15px; font-size:12px; font-weight:600;">${escapeHTML(t)}</span>`).join('')
+                            ? fam.tags.map(t => `<span style="background:var(--accent); color:white; padding:4px 12px; border-radius:15px; font-size:12px; font-weight:600;">${escapeHTML(t)}</span>`).join('')
                             : '<span style="color:var(--text-muted); font-size:13px;">אין תגיות</span>'
                         }
                     </div>
@@ -446,7 +450,7 @@ const fieldApp = (function () {
         const bldg = decodeURIComponent(bldgEnc); currentTarget = { bldg, aptIdx }; const fam = db[bldg].apts[aptIdx];
         if (!fam) return;
         const safeName = escapeHTML(fam.name || 'ללא שם');
-        const parents = [fam.fatherName, fam.motherName].filter(Boolean).join(' ו-');
+        const parents = [fam.father || fam.fatherName, fam.mother || fam.motherName].filter(Boolean).join(' ו-');
         const parentsHTML = parents ? `<div style="font-size:14px; color:var(--text-muted); margin-bottom:5px;">${escapeHTML(parents)}</div>` : '';
         const phone = fam.fatherPhone || fam.motherPhone || fam.phone || '';
         const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '972')}` : '#';
@@ -702,7 +706,7 @@ const fieldApp = (function () {
         document.getElementById('view-' + viewId).classList.add('active');
         closeOverlays();
         if (viewId === 'map' && map) setTimeout(() => map.resize(), 100);
-        if (viewId === 'tasks' && db) renderTasks();
+        if (viewId === 'tasks' && db) { initTaskDateFilter(); renderTasks(); }
     }
 
     function openRouteMenu() {
@@ -726,7 +730,7 @@ const fieldApp = (function () {
             const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '972')}` : '#';
             const disableStyle = !phone ? 'opacity:0.3; pointer-events:none;' : '';
             const coords = db[f.bldg]?.info?.coords; const lng = coords?.[0]; const lat = coords?.[1];
-            const parents = [f.apt.fatherName, f.apt.motherName].filter(Boolean).join(' ו-');
+            const parents = [f.apt.father || f.apt.fatherName, f.apt.mother || f.apt.motherName].filter(Boolean).join(' ו-');
             const tags = (f.apt.tags || []).map(t => `<span style="background:var(--accent);color:white;padding:2px 6px;border-radius:4px;font-size:11px;">${escapeHTML(t)}</span>`).join(' ');
             const safeBldgEnc = encodeURIComponent(f.bldg);
 
@@ -787,8 +791,8 @@ const fieldApp = (function () {
             const bldgDecoded = typeof bldg === 'string' && bldg.includes('%') ? decodeURIComponent(bldg) : bldg;
             editingFamilyContext = { bldg: bldgDecoded, aptIdx }; const fam = db[bldgDecoded].apts[aptIdx];
             document.getElementById('f-add-fam-name').value = fam.name || '';
-            document.getElementById('f-add-fam-father').value = fam.fatherName || '';
-            document.getElementById('f-add-fam-mother').value = fam.motherName || '';
+            document.getElementById('f-add-fam-father').value = fam.father || fam.fatherName || '';
+            document.getElementById('f-add-fam-mother').value = fam.mother || fam.motherName || '';
             document.getElementById('f-add-fam-address').value = bldgDecoded === NO_ADDRESS_KEY ? '' : bldgDecoded;
             document.getElementById('f-add-fam-apt').value = fam.num || '';
             document.getElementById('f-add-fam-phone').value = fam.phone || fam.fatherPhone || fam.motherPhone || '';
@@ -851,7 +855,7 @@ const fieldApp = (function () {
             } catch(e) { console.log("Geocoding failed"); }
         }
 
-        const familyData = { name, fatherName, motherName, phone, homePhone, num: aptNum };
+        const familyData = { name, father: fatherName, mother: motherName, fatherName, motherName, phone, homePhone, num: aptNum };
         const outbox = storageGet(OUTBOX_KEY) || [];
 
         if (editingFamilyContext) {
@@ -924,9 +928,13 @@ const fieldApp = (function () {
     function initTaskDateFilter() {
         const d = document.getElementById('f-task-date-filter');
         if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
+        // וודא שחיפוש מופעל
+        const searchInput = document.getElementById('f-task-search');
+        if (searchInput && !searchInput._fieldSearchBound) {
+            searchInput._fieldSearchBound = true;
+            searchInput.addEventListener('input', () => renderTasks());
+        }
     }
-
-    function renderTasks() {
         const activeList = document.getElementById('f-tasks-list');
         const completedList = document.getElementById('f-completed-tasks-list');
         if (!activeList) return;
@@ -956,11 +964,18 @@ const fieldApp = (function () {
                 (t.tags || []).some(tag => tag.toLowerCase().includes(searchQ));
             if (!matchSearch) return false;
             if (taskFilterMode === 'all') return true;
-            // המרת תאריך המשימה מעברית ל-ISO
+            // נרמול תאריך המשימה ל-ISO (תומך ב-d/m/yyyy, d.m.yyyy, yyyy-mm-dd)
             let tISO = null;
             if (t.date) {
-                const parts = t.date.split('.');
-                if (parts.length === 3) tISO = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
+                    tISO = t.date; // כבר ISO
+                } else {
+                    const sep = t.date.includes('.') ? '.' : '/';
+                    const parts = t.date.split(sep);
+                    if (parts.length === 3) {
+                        tISO = `${parts[2].padStart(4,'20')}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+                    }
+                }
             }
             const compareDate = taskFilterMode === 'date' ? filterDate : todayISO;
             return tISO === compareDate || (!tISO && compareDate === todayISO);
@@ -1087,10 +1102,6 @@ const fieldApp = (function () {
 
     function toggleViewAllTasks() { setTaskFilter(taskFilterMode === 'all' ? 'today' : 'all'); }
 
-    function initTaskDateFilter() {
-        const d = document.getElementById('f-task-date-filter');
-        if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
-    }
 
     function deleteCurrentTask() {
         if (!currentEditTaskRef) return;
@@ -1550,6 +1561,7 @@ const fieldApp = (function () {
         document.getElementById('f-mission-summary').style.display = 'none';
         document.getElementById('f-bottom-nav-bar').style.display = 'flex';
         document.getElementById('f-fab-wrapper').style.display = 'block';
+        document.getElementById('f-sync-status').style.display = 'flex';
         missionWaypoints = []; missionCurrentIdx = 0; isMissionActive = false;
         if (map && map.getLayer('route')) map.removeLayer('route');
         if (map && map.getSource('route')) map.removeSource('route');
