@@ -108,7 +108,7 @@ body, html {
 .f-fab-center.open .f-fab-option { opacity: 1; transform: translateY(0) scale(1); }
 
 .f-sync-indicator {
-    position: fixed; top: calc(var(--safe-t) + 15px); right: 15px;
+    position: fixed; top: calc(var(--safe-t) + 15px); left: 15px;
     background: var(--surface); color: var(--text-muted);
     padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700;
     box-shadow: var(--shadow); border: 1px solid var(--border-light);
