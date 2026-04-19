@@ -680,6 +680,7 @@ const fieldApp = (function () {
         document.getElementById('view-' + viewId).classList.add('active');
         closeOverlays();
         if (viewId === 'map' && map) setTimeout(() => map.resize(), 100);
+        if (viewId === 'tasks' && db) renderTasks();
     }
 
     function openRouteMenu() {
@@ -967,8 +968,8 @@ const fieldApp = (function () {
 
         return `<div style="position:relative;overflow:hidden;border-radius:14px;margin-bottom:11px;">
             ${swipeHint}
-            <div class="task-card-full ${doneClass} task-swipe-front" ${idxData} onclick="fieldApp.openTaskEdit(this)">
-                <div class="task-text">${escapeHTML(t.isGeneral ? '' : `משפחת ${t.famName}: `)}${escapeHTML(t.text)}</div>
+            <div class="task-card-full ${doneClass} task-swipe-front" ${idxData} onclick="fieldApp.openTaskEdit(event.currentTarget)">
+                <div class="task-text" style="font-size:16px; font-weight:700; color:var(--text-main); margin-bottom:6px;">${escapeHTML(t.text) || '(ללא תיאור)'}</div>
                 <div class="task-meta">
                     <span><i class="far fa-user" style="margin-left:4px;"></i>${escapeHTML(t.famName)}</span>
                     <span><i class="far fa-calendar-alt" style="margin-left:4px;"></i>${t.date || 'ללא תאריך'}</span>
@@ -1045,32 +1046,162 @@ const fieldApp = (function () {
             currentEditTaskRef = db[bldg].apts[el.getAttribute('data-apt')].tasks[el.getAttribute('data-task')];
         }
         document.getElementById('f-task-edit-text').value = currentEditTaskRef.text || '';
-        // נרמל תאריך לפורמט ISO אם צריך
         let dateVal = currentEditTaskRef.date || '';
         if (dateVal && dateVal.includes('.')) {
             const parts = dateVal.split('.');
             if (parts.length === 3) dateVal = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
         }
         document.getElementById('f-task-edit-date').value = dateVal;
-        document.getElementById('f-task-edit-tags').value = (currentEditTaskRef.tags || []).join(', ');
+        currentEditTags = [...(currentEditTaskRef.tags || [])];
+        buildTagChipsBar();
+        renderEditTags();
+        closeTagDropdown();
+        const inp = document.getElementById('f-tag-at-input');
+        if (inp) inp.value = '';
         document.getElementById('f-task-edit-sheet').classList.add('open');
         document.getElementById('f-scrim').style.display = 'block';
         document.getElementById('f-fab-wrapper').style.display = 'none';
+    }
+
+    let currentEditTags = [];
+    let tagDropdownItems = [];
+    let tagDropdownFocus = -1;
+
+    function buildTagChipsBar() {
+        const bar = document.getElementById('f-tag-chips-bar');
+        if (!bar) return;
+        const suggestions = getTagSuggestions('').slice(0, 8);
+        bar.innerHTML = suggestions.map(s => {
+            const active = currentEditTags.includes(s);
+            return `<button type="button" onclick="fieldApp.toggleChipTag('${s.replace(/'/g,"\\'")}')"
+                style="padding:6px 13px; border-radius:20px; border:1.5px solid ${active ? 'var(--accent)' : 'var(--border-light)'};
+                       background:${active ? 'var(--accent)' : 'var(--bg-body)'};
+                       color:${active ? 'white' : 'var(--text-main)'};
+                       font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; transition:all 0.15s;">
+                ${active ? '<i class="fas fa-check" style="margin-left:5px;font-size:10px;"></i>' : ''}${escapeHTML(s)}
+            </button>`;
+        }).join('');
+    }
+
+    function toggleChipTag(tag) {
+        if (currentEditTags.includes(tag)) currentEditTags = currentEditTags.filter(t => t !== tag);
+        else currentEditTags.push(tag);
+        buildTagChipsBar();
+        renderEditTags();
+    }
+
+    function getTagSuggestions(query) {
+        const q = query.toLowerCase();
+        const set = new Set();
+        Object.keys(db).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            if (!q || bldg.toLowerCase().includes(q)) set.add(bldg);
+            (db[bldg].apts || []).forEach(apt => {
+                if (apt.name && (!q || apt.name.toLowerCase().includes(q))) set.add(apt.name);
+                (apt.tasks || []).forEach(t => (t.tags || []).forEach(tag => { if (!q || tag.toLowerCase().includes(q)) set.add(tag); }));
+            });
+        });
+        (db.meta?.generalTasks || []).forEach(t => (t.tags || []).forEach(tag => { if (!q || tag.toLowerCase().includes(q)) set.add(tag); }));
+        return [...set].sort((a, b) => a.localeCompare(b, 'he'));
+    }
+
+    function onTagAtInput(val) {
+        const q = val.trim();
+        const dropdown = document.getElementById('f-tag-at-dropdown');
+        if (!dropdown) return;
+        if (!q) { closeTagDropdown(); return; }
+        const results = getTagSuggestions(q);
+        const hasFree = !results.map(r => r.toLowerCase()).includes(q.toLowerCase());
+        tagDropdownItems = [
+            ...(hasFree ? [{ label: `➕ הוסף "${q}"`, val: q }] : []),
+            ...results.slice(0, 7).map(r => ({ label: r, val: r }))
+        ];
+        tagDropdownFocus = -1;
+        if (!tagDropdownItems.length) { closeTagDropdown(); return; }
+        dropdown.style.display = 'block';
+        dropdown.innerHTML = tagDropdownItems.map((item, i) =>
+            `<div class="tag-dd-item" data-i="${i}"
+                style="padding:11px 15px; cursor:pointer; font-size:14px;
+                       color:${item.label.startsWith('➕') ? 'var(--accent)' : 'var(--text-main)'};
+                       font-weight:${item.label.startsWith('➕') ? '700' : '500'};
+                       border-bottom:1px solid var(--border-light);"
+                onmousedown="event.preventDefault(); fieldApp.selectDropdownTag(${i})"
+                ontouchstart="event.preventDefault(); fieldApp.selectDropdownTag(${i})">
+                ${item.label.startsWith('➕') ? '' : '<i class="fas fa-at" style="margin-left:7px;font-size:10px;color:var(--text-muted);"></i>'}${escapeHTML(item.label)}
+            </div>`
+        ).join('');
+    }
+
+    function onTagAtKey(e) {
+        const dropdown = document.getElementById('f-tag-at-dropdown');
+        if (!dropdown || dropdown.style.display === 'none') return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); tagDropdownFocus = Math.min(tagDropdownFocus + 1, tagDropdownItems.length - 1); highlightTagDropdown(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); tagDropdownFocus = Math.max(tagDropdownFocus - 1, 0); highlightTagDropdown(); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (tagDropdownFocus >= 0) selectDropdownTag(tagDropdownFocus); }
+        else if (e.key === 'Escape') closeTagDropdown();
+    }
+
+    function highlightTagDropdown() {
+        document.querySelectorAll('.tag-dd-item').forEach((el, i) => {
+            el.style.background = i === tagDropdownFocus ? 'rgba(37,99,235,0.1)' : '';
+        });
+    }
+
+    function selectDropdownTag(i) {
+        const tag = tagDropdownItems[i]?.val;
+        if (!tag) return;
+        if (!currentEditTags.includes(tag)) currentEditTags.push(tag);
+        buildTagChipsBar();
+        renderEditTags();
+        const inp = document.getElementById('f-tag-at-input');
+        if (inp) inp.value = '';
+        closeTagDropdown();
+    }
+
+    function closeTagDropdown() {
+        const d = document.getElementById('f-tag-at-dropdown');
+        if (d) { d.style.display = 'none'; d.innerHTML = ''; }
+        tagDropdownItems = [];
+        tagDropdownFocus = -1;
+    }
+
+    function renderEditTags() {
+        const container = document.getElementById('f-task-edit-tags-display');
+        if (!container) return;
+        container.innerHTML = currentEditTags.map((tag, i) =>
+            `<span style="background:rgba(37,99,235,0.13); color:var(--accent); padding:5px 12px; border-radius:20px; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:6px;">
+                <i class="fas fa-at" style="font-size:10px; opacity:0.6;"></i>${escapeHTML(tag)}
+                <i class="fas fa-times" style="cursor:pointer; font-size:10px; opacity:0.5;" onclick="fieldApp.removeEditTag(${i})"></i>
+            </span>`
+        ).join('');
+    }
+
+    function addEditTag() {
+        const input = document.getElementById('f-tag-at-input');
+        if (!input) return;
+        const val = input.value.trim();
+        if (val && !currentEditTags.includes(val)) { currentEditTags.push(val); buildTagChipsBar(); renderEditTags(); }
+        input.value = '';
+        closeTagDropdown();
+    }
+
+    function removeEditTag(idx) {
+        currentEditTags.splice(idx, 1);
+        buildTagChipsBar();
+        renderEditTags();
     }
 
     function saveEditedTask() {
         if (!currentEditTaskRef) return;
         currentEditTaskRef.text = document.getElementById('f-task-edit-text').value.trim();
         const rawDate = document.getElementById('f-task-edit-date').value;
-        // שמור בפורמט המקורי אם האפליקציה משתמשת ב-he-IL
         if (rawDate) {
             const d = new Date(rawDate);
             currentEditTaskRef.date = d.toLocaleDateString('he-IL');
         } else {
             currentEditTaskRef.date = '';
         }
-        const tagsRaw = document.getElementById('f-task-edit-tags').value;
-        currentEditTaskRef.tags = tagsRaw.split(',').map(s => s.trim()).filter(Boolean);
+        currentEditTaskRef.tags = [...currentEditTags];
         storageSet(DATA_KEY, db);
         const outbox = storageGet(OUTBOX_KEY) || [];
         outbox.push({ type: 'edit_task', timestamp: new Date().toISOString() });
@@ -1374,7 +1505,8 @@ const fieldApp = (function () {
         // *** פונקציות חדשות חשופות ***
         openFullImage, openFullFamilyCard,
         // *** מסך משימות מתקדם ***
-        toggleViewAllTasks, toggleCompletedTasks, openTaskEdit, saveEditedTask
+        toggleViewAllTasks, toggleCompletedTasks, openTaskEdit, saveEditedTask,
+        addEditTag, removeEditTag, toggleChipTag, onTagAtInput, onTagAtKey, selectDropdownTag
     };
 })();
 
