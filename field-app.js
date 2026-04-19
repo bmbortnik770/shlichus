@@ -957,20 +957,34 @@ const fieldApp = (function () {
     function buildTaskCard(t) {
         const doneClass = t.done ? 'is-done' : '';
         const tagsHtml = (t.tags || []).length
-            ? `<div class="task-tags">${t.tags.map(tag => `<span class="task-tag">${escapeHTML(tag)}</span>`).join('')}</div>`
+            ? `<div class="task-tags" style="margin-top:6px; display:flex; gap:5px; flex-wrap:wrap;">${t.tags.map(tag => `<span class="task-tag">${escapeHTML(tag)}</span>`).join('')}</div>`
             : '';
         const idxData = t.isGeneral
             ? `data-general="true" data-idx="${t.idx}"`
             : `data-general="false" data-bldg="${encodeURIComponent(t.bldg)}" data-apt="${t.aptIdx}" data-task="${t.tIdx}"`;
-        const swipeHint = t.done
-            ? `<div style="position:absolute;top:0;bottom:0;right:0;left:0;background:var(--warning);display:flex;align-items:center;justify-content:flex-end;padding-left:20px;border-radius:14px;z-index:1;"><span style="color:white;font-weight:bold;font-size:13px;"><i class="fas fa-undo"></i> בטל</span></div>`
-            : `<div style="position:absolute;top:0;bottom:0;right:0;left:0;background:var(--success);display:flex;align-items:center;padding-right:20px;border-radius:14px;z-index:1;"><span style="color:white;font-weight:bold;font-size:13px;"><i class="fas fa-check"></i> בוצע</span></div>`;
 
-        return `<div style="position:relative;overflow:hidden;border-radius:14px;margin-bottom:11px;">
-            ${swipeHint}
-            <div class="task-card-full ${doneClass} task-swipe-front" ${idxData} onclick="fieldApp.openTaskEdit(event.currentTarget)">
-                <div class="task-text" style="font-size:16px; font-weight:700; color:var(--text-main); margin-bottom:6px;">${escapeHTML(t.text) || '(ללא תיאור)'}</div>
-                <div class="task-meta">
+        // רקע החלקה — ירוק לביצוע, כתום לביטול
+        const bgColor = t.done ? 'var(--warning)' : 'var(--success)';
+        const bgIcon  = t.done ? '<i class="fas fa-undo"></i> בטל' : '<i class="fas fa-check"></i> בוצע';
+        const bgAlign = t.done ? 'flex-end; padding-left:20px;' : 'flex-start; padding-right:20px;';
+
+        const cardId = `tc-${t.isGeneral ? 'g' + t.idx : t.bldg + t.aptIdx + t.tIdx}`.replace(/[^a-zA-Z0-9-]/g,'_');
+
+        return `
+        <div id="${cardId}" style="position:relative; overflow:hidden; border-radius:14px; margin-bottom:11px;">
+            <div style="position:absolute;top:0;bottom:0;right:0;left:0;
+                        background:${bgColor}; display:flex; align-items:center;
+                        justify-content:${bgAlign}
+                        z-index:1; border-radius:14px;">
+                <span style="color:white;font-weight:bold;font-size:14px;">${bgIcon}</span>
+            </div>
+            <div class="task-card-full ${doneClass}" ${idxData}
+                 style="position:relative; z-index:2; cursor:pointer;"
+                 onclick="fieldApp.openTaskEdit(this)">
+                <div style="font-size:16px; font-weight:700; color:var(--text-main); margin-bottom:5px; ${t.done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
+                    ${escapeHTML(t.text) || '(ללא תיאור)'}
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
                     <span><i class="far fa-user" style="margin-left:4px;"></i>${escapeHTML(t.famName)}</span>
                     <span><i class="far fa-calendar-alt" style="margin-left:4px;"></i>${t.date || 'ללא תאריך'}</span>
                 </div>
@@ -980,14 +994,18 @@ const fieldApp = (function () {
     }
 
     function attachTaskSwipe() {
-        document.querySelectorAll('.task-swipe-front').forEach(item => {
+        document.querySelectorAll('.task-card-full').forEach(item => {
             let startX = 0, curX = 0, dragging = false;
-            item.addEventListener('touchstart', e => { startX = e.touches[0].clientX; dragging = true; item.style.transition = 'none'; }, { passive: true });
+            item.addEventListener('touchstart', e => {
+                startX = e.touches[0].clientX; curX = startX; dragging = true;
+                item.style.transition = 'none';
+            }, { passive: true });
             item.addEventListener('touchmove', e => {
                 if (!dragging) return;
                 curX = e.touches[0].clientX;
                 const diff = curX - startX;
                 const isDone = item.classList.contains('is-done');
+                // RTL: ימינה = ביצוע למשימה פתוחה, שמאלה = ביטול למשימה שבוצעה
                 if (!isDone && diff > 0) item.style.transform = `translateX(${diff}px)`;
                 if (isDone && diff < 0) item.style.transform = `translateX(${diff}px)`;
             }, { passive: true });
@@ -1095,14 +1113,22 @@ const fieldApp = (function () {
         const set = new Set();
         Object.keys(db).forEach(bldg => {
             if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            // שם הבניין/רחוב
             if (!q || bldg.toLowerCase().includes(q)) set.add(bldg);
             (db[bldg].apts || []).forEach(apt => {
+                // שם משפחה
                 if (apt.name && (!q || apt.name.toLowerCase().includes(q))) set.add(apt.name);
+                // שמות הורים בנפרד
+                if (apt.fatherName && (!q || apt.fatherName.toLowerCase().includes(q))) set.add(apt.fatherName);
+                if (apt.motherName && (!q || apt.motherName.toLowerCase().includes(q))) set.add(apt.motherName);
+                // תיוגים קיימים מהמשפחה
+                (apt.tags || []).forEach(tag => { if (!q || tag.toLowerCase().includes(q)) set.add(tag); });
+                // תיוגים ממשימות קיימות
                 (apt.tasks || []).forEach(t => (t.tags || []).forEach(tag => { if (!q || tag.toLowerCase().includes(q)) set.add(tag); }));
             });
         });
         (db.meta?.generalTasks || []).forEach(t => (t.tags || []).forEach(tag => { if (!q || tag.toLowerCase().includes(q)) set.add(tag); }));
-        return [...set].sort((a, b) => a.localeCompare(b, 'he'));
+        return [...set].filter(Boolean).sort((a, b) => a.localeCompare(b, 'he'));
     }
 
     function onTagAtInput(val) {
