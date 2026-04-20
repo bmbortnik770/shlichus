@@ -285,7 +285,7 @@ const fieldApp = (function () {
         map.on('touchend', handlePointerUp, {passive: true});
     }
 
-    function handlePointerDown(e) { isDraggingMap = false; pressTimer = setTimeout(() => { if(!isDraggingMap) { if(navigator.vibrate) navigator.vibrate([30,50,30]); openRouteMenu(); } }, 500); }
+    function handlePointerDown(e) { isDraggingMap = false; pressTimer = setTimeout(() => { if(!isDraggingMap) { if(navigator.vibrate) navigator.vibrate([30,50,30]); openRouteMenu(); } }, 900); }
     function handlePointerUp(e) { clearTimeout(pressTimer); }
 
     function renderMarkers() {
@@ -1251,7 +1251,7 @@ const fieldApp = (function () {
     }
 
     function handleCardTouchStart(e, bldgEnc, aptIdx) {
-        cardPressTimer = setTimeout(() => { if (navigator.vibrate) navigator.vibrate(50); openCardActionMenu(bldgEnc, aptIdx); }, 600);
+        cardPressTimer = setTimeout(() => { if (navigator.vibrate) navigator.vibrate(50); openCardActionMenu(bldgEnc, aptIdx); }, 900);
     }
     function handleCardTouchEnd() { clearTimeout(cardPressTimer); }
 

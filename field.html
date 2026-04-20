@@ -357,18 +357,12 @@
         <div class="nav-item" onclick="fieldApp.switchView('community', this)">
             <i class="fas fa-address-book"></i><span>קהילה</span>
         </div>
-        <div class="nav-item" onclick="fieldApp.forceSync()">
-            <i class="fas fa-sync-alt"></i><span>סנכרן</span>
-        </div>
     </nav>
 
     <div id="action-sheet-overlay" class="sheet-overlay" onclick="fieldApp.toggleActionSheet()"></div>
     <div id="action-sheet" class="bottom-sheet">
         <div class="sheet-handle"></div>
         <h3 class="sheet-title">פעולות מהירות</h3>
-        <div id="f-sync-status" style="text-align:center; font-size:13px; color:var(--text-muted); margin-bottom:15px; display:flex; align-items:center; justify-content:center; gap:8px;">
-            <i class="fas fa-sync-alt"></i> <span>בודק סנכרון...</span>
-        </div>
         <div class="action-grid">
             <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openFamilyForm()">
                 <div class="action-icon"><i class="fas fa-user-plus"></i></div>
