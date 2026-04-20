@@ -39,6 +39,8 @@ const fieldApp = (function () {
     let missionPaused = false;
     let taskLayerVisible = false;
     let taskMarkers = [];
+    let currentDraftRoute = [];
+    let activeRouteIndex = 0;
 
     // ==========================================
     // פונקציות בסיס ועזר
@@ -78,12 +80,37 @@ const fieldApp = (function () {
     }
 
     function setSyncStatus(state) {
-        const el = document.getElementById('f-sync-status'); if(!el) return;
-        const span = el.querySelector('span'); const icon = el.querySelector('i');
-        el.className = 'f-sync-indicator'; 
-        if (state === 'syncing') { el.classList.add('syncing'); icon.className = 'fas fa-sync-alt'; span.innerText = 'מסנכרן...'; } 
-        else if (state === 'success') { el.classList.add('success'); icon.className = 'fas fa-check-circle'; const timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }); span.innerText = `מעודכן ל- ${timeStr}`; localStorage.setItem(SYNC_TIME_KEY, timeStr); } 
-        else if (state === 'offline' || state === 'error') { el.classList.add('offline'); icon.className = state === 'offline' ? 'fas fa-wifi-slash' : 'fas fa-exclamation-triangle'; span.innerText = 'לא מסונכרן'; }
+        const widget = document.getElementById('sync-widget');
+        if (!widget) return;
+        const text = widget.querySelector('.sync-text');
+        // הסר כל מצב קודם
+        widget.className = 'sync-widget';
+        if (state === 'syncing') {
+            widget.classList.add('status-syncing', 'expanded');
+            if (text) text.innerText = 'מסנכרן...';
+            // סגירה אוטומטית אחרי 8 שניות אם לא עבר למצב אחר
+        } else if (state === 'success') {
+            const timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+            localStorage.setItem(SYNC_TIME_KEY, timeStr);
+            widget.classList.add('status-online', 'expanded');
+            if (text) text.innerText = `עודכן ב- ${timeStr}`;
+            setTimeout(() => widget.classList.remove('expanded'), 3000);
+        } else if (state === 'offline') {
+            widget.classList.add('status-offline');
+            if (text) text.innerText = 'אין רשת';
+        } else if (state === 'error') {
+            widget.classList.add('status-error');
+            if (text) text.innerText = 'שגיאת סנכרון';
+        }
+    }
+
+    function toggleSyncDetails() {
+        const widget = document.getElementById('sync-widget');
+        if (!widget) return;
+        widget.classList.toggle('expanded');
+        if (widget.classList.contains('expanded')) {
+            setTimeout(() => widget.classList.remove('expanded'), 4000);
+        }
     }
 
     // ==========================================
@@ -140,7 +167,7 @@ const fieldApp = (function () {
             const textData = await dlRes.text();
             try { 
                 db = JSON.parse(textData); if(!db.meta) db.meta = {}; storageSet(DATA_KEY, db); setSyncStatus('success'); 
-                document.getElementById('f-fab-wrapper').style.display = 'block';
+                document.getElementById('f-fab-wrapper').style.display = 'flex';
                 if(map) { renderMarkers(); renderTasks(); renderCommunity(); } 
                 checkForOfficeRoute();
             } catch(e) { setSyncStatus('error'); continueOffline(); }
@@ -149,7 +176,7 @@ const fieldApp = (function () {
 
     function continueOffline() {
         isOfflineMode = true; db = storageGet(DATA_KEY); setSyncStatus('offline');
-        if (db) { document.getElementById('f-login').style.display = 'none'; document.getElementById('f-fab-wrapper').style.display = 'block'; bootMap(); startLocationTracking(); checkForOfficeRoute(); }
+        if (db) { document.getElementById('f-login').style.display = 'none'; document.getElementById('f-fab-wrapper').style.display = 'flex'; bootMap(); startLocationTracking(); checkForOfficeRoute(); }
         else { showToast("❌ חובה חיבור רשת לאיפוס ראשוני"); showAuthScreen(); }
     }
 
@@ -163,7 +190,14 @@ const fieldApp = (function () {
     }
 
     async function pushOutboxToDrive() { return true; }
-    async function forceSync() { if (!navigator.onLine) { showToast("אין חיבור רשת"); return; } if (!accessToken) { login(); return; } await pushOutboxToDrive(); await loadDataFromDrive(); }
+    async function forceSync(event) {
+        if (event) event.stopPropagation();
+        if (!navigator.onLine) { showToast("אין חיבור רשת"); setSyncStatus('offline'); return; }
+        if (!accessToken) { login(); return; }
+        setSyncStatus('syncing');
+        await pushOutboxToDrive();
+        await loadDataFromDrive();
+    }
 
     // ==========================================
     // מפה ולוגיקת קליקים
@@ -173,7 +207,22 @@ const fieldApp = (function () {
         setTimeout(() => document.getElementById('f-splash').style.display = 'none', 500);
         let centerCoords = db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928];
         map = new mapboxgl.Map({ container: 'f-map', style: isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12', center: centerCoords, zoom: 15, pitch: 60, antialias: true });
-        map.on('load', () => { add3DLayer(); renderMarkers(); renderTasks(); renderCommunity(); initClickLogic(); });
+        map.on('load', () => { 
+            add3DLayer(); renderMarkers(); renderTasks(); renderCommunity(); initClickLogic();
+            // מאזין ללחיצה ימנית/לחיצה ארוכה על בניין להוספה למסלול
+            map.on('contextmenu', '3d-buildings', async (e) => {
+                if (!e.features.length) return;
+                const lngLat = e.lngLat;
+                try {
+                    const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lngLat.lng},${lngLat.lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`);
+                    const d = await r.json();
+                    const addr = d.features?.[0] ? (d.features[0].place_name_he || d.features[0].place_name).split(',')[0].trim() : `מיקום`;
+                    addStopToRoute(e.features[0].id, addr, addr, [lngLat.lng, lngLat.lat]);
+                } catch(err) {
+                    addStopToRoute(e.features[0].id, 'בניין', 'מיקום מהמפה', [lngLat.lng, lngLat.lat]);
+                }
+            });
+        });
     }
 
     function add3DLayer() { 
@@ -315,7 +364,10 @@ const fieldApp = (function () {
         </div>`;
 
         if (!isFromRouteMode) {
-            html += `<button onclick="fieldApp.promptAddToRoute('${safeBldgEnc}')" style="width:100%; margin-bottom:15px; padding:12px; background:var(--accent); color:white; border:none; border-radius:12px; font-weight:bold; font-size:15px; cursor:pointer;"><i class="fas fa-plus"></i> הוסף למסלול מהיר</button>`;
+            html += `<div style="display:flex; gap:10px; margin-bottom:15px;">
+                <button onclick="fieldApp.promptAddToRoute('${safeBldgEnc}')" style="flex:1; padding:12px; background:var(--accent); color:white; border:none; border-radius:12px; font-weight:bold; font-size:14px; cursor:pointer;"><i class="fas fa-route"></i> הוסף למסלול</button>
+                <button onclick="fieldApp.openQuickFamilyForm('${escapeHTML(bldg)}')" style="flex:1; padding:12px; background:rgba(16,185,129,0.1); color:var(--success); border:1px solid var(--success); border-radius:12px; font-weight:bold; font-size:14px; cursor:pointer;"><i class="fas fa-user-plus"></i> הוסף משפחה</button>
+            </div>`;
         }
 
         html += `<div style="max-height:30vh; overflow-y:auto;">`;
@@ -358,13 +410,13 @@ const fieldApp = (function () {
     function openFullFamilyCard(bldgEnc, aptIdx) {
         const bldg = decodeURIComponent(bldgEnc);
         if (!db[bldg] || !db[bldg].apts[aptIdx]) return;
-
-        // שמור context עריכה
-        const sheet = document.getElementById('f-sheet');
-        sheet.style.height = '92vh';
         _ffcRender(bldgEnc, aptIdx, 'details');
-        sheet.classList.add('open');
-        document.getElementById('f-scrim').style.display = 'block';
+        const sheet = document.getElementById('ffc-snap-sheet');
+        sheet.className = 'bottom-sheet snap-sheet active state-mini';
+        // סגור scrim אם פתוח (הsnap sheet לא צריך אותו)
+        document.getElementById('f-scrim').style.display = 'none';
+        // אתחל גרירה
+        _initFFCDrag(sheet);
     }
 
     function _ffcRender(bldgEnc, aptIdx, activeTab) {
@@ -546,12 +598,10 @@ const fieldApp = (function () {
             ${tabs.map(t => `<div id="ffc-content-${t.id}" style="display:${t.id===activeTab?'block':'none'};">${t.content}</div>`).join('')}
         </div>`;
 
-        document.getElementById('f-sheet-content').innerHTML = html;
+        const wrapper = document.getElementById('ffc-content-wrapper');
+        if (wrapper) wrapper.innerHTML = html;
+        else document.getElementById('f-sheet-content').innerHTML = html;
     }
-
-    // ==========================================
-    // פונקציות עריכה בכרטיס המלא
-    // ==========================================
 
     function _ffcSaveDetails(bldgEnc, aptIdx) {
         const bldg = decodeURIComponent(bldgEnc);
@@ -943,24 +993,31 @@ const fieldApp = (function () {
     }
 
     function autoSortRoute() {
-        if (selectedRouteBuildings.length < 2) return;
+        // עובד על המקור הרלוונטי — currentDraftRoute או selectedRouteBuildings
+        const useDraft = currentDraftRoute.length >= 2;
+        const useSelected = selectedRouteBuildings.length >= 2;
+        if (!useDraft && !useSelected) return;
         showToast("מחשב את המסלול היעיל ביותר...");
-        let unvisited = [...selectedRouteBuildings];
-        let current = unvisited.shift();
-        let sorted = [current];
-        while (unvisited.length > 0) {
-            let nearestIdx = 0, minDist = Infinity;
-            for (let i = 0; i < unvisited.length; i++) {
-                let d = calculateDistance(current.coords, unvisited[i].coords);
-                if (d < minDist) { minDist = d; nearestIdx = i; }
+
+        const sortNearest = (arr) => {
+            let unvisited = [...arr];
+            let current = unvisited.shift();
+            let sorted = [current];
+            while (unvisited.length > 0) {
+                let nearestIdx = 0, minDist = Infinity;
+                for (let i = 0; i < unvisited.length; i++) {
+                    let d = calculateDistance(current.coords, unvisited[i].coords);
+                    if (d < minDist) { minDist = d; nearestIdx = i; }
+                }
+                current = unvisited.splice(nearestIdx, 1)[0];
+                sorted.push(current);
             }
-            current = unvisited.splice(nearestIdx, 1)[0];
-            sorted.push(current);
-        }
-        selectedRouteBuildings = sorted;
+            return sorted;
+        };
+
+        if (useDraft) { currentDraftRoute = sortNearest(currentDraftRoute); renderRouteSheet(); }
+        if (useSelected) { selectedRouteBuildings = sortNearest(selectedRouteBuildings); renderRouteEditorList(); updateRouteVisuals(); }
         if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-        renderRouteEditorList();
-        updateRouteVisuals();
         showToast("המסלול סודר בהצלחה! ✨");
     }
 
@@ -1093,19 +1150,35 @@ const fieldApp = (function () {
     function closeOverlays() {
         stopVoiceRecording();
         document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open'));
-        if (fabIsOpen) { fabIsOpen = false; document.getElementById('f-fab-wrapper')?.classList.remove('open'); }
+        // סגור גם את ה-bottom sheet החדש
+        const actionSheet = document.getElementById('action-sheet');
+        const actionOverlay = document.getElementById('action-sheet-overlay');
+        if (actionSheet) actionSheet.classList.remove('active');
+        if (actionOverlay) actionOverlay.classList.remove('active');
         document.getElementById('f-scrim').style.display = 'none';
-        if(db) document.getElementById('f-fab-wrapper').style.display = 'block';
+        if(db) document.getElementById('f-fab-wrapper').style.display = 'flex';
         if (activeBuildingFeatureId && map) { map.setFeatureState({source: 'composite', sourceLayer: 'building', id: activeBuildingFeatureId}, { active: false }); activeBuildingFeatureId = null; }
     }
 
-    function toggleFab() {
-        fabIsOpen = !fabIsOpen;
-        document.getElementById('f-fab-wrapper')?.classList.toggle('open', fabIsOpen);
-        const scrim = document.getElementById('f-scrim');
-        if (fabIsOpen) { document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open')); scrim.style.display = 'block'; if (navigator.vibrate) navigator.vibrate(20); }
-        else { scrim.style.display = 'none'; }
+    function toggleActionSheet() {
+        const sheet = document.getElementById('action-sheet');
+        const overlay = document.getElementById('action-sheet-overlay');
+        const isOpen = sheet.classList.contains('active');
+        if (isOpen) {
+            sheet.classList.remove('active');
+            overlay.classList.remove('active');
+        } else {
+            // סגור קודם שאר המגירות
+            document.querySelectorAll('.f-sheet').forEach(s => s.classList.remove('open'));
+            document.getElementById('f-scrim').style.display = 'none';
+            sheet.classList.add('active');
+            overlay.classList.add('active');
+            if (navigator.vibrate) navigator.vibrate(20);
+        }
     }
+
+    // נשמר לתאימות אחורה
+    function toggleFab() { toggleActionSheet(); }
 
     function switchView(viewId, element) {
         if (element) { document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); element.classList.add('active'); }
@@ -1142,6 +1215,14 @@ const fieldApp = (function () {
             const safeBldgEnc = encodeURIComponent(f.bldg);
 
             return `
+            <div class="community-list-item-wrapper">
+                <div class="swipe-bg bg-call"><i class="fas fa-phone"></i></div>
+                <div class="swipe-bg bg-nav"><i class="fas fa-route"></i></div>
+                <div class="community-card-front"
+                     ondragstart="return false;"
+                     ontouchstart="fieldApp.handleCommTouchStart(event)"
+                     ontouchmove="fieldApp.handleCommTouchMove(event)"
+                     ontouchend="fieldApp.handleCommTouchEnd(event, '${phone}', '${f.bldg}')">
             <div class="expandable-card" oncontextmenu="event.preventDefault();" ontouchstart="fieldApp.handleCardTouchStart(event, '${safeBldgEnc}', ${f.aptIdx})" ontouchend="fieldApp.handleCardTouchEnd()" onmousedown="fieldApp.handleCardTouchStart(event, '${safeBldgEnc}', ${f.aptIdx})" onmouseup="fieldApp.handleCardTouchEnd()" onmouseleave="fieldApp.handleCardTouchEnd()">
                 <div class="expandable-card-header" onclick="this.parentElement.classList.toggle('expanded')">
                     <div>
@@ -1162,6 +1243,8 @@ const fieldApp = (function () {
                         <button class="card-action-btn" onclick="event.stopPropagation(); fieldApp.toggleTargetForRoute(this, ${lng || 0}, ${lat || 0})"><i class="fas fa-map-pin" style="color:var(--warning);"></i>בחר יעדים</button>
                         <button class="card-action-btn" onclick="event.stopPropagation(); fieldApp.openFullFamilyCard('${safeBldgEnc}', ${f.aptIdx});"><i class="fas fa-id-card" style="color:var(--accent);"></i>כרטיס</button>
                     </div>
+                </div>
+            </div>
                 </div>
             </div>`;
         }).join('');
@@ -1977,7 +2060,7 @@ const fieldApp = (function () {
     function closeMissionSummary() {
         document.getElementById('f-mission-summary').style.display = 'none';
         document.getElementById('f-bottom-nav-bar').style.display = 'flex';
-        document.getElementById('f-fab-wrapper').style.display = 'block';
+        document.getElementById('f-fab-wrapper').style.display = 'flex';
         missionWaypoints = []; missionCurrentIdx = 0; isMissionActive = false;
         if (map && map.getLayer('route')) map.removeLayer('route');
         if (map && map.getSource('route')) map.removeSource('route');
@@ -2050,11 +2133,500 @@ const fieldApp = (function () {
 
     function openArrivalSheetEncoded(bEnc, idx) { openFamilyCard(bEnc, idx); }
 
+
+    // ==========================================
+    // מגירת מסלול פעיל + ניווט (Route Sheet)
+    // ==========================================
+    function toggleRouteSheet() {
+        const sheet = document.getElementById('route-sheet');
+        if (sheet) sheet.classList.toggle('expanded');
+    }
+
+    function addStopToRoute(id, name, address, coords) {
+        const exists = currentDraftRoute.findIndex(s => s.id === id);
+        if (exists > -1) { removeStopFromRoute(id); return; }
+        currentDraftRoute.push({ id, name, address, coords, done: false });
+        renderRouteSheet();
+        // צבע בניין במפה
+        if (coords) colorBuildingByCoords(coords, true);
+        // הצג מגירה
+        const sheet = document.getElementById('route-sheet');
+        if (sheet) sheet.classList.add('expanded');
+    }
+
+    function removeStopFromRoute(id) {
+        const stop = currentDraftRoute.find(s => s.id === id);
+        if (stop && stop.coords) colorBuildingByCoords(stop.coords, false);
+        currentDraftRoute = currentDraftRoute.filter(s => s.id !== id);
+        renderRouteSheet();
+    }
+
+    function renderRouteSheet() {
+        const list = document.getElementById('route-stops-list');
+        const countEl = document.getElementById('route-count');
+        const startBtn = document.getElementById('btn-start-route');
+        const etaEl = document.getElementById('route-eta');
+        if (!list) return;
+
+        if (countEl) countEl.innerText = currentDraftRoute.length;
+        if (startBtn) startBtn.disabled = currentDraftRoute.length === 0;
+        if (etaEl) etaEl.innerText = currentDraftRoute.length === 0
+            ? 'בחר נקודות במפה'
+            : `${currentDraftRoute.length} תחנות נבחרו`;
+
+        if (currentDraftRoute.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding:15px; color:var(--text-muted); font-size:13px;">לחץ על בניין במפה להוספה</div>';
+            return;
+        }
+
+        let html = `<button onclick="fieldApp.autoSortRoute()" style="width:100%; margin-bottom:10px; padding:9px; background:rgba(16,185,129,0.1); color:var(--success); border:1px solid var(--success); border-radius:10px; font-weight:bold; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; font-size:13px;"><i class="fas fa-magic"></i> סדר אוטומטי</button>`;
+
+        html += currentDraftRoute.map((stop, idx) => `
+            <div class="route-editor-item" data-idx="${idx}"
+                 draggable="true"
+                 ondragstart="fieldApp.handleRouteDragStart(event, ${idx})"
+                 ondragover="event.preventDefault()"
+                 ondrop="fieldApp.handleRouteDrop(event, ${idx})"
+                 ontouchstart="fieldApp.handleRouteTouchStart(event, ${idx})"
+                 ontouchmove="fieldApp.handleRouteTouchMove(event)"
+                 ontouchend="fieldApp.handleRouteTouchEnd(event)"
+                 style="${stop.done ? 'opacity:0.45;' : ''}">
+                <div class="drag-handle"><i class="fas fa-grip-lines"></i></div>
+                <div class="content">
+                    <div style="font-weight:700; font-size:14px;">
+                        <span style="color:var(--warning); font-weight:900; margin-left:4px;">${idx+1}.</span>
+                        ${escapeHTML(stop.name || stop.address)}
+                    </div>
+                    ${stop.address && stop.address !== stop.name ? `<div style="font-size:12px; color:var(--text-muted);">${escapeHTML(stop.address)}</div>` : ''}
+                </div>
+                <button onclick="fieldApp.removeStopFromRoute('${stop.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:6px;"><i class="fas fa-times"></i></button>
+            </div>`).join('');
+
+        list.innerHTML = html;
+    }
+
+    function startActiveRoute() {
+        if (currentDraftRoute.length === 0) return;
+        activeRouteIndex = 0;
+        document.getElementById('route-sheet').classList.remove('expanded');
+        document.getElementById('active-nav-overlay').style.display = 'flex';
+        renderActiveStop();
+        // הפעל גם את מנוע המסלול הקיים
+        const waypoints = currentDraftRoute.map(s => s.coords);
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], waypoints),
+                () => drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], waypoints)
+            );
+        }
+        showToast('🚀 מסלול התחיל!');
+        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+    }
+
+    function stopActiveRoute() {
+        document.getElementById('active-nav-overlay').style.display = 'none';
+        showToast('⏸ המסלול הושהה');
+    }
+
+    function renderActiveStop() {
+        const stop = currentDraftRoute[activeRouteIndex];
+        if (!stop) { stopActiveRoute(); showMissionSummary(); return; }
+        document.getElementById('active-stop-counter').innerText = `תחנה ${activeRouteIndex + 1} מתוך ${currentDraftRoute.length}`;
+        document.getElementById('active-stop-name').innerText = stop.name || stop.address;
+        document.getElementById('active-stop-address').innerText = stop.address || '';
+        if (stop.coords && map) map.flyTo({ center: stop.coords, zoom: 18, pitch: 60, duration: 1200 });
+    }
+
+    function markStopDone() {
+        if (currentDraftRoute[activeRouteIndex]) {
+            currentDraftRoute[activeRouteIndex].done = true;
+            renderRouteSheet();
+        }
+        if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+        activeRouteIndex++;
+        if (activeRouteIndex >= currentDraftRoute.length) {
+            document.getElementById('active-nav-overlay').style.display = 'none';
+            currentDraftRoute = [];
+            renderRouteSheet();
+            showMissionSummary();
+        } else {
+            renderActiveStop();
+        }
+    }
+
+    function openWaze() {
+        const stop = currentDraftRoute[activeRouteIndex];
+        if (!stop || !stop.coords) return;
+        window.open(`https://waze.com/ul?ll=${stop.coords[1]},${stop.coords[0]}&navigate=yes`, '_blank');
+    }
+
+
+    // ==========================================
+    // מיקרו-טופס הוספת משפחה מהירה
+    // ==========================================
+    function openQuickFamilyForm(prefilledAddress = '') {
+        // אפס שדות
+        document.getElementById('q-family-name').value = '';
+        document.getElementById('q-first-name').value = '';
+        document.getElementById('q-family-phone').value = '';
+        document.getElementById('q-family-address').value = prefilledAddress;
+        // פתח מגירה
+        document.getElementById('quick-family-sheet').classList.add('active');
+        document.getElementById('action-sheet-overlay').classList.add('active');
+        // פוקוס לשדה הראשון הריק
+        setTimeout(() => {
+            const focus = prefilledAddress
+                ? document.getElementById('q-family-name')
+                : document.getElementById('q-family-address');
+            focus.focus();
+        }, 350);
+    }
+
+    function closeQuickFamilyForm() {
+        document.getElementById('quick-family-sheet').classList.remove('active');
+        document.getElementById('action-sheet-overlay').classList.remove('active');
+    }
+
+    function expandToFullFamilyForm() {
+        closeQuickFamilyForm();
+        openFamilyForm();
+    }
+
+    function saveQuickFamily() {
+        const familyName = document.getElementById('q-family-name').value.trim();
+        const firstName  = document.getElementById('q-first-name').value.trim();
+        const address    = document.getElementById('q-family-address').value.trim();
+        const phone      = document.getElementById('q-family-phone').value.trim();
+
+        if (!familyName && !firstName && !phone) {
+            showToast("⚠️ יש למלא לפחות שם משפחה או טלפון");
+            return;
+        }
+
+        const bldgKey = address || NO_ADDRESS_KEY;
+        if (!db[bldgKey]) {
+            db[bldgKey] = { info: { coords: null, code: '', rep: '', notes: '' }, apts: [] };
+        }
+
+        const newFamily = {
+            name: familyName,
+            father: firstName,
+            fatherName: firstName,
+            mother: '',
+            motherName: '',
+            fatherPhone: phone,
+            motherPhone: '',
+            phone,
+            num: '',
+            style: '',
+            notes: '',
+            tags: [],
+            boards: {},
+            childrenList: [],
+            interactions: [],
+            donations: [],
+            tasks: [],
+            customData: {},
+            status: 'חדש',
+            updatedAt: Date.now()
+        };
+
+        db[bldgKey].apts.push(newFamily);
+
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({
+            type: 'add_full_family',
+            bldg: bldgKey,
+            timestamp: new Date().toISOString(),
+            payload: newFamily
+        });
+        storageSet(DATA_KEY, db);
+        storageSet(OUTBOX_KEY, outbox);
+
+        closeQuickFamilyForm();
+        renderCommunity();
+        renderMarkers();
+        showToast(`✅ משפחת ${familyName || firstName} נשמרה!`);
+        if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+    }
+
+
+    // ==========================================
+    // מיקרו-טופס הוספת משימה מהירה
+    // ==========================================
+    let _taskVoiceRec = null;
+
+    function openQuickTaskForm() {
+        // סגור action-sheet אם פתוח
+        const actionSheet = document.getElementById('action-sheet');
+        const actionOverlay = document.getElementById('action-sheet-overlay');
+        if (actionSheet) actionSheet.classList.remove('active');
+        if (actionOverlay) actionOverlay.classList.remove('active');
+
+        // אפס שדות
+        document.getElementById('q-task-title').value = '';
+        document.getElementById('q-task-date').value = new Date().toISOString().split('T')[0];
+
+        // טאגיות חכמות
+        renderSmartChips();
+
+        // פתח מגירה
+        document.getElementById('quick-task-sheet').classList.add('active');
+        if (actionOverlay) actionOverlay.classList.add('active');
+
+        setTimeout(() => document.getElementById('q-task-title').focus(), 350);
+    }
+
+    function closeQuickTaskForm() {
+        document.getElementById('quick-task-sheet').classList.remove('active');
+        const actionOverlay = document.getElementById('action-sheet-overlay');
+        if (actionOverlay) actionOverlay.classList.remove('active');
+        // עצור הקלטה אם פעילה
+        if (_taskVoiceRec) { try { _taskVoiceRec.stop(); } catch(e) {} _taskVoiceRec = null; }
+        const mic = document.getElementById('btn-task-mic');
+        if (mic) mic.classList.remove('listening');
+    }
+
+    function expandToFullTaskForm() {
+        closeQuickTaskForm();
+        openAddTask();
+    }
+
+    function renderSmartChips() {
+        const container = document.getElementById('q-task-smart-chips');
+        if (!container) return;
+
+        // ספור מחרוזות נפוצות ממשימות קיימות
+        const freq = {};
+        const addWord = (text) => {
+            if (!text) return;
+            // חלץ מילים בנות 3+ תווים
+            text.split(/[\s,./]+/).forEach(w => {
+                w = w.trim();
+                if (w.length >= 3) freq[w] = (freq[w] || 0) + 1;
+            });
+        };
+
+        // סרוק כל המשימות במסד
+        (db?.meta?.generalTasks || []).forEach(t => addWord(t.text));
+        Object.keys(db || {}).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg]?.apts || []).forEach(apt => {
+                (apt.tasks || []).forEach(t => addWord(t.text));
+            });
+        });
+
+        // המר לרשימה ממוינת
+        let chips = Object.entries(freq)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([text]) => text);
+
+        // ברירת מחדל אם ריק
+        if (chips.length === 0) {
+            chips = ['מבצע תפילין', 'בדיקת מזוזה', 'חלוקה'];
+        }
+
+        container.innerHTML = chips.map(chip => `
+            <button class="smart-chip" onclick="fieldApp._selectChip(this, '${escapeHTML(chip)}')">${escapeHTML(chip)}</button>
+        `).join('');
+    }
+
+    function _selectChip(el, text) {
+        // הורד סלקציה מכולם
+        document.querySelectorAll('.smart-chip').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        const input = document.getElementById('q-task-title');
+        if (input) {
+            input.value = text;
+            input.focus();
+        }
+    }
+
+    function startTaskVoiceDictation() {
+        const mic = document.getElementById('btn-task-mic');
+        const input = document.getElementById('q-task-title');
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SR) { showToast('הקלטה קולית אינה נתמכת בדפדפן זה'); return; }
+
+        // אם כבר מקליט — עצור
+        if (_taskVoiceRec) {
+            try { _taskVoiceRec.stop(); } catch(e) {}
+            _taskVoiceRec = null;
+            if (mic) mic.classList.remove('listening');
+            return;
+        }
+
+        _taskVoiceRec = new SR();
+        _taskVoiceRec.lang = 'he-IL';
+        _taskVoiceRec.interimResults = true;
+        _taskVoiceRec.continuous = false;
+
+        _taskVoiceRec.onstart = () => { if (mic) mic.classList.add('listening'); };
+        _taskVoiceRec.onresult = (e) => {
+            let transcript = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                transcript += e.results[i][0].transcript;
+            }
+            if (input) input.value = transcript;
+        };
+        _taskVoiceRec.onerror = () => {
+            _taskVoiceRec = null;
+            if (mic) mic.classList.remove('listening');
+        };
+        _taskVoiceRec.onend = () => {
+            _taskVoiceRec = null;
+            if (mic) mic.classList.remove('listening');
+        };
+
+        try { _taskVoiceRec.start(); } catch(e) { showToast('לא ניתן להפעיל הקלטה'); }
+    }
+
+    function saveQuickTask() {
+        const title = document.getElementById('q-task-title').value.trim();
+        const date  = document.getElementById('q-task-date').value;
+
+        if (!title) { showToast('⚠️ יש להזין תיאור למשימה'); return; }
+
+        const dateFormatted = date
+            ? new Date(date).toLocaleDateString('he-IL')
+            : new Date().toLocaleDateString('he-IL');
+
+        const newTask = { text: title, date: dateFormatted, done: false };
+
+        // שמור כמשימה כללית במסד
+        if (!db.meta) db.meta = {};
+        if (!db.meta.generalTasks) db.meta.generalTasks = [];
+        db.meta.generalTasks.push(newTask);
+
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'add_general_task', timestamp: new Date().toISOString(), payload: { text: title, date: dateFormatted } });
+        storageSet(DATA_KEY, db);
+        storageSet(OUTBOX_KEY, outbox);
+
+        closeQuickTaskForm();
+        renderTasks();
+        showToast(`✅ משימה נשמרה: ${title}`);
+        if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+    }
+
+
+    // ==========================================
+    // FFC Snap Sheet — Drag Logic
+    // ==========================================
+    let _ffcDragInitialized = false;
+
+    function _initFFCDrag(sheet) {
+        if (_ffcDragInitialized) return;
+        _ffcDragInitialized = true;
+        const handle = document.getElementById('ffc-drag-handle');
+        if (!handle) return;
+
+        let startY = 0, startH = 0, dragging = false;
+        const snapPoints = [
+            { cls: 'state-mini', vh: 35 },
+            { cls: 'state-half', vh: 65 },
+            { cls: 'state-full', vh: 95 }
+        ];
+
+        handle.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+            startH = sheet.getBoundingClientRect().height;
+            dragging = true;
+            sheet.style.transition = 'none';
+        }, { passive: true });
+
+        handle.addEventListener('touchmove', (e) => {
+            if (!dragging) return;
+            const dy = startY - e.touches[0].clientY;
+            const newH = Math.max(80, Math.min(window.innerHeight * 0.97, startH + dy));
+            sheet.style.height = newH + 'px';
+        }, { passive: true });
+
+        handle.addEventListener('touchend', (e) => {
+            if (!dragging) return;
+            dragging = false;
+            sheet.style.transition = '';
+            sheet.style.height = '';
+
+            const currentH = sheet.getBoundingClientRect().height;
+            const vh = (currentH / window.innerHeight) * 100;
+
+            // סגירה אם גוררים מאוד למטה
+            if (vh < 18) {
+                sheet.classList.remove('active');
+                _ffcDragInitialized = false;
+                return;
+            }
+            // מצא snap point קרוב
+            let closest = snapPoints[0];
+            let minDist = Infinity;
+            snapPoints.forEach(p => {
+                const dist = Math.abs(p.vh - vh);
+                if (dist < minDist) { minDist = dist; closest = p; }
+            });
+            sheet.className = 'bottom-sheet snap-sheet active ' + closest.cls;
+        });
+    }
+
+    function closeFFCSheet() {
+        const sheet = document.getElementById('ffc-snap-sheet');
+        if (sheet) { sheet.classList.remove('active'); _ffcDragInitialized = false; }
+    }
+
+    // ==========================================
+    // Community List — Swipe Gestures
+    // ==========================================
+    let _commSwipeEl = null, _commSwipeStartX = 0, _commSwipeCurX = 0;
+
+    function handleCommTouchStart(e) {
+        _commSwipeEl = e.currentTarget;
+        _commSwipeStartX = e.touches[0].clientX;
+        _commSwipeCurX = _commSwipeStartX;
+        _commSwipeEl.style.transition = 'none';
+    }
+
+    function handleCommTouchMove(e) {
+        if (!_commSwipeEl) return;
+        _commSwipeCurX = e.touches[0].clientX;
+        const dx = _commSwipeCurX - _commSwipeStartX;
+        // רק אם ברור שזו תנועה אופקית
+        if (Math.abs(dx) > 8) {
+            e.preventDefault();
+            _commSwipeEl.style.transform = `translateX(${dx}px)`;
+        }
+    }
+
+    function handleCommTouchEnd(e, phone, address) {
+        if (!_commSwipeEl) return;
+        const dx = _commSwipeCurX - _commSwipeStartX;
+        _commSwipeEl.style.transition = 'transform 0.25s ease-out';
+        _commSwipeEl.style.transform = 'translateX(0)';
+
+        if (dx > 80 && phone) {
+            // החלקה ימינה — התקשר
+            setTimeout(() => { window.location.href = 'tel:' + phone.replace(/\D/g, ''); }, 200);
+        } else if (dx < -80 && address) {
+            // החלקה שמאלה — Waze
+            const coords = (() => {
+                const key = address;
+                return db[key]?.info?.coords;
+            })();
+            if (coords) {
+                setTimeout(() => window.open(`https://waze.com/ul?ll=${coords[1]},${coords[0]}&navigate=yes`, '_blank'), 200);
+            } else {
+                setTimeout(() => window.open(`https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`, '_blank'), 200);
+            }
+        }
+        _commSwipeEl = null;
+    }
+
     // ==========================================
     // חשיפת הפונקציות החוצה
     // ==========================================
     return { 
-        init, login, switchView, toggleFab, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm,
+        init, login, switchView, toggleFab, toggleActionSheet, toggleSyncDetails, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm,
         openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded,
         openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter,
         callFamilyNumber, toggleDarkMode, forceSync, openExternalNav, searchAddressInput, selectAddressOption,
@@ -2065,8 +2637,12 @@ const fieldApp = (function () {
         toggleRouteBuilderMode, promptAddToRoute, openRouteEditor, moveRouteItem, removeRouteItem, saveAndStartEditedRoute,
         handleCardTouchStart, handleCardTouchEnd, addSingleToRoute, removeSingleFromRoute,
         autoSortRoute, handleRouteTouchStart, handleRouteTouchMove, handleRouteTouchEnd, handleRouteDragStart, handleRouteDrop, colorBuildingByCoords,
+        toggleRouteSheet, addStopToRoute, removeStopFromRoute, renderRouteSheet, startActiveRoute, stopActiveRoute, renderActiveStop, openWaze, markStopDone,
+        openQuickFamilyForm, closeQuickFamilyForm, expandToFullFamilyForm, saveQuickFamily,
+        openQuickTaskForm, closeQuickTaskForm, expandToFullTaskForm, renderSmartChips, _selectChip, startTaskVoiceDictation, saveQuickTask,
         // *** פונקציות חדשות חשופות ***
-        openFullImage, openFullFamilyCard, _ffcTab, _ffcRender,
+        openFullImage, openFullFamilyCard, _ffcTab, _ffcRender, closeFFCSheet,
+        handleCommTouchStart, handleCommTouchMove, handleCommTouchEnd,
         _ffcSaveDetails, _ffcDelete, _ffcAddTag, _ffcRemoveTag,
         _ffcAddChild, _ffcRemoveChild, _ffcUpdateChild,
         _ffcToggleTask, _ffcAddTask, _ffcDeleteTask,

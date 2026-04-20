@@ -19,6 +19,11 @@
         <h2 style="margin-top:15px; letter-spacing: 1px; color: var(--accent);">שליחות CRM</h2>
     </div>
 
+    <div id="sync-widget" class="sync-widget status-pending" onclick="fieldApp.toggleSyncDetails()">
+        <div class="sync-dot"></div>
+        <div class="sync-text" onclick="fieldApp.forceSync(event)">ממתין לסנכרון</div>
+    </div>
+
     <div id="f-login" class="view-container" style="display:none; padding:40px 20px; text-align:center; height: 100vh; background: var(--bg-body); position: fixed; inset: 0; z-index: 9998;">
         <div style="margin-top: 20vh;">
             <i class="fas fa-user-shield fa-4x" style="color: var(--accent); margin-bottom: 20px;"></i>
@@ -338,21 +343,143 @@
     </div>
 
     <nav class="f-bottom-nav" id="f-bottom-nav-bar">
-        <div class="nav-item active" onclick="fieldApp.switchView('map', this)"><i class="fas fa-map-marked-alt"></i><span>מפה</span></div>
-        <div class="nav-item" onclick="fieldApp.switchView('tasks', this)"><i class="fas fa-clipboard-list"></i><span>משימות</span></div>
-        <div class="nav-item" onclick="fieldApp.switchView('community', this)"><i class="fas fa-address-book"></i><span>קהילה</span></div>
+        <div class="nav-item active" onclick="fieldApp.switchView('map', this)">
+            <i class="fas fa-map-marked-alt"></i><span>מפה</span>
+        </div>
+        <div class="nav-item" onclick="fieldApp.switchView('tasks', this)">
+            <i class="fas fa-clipboard-list"></i><span>משימות</span>
+        </div>
+        <div class="nav-item super-fab-container" id="f-fab-wrapper" style="display:none;">
+            <button class="super-fab" onclick="fieldApp.toggleActionSheet()">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+        <div class="nav-item" onclick="fieldApp.switchView('community', this)">
+            <i class="fas fa-address-book"></i><span>קהילה</span>
+        </div>
+        <div class="nav-item" onclick="fieldApp.forceSync()">
+            <i class="fas fa-sync-alt"></i><span>סנכרן</span>
+        </div>
     </nav>
 
-    <div class="f-fab-center" id="f-fab-wrapper" style="display:none;">
-        <button class="f-fab-main" onclick="fieldApp.toggleFab()"><i class="fas fa-plus"></i></button>
-        <div class="f-fab-menu">
-            <div class="f-fab-option mission" onclick="fieldApp.openRouteMenu()"><i class="fas fa-route"></i> צא למבצעים</div>
-            <div class="f-fab-option" onclick="fieldApp.openSavedRoutesSheet()"><i class="fas fa-bookmark"></i> מסלולים שמורים</div>
-            <div class="f-fab-option" onclick="fieldApp.openFamilyForm()"><i class="fas fa-user-plus"></i> הוסף משפחה</div>
-            <div class="f-fab-option" onclick="fieldApp.openAddTask()"><i class="fas fa-tasks"></i> הוסף משימה</div>
-            <div id="f-sync-status" style="padding: 12px; text-align: center; font-size: 13px; color: var(--text-muted); border-top: 1px solid var(--border-light); margin-top: 5px; cursor: default;">
-                <i class="fas fa-sync-alt"></i> <span>בודק סנכרון...</span>
+    <div id="action-sheet-overlay" class="sheet-overlay" onclick="fieldApp.toggleActionSheet()"></div>
+    <div id="action-sheet" class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <h3 class="sheet-title">פעולות מהירות</h3>
+        <div id="f-sync-status" style="text-align:center; font-size:13px; color:var(--text-muted); margin-bottom:15px; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <i class="fas fa-sync-alt"></i> <span>בודק סנכרון...</span>
+        </div>
+        <div class="action-grid">
+            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openFamilyForm()">
+                <div class="action-icon"><i class="fas fa-user-plus"></i></div>
+                <span>משפחה חדשה</span>
             </div>
+            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openQuickTaskForm()">
+                <div class="action-icon"><i class="fas fa-tasks"></i></div>
+                <span>משימה חדשה</span>
+            </div>
+            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openRouteMenu()">
+                <div class="action-icon" style="background:rgba(37,99,235,0.15);"><i class="fas fa-route" style="color:var(--accent);"></i></div>
+                <span>צא למבצעים</span>
+            </div>
+            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openSavedRoutesSheet()">
+                <div class="action-icon"><i class="fas fa-bookmark"></i></div>
+                <span>מסלולים שמורים</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- מגירת הוספת משפחה מהירה -->
+    <div id="quick-family-sheet" class="bottom-sheet quick-form-sheet">
+        <div class="sheet-handle" onclick="fieldApp.closeQuickFamilyForm()"></div>
+        <div class="quick-form-header">
+            <h3>הוסף משפחה בקליק</h3>
+            <button class="btn-icon-only" onclick="fieldApp.expandToFullFamilyForm()" title="טופס מלא">
+                <i class="fas fa-expand-arrows-alt"></i>
+            </button>
+        </div>
+        <div class="quick-form-body">
+            <div class="f-input-group row-group">
+                <div class="f-input-wrapper flex-2">
+                    <i class="fas fa-users"></i>
+                    <input type="text" id="q-family-name" class="f-input" placeholder="שם משפחה">
+                </div>
+                <div class="f-input-wrapper flex-1">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="q-first-name" class="f-input" placeholder="שם פרטי">
+                </div>
+            </div>
+            <div class="f-input-wrapper">
+                <i class="fas fa-map-marker-alt"></i>
+                <input type="text" id="q-family-address" class="f-input" placeholder="כתובת (רחוב, בניין, דירה)">
+            </div>
+            <div class="f-input-wrapper">
+                <i class="fas fa-phone"></i>
+                <input type="tel" id="q-family-phone" class="f-input" placeholder="טלפון / וואטסאפ">
+            </div>
+            <button id="btn-save-quick-family" class="btn-save-quick" onclick="fieldApp.saveQuickFamily()">
+                שמור והמשך <i class="fas fa-check"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- FFC Snap Sheet — כרטיס משפחה מלא נגרר -->
+    <div id="ffc-snap-sheet" class="bottom-sheet snap-sheet">
+        <div class="sheet-drag-area" id="ffc-drag-handle">
+            <div class="sheet-handle"></div>
+        </div>
+        <div id="ffc-content-wrapper" class="ffc-scrollable-content"></div>
+    </div>
+
+    <!-- מגירת הוספת משימה מהירה -->
+    <div id="quick-task-sheet" class="bottom-sheet quick-form-sheet">
+        <div class="sheet-handle" onclick="fieldApp.closeQuickTaskForm()"></div>
+        <div class="quick-form-header">
+            <h3>הוסף משימה בשנייה</h3>
+            <button class="btn-icon-only" onclick="fieldApp.expandToFullTaskForm()" title="טופס מלא"><i class="fas fa-expand-arrows-alt"></i></button>
+        </div>
+        <div class="quick-form-body">
+            <div class="smart-chips-container" id="q-task-smart-chips"></div>
+            <div class="f-input-wrapper voice-input-wrapper">
+                <input type="text" id="q-task-title" class="f-input" placeholder="מה צריך לעשות?">
+                <button class="btn-mic" onclick="fieldApp.startTaskVoiceDictation()" id="btn-task-mic">
+                    <i class="fas fa-microphone"></i>
+                </button>
+            </div>
+            <div class="f-input-wrapper">
+                <i class="fas fa-calendar-alt"></i>
+                <input type="date" id="q-task-date" class="f-input">
+            </div>
+            <button id="btn-save-quick-task" class="btn-save-quick" onclick="fieldApp.saveQuickTask()">
+                שמור משימה <i class="fas fa-check"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- מגירת מסלול פעיל -->
+    <div id="route-sheet" class="route-sheet">
+        <div class="sheet-handle" onclick="fieldApp.toggleRouteSheet()"></div>
+        <div class="route-header">
+            <div class="route-info">
+                <h3>מסלול פעיל <span class="route-badge" id="route-count">0</span></h3>
+                <span id="route-eta" class="route-eta">בחר נקודות במפה</span>
+            </div>
+            <button id="btn-start-route" class="btn-start-route" onclick="fieldApp.startActiveRoute()" disabled>התחל</button>
+        </div>
+        <div class="route-stops-list" id="route-stops-list"></div>
+    </div>
+
+    <!-- ניווט פעיל (HUD) -->
+    <div id="active-nav-overlay" class="active-nav-overlay" style="display:none;">
+        <div class="active-nav-card">
+            <div class="stop-counter" id="active-stop-counter">תחנה 1 מתוך 0</div>
+            <h2 id="active-stop-name" class="active-stop-name">שם התחנה</h2>
+            <p id="active-stop-address" class="active-stop-address">כתובת</p>
+            <div class="active-nav-actions">
+                <button class="btn-waze" onclick="fieldApp.openWaze()"><i class="fab fa-waze"></i> נווט</button>
+                <button class="btn-done" onclick="fieldApp.markStopDone()"><i class="fas fa-check-circle"></i> סיימתי</button>
+            </div>
+            <button class="btn-cancel-nav" onclick="fieldApp.stopActiveRoute()">השהה מסלול</button>
         </div>
     </div>
 
