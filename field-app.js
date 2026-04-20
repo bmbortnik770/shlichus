@@ -357,160 +357,364 @@ const fieldApp = (function () {
 
     function openFullFamilyCard(bldgEnc, aptIdx) {
         const bldg = decodeURIComponent(bldgEnc);
-        const fam = db[bldg].apts[aptIdx];
-        if (!fam) return;
+        if (!db[bldg] || !db[bldg].apts[aptIdx]) return;
 
+        // שמור context עריכה
         const sheet = document.getElementById('f-sheet');
         sheet.style.height = '92vh';
-
-        const openTasks = (fam.tasks || []).filter(t => !t.done).length;
-        const interactions = fam.interactions || fam.history || [];
-        const donations = fam.donations || [];
-        const boards = fam.boards || {};
-        const phone1 = fam.fatherPhone || fam.phone || '';
-        const phone2 = fam.motherPhone || '';
-        const safeBldgEnc = encodeURIComponent(bldg);
-
-        // helper לשורת מידע
-        const row = (label, val) => val ? `
-            <div>
-                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">${label}</label>
-                <div style="padding:9px 11px;background:var(--bg-body);border-radius:8px;font-size:14px;">${escapeHTML(val)}</div>
-            </div>` : '';
-
-        // --- תוכן טאב פרטים ---
-        let detailsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">
-            ${row('שם האב', fam.father || fam.fatherName)}
-            ${row('שם האם', fam.mother || fam.motherName)}
-            ${row('טלפון אב', phone1)}
-            ${row('טלפון אם', phone2)}
-            ${row('מייל אב', fam.fatherEmail)}
-            ${row('מייל אם', fam.motherEmail)}
-            ${fam.style ? row('סגנון', fam.style) : ''}
-            ${fam.notes ? `<div style="grid-column:span 2;">${row('הערות', fam.notes)}</div>` : ''}
-        </div>`;
-
-        if ((fam.childrenList || []).length > 0) {
-            detailsHtml += `<div style="margin-bottom:15px;">
-                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;"><i class="fas fa-child"></i> ילדים</label>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${fam.childrenList.map(c => `<span style="background:rgba(16,185,129,0.1);color:var(--success);border:1px solid rgba(16,185,129,0.3);padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;">${escapeHTML(c.name||'')}${c.dob?' · '+escapeHTML(c.dob):''}</span>`).join('')}
-                </div>
-            </div>`;
-        }
-
-        if ((fam.tags || []).length > 0) {
-            detailsHtml += `<div style="margin-bottom:15px;">
-                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;"><i class="fas fa-tags"></i> תגיות</label>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${fam.tags.map(t => `<span style="background:var(--accent);color:white;padding:4px 12px;border-radius:15px;font-size:12px;font-weight:600;">${escapeHTML(t)}</span>`).join('')}
-                </div>
-            </div>`;
-        }
-
-        // פרויקטים
-        const boardHtml = Object.entries(boards).map(([bid, status]) => {
-            const board = (db.__BOARDS__ || []).find(b => b.id === bid);
-            return board ? `<span style="background:rgba(37,99,235,0.1);color:var(--accent);border:1px solid rgba(37,99,235,0.3);padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;">${escapeHTML(board.name)}: ${escapeHTML(status)}</span>` : '';
-        }).join('');
-        if (boardHtml) {
-            detailsHtml += `<div style="margin-bottom:15px;">
-                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;"><i class="fas fa-project-diagram"></i> פרויקטים</label>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">${boardHtml}</div>
-            </div>`;
-        }
-
-        // --- תוכן טאב משימות ---
-        const allTasks = fam.tasks || [];
-        const activeTasks = allTasks.filter(t => !t.done);
-        const doneTasks = allTasks.filter(t => t.done);
-        let tasksHtml = activeTasks.length === 0
-            ? `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-check-circle" style="font-size:30px;opacity:0.3;display:block;margin-bottom:8px;"></i>אין משימות פתוחות</div>`
-            : activeTasks.map(t => `<div style="background:rgba(37,99,235,0.06);border:1px solid rgba(37,99,235,0.2);padding:10px 12px;border-radius:10px;margin-bottom:8px;">
-                <div style="font-weight:600;font-size:14px;">${escapeHTML(t.text)}</div>
-                ${t.date ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px;"><i class="far fa-calendar-alt"></i> ${escapeHTML(t.date)}</div>` : ''}
-            </div>`).join('');
-        if (doneTasks.length > 0) {
-            tasksHtml += `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin:12px 0 8px;">הושלמו (${doneTasks.length})</div>`;
-            tasksHtml += doneTasks.map(t => `<div style="background:var(--bg-body);border:1px solid var(--border-light);padding:9px 12px;border-radius:10px;margin-bottom:6px;opacity:0.6;">
-                <div style="font-size:13px;text-decoration:line-through;">${escapeHTML(t.text)}</div>
-            </div>`).join('');
-        }
-
-        // --- תוכן טאב קשר ---
-        let logsHtml = interactions.length === 0
-            ? `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-comments" style="font-size:30px;opacity:0.3;display:block;margin-bottom:8px;"></i>אין היסטוריית קשר</div>`
-            : [...interactions].reverse().map(l => {
-                const type = l.type || l.status || 'כללי';
-                const text = l.text || l.notes || l.content || '';
-                const colorMap = {'ביקור':'var(--success)','שיחה':'var(--accent)','בוצע':'var(--success)','אין מענה':'var(--warning)','לא מעוניינים':'var(--danger)'};
-                const color = colorMap[type] || 'var(--text-muted)';
-                return `<div style="background:var(--bg-body);border-right:4px solid ${color};border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                        <span style="font-weight:700;font-size:13px;color:${color};">${escapeHTML(type)}</span>
-                        <span style="font-size:12px;color:var(--text-muted);">${escapeHTML(l.date||'')}</span>
-                    </div>
-                    ${text ? `<div style="font-size:13px;color:var(--text-main);">${escapeHTML(text)}</div>` : ''}
-                </div>`;
-            }).join('');
-
-        // --- תוכן טאב תרומות ---
-        const donationsTotal = donations.reduce((s, d) => s + Number(d.amount || 0), 0);
-        let donationsHtml = donations.length === 0
-            ? `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-hand-holding-heart" style="font-size:30px;opacity:0.3;display:block;margin-bottom:8px;"></i>אין תרומות</div>`
-            : `<div style="text-align:center;background:rgba(16,185,129,0.1);color:var(--success);padding:12px;border-radius:10px;font-size:18px;font-weight:bold;margin-bottom:12px;">סה"כ: ₪${donationsTotal}</div>` +
-              [...donations].reverse().map(d => `<div style="background:var(--bg-body);padding:10px 12px;border-radius:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <div style="font-weight:600;font-size:14px;">₪${escapeHTML(String(d.amount))}</div>
-                    <div style="font-size:12px;color:var(--text-muted);">${escapeHTML(d.reason||'')} · ${escapeHTML(d.date||'')}</div>
-                </div>
-              </div>`).join('');
-
-        let html = `
-        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays(); document.getElementById('f-sheet').style.height=''">
-            <i class="fas fa-times"></i>
-        </button>
-        <div style="overflow-y:auto; max-height:calc(92vh - 50px); padding-bottom:20px; margin-top:15px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-left:5px;">
-                <div>
-                    <h2 style="margin:0 0 3px 0;font-size:20px;">משפחת ${escapeHTML(fam.name || 'ללא שם')}</h2>
-                    <div style="font-size:13px;color:var(--text-muted);">
-                        <i class="fas fa-map-marker-alt"></i> ${escapeHTML(bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : bldg)}
-                        ${fam.num ? ' · דירה ' + escapeHTML(String(fam.num)) : ''}
-                    </div>
-                </div>
-                <div style="display:flex;gap:8px;">
-                    ${phone1 ? `<button onclick="fieldApp.callFamilyNumber('${phone1}')" style="width:38px;height:38px;border-radius:50%;background:var(--bg-body);border:1px solid var(--border-light);color:var(--success);font-size:15px;cursor:pointer;"><i class="fas fa-phone"></i></button>` : ''}
-                    ${phone1 ? `<button onclick="window.open('https://wa.me/${phone1.replace(/\\D/g,'').replace(/^0/,'972')}','_blank')" style="width:38px;height:38px;border-radius:50%;background:#25D366;border:none;color:white;font-size:15px;cursor:pointer;"><i class="fab fa-whatsapp"></i></button>` : ''}
-                </div>
-            </div>
-
-            <!-- טאבים -->
-            <div id="ffc-tabs" style="display:flex;border-bottom:1px solid var(--border-light);margin-bottom:15px;overflow-x:auto;gap:0;">
-                <div id="ffc-tab-details" onclick="fieldApp._ffcTab('details')" style="padding:9px 13px;border-bottom:3px solid var(--accent);font-weight:bold;color:var(--accent);cursor:pointer;white-space:nowrap;font-size:13px;">פרטים</div>
-                <div id="ffc-tab-tasks" onclick="fieldApp._ffcTab('tasks')" style="padding:9px 13px;border-bottom:3px solid transparent;color:var(--text-muted);cursor:pointer;white-space:nowrap;font-size:13px;">משימות (${openTasks})</div>
-                <div id="ffc-tab-logs" onclick="fieldApp._ffcTab('logs')" style="padding:9px 13px;border-bottom:3px solid transparent;color:var(--text-muted);cursor:pointer;white-space:nowrap;font-size:13px;">קשר (${interactions.length})</div>
-                <div id="ffc-tab-donations" onclick="fieldApp._ffcTab('donations')" style="padding:9px 13px;border-bottom:3px solid transparent;color:var(--text-muted);cursor:pointer;white-space:nowrap;font-size:13px;">תרומות (${donations.length})</div>
-            </div>
-
-            <div id="ffc-content-details">${detailsHtml}</div>
-            <div id="ffc-content-tasks" style="display:none;">${tasksHtml}</div>
-            <div id="ffc-content-logs" style="display:none;">${logsHtml}</div>
-            <div id="ffc-content-donations" style="display:none;">${donationsHtml}</div>
-
-            <button onclick="fieldApp.openFamilyForm('${safeBldgEnc}', ${aptIdx}); document.getElementById('f-sheet').style.height='';"
-                style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-weight:bold;font-size:15px;cursor:pointer;font-family:inherit;margin-top:10px;">
-                <i class="fas fa-edit"></i> ערוך פרטי משפחה
-            </button>
-        </div>`;
-
-        document.getElementById('f-sheet-content').innerHTML = html;
+        _ffcRender(bldgEnc, aptIdx, 'details');
         sheet.classList.add('open');
         document.getElementById('f-scrim').style.display = 'block';
     }
 
+    function _ffcRender(bldgEnc, aptIdx, activeTab) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const fam = db[bldg].apts[aptIdx];
+        if (!fam) return;
 
-        function _ffcTab(tab) {
+        const interactions = fam.interactions || fam.history || [];
+        const donations = fam.donations || [];
+        const openTasks = (fam.tasks || []).filter(t => !t.done).length;
+        const phone1 = fam.fatherPhone || fam.phone || '';
+        const phone2 = fam.motherPhone || '';
+
+        // --- טאב פרטים (עריכה) ---
+        const detailsHtml = `
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">שם האב</label>
+                <input id="ffc-father" value="${escapeHTML(fam.father||fam.fatherName||'')}" class="ffc-input" placeholder="שם האב..."></div>
+                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">שם האם</label>
+                <input id="ffc-mother" value="${escapeHTML(fam.mother||fam.motherName||'')}" class="ffc-input" placeholder="שם האם..."></div>
+                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">טלפון אב</label>
+                <input id="ffc-father-phone" value="${escapeHTML(phone1)}" class="ffc-input" placeholder="05X-XXXXXXX" dir="ltr"></div>
+                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">טלפון אם</label>
+                <input id="ffc-mother-phone" value="${escapeHTML(phone2)}" class="ffc-input" placeholder="05X-XXXXXXX" dir="ltr"></div>
+                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">מייל אב</label>
+                <input id="ffc-father-email" value="${escapeHTML(fam.fatherEmail||'')}" class="ffc-input" placeholder="mail@..." dir="ltr"></div>
+                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">מייל אם</label>
+                <input id="ffc-mother-email" value="${escapeHTML(fam.motherEmail||'')}" class="ffc-input" placeholder="mail@..." dir="ltr"></div>
+            </div>
+            <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">סגנון</label>
+            <input id="ffc-style" value="${escapeHTML(fam.style||'')}" class="ffc-input" placeholder="חרדי / דתי / מסורתי..."></div>
+            <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">הערות</label>
+            <textarea id="ffc-notes" class="ffc-input" rows="3" placeholder="הערות פנימיות...">${escapeHTML(fam.notes||'')}</textarea></div>
+            <div>
+                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;">תגיות</label>
+                <div id="ffc-tags-display" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+                    ${(fam.tags||[]).map((t,i) => `<span style="background:var(--accent);color:white;padding:4px 10px;border-radius:15px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;">${escapeHTML(t)}<i class="fas fa-times" style="cursor:pointer;font-size:10px;" onclick="fieldApp._ffcRemoveTag('${bldgEnc}',${aptIdx},${i})"></i></span>`).join('')}
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <input id="ffc-tag-input" class="ffc-input" placeholder="הוסף תגית..." style="flex:1;">
+                    <button onclick="fieldApp._ffcAddTag('${bldgEnc}',${aptIdx})" style="padding:10px 16px;background:var(--accent);color:white;border:none;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-plus"></i></button>
+                </div>
+            </div>
+            <div>
+                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;"><i class="fas fa-child"></i> ילדים</label>
+                <div id="ffc-children-list">
+                    ${(fam.childrenList||[]).map((c,i) => `
+                    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+                        <input value="${escapeHTML(c.name||'')}" class="ffc-input" style="flex:2;" placeholder="שם" oninput="fieldApp._ffcUpdateChild('${bldgEnc}',${aptIdx},${i},'name',this.value)">
+                        <input type="date" value="${escapeHTML(c.dob||'')}" class="ffc-input" style="flex:2;" oninput="fieldApp._ffcUpdateChild('${bldgEnc}',${aptIdx},${i},'dob',this.value)">
+                        <button onclick="fieldApp._ffcRemoveChild('${bldgEnc}',${aptIdx},${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;"><i class="fas fa-times"></i></button>
+                    </div>`).join('')}
+                </div>
+                <button onclick="fieldApp._ffcAddChild('${bldgEnc}',${aptIdx})" style="width:100%;padding:9px;background:var(--bg-body);border:1px dashed var(--border-light);border-radius:10px;color:var(--text-muted);cursor:pointer;font-family:inherit;">
+                    <i class="fas fa-plus"></i> הוסף ילד/ה
+                </button>
+            </div>
+            <button onclick="fieldApp._ffcSaveDetails('${bldgEnc}',${aptIdx})" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-weight:bold;font-size:16px;cursor:pointer;font-family:inherit;">
+                <i class="fas fa-save"></i> שמור פרטים
+            </button>
+            <button onclick="fieldApp._ffcDelete('${bldgEnc}',${aptIdx})" style="width:100%;padding:12px;background:rgba(239,68,68,0.08);color:var(--danger);border:1px solid rgba(239,68,68,0.3);border-radius:12px;font-weight:bold;font-size:15px;cursor:pointer;font-family:inherit;">
+                <i class="fas fa-trash"></i> מחק משפחה
+            </button>
+        </div>`;
+
+        // --- טאב משימות ---
+        const allTasks = fam.tasks || [];
+        const tasksHtml = `
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            ${allTasks.length === 0
+                ? `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-check-circle" style="font-size:30px;opacity:0.3;display:block;margin-bottom:8px;"></i>אין משימות</div>`
+                : allTasks.map((t,i) => `
+                <div style="background:${t.done?'var(--bg-body)':'rgba(37,99,235,0.06)'};border:1px solid ${t.done?'var(--border-light)':'rgba(37,99,235,0.2)'};padding:10px 12px;border-radius:10px;display:flex;gap:10px;align-items:center;">
+                    <input type="checkbox" ${t.done?'checked':''} onchange="fieldApp._ffcToggleTask('${bldgEnc}',${aptIdx},${i},this.checked)" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;">
+                    <div style="flex:1;">
+                        <div style="font-size:14px;font-weight:600;${t.done?'text-decoration:line-through;opacity:0.5;':''}">${escapeHTML(t.text)}</div>
+                        ${t.date?`<div style="font-size:12px;color:var(--text-muted);">${escapeHTML(t.date)}</div>`:''}
+                    </div>
+                    <button onclick="fieldApp._ffcDeleteTask('${bldgEnc}',${aptIdx},${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button>
+                </div>`).join('')}
+            <div style="border-top:1px solid var(--border-light);margin-top:8px;padding-top:12px;">
+                <div style="display:flex;gap:8px;">
+                    <input id="ffc-new-task" class="ffc-input" placeholder="משימה חדשה..." style="flex:1;">
+                    <input type="date" id="ffc-new-task-date" class="ffc-input" style="width:130px;">
+                    <button onclick="fieldApp._ffcAddTask('${bldgEnc}',${aptIdx})" style="padding:10px 16px;background:var(--accent);color:white;border:none;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-plus"></i></button>
+                </div>
+            </div>
+        </div>`;
+
+        // --- טאב קשר ---
+        const logsHtml = `
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            ${interactions.length === 0
+                ? `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-comments" style="font-size:30px;opacity:0.3;display:block;margin-bottom:8px;"></i>אין היסטוריית קשר</div>`
+                : [...interactions].reverse().map((l,i) => {
+                    const realIdx = interactions.length - 1 - i;
+                    const type = l.type||l.status||'כללי';
+                    const text = l.text||l.notes||l.content||'';
+                    const colorMap = {'ביקור':'var(--success)','שיחה':'var(--accent)','בוצע':'var(--success)','אין מענה':'var(--warning)','לא מעוניינים':'var(--danger)'};
+                    const color = colorMap[type]||'var(--text-muted)';
+                    return `<div style="background:var(--bg-body);border-right:4px solid ${color};border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div style="flex:1;">
+                            <div style="display:flex;gap:8px;margin-bottom:3px;">
+                                <span style="font-weight:700;font-size:13px;color:${color};">${escapeHTML(type)}</span>
+                                <span style="font-size:12px;color:var(--text-muted);">${escapeHTML(l.date||'')}</span>
+                            </div>
+                            ${text?`<div style="font-size:13px;">${escapeHTML(text)}</div>`:''}
+                        </div>
+                        <button onclick="fieldApp._ffcDeleteLog('${bldgEnc}',${aptIdx},${realIdx})" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-right:5px;"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                }).join('')}
+            <div style="border-top:1px solid var(--border-light);margin-top:8px;padding-top:12px;display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;gap:8px;">
+                    <select id="ffc-log-type" class="ffc-input" style="flex:1;">
+                        <option>ביקור</option><option>שיחה</option><option>הודעה</option><option>אחר</option>
+                    </select>
+                    <input type="date" id="ffc-log-date" class="ffc-input" style="flex:1;" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <textarea id="ffc-log-text" class="ffc-input" rows="2" placeholder="מה היה?..."></textarea>
+                <button onclick="fieldApp._ffcAddLog('${bldgEnc}',${aptIdx})" style="width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:10px;font-weight:bold;cursor:pointer;font-family:inherit;"><i class="fas fa-plus"></i> הוסף תיעוד</button>
+            </div>
+        </div>`;
+
+        // --- טאב תרומות ---
+        const donationsTotal = donations.reduce((s,d)=>s+Number(d.amount||0),0);
+        const donationsHtml = `
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            ${donations.length > 0 ? `<div style="text-align:center;background:rgba(16,185,129,0.1);color:var(--success);padding:12px;border-radius:10px;font-size:18px;font-weight:bold;margin-bottom:4px;">סה"כ: ₪${donationsTotal}</div>` : ''}
+            ${donations.length === 0
+                ? `<div style="text-align:center;padding:20px;color:var(--text-muted);"><i class="fas fa-hand-holding-heart" style="font-size:30px;opacity:0.3;display:block;margin-bottom:8px;"></i>אין תרומות</div>`
+                : [...donations].reverse().map((d,i) => {
+                    const realIdx = donations.length - 1 - i;
+                    return `<div style="background:var(--bg-body);padding:10px 12px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="font-weight:700;font-size:15px;color:var(--success);">₪${escapeHTML(String(d.amount))}</div>
+                            <div style="font-size:12px;color:var(--text-muted);">${escapeHTML(d.reason||'')} · ${escapeHTML(d.date||'')}</div>
+                        </div>
+                        <button onclick="fieldApp._ffcDeleteDonation('${bldgEnc}',${aptIdx},${realIdx})" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                }).join('')}
+            <div style="border-top:1px solid var(--border-light);margin-top:8px;padding-top:12px;display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;gap:8px;">
+                    <input type="number" id="ffc-don-amount" class="ffc-input" placeholder="סכום ₪" style="flex:1;">
+                    <input type="date" id="ffc-don-date" class="ffc-input" style="flex:1;" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <input id="ffc-don-reason" class="ffc-input" placeholder="עבור מה?">
+                <button onclick="fieldApp._ffcAddDonation('${bldgEnc}',${aptIdx})" style="width:100%;padding:12px;background:var(--success);color:white;border:none;border-radius:10px;font-weight:bold;cursor:pointer;font-family:inherit;"><i class="fas fa-plus"></i> הוסף תרומה</button>
+            </div>
+        </div>`;
+
+        const tabs = [
+            {id:'details', label:'פרטים', content: detailsHtml},
+            {id:'tasks', label:`משימות (${openTasks})`, content: tasksHtml},
+            {id:'logs', label:`קשר (${interactions.length})`, content: logsHtml},
+            {id:'donations', label:`תרומות (${donations.length})`, content: donationsHtml},
+        ];
+
+        const html = `
+        <style>.ffc-input{width:100%;padding:9px 11px;border:1px solid var(--border-light);border-radius:10px;background:var(--bg-body);color:var(--text-main);font-family:inherit;font-size:14px;box-sizing:border-box;}</style>
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays(); document.getElementById('f-sheet').style.height=''"><i class="fas fa-times"></i></button>
+        <div style="overflow-y:auto;max-height:calc(92vh - 50px);padding-bottom:20px;margin-top:15px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                <div>
+                    <h2 style="margin:0 0 3px 0;font-size:20px;">משפחת ${escapeHTML(fam.name||'ללא שם')}</h2>
+                    <div style="font-size:13px;color:var(--text-muted);">
+                        <i class="fas fa-map-marker-alt"></i> ${escapeHTML(bldg===NO_ADDRESS_KEY?'ללא כתובת':bldg)}
+                        ${fam.num?' · דירה '+escapeHTML(String(fam.num)):''}
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    ${phone1?`<button onclick="fieldApp.callFamilyNumber('${phone1}')" style="width:38px;height:38px;border-radius:50%;background:var(--bg-body);border:1px solid var(--border-light);color:var(--success);font-size:15px;cursor:pointer;"><i class="fas fa-phone"></i></button>`:''}
+                    ${phone1?`<button onclick="window.open('https://wa.me/${phone1.replace(/\D/g,'').replace(/^0/,'972')}','_blank')" style="width:38px;height:38px;border-radius:50%;background:#25D366;border:none;color:white;font-size:15px;cursor:pointer;"><i class="fab fa-whatsapp"></i></button>`:''}
+                </div>
+            </div>
+            <div style="display:flex;border-bottom:1px solid var(--border-light);margin-bottom:15px;overflow-x:auto;gap:0;">
+                ${tabs.map(t => `<div onclick="fieldApp._ffcTab('${t.id}')" id="ffc-tab-${t.id}" style="padding:9px 13px;border-bottom:3px solid ${t.id===activeTab?'var(--accent)':'transparent'};color:${t.id===activeTab?'var(--accent)':'var(--text-muted)'};font-weight:${t.id===activeTab?'bold':'normal'};cursor:pointer;white-space:nowrap;font-size:13px;">${t.label}</div>`).join('')}
+            </div>
+            ${tabs.map(t => `<div id="ffc-content-${t.id}" style="display:${t.id===activeTab?'block':'none'};">${t.content}</div>`).join('')}
+        </div>`;
+
+        document.getElementById('f-sheet-content').innerHTML = html;
+    }
+
+    // ==========================================
+    // פונקציות עריכה בכרטיס המלא
+    // ==========================================
+
+    function _ffcSaveDetails(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const fam = db[bldg].apts[aptIdx];
+        fam.father = document.getElementById('ffc-father').value.trim();
+        fam.fatherName = fam.father;
+        fam.mother = document.getElementById('ffc-mother').value.trim();
+        fam.motherName = fam.mother;
+        fam.fatherPhone = document.getElementById('ffc-father-phone').value.trim();
+        fam.motherPhone = document.getElementById('ffc-mother-phone').value.trim();
+        fam.fatherEmail = document.getElementById('ffc-father-email').value.trim();
+        fam.motherEmail = document.getElementById('ffc-mother-email').value.trim();
+        fam.style = document.getElementById('ffc-style').value.trim();
+        fam.notes = document.getElementById('ffc-notes').value.trim();
+        fam.updatedAt = Date.now();
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'edit_family', bldg, aptName: fam.name, timestamp: new Date().toISOString(), payload: fam });
+        storageSet(OUTBOX_KEY, outbox);
+        showToast('✅ הפרטים נשמרו!');
+        renderCommunity();
+        _ffcRender(bldgEnc, aptIdx, 'details');
+    }
+
+    function _ffcDelete(bldgEnc, aptIdx) {
+        if (!confirm('למחוק את המשפחה לצמיתות?')) return;
+        const bldg = decodeURIComponent(bldgEnc);
+        db[bldg].apts.splice(aptIdx, 1);
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'delete_family', bldg, aptIdx, timestamp: new Date().toISOString() });
+        storageSet(OUTBOX_KEY, outbox);
+        closeOverlays();
+        document.getElementById('f-sheet').style.height = '';
+        renderCommunity();
+        renderMarkers();
+        showToast('🗑️ המשפחה נמחקה');
+    }
+
+    function _ffcAddTag(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const val = document.getElementById('ffc-tag-input').value.trim();
+        if (!val) return;
+        const fam = db[bldg].apts[aptIdx];
+        if (!fam.tags) fam.tags = [];
+        if (!fam.tags.includes(val)) fam.tags.push(val);
+        storageSet(DATA_KEY, db);
+        _ffcRender(bldgEnc, aptIdx, 'details');
+    }
+
+    function _ffcRemoveTag(bldgEnc, aptIdx, tagIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        db[bldg].apts[aptIdx].tags.splice(tagIdx, 1);
+        storageSet(DATA_KEY, db);
+        _ffcRender(bldgEnc, aptIdx, 'details');
+    }
+
+    function _ffcAddChild(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const fam = db[bldg].apts[aptIdx];
+        if (!fam.childrenList) fam.childrenList = [];
+        fam.childrenList.push({ name: '', dob: '' });
+        storageSet(DATA_KEY, db);
+        _ffcRender(bldgEnc, aptIdx, 'details');
+    }
+
+    function _ffcRemoveChild(bldgEnc, aptIdx, childIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        db[bldg].apts[aptIdx].childrenList.splice(childIdx, 1);
+        storageSet(DATA_KEY, db);
+        _ffcRender(bldgEnc, aptIdx, 'details');
+    }
+
+    function _ffcUpdateChild(bldgEnc, aptIdx, childIdx, field, val) {
+        const bldg = decodeURIComponent(bldgEnc);
+        if (!db[bldg].apts[aptIdx].childrenList) db[bldg].apts[aptIdx].childrenList = [];
+        db[bldg].apts[aptIdx].childrenList[childIdx][field] = val;
+        storageSet(DATA_KEY, db);
+    }
+
+    function _ffcToggleTask(bldgEnc, aptIdx, taskIdx, done) {
+        const bldg = decodeURIComponent(bldgEnc);
+        db[bldg].apts[aptIdx].tasks[taskIdx].done = done;
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: done ? 'task_done' : 'task_undone', bldg, aptIdx, taskIdx, timestamp: new Date().toISOString() });
+        storageSet(OUTBOX_KEY, outbox);
+        _ffcRender(bldgEnc, aptIdx, 'tasks');
+    }
+
+    function _ffcAddTask(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const text = document.getElementById('ffc-new-task').value.trim();
+        if (!text) return;
+        const date = document.getElementById('ffc-new-task-date').value;
+        const fam = db[bldg].apts[aptIdx];
+        if (!fam.tasks) fam.tasks = [];
+        const dateFormatted = date ? new Date(date).toLocaleDateString('he-IL') : '';
+        fam.tasks.push({ text, date: dateFormatted, done: false });
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'add_family_task', bldg, aptName: fam.name, timestamp: new Date().toISOString(), payload: { taskText: text, taskDate: dateFormatted } });
+        storageSet(OUTBOX_KEY, outbox);
+        renderTasks();
+        _ffcRender(bldgEnc, aptIdx, 'tasks');
+    }
+
+    function _ffcDeleteTask(bldgEnc, aptIdx, taskIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        db[bldg].apts[aptIdx].tasks.splice(taskIdx, 1);
+        storageSet(DATA_KEY, db);
+        renderTasks();
+        _ffcRender(bldgEnc, aptIdx, 'tasks');
+    }
+
+    function _ffcAddLog(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const type = document.getElementById('ffc-log-type').value;
+        const date = document.getElementById('ffc-log-date').value;
+        const text = document.getElementById('ffc-log-text').value.trim();
+        if (!text) return;
+        const fam = db[bldg].apts[aptIdx];
+        if (!fam.interactions) fam.interactions = [];
+        const dateStr = date ? new Date(date).toLocaleDateString('he-IL') : new Date().toLocaleDateString('he-IL');
+        fam.interactions.push({ type, date: dateStr, text });
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'visit_log', bldg, aptName: fam.name, timestamp: new Date().toISOString(), payload: { note: text, result: type } });
+        storageSet(OUTBOX_KEY, outbox);
+        _ffcRender(bldgEnc, aptIdx, 'logs');
+    }
+
+    function _ffcDeleteLog(bldgEnc, aptIdx, logIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const fam = db[bldg].apts[aptIdx];
+        const arr = fam.interactions || fam.history || [];
+        arr.splice(logIdx, 1);
+        storageSet(DATA_KEY, db);
+        _ffcRender(bldgEnc, aptIdx, 'logs');
+    }
+
+    function _ffcAddDonation(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const amount = document.getElementById('ffc-don-amount').value.trim();
+        const date = document.getElementById('ffc-don-date').value;
+        const reason = document.getElementById('ffc-don-reason').value.trim();
+        if (!amount) return;
+        const fam = db[bldg].apts[aptIdx];
+        if (!fam.donations) fam.donations = [];
+        const dateStr = date ? new Date(date).toLocaleDateString('he-IL') : new Date().toLocaleDateString('he-IL');
+        fam.donations.push({ amount, date: dateStr, reason: reason || 'כללי' });
+        storageSet(DATA_KEY, db);
+        _ffcRender(bldgEnc, aptIdx, 'donations');
+    }
+
+    function _ffcDeleteDonation(bldgEnc, aptIdx, donIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        db[bldg].apts[aptIdx].donations.splice(donIdx, 1);
+        storageSet(DATA_KEY, db);
+        _ffcRender(bldgEnc, aptIdx, 'donations');
+    }
+
+    function _ffcTab(tab) {
         ['details','tasks','logs','donations'].forEach(t => {
             const btn = document.getElementById('ffc-tab-' + t);
             const content = document.getElementById('ffc-content-' + t);
@@ -627,20 +831,44 @@ const fieldApp = (function () {
     }
 
     function promptAddToRoute(bldgEnc) {
-        const bldg = decodeURIComponent(bldgEnc); const coords = db[bldg]?.info?.coords;
-        if(!coords) return showToast("אין מיקום למשפחה זו");
+        const bldg = decodeURIComponent(bldgEnc);
+        const coords = db[bldg]?.info?.coords;
+        if (!coords) return showToast("אין מיקום למשפחה זו");
         isRouteBuilderMode = true;
         const existingIdx = selectedRouteBuildings.findIndex(b => b.address === bldg);
-        if(existingIdx === -1) selectedRouteBuildings.push({ address: bldg, coords: coords });
+        if (existingIdx === -1) {
+            const featureId = colorBuildingByCoords(coords, true);
+            selectedRouteBuildings.push({ address: bldg, coords, featureId });
+        }
         closeOverlays(); updateRouteVisuals(); showToast("הבניין נוסף למסלול! סרגל המסלול מוצג למטה.");
     }
 
+    function colorBuildingByCoords(coords, selected) {
+        if (!map || !coords) return null;
+        try {
+            const point = map.project(coords);
+            const features = map.queryRenderedFeatures(
+                [[point.x - 5, point.y - 5], [point.x + 5, point.y + 5]],
+                { layers: ['3d-buildings'] }
+            );
+            if (features.length > 0) {
+                map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: features[0].id }, { selected });
+                return features[0].id;
+            }
+        } catch(e) {}
+        return null;
+    }
+
     function addSingleToRoute(bldgEnc) {
-        const bldg = decodeURIComponent(bldgEnc); const coords = db[bldg]?.info?.coords;
-        if(!coords || isNaN(coords[0])) return showToast("אין מיקום למשפחה זו");
+        const bldg = decodeURIComponent(bldgEnc);
+        const coords = db[bldg]?.info?.coords;
+        if (!coords || isNaN(coords[0])) return showToast("אין מיקום למשפחה זו");
         isRouteBuilderMode = true;
         const existingIdx = selectedRouteBuildings.findIndex(b => b.address === bldg);
-        if(existingIdx === -1) selectedRouteBuildings.push({ address: bldg, coords: coords });
+        if (existingIdx === -1) {
+            const featureId = colorBuildingByCoords(coords, true);
+            selectedRouteBuildings.push({ address: bldg, coords, featureId });
+        }
         showToast("נוסף למסלול בהצלחה"); closeOverlays(); updateRouteVisuals();
     }
 
@@ -667,18 +895,107 @@ const fieldApp = (function () {
         renderRouteEditorList(); document.getElementById('f-route-editor-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block';
     }
 
+    // ==========================================
+    // עריכת מסלול מתקדמת: גרירה וסידור אוטומטי
+    // ==========================================
     function renderRouteEditorList() {
         const container = document.getElementById('f-route-editor-list');
-        if (selectedRouteBuildings.length === 0) { container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">המסלול כרגע ריק.</div>'; return; }
-        container.innerHTML = selectedRouteBuildings.map((bldg, idx) => `
-            <div class="route-editor-item">
-                <div class="content"><div style="font-weight:700; font-size:15px;"><span style="color:var(--warning); font-weight:900;">${idx+1}.</span> ${escapeHTML(bldg.address)}</div></div>
+        if (selectedRouteBuildings.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">המסלול כרגע ריק.</div>';
+            return;
+        }
+        let html = `<button onclick="fieldApp.autoSortRoute()" style="width:100%; margin-bottom:15px; padding:10px; background:rgba(16,185,129,0.1); color:var(--success); border:1px solid var(--success); border-radius:10px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; font-family:inherit;"><i class="fas fa-magic"></i> סדר מסלול אוטומטית לפי מפה</button>`;
+        html += selectedRouteBuildings.map((bldg, idx) => `
+            <div class="route-editor-item" data-idx="${idx}"
+                 ontouchstart="fieldApp.handleRouteTouchStart(event, ${idx})"
+                 ontouchmove="fieldApp.handleRouteTouchMove(event)"
+                 ontouchend="fieldApp.handleRouteTouchEnd(event)"
+                 draggable="true"
+                 ondragstart="fieldApp.handleRouteDragStart(event, ${idx})"
+                 ondragover="event.preventDefault()"
+                 ondrop="fieldApp.handleRouteDrop(event, ${idx})">
+                <div class="drag-handle"><i class="fas fa-grip-lines"></i></div>
+                <div class="content">
+                    <div style="font-weight:700; font-size:15px;"><span style="color:var(--warning); font-weight:900; margin-left:5px;">${idx+1}.</span> ${escapeHTML(bldg.address)}</div>
+                </div>
                 <div class="actions">
-                    <button onclick="fieldApp.moveRouteItem(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3"' : ''}><i class="fas fa-chevron-up"></i></button>
-                    <button onclick="fieldApp.moveRouteItem(${idx}, 1)" ${idx === selectedRouteBuildings.length - 1 ? 'disabled style="opacity:0.3"' : ''}><i class="fas fa-chevron-down"></i></button>
                     <button class="delete-btn" onclick="fieldApp.removeRouteItem(${idx})"><i class="fas fa-trash"></i></button>
                 </div>
             </div>`).join('');
+        container.innerHTML = html;
+    }
+
+    function autoSortRoute() {
+        if (selectedRouteBuildings.length < 2) return;
+        showToast("מחשב את המסלול היעיל ביותר...");
+        let unvisited = [...selectedRouteBuildings];
+        let current = unvisited.shift();
+        let sorted = [current];
+        while (unvisited.length > 0) {
+            let nearestIdx = 0, minDist = Infinity;
+            for (let i = 0; i < unvisited.length; i++) {
+                let d = calculateDistance(current.coords, unvisited[i].coords);
+                if (d < minDist) { minDist = d; nearestIdx = i; }
+            }
+            current = unvisited.splice(nearestIdx, 1)[0];
+            sorted.push(current);
+        }
+        selectedRouteBuildings = sorted;
+        if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+        renderRouteEditorList();
+        updateRouteVisuals();
+        showToast("המסלול סודר בהצלחה! ✨");
+    }
+
+    let routeDragItem = null;
+    let routeDragStartIdx = -1;
+
+    function handleRouteTouchStart(e, idx) {
+        routeDragStartIdx = idx;
+        routeDragItem = e.currentTarget;
+        routeDragItem.classList.add('dragging');
+    }
+
+    function handleRouteTouchMove(e) {
+        if (!routeDragItem) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+        const dropTarget = targetEl?.closest('.route-editor-item');
+        document.querySelectorAll('.route-editor-item').forEach(item => item.style.border = '1px solid var(--border-light)');
+        if (dropTarget && dropTarget !== routeDragItem) dropTarget.style.border = '2px dashed var(--accent)';
+    }
+
+    function handleRouteTouchEnd(e) {
+        if (!routeDragItem) return;
+        routeDragItem.classList.remove('dragging');
+        document.querySelectorAll('.route-editor-item').forEach(item => item.style.border = '1px solid var(--border-light)');
+        const touch = e.changedTouches[0];
+        const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+        const dropTarget = targetEl?.closest('.route-editor-item');
+        if (dropTarget) {
+            const targetIdx = parseInt(dropTarget.getAttribute('data-idx'));
+            if (!isNaN(targetIdx) && targetIdx !== routeDragStartIdx) {
+                const itemToMove = selectedRouteBuildings.splice(routeDragStartIdx, 1)[0];
+                selectedRouteBuildings.splice(targetIdx, 0, itemToMove);
+                renderRouteEditorList();
+                updateRouteVisuals();
+                if (navigator.vibrate) navigator.vibrate(20);
+            }
+        }
+        routeDragItem = null;
+        routeDragStartIdx = -1;
+    }
+
+    function handleRouteDragStart(e, idx) { e.dataTransfer.setData('text/plain', idx); }
+    function handleRouteDrop(e, targetIdx) {
+        e.preventDefault();
+        const startIdx = parseInt(e.dataTransfer.getData('text/plain'));
+        if (startIdx === targetIdx) return;
+        const itemToMove = selectedRouteBuildings.splice(startIdx, 1)[0];
+        selectedRouteBuildings.splice(targetIdx, 0, itemToMove);
+        renderRouteEditorList();
+        updateRouteVisuals();
     }
 
     function moveRouteItem(idx, direction) {
@@ -1256,12 +1573,20 @@ const fieldApp = (function () {
 
     function openTaskEdit(el) {
         const isGeneral = el.getAttribute('data-general') === 'true';
+        let taskFamilyLabel = 'משימה כללית';
         if (isGeneral) {
             currentEditTaskRef = db.meta.generalTasks[el.getAttribute('data-idx')];
         } else {
             const bldg = decodeURIComponent(el.getAttribute('data-bldg'));
-            currentEditTaskRef = db[bldg].apts[el.getAttribute('data-apt')].tasks[el.getAttribute('data-task')];
+            const aptIdx = parseInt(el.getAttribute('data-apt'));
+            currentEditTaskRef = db[bldg].apts[aptIdx].tasks[el.getAttribute('data-task')];
+            const famName = db[bldg].apts[aptIdx].name || '';
+            taskFamilyLabel = `משפחת ${famName} · ${bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : bldg}`;
         }
+        // הצג שיוך המשימה
+        const famLabelEl = document.getElementById('f-task-edit-family-label');
+        if (famLabelEl) famLabelEl.innerText = taskFamilyLabel;
+
         document.getElementById('f-task-edit-text').value = currentEditTaskRef.text || '';
         let dateVal = currentEditTaskRef.date || '';
         if (dateVal && dateVal.includes('.')) {
@@ -1722,8 +2047,14 @@ const fieldApp = (function () {
         closeMissionSummary, buildRouteFromSaved, openSavedRoutesSheet, routeDialogGoNow, routeDialogSaveLater,
         toggleRouteBuilderMode, promptAddToRoute, openRouteEditor, moveRouteItem, removeRouteItem, saveAndStartEditedRoute,
         handleCardTouchStart, handleCardTouchEnd, addSingleToRoute, removeSingleFromRoute,
+        autoSortRoute, handleRouteTouchStart, handleRouteTouchMove, handleRouteTouchEnd, handleRouteDragStart, handleRouteDrop, colorBuildingByCoords,
         // *** פונקציות חדשות חשופות ***
-        openFullImage, openFullFamilyCard, _ffcTab,
+        openFullImage, openFullFamilyCard, _ffcTab, _ffcRender,
+        _ffcSaveDetails, _ffcDelete, _ffcAddTag, _ffcRemoveTag,
+        _ffcAddChild, _ffcRemoveChild, _ffcUpdateChild,
+        _ffcToggleTask, _ffcAddTask, _ffcDeleteTask,
+        _ffcAddLog, _ffcDeleteLog,
+        _ffcAddDonation, _ffcDeleteDonation,
         // *** מסך משימות מתקדם ***
         toggleViewAllTasks, toggleCompletedTasks, setTaskFilter, openTaskEdit, saveEditedTask,
         deleteCurrentTask, addEditTag, removeEditTag, toggleChipTag, onTagAtInput, onTagAtKey, selectDropdownTag,
