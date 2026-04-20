@@ -814,17 +814,28 @@ const fieldApp = (function () {
 
     function toggleTargetForRoute(el, lng, lat) {
         if (!lng || !lat || isNaN(lng)) { showToast("למשפחה זו אין מיקום מוגדר במפה."); return; }
+        const coords = [lng, lat];
         const coordsStr = `${lng},${lat}`;
         const existingIdx = selectedRouteBuildings.findIndex(c => `${c.coords[0]},${c.coords[1]}` === coordsStr);
 
         if (existingIdx >= 0) {
-            selectedRouteBuildings.splice(existingIdx, 1);
+            const removed = selectedRouteBuildings.splice(existingIdx, 1)[0];
+            if (removed.featureId) map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: removed.featureId }, { selected: false });
             el.style.border = "1px solid var(--border-light)";
             el.style.background = "var(--surface)";
         } else {
-            selectedRouteBuildings.push({ address: 'יעד מהקהילה', coords: [lng, lat], featureId: null });
+            selectedRouteBuildings.push({ address: 'יעד מהקהילה', coords, featureId: null });
             el.style.border = "2px solid var(--accent)";
             el.style.background = "rgba(59,130,246,0.05)";
+            // flyTo ואז צביעה אחרי טעינה
+            map.once('idle', () => {
+                const idx = selectedRouteBuildings.findIndex(c => `${c.coords[0]},${c.coords[1]}` === coordsStr);
+                if (idx > -1) {
+                    const fid = colorBuildingByCoords(coords, true);
+                    if (fid) selectedRouteBuildings[idx].featureId = fid;
+                }
+            });
+            map.flyTo({ center: coords, zoom: Math.max(map.getZoom(), 17), pitch: 60, duration: 1200 });
         }
         isRouteBuilderMode = true;
         updateRouteVisuals();
@@ -866,8 +877,14 @@ const fieldApp = (function () {
         isRouteBuilderMode = true;
         const existingIdx = selectedRouteBuildings.findIndex(b => b.address === bldg);
         if (existingIdx === -1) {
-            const featureId = colorBuildingByCoords(coords, true);
-            selectedRouteBuildings.push({ address: bldg, coords, featureId });
+            selectedRouteBuildings.push({ address: bldg, coords, featureId: null });
+            const newIdx = selectedRouteBuildings.length - 1;
+            // flyTo ואז צביעה אחרי שהמפה טעונה
+            map.once('idle', () => {
+                const fid = colorBuildingByCoords(coords, true);
+                if (fid) selectedRouteBuildings[newIdx].featureId = fid;
+            });
+            map.flyTo({ center: coords, zoom: Math.max(map.getZoom(), 17), pitch: 60, duration: 1200 });
         }
         showToast("נוסף למסלול בהצלחה"); closeOverlays(); updateRouteVisuals();
     }
