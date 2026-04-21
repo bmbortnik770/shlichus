@@ -326,6 +326,34 @@ const fieldApp = (function () {
     // ==========================================
     // *** עדכון מרכזי: openBuildingCard עם תמונת Street View ***
     // ==========================================
+
+    // ==========================================
+    // מגירה ראשית מאוחדת
+    // ==========================================
+    function openSheet(htmlContent, heightMode = 'auto') {
+        closeOverlays();
+        const sheet = document.getElementById('f-sheet');
+        const sheetContent = document.getElementById('f-sheet-content');
+        
+        // גבהים
+        sheet.style.height = '';
+        sheet.style.maxHeight = '';
+        sheet.style.borderRadius = '24px 24px 0 0';
+
+        if (heightMode === 'full') {
+            sheet.style.height = '92vh';
+        } else if (heightMode === 'half') {
+            sheet.style.maxHeight = '60vh';
+        } else {
+            sheet.style.maxHeight = '85vh';
+        }
+
+        sheetContent.innerHTML = htmlContent;
+        sheet.classList.add('open');
+        document.getElementById('f-scrim').style.display = 'block';
+        if (db) document.getElementById('f-fab-wrapper').style.display = 'flex';
+    }
+
     function openBuildingCard(bldg, isFromRouteMode = false) {
         closeOverlays();
         const sheet = document.getElementById('f-sheet');
@@ -383,9 +411,7 @@ const fieldApp = (function () {
         });
         html += `</div>`;
 
-        document.getElementById('f-sheet-content').innerHTML = html;
-        sheet.classList.add('open');
-        document.getElementById('f-scrim').style.display = 'block';
+        openSheet(html);
     }
 
     // ==========================================
@@ -807,9 +833,7 @@ const fieldApp = (function () {
         
         html += historyHTML;
 
-        document.getElementById('f-sheet-content').innerHTML = html;
-        document.getElementById('f-sheet').classList.add('open');
-        document.getElementById('f-scrim').style.display = 'block';
+        openSheet(html);
     }
 
     // ==========================================
@@ -969,7 +993,8 @@ const fieldApp = (function () {
 
     function openRouteEditor() {
         document.getElementById('f-route-dialog').style.display = 'none';
-        renderRouteEditorList(); document.getElementById('f-route-editor-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block';
+        renderRouteEditorList();
+        openSheet(document.getElementById('f-route-editor-sheet').innerHTML, 'full');
     }
 
     // ==========================================
@@ -1306,7 +1331,7 @@ const fieldApp = (function () {
             titleIcon.innerHTML = '<i class="fas fa-user-plus" style="color:var(--accent);"></i> הוספת משפחה חדשה';
             saveBtn.innerHTML = '<i class="fas fa-save"></i> הוסף למערכת';
         }
-        sheet.classList.add('open'); document.getElementById('f-scrim').style.display = 'block';
+        openSheet(sheet.innerHTML, 'full');
     }
 
     async function searchAddressInput(query) {
@@ -1386,7 +1411,9 @@ const fieldApp = (function () {
         let optionsHtml = '<option value="">-- משימה כללית (ללא שיוך) --</option>';
         Object.keys(db).forEach(bldg => { if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return; (db[bldg].apts || []).forEach((apt, aptIdx) => { optionsHtml += `<option value="${encodeURIComponent(bldg)}|${aptIdx}">משפחת ${escapeHTML(apt.name)} (${escapeHTML(bldg)})</option>`; }); });
         select.innerHTML = optionsHtml;
-        document.getElementById('f-add-task-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block';
+        const taskSheetEl = document.getElementById('f-add-task-sheet');
+        openSheet(taskSheetEl.innerHTML, 'auto');
+        taskSheetEl.classList.remove('open');
     }
 
     function saveNewTask() {
@@ -1710,8 +1737,7 @@ const fieldApp = (function () {
         closeTagDropdown();
         const inp = document.getElementById('f-tag-at-input');
         if (inp) inp.value = '';
-        document.getElementById('f-task-edit-sheet').classList.add('open');
-        document.getElementById('f-scrim').style.display = 'block';
+        openSheet(document.getElementById('f-task-edit-sheet').innerHTML, 'auto');
         document.getElementById('f-fab-wrapper').style.display = 'none';
     }
 
@@ -1875,8 +1901,7 @@ const fieldApp = (function () {
         closeOverlays();
         if(currentTarget) currentTarget.status = status;
         document.getElementById('f-voice-status-badge').innerText = status;
-        document.getElementById('f-voice-sheet').classList.add('open');
-        document.getElementById('f-scrim').style.display = 'block';
+        openSheet(document.getElementById('f-voice-sheet').innerHTML, 'auto');
         document.getElementById('f-voice-result').value = '';
         if(recognition) toggleVoiceRecording(); else showToast("הקלטה קולית אינה נתמכת, ניתן להקליד.");
     }
@@ -2125,7 +2150,7 @@ const fieldApp = (function () {
         if (navigator.geolocation) { navigator.geolocation.getCurrentPosition( pos => { drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], route.waypoints); startMissionMode(route.waypoints); }, () => { drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], route.waypoints); startMissionMode(route.waypoints); } ); }
     }
 
-    function openSavedRoutesSheet() { closeOverlays(); renderSavedRoutesSheet(); document.getElementById('f-saved-routes-sheet').classList.add('open'); document.getElementById('f-scrim').style.display = 'block'; }
+    function openSavedRoutesSheet() { closeOverlays(); renderSavedRoutesSheet(); openSheet(document.getElementById('f-saved-routes-sheet').innerHTML, 'auto'); }
     function showRouteDialog(waypoints) { pendingRouteWaypoints = waypoints; document.getElementById('f-route-dialog').style.display = 'flex'; }
 
     function routeDialogGoNow() {
@@ -2280,8 +2305,8 @@ const fieldApp = (function () {
         document.getElementById('q-family-phone').value = '';
         document.getElementById('q-family-address').value = prefilledAddress;
         // פתח מגירה
-        document.getElementById('quick-family-sheet').classList.add('active');
-        document.getElementById('action-sheet-overlay').classList.add('active');
+        openSheet(document.getElementById('quick-family-sheet').innerHTML, 'auto');
+        document.getElementById('action-sheet-overlay').classList.remove('active');
         // פוקוס לשדה הראשון הריק
         setTimeout(() => {
             const focus = prefilledAddress
@@ -2291,10 +2316,7 @@ const fieldApp = (function () {
         }, 350);
     }
 
-    function closeQuickFamilyForm() {
-        document.getElementById('quick-family-sheet').classList.remove('active');
-        document.getElementById('action-sheet-overlay').classList.remove('active');
-    }
+    function closeQuickFamilyForm() { closeOverlays(); }
 
     function expandToFullFamilyForm() {
         closeQuickFamilyForm();
@@ -2380,20 +2402,17 @@ const fieldApp = (function () {
         renderSmartChips();
 
         // פתח מגירה
-        document.getElementById('quick-task-sheet').classList.add('active');
-        if (actionOverlay) actionOverlay.classList.add('active');
+        openSheet(document.getElementById('quick-task-sheet').innerHTML, 'auto');
+        if (actionOverlay) actionOverlay.classList.remove('active');
 
         setTimeout(() => document.getElementById('q-task-title').focus(), 350);
     }
 
     function closeQuickTaskForm() {
-        document.getElementById('quick-task-sheet').classList.remove('active');
-        const actionOverlay = document.getElementById('action-sheet-overlay');
-        if (actionOverlay) actionOverlay.classList.remove('active');
-        // עצור הקלטה אם פעילה
         if (_taskVoiceRec) { try { _taskVoiceRec.stop(); } catch(e) {} _taskVoiceRec = null; }
         const mic = document.getElementById('btn-task-mic');
         if (mic) mic.classList.remove('listening');
+        closeOverlays();
     }
 
     function expandToFullTaskForm() {
