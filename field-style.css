@@ -899,3 +899,28 @@ body, html {
     color: var(--success);
 }
 #route-builder-bar.visible { display: flex; }
+
+/* ==========================================
+   מצב מבצע נקי (Waze-style)
+   ========================================== */
+#f-mission-hud {
+    animation: fadeIn 0.3s ease;
+}
+
+/* כפתור "הגעתי" — pulse עדין */
+#f-mission-hud button[onclick*="nextMissionTarget"] {
+    position: relative;
+    overflow: hidden;
+}
+#f-mission-hud button[onclick*="nextMissionTarget"]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.15);
+    animation: missionBtnPulse 2s infinite;
+    border-radius: inherit;
+}
+@keyframes missionBtnPulse {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+}
