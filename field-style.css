@@ -58,6 +58,7 @@ body, html {
     display: flex; justify-content: space-around; align-items: center;
     padding-bottom: var(--safe-b); z-index: 1000;
     transition: background 0.3s;
+    overflow: visible;
 }
 
 .nav-item {
@@ -121,22 +122,26 @@ body, html {
    ========================================== */
 .super-fab-container {
     position: relative;
-    top: -15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .super-fab {
-    width: 56px;
-    height: 56px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent), #1d4ed8);
     color: white;
     border: none;
-    font-size: 24px;
+    font-size: 26px;
     box-shadow: 0 4px 15px rgba(37, 99, 235, 0.45);
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
+    position: absolute;
+    bottom: 10px;
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .super-fab:active { transform: scale(0.92); }
@@ -465,7 +470,7 @@ body, html {
     box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
     border-top: 1px solid var(--border-light);
     z-index: 8000;
-    transform: translateY(calc(100% - 52px));
+    transform: translateY(100%);
     transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     max-height: 60vh;
     display: flex;
