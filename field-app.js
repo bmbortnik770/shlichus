@@ -820,6 +820,7 @@ const fieldApp = (function () {
     function toggleRouteBuilderMode() {
         isRouteBuilderMode = true;
         closeOverlays();
+        updateAppUIState('ROUTE_BUILDER');
 
         const dialogHtml = `
         <div style="text-align:center; padding:10px;">
@@ -854,11 +855,19 @@ const fieldApp = (function () {
         const bldgCountEl = document.getElementById('f-bldg-count');
         if (bldgCountEl) bldgCountEl.innerText = selectedRouteBuildings.length;
 
+        // עדכן route-builder-bar
+        const rbBar = document.getElementById('route-builder-bar');
+        const rbCount = document.getElementById('route-builder-count');
+        if (rbCount) rbCount.innerText = `${selectedRouteBuildings.length} תחנות נבחרו`;
+
         if (selectedRouteBuildings.length > 0) { 
             if(bar) { bar.style.display = 'flex'; document.getElementById('f-route-counter').innerText = selectedRouteBuildings.length; }
+            updateAppUIState('ROUTE_BUILDER');
         } else { 
-            if(bar) bar.style.display = 'none'; 
+            if(bar) bar.style.display = 'none';
+            if(rbBar) rbBar.classList.remove('visible');
             isRouteBuilderMode = false;
+            updateAppUIState('CRM');
         }
     }
 
@@ -955,6 +964,7 @@ const fieldApp = (function () {
         pendingRouteWaypoints = selectedRouteBuildings.map(b => b.coords);
         document.getElementById('f-route-action-bar').style.display = 'none';
         document.getElementById('f-route-dialog').style.display = 'flex';
+        updateAppUIState('CRM');
     }
 
     function openRouteEditor() {
@@ -1985,8 +1995,7 @@ const fieldApp = (function () {
     function startMissionMode(waypoints) {
         missionWaypoints = waypoints || []; missionCurrentIdx = 0; missionPaused = false; isMissionActive = true;
         document.getElementById('f-mission-hud').style.display = 'flex';
-        document.getElementById('f-bottom-nav-bar').style.display = 'none';
-        document.getElementById('f-fab-wrapper').style.display = 'none';
+        updateAppUIState('MISSION_ACTIVE');
         updateMissionHUD(); showToast("🚀 מצב מבצע פעיל! נווט ליעד הראשון."); if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
     }
 
@@ -2059,8 +2068,7 @@ const fieldApp = (function () {
 
     function closeMissionSummary() {
         document.getElementById('f-mission-summary').style.display = 'none';
-        document.getElementById('f-bottom-nav-bar').style.display = 'flex';
-        document.getElementById('f-fab-wrapper').style.display = 'flex';
+        updateAppUIState('CRM');
         missionWaypoints = []; missionCurrentIdx = 0; isMissionActive = false;
         if (map && map.getLayer('route')) map.removeLayer('route');
         if (map && map.getSource('route')) map.removeSource('route');
@@ -2139,7 +2147,7 @@ const fieldApp = (function () {
     // ==========================================
     function toggleRouteSheet() {
         const sheet = document.getElementById('route-sheet');
-        if (sheet) sheet.classList.toggle('expanded');
+        if (sheet) { sheet.classList.toggle('expanded'); updateMapPadding(); }
     }
 
     function addStopToRoute(id, name, address, coords) {
@@ -2210,8 +2218,8 @@ const fieldApp = (function () {
         activeRouteIndex = 0;
         document.getElementById('route-sheet').classList.remove('expanded');
         document.getElementById('active-nav-overlay').style.display = 'flex';
+        updateAppUIState('MISSION_ACTIVE');
         renderActiveStop();
-        // הפעל גם את מנוע המסלול הקיים
         const waypoints = currentDraftRoute.map(s => s.coords);
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -2225,6 +2233,7 @@ const fieldApp = (function () {
 
     function stopActiveRoute() {
         document.getElementById('active-nav-overlay').style.display = 'none';
+        updateAppUIState('CRM');
         showToast('⏸ המסלול הושהה');
     }
 
@@ -2622,11 +2631,74 @@ const fieldApp = (function () {
         _commSwipeEl = null;
     }
 
+
+    // ==========================================
+    // משימה 5: מכונת מצבים מרכזית לUI
+    // ==========================================
+    function updateAppUIState(state) {
+        const navBar    = document.getElementById('f-bottom-nav-bar');
+        const fabWrap   = document.getElementById('f-fab-wrapper');
+        const fabBtn    = document.getElementById('super-fab-btn');
+        const fabIcon   = document.getElementById('fab-icon');
+        const syncW     = document.getElementById('sync-widget');
+        const routeBar  = document.getElementById('route-builder-bar');
+
+        // ניקוי classes קודמות
+        if (fabBtn) { fabBtn.classList.remove('state-crm', 'state-route'); }
+
+        switch (state) {
+            case 'CRM':
+                if (navBar)  navBar.style.display  = 'flex';
+                if (fabWrap) fabWrap.style.display  = 'flex';
+                if (syncW)   syncW.style.display    = 'flex';
+                if (routeBar) routeBar.classList.remove('visible');
+                if (fabBtn)  { fabBtn.classList.add('state-crm'); fabBtn.onclick = () => fieldApp.toggleActionSheet(); }
+                if (fabIcon) fabIcon.innerHTML = '<i class="fas fa-plus"></i>';
+                updateMapPadding();
+                break;
+
+            case 'ROUTE_BUILDER':
+                if (navBar)  navBar.style.display  = 'flex';
+                if (fabWrap) fabWrap.style.display  = 'flex';
+                if (syncW)   syncW.style.display    = 'flex';
+                if (routeBar) routeBar.classList.add('visible');
+                if (fabBtn)  {
+                    fabBtn.classList.add('state-route');
+                    fabBtn.onclick = () => fieldApp.startCustomRoute();
+                }
+                if (fabIcon) fabIcon.innerHTML = '<i class="fas fa-check"></i>';
+                updateMapPadding();
+                break;
+
+            case 'MISSION_ACTIVE':
+                if (navBar)  navBar.style.display  = 'none';
+                if (fabWrap) fabWrap.style.display  = 'none';
+                if (syncW)   syncW.style.display    = 'none';
+                if (routeBar) routeBar.classList.remove('visible');
+                // Map padding מלא כשאין UI תחתון
+                if (map) map.setPadding({ bottom: 0, top: 0 });
+                break;
+        }
+    }
+
+    // משימה 6: עדכון padding דינמי של המפה
+    function updateMapPadding() {
+        if (!map) return;
+        const routeSheet = document.getElementById('route-sheet');
+        const navH = 70; // bottom-nav-h
+        let bottomPad = navH + 20;
+        if (routeSheet && routeSheet.classList.contains('expanded')) {
+            bottomPad = routeSheet.getBoundingClientRect().height + 20;
+        }
+        map.setPadding({ bottom: bottomPad, top: 0, left: 0, right: 0 });
+    }
+
     // ==========================================
     // חשיפת הפונקציות החוצה
     // ==========================================
     return { 
         init, login, switchView, toggleFab, toggleActionSheet, toggleSyncDetails, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm,
+        updateAppUIState, updateMapPadding,
         openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded,
         openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter,
         callFamilyNumber, toggleDarkMode, forceSync, openExternalNav, searchAddressInput, selectAddressOption,

@@ -24,6 +24,13 @@
         <div class="sync-text" onclick="fieldApp.forceSync(event)">ממתין לסנכרון</div>
     </div>
 
+    <!-- Route Builder State Bar -->
+    <div id="route-builder-bar">
+        <i class="fas fa-route"></i>
+        <span id="route-builder-count">0 תחנות נבחרו</span>
+        <span style="margin-right:auto; font-size:11px; color:var(--text-muted);">לחץ על בניינים להוספה</span>
+    </div>
+
     <div id="f-login" class="view-container" style="display:none; padding:40px 20px; text-align:center; height: 100vh; background: var(--bg-body); position: fixed; inset: 0; z-index: 9998;">
         <div style="margin-top: 20vh;">
             <i class="fas fa-user-shield fa-4x" style="color: var(--accent); margin-bottom: 20px;"></i>
@@ -350,8 +357,8 @@
             <i class="fas fa-clipboard-list"></i><span>משימות</span>
         </div>
         <div class="nav-item super-fab-container" id="f-fab-wrapper" style="display:none;">
-            <button class="super-fab" onclick="fieldApp.toggleActionSheet()">
-                <i class="fas fa-plus"></i>
+            <button class="super-fab state-crm" id="super-fab-btn" onclick="fieldApp.toggleActionSheet()">
+                <span class="fab-icon" id="fab-icon"><i class="fas fa-plus"></i></span>
             </button>
         </div>
         <div class="nav-item" onclick="fieldApp.switchView('community', this)">

@@ -12,6 +12,15 @@
     --bottom-nav-h: 70px;
     --safe-b: env(safe-area-inset-bottom, 0px);
     --safe-t: env(safe-area-inset-top, 0px);
+    /* ==========================================
+       מערכת Z-Index מרכזית
+       ========================================== */
+    --z-map-controls: 10;
+    --z-bottom-nav: 20;
+    --z-fab: 30;
+    --z-bottom-sheet: 40;
+    --z-top-bar: 50;
+    --z-overlay: 100;
 }
 
 body.dark-mode {
@@ -828,3 +837,60 @@ body, html {
     transition: transform 0.25s ease-out;
     will-change: transform;
 }
+
+/* ==========================================
+   משימה 1+2: Z-Index + Pointer Events
+   ========================================== */
+.f-bottom-nav       { z-index: var(--z-bottom-nav); }
+.super-fab-container { z-index: var(--z-fab); }
+.bottom-sheet, .snap-sheet, .route-sheet { z-index: var(--z-bottom-sheet); }
+.sync-widget        { z-index: var(--z-top-bar); }
+#action-sheet-overlay, #f-scrim { z-index: var(--z-overlay); }
+#action-sheet       { z-index: calc(var(--z-overlay) + 1); }
+
+/* Pointer Events — שכבות מכילות לא חוסמות מגע */
+.map-anchors        { pointer-events: none; }
+.map-anchors > *    { pointer-events: auto; }
+.theme-anchor       { pointer-events: auto; }
+.sync-widget        { pointer-events: auto; }
+
+/* ==========================================
+   משימה 4: FAB States
+   ========================================== */
+.super-fab {
+    transition: background 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.super-fab.state-crm {
+    background: linear-gradient(135deg, var(--accent), #1d4ed8);
+}
+.super-fab.state-route {
+    background: linear-gradient(135deg, var(--success), #059669);
+    transform: rotate(0deg);
+}
+.super-fab .fab-icon {
+    transition: opacity 0.2s, transform 0.3s;
+    display: inline-block;
+}
+
+/* ==========================================
+   משימה 3: Route Builder State Bar
+   ========================================== */
+#route-builder-bar {
+    position: fixed;
+    top: calc(15px + var(--safe-t));
+    left: 15px;
+    right: 55px; /* מרווח מהsync widget */
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 8px 16px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    z-index: var(--z-top-bar);
+    box-shadow: var(--shadow);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--success);
+}
+#route-builder-bar.visible { display: flex; }
