@@ -1,65 +1,901 @@
-// *** עדכן את המספר הזה בכל פעם שמעלים גרסה חדשה ***
-const CACHE_VERSION = 'v29';
-const CACHE_NAME = 'field-app-cache-' + CACHE_VERSION;
+:root {
+    --accent: #2563eb;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --bg-body: #f8fafc;
+    --surface: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-light: #e2e8f0;
+    --shadow: 0 4px 15px rgba(0,0,0,0.1);
+    --bottom-nav-h: 70px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+    /* ==========================================
+       מערכת Z-Index מרכזית
+       ========================================== */
+    --z-map-controls: 10;
+    --z-bottom-nav: 20;
+    --z-fab: 30;
+    --z-bottom-sheet: 40;
+    --z-top-bar: 50;
+    --z-overlay: 100;
+}
 
-const ASSETS_TO_CACHE = [
-  './field.html',
-  './field-style.css',
-  './field-app.js',
-  './field-manifest.json',
-  './favicon.ico'
-];
+body.dark-mode {
+    --bg-body: #020617;
+    --surface: #0f172a;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --border-light: rgba(255, 255, 255, 0.1);
+    --shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return Promise.allSettled(
-        ASSETS_TO_CACHE.map(url => cache.add(url).catch(e => console.warn('Cache miss:', url, e)))
-      );
-    })
-  );
-  self.skipWaiting();
-});
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('Deleting old cache:', cache);
-            return caches.delete(cache);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
-});
+body, html {
+    height: 100%; width: 100%; font-family: 'Assistant', sans-serif;
+    background-color: var(--bg-body); color: var(--text-main);
+    overflow: hidden; direction: rtl; transition: background-color 0.3s, color 0.3s;
+}
 
-self.addEventListener('fetch', (event) => {
-  // דלג על בקשות POST ובקשות לשרתים חיצוניים
-  if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('googleapis.com')) return;
-  if (event.request.url.includes('mapbox.com')) return;
-  if (event.request.url.includes('accounts.google.com')) return;
+.view-container {
+    position: absolute; top: 0; left: 0; right: 0;
+    bottom: calc(var(--bottom-nav-h) + var(--safe-b));
+    display: none; overflow-y: auto; background: var(--bg-body);
+}
+.view-container.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
+.map-anchors, .theme-anchor { z-index: 500; }
 
-      return fetch(event.request).then((response) => {
-        // שמור רק תגובות תקינות מאותו מקור
-        if (!response || response.status !== 200 || response.type === 'opaque') {
-          return response;
-        }
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, response.clone());
-          return response;
-        });
-      });
-    }).catch(() => {
-      if (event.request.mode === 'navigate') return caches.match('./field.html');
-    })
-  );
-});
+.f-bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: calc(var(--bottom-nav-h) + var(--safe-b));
+    background: var(--surface); box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+    border-top: 1px solid var(--border-light);
+    display: flex; justify-content: space-around; align-items: center;
+    padding-bottom: var(--safe-b); z-index: 1000;
+    transition: background 0.3s;
+    overflow: visible;
+}
+
+.nav-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 12px; flex: 1; cursor: pointer; padding: 10px 0;
+}
+.nav-item i { font-size: 24px; margin-bottom: 4px; transition: 0.2s; }
+.nav-item.active { color: var(--accent); font-weight: bold; }
+.nav-item.active i { transform: translateY(-3px) scale(1.1); }
+
+/* ==========================================
+   Z-INDEX מעודכן — חלוניות מעל כל הניווט
+   ========================================== */
+#f-scrim {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
+    backdrop-filter: blur(3px); z-index: 9400; display: none;
+}
+
+.f-sheet {
+    position: fixed; left: 10px; right: 10px; bottom: calc(var(--bottom-nav-h) + 15px);
+    background: var(--surface); border-radius: 24px;
+    padding: 24px; box-shadow: var(--shadow);
+    z-index: 9600; 
+    transform: translateY(150vh); opacity: 0; pointer-events: none;
+    transition: transform 0.4s cubic-bezier(0.1, 0.7, 0.1, 1), opacity 0.3s;
+    border: 1px solid var(--border-light);
+}
+.f-sheet.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.f-sheet-handle { width: 40px; height: 5px; background: var(--border-light); border-radius: 10px; margin: -10px auto 20px; }
+
+.f-fab-center {
+    position: fixed; bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 20px); right: 20px;
+    width: 64px; height: 64px; z-index: 9700; 
+}
+.f-fab-main {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #1d4ed8);
+    color: white; border: none; font-size: 26px;
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
+    cursor: pointer; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.f-fab-menu {
+    position: absolute; bottom: 80px; right: 0;
+    display: flex; flex-direction: column; gap: 12px; align-items: flex-start;
+    pointer-events: none; z-index: 9700;
+}
+.f-fab-option {
+    background: var(--surface); color: var(--text-main);
+    padding: 12px 20px; border-radius: 30px; border: 1px solid var(--border-light);
+    display: flex; align-items: center; gap: 10px; white-space: nowrap;
+    box-shadow: var(--shadow); font-weight: 600;
+    opacity: 0; transform: translateY(20px) scale(0.8); transition: 0.25s;
+}
+.f-fab-option.mission { background: var(--accent); color: white; border: none; }
+.f-fab-center.open .f-fab-main { transform: rotate(45deg); background: var(--surface); color: var(--danger); border: 2px solid var(--border-light); }
+.f-fab-center.open .f-fab-menu { pointer-events: auto; }
+.f-fab-center.open .f-fab-option { opacity: 1; transform: translateY(0) scale(1); }
+
+/* ==========================================
+   Super FAB + Bottom Sheet
+   ========================================== */
+.super-fab-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.super-fab {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #1d4ed8);
+    color: white;
+    border: none;
+    font-size: 26px;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.45);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: absolute;
+    bottom: 10px;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.super-fab:active { transform: scale(0.92); }
+
+.sheet-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(2px);
+    z-index: 9800;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+.sheet-overlay.active { opacity: 1; pointer-events: auto; }
+
+.bottom-sheet {
+    position: fixed;
+    bottom: -100%;
+    left: 0; right: 0;
+    background: var(--surface);
+    border-radius: 24px 24px 0 0;
+    z-index: 9900;
+    padding: 10px 20px calc(20px + var(--safe-b));
+    box-shadow: 0 -4px 30px rgba(0,0,0,0.15);
+    transition: bottom 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border-top: 1px solid var(--border-light);
+}
+.bottom-sheet.active { bottom: 0; }
+
+.sheet-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 18px;
+    color: var(--text-main);
+}
+
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.action-btn {
+    background: var(--bg-body);
+    border: 1px solid var(--border-light);
+    border-radius: 16px;
+    padding: 16px 12px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: 0.2s;
+}
+.action-btn:active { background: var(--border-light); transform: scale(0.97); }
+
+.action-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--accent);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 18px;
+}
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+#f-login { z-index: 9998; }
+.f-splash {
+    position: fixed; inset: 0; z-index: 10000; background: var(--bg-body);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.5s;
+}
+.f-splash img { width: 80px; margin-bottom: 20px; animation: pulse 2s infinite; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes celebratePulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+
+.map-anchors { position: absolute; left: 15px; bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
+.map-anchor-btn, .theme-anchor {
+    width: 45px; height: 45px; border-radius: 50%; background: var(--surface);
+    color: var(--text-main); border: 1px solid var(--border-light);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    box-shadow: var(--shadow); cursor: pointer; transition: 0.2s;
+}
+.theme-anchor { position: absolute; right: 15px; top: calc(var(--safe-t) + 15px); }
+
+/* עיצוב סיכת בית חב"ד בשטח */
+.chabad-pin-wrapper { width:50px; height:65px; z-index:1000; }
+.chabad-pin-container { display:flex; flex-direction:column; align-items:center; width:100%; height:100%; cursor:pointer; filter:drop-shadow(0 4px 6px rgba(0,0,0,0.4)); transition:transform 0.2s ease-out; transform-origin:bottom center; }
+.chabad-pin-container:hover { transform:scale(1.15); }
+.chabad-pin-circle { width:50px; height:50px; background-color:white; border-radius:50%; border:3px solid white; box-sizing:border-box; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+.chabad-pin-image { width:100%; height:100%; background-image:url('770.jpg'); background-size:cover; background-position:center; background-repeat:no-repeat; }
+.chabad-pin-arrow { width:0; height:0; border-left:10px solid transparent; border-right:10px solid transparent; border-top:18px solid white; margin-top:-3px; }
+
+/* כפתור סגירה (X) למגירות */
+.sheet-close-btn { position: absolute; left: 15px; top: 15px; background: var(--bg-body); border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted); z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+
+/* כרטיסיות אקורדיון בקהילה */
+.expandable-card { background: var(--surface); border: 1px solid var(--border-light); border-radius: 16px; margin-bottom: 12px; box-shadow: var(--shadow); overflow: hidden; transition: 0.3s; }
+.expandable-card-header { padding: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.expandable-card-body { max-height: 0; padding: 0 16px; opacity: 0; transition: 0.3s ease-in-out; background: var(--bg-body); pointer-events: none; }
+.expandable-card.expanded .expandable-card-body { max-height: 400px; padding: 16px; opacity: 1; border-top: 1px solid var(--border-light); pointer-events: auto; }
+
+/* כפתורי פעולה בקהילה */
+.card-action-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border-light); border-radius: 12px; padding: 10px 5px; color: var(--text-main); font-size: 12px; font-weight: 600; gap: 6px; cursor: pointer; transition: 0.2s; }
+.card-action-btn:active { background: var(--border-light); }
+.card-action-btn i { font-size: 18px; }
+
+/* עורך מסלול (Drag & Drop ויזואלי) */
+.route-editor-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.route-editor-item {
+    background: var(--surface); border: 1px solid var(--border-light); border-left: 4px solid var(--accent);
+    border-radius: 12px; padding: 12px; display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s;
+}
+.route-editor-item .content { flex: 1; padding: 0 10px; }
+.route-editor-item .actions { display: flex; gap: 8px; flex-direction: column; }
+.route-editor-item .actions button { background: var(--bg-body); border: 1px solid var(--border-light); color: var(--text-main); font-size: 14px; cursor: pointer; padding: 5px 12px; border-radius: 6px; }
+.route-editor-item .actions button.delete-btn { color: var(--danger); border-color: rgba(239,68,68,0.3); }
+
+/* ==========================================
+   תמונת פרופיל של בניין
+   ========================================== */
+.bldg-profile-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 2px solid var(--border-light);
+    cursor: pointer;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+    background: var(--bg-body);
+}
+.bldg-profile-img:active { transform: scale(0.9); }
+
+/* תצוגת תמונה מלאה */
+.full-img-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    z-index: 10000; display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 15px;
+}
+.full-img-overlay img {
+    max-width: 90%; max-height: 80vh;
+    border-radius: 16px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    object-fit: contain;
+}
+.full-img-overlay .close-hint {
+    color: rgba(255,255,255,0.7);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* ==========================================
+   סרגל כלים משימות
+   ========================================== */
+.f-tasks-toolbar {
+    background: var(--surface);
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-light);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: background 0.3s;
+}
+.f-tasks-search-box {
+    position: relative;
+    flex: 1;
+}
+.f-tasks-search-box input {
+    width: 100%;
+    padding: 10px 10px 10px 35px;
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    background: var(--bg-body);
+    color: var(--text-main);
+    font-family: 'Assistant', sans-serif;
+    font-size: 15px;
+    outline: none;
+}
+.f-tasks-search-box i {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+#f-btn-view-all.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* כרטיס משימה מלא */
+.task-card-full {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-right: 4px solid var(--accent);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease-out;
+}
+.task-card-full.is-done {
+    border-right-color: var(--success);
+    opacity: 0.7;
+}
+.task-card-full .task-text {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 6px;
+}
+.task-card-full.is-done .task-text {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+.task-card-full .task-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+.task-card-full .task-tags {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+.task-tag {
+    background: rgba(37,99,235,0.12);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* ==========================================
+   אינדיקטור סנכרון צף (Sync Widget)
+   ========================================== */
+.sync-widget {
+    position: fixed;
+    top: calc(15px + var(--safe-t));
+    right: 15px;
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    border: 1px solid var(--border-light);
+    cursor: pointer;
+    z-index: 5000;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: 28px;
+    height: 28px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.sync-widget.expanded {
+    max-width: 160px;
+    padding: 8px 12px;
+}
+
+.sync-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 0.3s;
+}
+
+.status-online .sync-dot  { background: var(--success); }
+.status-offline .sync-dot { background: var(--text-muted); }
+.status-pending .sync-dot { background: var(--warning); }
+.status-error .sync-dot   { background: var(--danger); }
+.status-syncing .sync-dot {
+    background: var(--accent);
+    animation: pulseSync 0.8s infinite alternate;
+}
+
+.sync-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    opacity: 0;
+    transition: opacity 0.2s;
+    user-select: none;
+}
+.sync-widget.expanded .sync-text { opacity: 1; }
+
+@keyframes pulseSync {
+    0%   { transform: scale(0.8); opacity: 0.6; }
+    100% { transform: scale(1.2); opacity: 1; }
+}
+
+/* ==========================================
+   מגירת מסלול (Route Sheet)
+   ========================================== */
+.route-sheet {
+    position: fixed;
+    bottom: calc(var(--bottom-nav-h) + var(--safe-b));
+    left: 0; right: 0;
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
+    border-top: 1px solid var(--border-light);
+    z-index: 8000;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    max-height: 60vh;
+    display: flex;
+    flex-direction: column;
+}
+.route-sheet.expanded { transform: translateY(0); }
+
+.route-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    flex-shrink: 0;
+}
+.route-info h3 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.route-badge {
+    background: var(--accent);
+    color: white;
+    border-radius: 20px;
+    padding: 2px 9px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.route-eta { font-size: 12px; color: var(--text-muted); margin-top: 2px; display: block; }
+
+.btn-start-route {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: 0.2s;
+}
+.btn-start-route:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-start-route:not(:disabled):active { transform: scale(0.96); }
+
+.route-stops-list {
+    overflow-y: auto;
+    padding: 0 12px 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ==========================================
+   ניווט פעיל (Active Nav Overlay)
+   ========================================== */
+.active-nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 9500;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 10px);
+}
+.active-nav-card {
+    background: var(--surface);
+    border-radius: 24px;
+    padding: 24px;
+    width: calc(100% - 30px);
+    max-width: 480px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    border: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.stop-counter {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.active-stop-name {
+    font-size: 22px;
+    font-weight: 800;
+    margin: 0;
+    color: var(--text-main);
+}
+.active-stop-address {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0;
+}
+.active-nav-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+.btn-waze {
+    flex: 1;
+    padding: 14px;
+    background: #33ccff;
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.btn-done {
+    flex: 2;
+    padding: 14px;
+    background: var(--success);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.btn-cancel-nav {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 4px;
+}
+
+/* ==========================================
+   מיקרו-טופס הוספת משפחה מהירה
+   ========================================== */
+.quick-form-sheet {
+    height: auto;
+    max-height: 85vh;
+}
+
+.quick-form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.quick-form-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+
+.btn-icon-only {
+    background: rgba(0,0,0,0.05);
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.btn-icon-only:active { background: rgba(0,0,0,0.12); }
+
+.quick-form-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.f-input-group.row-group { display: flex; gap: 10px; }
+.flex-1 { flex: 1; }
+.flex-2 { flex: 2; }
+
+.f-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+.f-input-wrapper i {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--accent);
+    opacity: 0.7;
+    pointer-events: none;
+}
+.f-input-wrapper .f-input {
+    width: 100%;
+    padding: 14px 42px 14px 14px;
+    background: var(--bg-body);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    font-size: 16px;
+    font-family: 'Assistant', sans-serif;
+    color: var(--text-main);
+    transition: 0.2s;
+    box-sizing: border-box;
+}
+.f-input-wrapper .f-input:focus {
+    background: var(--surface);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    outline: none;
+}
+
+.btn-save-quick {
+    background: linear-gradient(135deg, var(--accent), #1d4ed8);
+    color: white;
+    border: none;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    font-family: 'Assistant', sans-serif;
+    margin-top: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    width: 100%;
+    box-shadow: 0 4px 15px rgba(37,99,235,0.3);
+    transition: 0.2s;
+}
+.btn-save-quick:active { transform: scale(0.98); }
+
+/* ==========================================
+   מיקרו-טופס הוספת משימה מהירה
+   ========================================== */
+.smart-chips-container {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 5px;
+    scrollbar-width: none;
+    margin-bottom: 10px;
+}
+.smart-chips-container::-webkit-scrollbar { display: none; }
+
+.smart-chip {
+    background: var(--bg-body);
+    border: 1px solid var(--border-light);
+    color: var(--text-main);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-family: 'Assistant', sans-serif;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: 0.2s;
+    flex-shrink: 0;
+}
+.smart-chip:active, .smart-chip.selected {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.voice-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.voice-input-wrapper .f-input { flex: 1; }
+
+.btn-mic {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--danger);
+    color: white;
+    border: none;
+    font-size: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: 0.3s;
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);
+    flex-shrink: 0;
+}
+.btn-mic.listening {
+    animation: pulseMic 1.5s infinite;
+    background: #dc2626;
+}
+@keyframes pulseMic {
+    0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70%  { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* ==========================================
+   FFC Snap Sheet — כרטיס משפחה מלא נגרר
+   ========================================== */
+.snap-sheet {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -5px 25px rgba(0,0,0,0.2);
+    z-index: 9850;
+    transition: height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(100%);
+    border: 1px solid var(--border-light);
+}
+.snap-sheet.active { transform: translateY(0); }
+.snap-sheet.state-mini { height: 35vh; }
+.snap-sheet.state-half { height: 65vh; }
+.snap-sheet.state-full { height: 95vh; border-radius: 0; }
+
+.sheet-drag-area {
+    padding: 12px 0 8px;
+    cursor: grab;
+    background: var(--surface);
+    z-index: 10;
+    flex-shrink: 0;
+    text-align: center;
+}
+.sheet-drag-area:active { cursor: grabbing; }
+
+.ffc-scrollable-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 15px 80px;
+}
+
+/* ==========================================
+   Community List — Swipe Actions
+   ========================================== */
+.community-list-item-wrapper {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 10px;
+    border-radius: 12px;
+}
+.swipe-bg {
+    position: absolute;
+    top: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 22px;
+    color: white;
+    font-size: 22px;
+    z-index: 1;
+    width: 100%;
+    pointer-events: none;
+}
+.swipe-bg.bg-call {
+    background: var(--success);
+    left: 0;
+    justify-content: flex-end;
+}
+.swipe-bg.bg-nav {
+    background: #33ccff;
+    right: 0;
+    justify-content: flex-start;
+}
+.community-card-front {
+    position: relative;
+    z-index: 2;
+    background: var(--surface);
+    transition: transform 0.25s ease-out;
+    will-change: transform;
+}
+
+/* ==========================================
+   משימה 1+2: Z-Index + Pointer Events
+   ========================================== */
+.f-bottom-nav       { z-index: var(--z-bottom-nav); }
+.super-fab-container { z-index: var(--z-fab); }
+.bottom-sheet, .snap-sheet, .route-sheet { z-index: var(--z-bottom-sheet); }
+.sync-widget        { z-index: var(--z-top-bar); }
+#action-sheet-overlay, #f-scrim { z-index: var(--z-overlay); }
+#action-sheet       { z-index: calc(var(--z-overlay) + 1); }
+
+/* Pointer Events — שכבות מכילות לא חוסמות מגע */
+.map-anchors        { pointer-events: none; }
+.map-anchors > *    { pointer-events: auto; }
+.theme-anchor       { pointer-events: auto; }
+.sync-widget        { pointer-events: auto; }
+
+/* ==========================================
+   משימה 4: FAB States
+   ========================================== */
+.super-fab {
+    transition: background 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.super-fab.state-crm {
+    background: linear-gradient(135deg, var(--accent), #1d4ed8);
+}
+.super-fab.state-route {
+    background: linear-gradient(135deg, var(--success), #059669);
+    transform: rotate(0deg);
+}
+.super-fab .fab-icon {
+    transition: opacity 0.2s, transform 0.3s;
+    display: inline-block;
+}
+
+/* ==========================================
+   משימה 3: Route Builder State Bar
+   ========================================== */
+#route-builder-bar {
+    position: fixed;
+    top: calc(15px + var(--safe-t));
+    left: 15px;
+    right: 55px; /* מרווח מהsync widget */
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 8px 16px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    z-index: var(--z-top-bar);
+    box-shadow: var(--shadow);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--success);
+}
+#route-builder-bar.visible { display: flex; }
