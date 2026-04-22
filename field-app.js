@@ -1322,7 +1322,7 @@ const fieldApp = (function () {
             titleIcon.innerHTML = '<i class="fas fa-user-plus" style="color:var(--accent);"></i> הוספת משפחה חדשה';
             saveBtn.innerHTML = '<i class="fas fa-save"></i> הוסף למערכת';
         }
-        openSheet(sheet.innerHTML, 'full');
+        openSheet(sheet.innerHTML, 'auto');
     }
 
     async function searchAddressInput(query) {
@@ -2018,6 +2018,12 @@ const fieldApp = (function () {
         );
     }
 
+    function _missionWaze() {
+        const wp = missionWaypoints[missionCurrentIdx];
+        if (!wp) return;
+        window.open(`https://waze.com/ul?ll=${wp[1]},${wp[0]}&navigate=yes`, '_blank');
+    }
+
     function startMissionMode(waypoints) {
         missionWaypoints = waypoints || []; missionCurrentIdx = 0; missionPaused = false; isMissionActive = true;
         document.getElementById('f-mission-hud').style.display = 'flex';
@@ -2668,8 +2674,8 @@ const fieldApp = (function () {
 
         switch (state) {
             case 'CRM':
-                if (navBar)  navBar.style.display  = 'flex';
-                if (fabWrap) fabWrap.style.display  = 'flex';
+                if (navBar)  { navBar.style.display = 'flex'; navBar.style.transform = 'translateY(0)'; }
+                if (fabWrap) { fabWrap.style.display = 'flex'; }
                 if (syncW)   syncW.style.display    = 'flex';
                 if (routeBar) routeBar.classList.remove('visible');
                 if (fabBtn)  { fabBtn.classList.add('state-crm'); fabBtn.onclick = () => fieldApp.toggleActionSheet(); }
@@ -2691,11 +2697,10 @@ const fieldApp = (function () {
                 break;
 
             case 'MISSION_ACTIVE':
-                if (navBar)  navBar.style.display  = 'none';
-                if (fabWrap) fabWrap.style.display  = 'none';
+                if (navBar)  { navBar.style.display = 'none'; navBar.style.transform = 'translateY(100%)'; }
+                if (fabWrap) { fabWrap.style.display = 'none'; }
                 if (syncW)   syncW.style.display    = 'none';
                 if (routeBar) routeBar.classList.remove('visible');
-                // Map padding מלא כשאין UI תחתון
                 if (map) map.setPadding({ bottom: 0, top: 0 });
                 break;
         }
@@ -2713,18 +2718,256 @@ const fieldApp = (function () {
         map.setPadding({ bottom: bottomPad, top: 0, left: 0, right: 0 });
     }
 
+
+    // ==========================================
+    // Speed Dial FAB
+    // ==========================================
+    let _speedDialOpen = false;
+
+    function toggleSpeedDial() {
+        _speedDialOpen = !_speedDialOpen;
+        const dial = document.getElementById('speed-dial');
+        const overlay = document.getElementById('speed-dial-overlay');
+        const fabBtn = document.getElementById('super-fab-btn');
+        if (dial) dial.classList.toggle('open', _speedDialOpen);
+        if (overlay) overlay.style.display = _speedDialOpen ? 'block' : 'none';
+        if (fabBtn) fabBtn.classList.toggle('dial-open', _speedDialOpen);
+    }
+
+    // ==========================================
+    // Mission Planner — מתכנן מבצעים
+    // ==========================================
+    let mpSelectedStops = []; // { id, name, address, coords, type, taskText }
+
+    function openMissionPlanner() {
+        mpSelectedStops = [];
+        const sheet = document.getElementById('mission-planner-sheet');
+        openSheet(sheet.innerHTML, 'full');
+        mpSwitchTab('map');
+        _mpUpdateBadge();
+    }
+
+    function mpSwitchTab(tab) {
+        ['map','tasks','community','saved'].forEach(t => {
+            const tabEl = document.getElementById('mp-tab-' + t);
+            const contentEl = document.getElementById('mp-content-' + t);
+            if (tabEl) tabEl.className = 'mp-tab' + (t === tab ? ' mp-tab-active' : '');
+            if (contentEl) contentEl.style.display = t === tab ? 'block' : 'none';
+        });
+        if (tab === 'tasks') _mpRenderTasks();
+        if (tab === 'community') _mpRenderCommunity();
+        if (tab === 'saved') _mpRenderSaved();
+    }
+
+    function _mpRenderTasks() {
+        const list = document.getElementById('mp-tasks-list');
+        if (!list) return;
+        let tasks = [];
+        Object.keys(db).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg].apts || []).forEach(apt => {
+                (apt.tasks || []).filter(t => !t.done).forEach(task => {
+                    tasks.push({ id: bldg + '_' + task.text, name: bldg, address: bldg, taskText: task.text, coords: db[bldg].info?.coords, type: 'task' });
+                });
+            });
+        });
+        (db?.meta?.generalTasks || []).filter(t => !t.done).forEach(task => {
+            tasks.push({ id: 'gen_' + task.text, name: task.text, address: '', taskText: task.text, coords: null, type: 'general' });
+        });
+
+        if (tasks.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">אין משימות פתוחות</div>';
+            return;
+        }
+        list.innerHTML = tasks.map(t => {
+            const sel = mpSelectedStops.find(s => s.id === t.id);
+            return `<div class="mp-select-item ${sel ? 'selected' : ''}" onclick="fieldApp._mpToggleStop(${JSON.stringify(t).replace(/"/g,"'")})">
+                <div class="mp-check">${sel ? '<i class="fas fa-check" style="font-size:12px;"></i>' : ''}</div>
+                <div style="flex:1;">
+                    <div style="font-weight:700; font-size:14px;">${escapeHTML(t.taskText)}</div>
+                    ${t.address ? `<div style="font-size:12px; color:var(--text-muted);">${escapeHTML(t.address)}</div>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function _mpRenderCommunity() {
+        const list = document.getElementById('mp-community-list');
+        if (!list) return;
+        let fams = [];
+        Object.keys(db).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg].apts || []).forEach((apt, idx) => {
+                fams.push({ id: bldg + '_apt_' + idx, name: 'משפחת ' + (apt.name || 'ללא שם'), address: bldg, coords: db[bldg].info?.coords, type: 'family' });
+            });
+        });
+        if (fams.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">אין משפחות</div>';
+            return;
+        }
+        list.innerHTML = fams.map(f => {
+            const sel = mpSelectedStops.find(s => s.id === f.id);
+            return `<div class="mp-select-item ${sel ? 'selected' : ''}" onclick="fieldApp._mpToggleStop(${JSON.stringify(f).replace(/"/g,"'")})">
+                <div class="mp-check">${sel ? '<i class="fas fa-check" style="font-size:12px;"></i>' : ''}</div>
+                <div style="flex:1;">
+                    <div style="font-weight:700; font-size:14px;">${escapeHTML(f.name)}</div>
+                    <div style="font-size:12px; color:var(--text-muted);">${escapeHTML(f.address)}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function _mpRenderSaved() {
+        const list = document.getElementById('mp-saved-list');
+        if (!list) return;
+        const saved = storageGet('saved_routes') ? JSON.parse(storageGet('saved_routes')) : [];
+        const history = storageGet('route_history') ? JSON.parse(storageGet('route_history')) : [];
+
+        let html = '';
+        if (saved.length === 0 && history.length === 0) {
+            html = '<div style="text-align:center; padding:20px; color:var(--text-muted);">אין מסלולים שמורים</div>';
+        }
+        saved.forEach(r => {
+            html += `<div class="mp-select-item" onclick="fieldApp._mpLoadSaved('${r.id}')">
+                <div style="font-size:22px;">📌</div>
+                <div style="flex:1;">
+                    <div style="font-weight:700; font-size:14px;">${escapeHTML(r.name)}</div>
+                    <div style="font-size:12px; color:var(--text-muted);">${r.stops?.length || 0} תחנות</div>
+                </div>
+                <button onclick="event.stopPropagation(); fieldApp._mpLoadSaved('${r.id}')" style="padding:8px 14px; background:var(--accent); color:white; border:none; border-radius:10px; font-weight:700; cursor:pointer; font-size:13px;">הפעל</button>
+            </div>`;
+        });
+        history.slice(-5).reverse().forEach(r => {
+            html += `<div class="mp-select-item" style="opacity:0.7;" onclick="fieldApp._mpLoadSaved('${r.id}')">
+                <div style="font-size:22px;">🕐</div>
+                <div style="flex:1;">
+                    <div style="font-weight:700; font-size:14px;">${escapeHTML(r.name || 'מסלול ' + new Date(r.date).toLocaleDateString('he-IL'))}</div>
+                    <div style="font-size:12px; color:var(--text-muted);">${r.stops?.length || 0} תחנות · היסטוריה</div>
+                </div>
+            </div>`;
+        });
+        list.innerHTML = html;
+    }
+
+    function _mpToggleStop(stop) {
+        const idx = mpSelectedStops.findIndex(s => s.id === stop.id);
+        if (idx > -1) mpSelectedStops.splice(idx, 1);
+        else mpSelectedStops.push(stop);
+        _mpUpdateBadge();
+        // רנדר מחדש את הלשונית הפעילה
+        const activeTab = document.querySelector('.mp-tab-active');
+        if (activeTab) {
+            const t = activeTab.id.replace('mp-tab-','');
+            if (t === 'tasks') _mpRenderTasks();
+            if (t === 'community') _mpRenderCommunity();
+        }
+    }
+
+    function _mpUpdateBadge() {
+        const badge = document.getElementById('mp-stop-count-badge');
+        const countEl = document.getElementById('mp-stop-count');
+        const createBtn = document.getElementById('mp-create-btn');
+        const createCount = document.getElementById('mp-create-count');
+        const n = mpSelectedStops.length;
+        if (badge) badge.style.display = n > 0 ? 'block' : 'none';
+        if (countEl) countEl.innerText = n;
+        if (createBtn) createBtn.style.display = n > 0 ? 'block' : 'none';
+        if (createCount) createCount.innerText = n;
+    }
+
+    function _mpLoadSaved(id) {
+        const saved = storageGet('saved_routes') ? JSON.parse(storageGet('saved_routes')) : [];
+        const route = saved.find(r => r.id === id);
+        if (!route || !route.stops) return;
+        mpSelectedStops = route.stops;
+        _openRouteEditor(route.name);
+    }
+
+    function activateMapPickMode() {
+        switchView('map', document.querySelector('.nav-item'));
+        showToast('לחץ לחיצה ארוכה על בניין להוספה למסלול', 3000);
+        isRouteBuilderMode = true;
+        updateAppUIState('ROUTE_BUILDER');
+    }
+
+    function createRouteFromPlanner() {
+        if (mpSelectedStops.length === 0) { showToast('בחר לפחות תחנה אחת'); return; }
+        _openRouteEditor('מסלול חדש');
+    }
+
+    function _openRouteEditor(name) {
+        closeOverlays();
+        const sheet = document.getElementById('route-edit-sheet');
+        sheet.style.display = 'block';
+        document.getElementById('re-route-name').value = name || '';
+        _reRenderStops();
+        openSheet(sheet.innerHTML, 'full');
+        sheet.style.display = 'none';
+    }
+
+    function _reRenderStops() {
+        const list = document.getElementById('re-stops-list');
+        if (!list) return;
+        list.innerHTML = mpSelectedStops.map((s, idx) => `
+            <div class="route-editor-item" draggable="true"
+                ondragstart="fieldApp.handleRouteDragStart(event, ${idx})"
+                ondragover="event.preventDefault()"
+                ondrop="fieldApp.handleRouteDrop(event, ${idx})">
+                <div class="drag-handle"><i class="fas fa-grip-lines"></i></div>
+                <div class="content" style="flex:1;">
+                    <div style="font-weight:700; font-size:14px;">
+                        <span style="color:var(--warning); margin-left:4px;">${idx+1}.</span>
+                        ${escapeHTML(s.name)}
+                    </div>
+                    ${s.taskText ? `<div style="font-size:12px; color:var(--text-muted);">${escapeHTML(s.taskText)}</div>` : ''}
+                </div>
+                <button onclick="fieldApp._reRemoveStop(${idx})" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:6px;"><i class="fas fa-times"></i></button>
+            </div>
+        `).join('');
+    }
+
+    function _reRemoveStop(idx) {
+        mpSelectedStops.splice(idx, 1);
+        _reRenderStops();
+    }
+
+    function startRouteFromEditor() {
+        const name = document.getElementById('re-route-name')?.value || 'מסלול חדש';
+        if (mpSelectedStops.length === 0) { showToast('אין תחנות במסלול'); return; }
+
+        // שמור היסטוריה
+        const history = storageGet('route_history') ? JSON.parse(storageGet('route_history')) : [];
+        history.push({ id: Date.now().toString(), name, date: Date.now(), stops: mpSelectedStops });
+        storageSet('route_history', JSON.stringify(history.slice(-20)));
+
+        const waypoints = mpSelectedStops.filter(s => s.coords).map(s => s.coords);
+        if (waypoints.length === 0) { showToast('אין תחנות עם מיקום'); return; }
+
+        closeOverlays();
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => { drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], waypoints); startMissionMode(waypoints); },
+                () => { drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], waypoints); startMissionMode(waypoints); }
+            );
+        } else {
+            drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], waypoints);
+            startMissionMode(waypoints);
+        }
+    }
+
     // ==========================================
     // חשיפת הפונקציות החוצה
     // ==========================================
     return { 
         init, login, switchView, toggleFab, toggleActionSheet, toggleSyncDetails, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm,
         updateAppUIState, updateMapPadding,
+        toggleSpeedDial, openMissionPlanner, mpSwitchTab, _mpToggleStop, _mpLoadSaved, activateMapPickMode, createRouteFromPlanner, _reRemoveStop, startRouteFromEditor,
         openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded,
         openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter,
         callFamilyNumber, toggleDarkMode, toggleMapStyle, forceSync, openExternalNav, searchAddressInput, selectAddressOption,
         toggleTargetForRoute, startCustomRoute, saveQuickTask, showToast,
         finishMission, pauseMission, refreshMissionRoute, markAllDoneInBuilding, saveRoute, loadSavedRoutes,
-        deleteSavedRoute, toggleTaskLayer, completeMissionTask, switchMissionTab, nextMissionTarget, prevMissionTarget,
+        deleteSavedRoute, toggleTaskLayer, completeMissionTask, switchMissionTab, nextMissionTarget, prevMissionTarget, _missionWaze,
         closeMissionSummary, buildRouteFromSaved, openSavedRoutesSheet, routeDialogGoNow, routeDialogSaveLater,
         toggleRouteBuilderMode, promptAddToRoute, openRouteEditor, moveRouteItem, removeRouteItem, saveAndStartEditedRoute,
         handleCardTouchStart, handleCardTouchEnd, addSingleToRoute, removeSingleFromRoute,
