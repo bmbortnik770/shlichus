@@ -924,3 +924,43 @@ body, html {
     0%, 100% { opacity: 0; }
     50% { opacity: 1; }
 }
+
+/* ==========================================
+   תיקונים: FAB, קהילה, טפסים
+   ========================================== */
+
+/* FAB — ימין תחתון מעל הניווט */
+.super-fab-container {
+    position: fixed !important;
+    bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 16px) !important;
+    right: 20px !important;
+    top: auto !important;
+    flex: none !important;
+    z-index: var(--z-fab) !important;
+}
+
+/* הסר את הכחול מתחת לכרטיסי קהילה */
+.community-list-item-wrapper {
+    margin-bottom: 10px !important;
+}
+.swipe-bg { display: none !important; }
+.community-card-front {
+    transform: none !important;
+    transition: none !important;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* טופס משפחה — לא יוצא מהמסך */
+.f-sheet {
+    max-height: 88vh !important;
+    overflow-y: auto;
+}
+
+/* action-sheet grid — ימין: משפחה+משימה, שמאל: מבצעים+מסלולים */
+.action-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-rows: 1fr 1fr !important;
+    gap: 12px !important;
+}
