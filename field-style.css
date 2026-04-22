@@ -120,31 +120,7 @@ body, html {
 /* ==========================================
    Super FAB + Bottom Sheet
    ========================================== */
-.super-fab-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
 
-.super-fab {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), #1d4ed8);
-    color: white;
-    border: none;
-    font-size: 26px;
-    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.45);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    position: absolute;
-    bottom: 10px;
-    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.super-fab:active { transform: scale(0.92); }
 
 .sheet-overlay {
     position: fixed;
@@ -1099,10 +1075,7 @@ body, html {
     color: var(--text-muted) !important;
 }
 
-/* תיקון FAB — קצת יותר שמאלה */
-.super-fab-container {
-    right: 16px !important;
-}
+
 
 /* תיקון מתכנן מבצעים — לא קופץ למעלה מדי */
 #mission-planner-sheet.f-sheet {
@@ -1237,3 +1210,39 @@ body, html {
 
 /* במצב מבצע — הסתר חיפוש */
 body.mission-active .global-search-bar { display: none; }
+
+/* ==========================================
+   Super FAB — הגדרה סופית
+   ========================================== */
+.super-fab-container {
+    position: fixed !important;
+    bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 14px) !important;
+    right: 16px !important;
+    width: 60px !important;
+    height: 60px !important;
+    z-index: var(--z-fab) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.super-fab {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #1d4ed8);
+    color: white;
+    border: none;
+    font-size: 26px;
+    box-shadow: 0 4px 20px rgba(37,99,235,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
+    position: relative;
+}
+.super-fab:active { transform: scale(0.9); }
+.super-fab.dial-open { transform: rotate(45deg); }
+.super-fab.state-crm { background: linear-gradient(135deg, var(--accent), #1d4ed8); }
+.super-fab.state-route { background: linear-gradient(135deg, var(--success), #059669); }
