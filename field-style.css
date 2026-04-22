@@ -964,3 +964,137 @@ body, html {
     grid-template-rows: 1fr 1fr !important;
     gap: 12px !important;
 }
+
+/* ==========================================
+   Speed Dial FAB
+   ========================================== */
+.speed-dial {
+    position: fixed;
+    bottom: calc(var(--bottom-nav-h) + var(--safe-b) + 80px);
+    right: 20px;
+    z-index: var(--z-fab);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.speed-dial.open {
+    pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0);
+}
+.speed-dial-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+.speed-dial-item:nth-child(1) { transition-delay: 0.05s; }
+.speed-dial-item:nth-child(2) { transition-delay: 0.1s; }
+.speed-dial-item:nth-child(3) { transition-delay: 0.15s; }
+
+.speed-dial-label {
+    background: var(--surface);
+    color: var(--text-main);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    border: 1px solid var(--border-light);
+    white-space: nowrap;
+}
+.speed-dial-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    color: white;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+.speed-dial-btn:active { transform: scale(0.9); }
+
+/* FAB מסתובב כשהתפריט פתוח */
+.super-fab.dial-open { transform: rotate(45deg) !important; }
+
+/* ==========================================
+   Mission Planner לשוניות
+   ========================================== */
+.mp-tab {
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+    transition: 0.2s;
+}
+.mp-tab-active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+.mp-content { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* פריט בחירה במתכנן */
+.mp-select-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border-light);
+    background: var(--surface);
+    cursor: pointer;
+    transition: 0.2s;
+}
+.mp-select-item.selected {
+    border-color: var(--accent);
+    background: rgba(37,99,235,0.06);
+}
+.mp-select-item .mp-check {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border-light);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: 0.2s;
+}
+.mp-select-item.selected .mp-check {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+/* כפתור dark mode — מינימלי ליד sync */
+.theme-anchor {
+    position: fixed !important;
+    top: calc(15px + var(--safe-t)) !important;
+    right: 52px !important; /* ליד הsync-widget */
+    left: auto !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--border-light) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    z-index: var(--z-top-bar) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    color: var(--text-muted) !important;
+}
