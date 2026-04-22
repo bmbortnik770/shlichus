@@ -1098,3 +1098,142 @@ body, html {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
     color: var(--text-muted) !important;
 }
+
+/* תיקון FAB — קצת יותר שמאלה */
+.super-fab-container {
+    right: 16px !important;
+}
+
+/* תיקון מתכנן מבצעים — לא קופץ למעלה מדי */
+#mission-planner-sheet.f-sheet {
+    max-height: 75vh !important;
+}
+
+/* sync-widget מאחורי שורת חיפוש */
+.sync-widget {
+    z-index: calc(var(--z-top-bar) - 1) !important;
+}
+
+/* שורת חיפוש משימות מעל הסינכרון */
+#view-tasks .f-top-bar {
+    z-index: var(--z-top-bar) !important;
+    position: relative;
+}
+
+/* ==========================================
+   שורת חיפוש גלובלית
+   ========================================== */
+.global-search-bar {
+    position: fixed;
+    top: calc(12px + var(--safe-t));
+    left: 90px;   /* מרווח מהסינכרון + כפתור לילה */
+    right: 90px;  /* מרווח מהצד השני */
+    z-index: var(--z-top-bar);
+    pointer-events: auto;
+}
+
+.global-search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    overflow: hidden;
+    height: 38px;
+    transition: box-shadow 0.2s;
+}
+.global-search-input-wrap:focus-within {
+    box-shadow: 0 0 0 2px var(--accent), 0 4px 16px rgba(37,99,235,0.15);
+    border-color: var(--accent);
+}
+
+.global-search-icon {
+    position: absolute;
+    right: 13px;
+    color: var(--text-muted);
+    font-size: 13px;
+    pointer-events: none;
+}
+
+.global-search-input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 0 34px 0 36px;
+    font-size: 14px;
+    font-family: 'Assistant', sans-serif;
+    color: var(--text-main);
+    outline: none;
+    direction: rtl;
+}
+.global-search-input::placeholder { color: var(--text-muted); }
+
+.global-search-clear {
+    position: absolute;
+    left: 10px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+}
+
+.global-search-results {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0; right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    max-height: 60vh;
+    overflow-y: auto;
+    z-index: calc(var(--z-top-bar) + 1);
+}
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-light);
+    transition: background 0.15s;
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:active { background: var(--bg-body); }
+
+.search-result-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+}
+.search-result-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-main);
+}
+.search-result-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+.search-result-type {
+    margin-right: auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--bg-body);
+    padding: 2px 8px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+/* במצב מבצע — הסתר חיפוש */
+body.mission-active .global-search-bar { display: none; }
