@@ -395,16 +395,16 @@
         <h3 class="sheet-title">פעולות מהירות</h3>
         <div class="action-grid">
             <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openFamilyForm()">
-                <div class="action-icon"><i class="fas fa-user-plus"></i></div>
+                <div class="action-icon" style="background:rgba(16,185,129,0.12);"><i class="fas fa-user-plus" style="color:var(--success);"></i></div>
                 <span>משפחה חדשה</span>
             </div>
-            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openQuickTaskForm()">
-                <div class="action-icon"><i class="fas fa-tasks"></i></div>
-                <span>משימה חדשה</span>
-            </div>
             <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openRouteMenu()">
-                <div class="action-icon" style="background:rgba(37,99,235,0.15);"><i class="fas fa-route" style="color:var(--accent);"></i></div>
+                <div class="action-icon" style="background:rgba(37,99,235,0.12);"><i class="fas fa-route" style="color:var(--accent);"></i></div>
                 <span>צא למבצעים</span>
+            </div>
+            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openQuickTaskForm()">
+                <div class="action-icon" style="background:rgba(245,158,11,0.12);"><i class="fas fa-tasks" style="color:var(--warning);"></i></div>
+                <span>משימה חדשה</span>
             </div>
             <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openSavedRoutesSheet()">
                 <div class="action-icon"><i class="fas fa-bookmark"></i></div>
