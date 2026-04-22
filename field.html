@@ -291,12 +291,17 @@
             <!-- כפתורי פעולה ראשיים -->
             <div style="display:flex; gap:10px; margin-bottom:12px;">
                 <button onclick="fieldApp.prevMissionTarget()"
-                    style="flex:1; padding:14px; background:var(--bg-body); border:1px solid var(--border-light); border-radius:14px; color:var(--text-main); font-weight:700; cursor:pointer; font-family:inherit; font-size:15px;">
+                    style="width:50px; padding:14px 0; background:var(--bg-body); border:1px solid var(--border-light); border-radius:14px; color:var(--text-main); font-weight:700; cursor:pointer; font-family:inherit; font-size:15px; flex-shrink:0;">
                     <i class="fas fa-arrow-right"></i>
                 </button>
+                <button id="f-mission-waze-btn"
+                    style="width:50px; padding:14px 0; background:#33ccff; border:none; border-radius:14px; color:white; font-weight:700; cursor:pointer; font-family:inherit; font-size:15px; flex-shrink:0;"
+                    onclick="fieldApp._missionWaze()">
+                    <i class="fab fa-waze"></i>
+                </button>
                 <button onclick="fieldApp.nextMissionTarget()"
-                    style="flex:4; padding:14px; background:var(--accent); border:none; border-radius:14px; color:white; font-weight:800; cursor:pointer; font-family:inherit; font-size:17px; box-shadow:0 4px 15px rgba(37,99,235,0.4);">
-                    הגעתי ← הבא
+                    style="flex:1; padding:16px; background:var(--success); border:none; border-radius:14px; color:white; font-weight:800; cursor:pointer; font-family:inherit; font-size:18px; box-shadow:0 4px 15px rgba(16,185,129,0.4);">
+                    <i class="fas fa-check"></i> הגעתי!
                 </button>
             </div>
 
@@ -380,7 +385,7 @@
             <i class="fas fa-clipboard-list"></i><span>משימות</span>
         </div>
         <div class="nav-item super-fab-container" id="f-fab-wrapper" style="display:none;">
-            <button class="super-fab state-crm" id="super-fab-btn" onclick="fieldApp.toggleActionSheet()">
+            <button class="super-fab state-crm" id="super-fab-btn" onclick="fieldApp.toggleSpeedDial()">
                 <span class="fab-icon" id="fab-icon"><i class="fas fa-plus"></i></span>
             </button>
         </div>
@@ -389,28 +394,99 @@
         </div>
     </nav>
 
-    <div id="action-sheet-overlay" class="sheet-overlay" onclick="fieldApp.toggleActionSheet()"></div>
-    <div id="action-sheet" class="bottom-sheet">
-        <div class="sheet-handle"></div>
-        <h3 class="sheet-title">פעולות מהירות</h3>
-        <div class="action-grid">
-            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openFamilyForm()">
-                <div class="action-icon" style="background:rgba(16,185,129,0.12);"><i class="fas fa-user-plus" style="color:var(--success);"></i></div>
-                <span>משפחה חדשה</span>
-            </div>
-            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openRouteMenu()">
-                <div class="action-icon" style="background:rgba(37,99,235,0.12);"><i class="fas fa-route" style="color:var(--accent);"></i></div>
-                <span>צא למבצעים</span>
-            </div>
-            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openQuickTaskForm()">
-                <div class="action-icon" style="background:rgba(245,158,11,0.12);"><i class="fas fa-tasks" style="color:var(--warning);"></i></div>
-                <span>משימה חדשה</span>
-            </div>
-            <div class="action-btn" onclick="fieldApp.toggleActionSheet(); fieldApp.openSavedRoutesSheet()">
-                <div class="action-icon"><i class="fas fa-bookmark"></i></div>
-                <span>מסלולים שמורים</span>
+    <!-- Speed Dial — 3 כפתורים שצצים מה-FAB -->
+    <div id="speed-dial-overlay" style="display:none; position:fixed; inset:0; z-index:calc(var(--z-fab) - 1);" onclick="fieldApp.toggleSpeedDial()"></div>
+    <div id="speed-dial" class="speed-dial">
+        <div class="speed-dial-item" id="sd-family" onclick="fieldApp.toggleSpeedDial(); fieldApp.openFamilyForm()">
+            <span class="speed-dial-label">משפחה חדשה</span>
+            <button class="speed-dial-btn" style="background:var(--success);"><i class="fas fa-user-plus"></i></button>
+        </div>
+        <div class="speed-dial-item" id="sd-task" onclick="fieldApp.toggleSpeedDial(); fieldApp.openQuickTaskForm()">
+            <span class="speed-dial-label">משימה חדשה</span>
+            <button class="speed-dial-btn" style="background:var(--warning);"><i class="fas fa-tasks"></i></button>
+        </div>
+        <div class="speed-dial-item" id="sd-mission" onclick="fieldApp.toggleSpeedDial(); fieldApp.openMissionPlanner()">
+            <span class="speed-dial-label">מבצעים</span>
+            <button class="speed-dial-btn" style="background:var(--accent);"><i class="fas fa-route"></i></button>
+        </div>
+    </div>
+
+    <!-- מתכנן מבצעים (Mission Planner) -->
+    <div id="mission-planner-sheet" class="f-sheet" style="max-height:92vh;">
+        <div class="f-sheet-handle"></div>
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+
+        <!-- כותרת + מונה תחנות -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-right:36px;">
+            <h3 style="margin:0; font-size:20px;"><i class="fas fa-route" style="color:var(--accent);"></i> מבצעים</h3>
+            <div id="mp-stop-count-badge" style="background:var(--accent); color:white; border-radius:20px; padding:4px 14px; font-weight:800; font-size:14px; display:none;">
+                <span id="mp-stop-count">0</span> תחנות
             </div>
         </div>
+
+        <!-- לשוניות -->
+        <div style="display:flex; border-bottom:1px solid var(--border-light); margin-bottom:16px; gap:0; overflow-x:auto;">
+            <div id="mp-tab-map"      class="mp-tab mp-tab-active" onclick="fieldApp.mpSwitchTab('map')">🗺️ מפה</div>
+            <div id="mp-tab-tasks"    class="mp-tab" onclick="fieldApp.mpSwitchTab('tasks')">✅ משימות</div>
+            <div id="mp-tab-community" class="mp-tab" onclick="fieldApp.mpSwitchTab('community')">👥 קהילה</div>
+            <div id="mp-tab-saved"    class="mp-tab" onclick="fieldApp.mpSwitchTab('saved')">📁 שמורים</div>
+        </div>
+
+        <!-- תוכן לשוניות -->
+        <div id="mp-content-map" class="mp-content">
+            <div style="background:rgba(37,99,235,0.07); border:1px solid rgba(37,99,235,0.2); border-radius:14px; padding:16px; text-align:center; color:var(--accent);">
+                <i class="fas fa-hand-pointer fa-2x" style="margin-bottom:10px; display:block;"></i>
+                <div style="font-weight:700; font-size:15px;">לחץ על בניינים במפה להוספה למסלול</div>
+                <div style="font-size:13px; color:var(--text-muted); margin-top:6px;">הבניין יצבע וייווסף אוטומטית</div>
+            </div>
+            <button onclick="fieldApp.closeOverlays(); fieldApp.activateMapPickMode()" 
+                style="width:100%; margin-top:12px; padding:14px; background:var(--accent); color:white; border:none; border-radius:14px; font-weight:700; font-size:16px; cursor:pointer; font-family:inherit;">
+                <i class="fas fa-map-marked-alt"></i> עבור למפה ובחר בניינים
+            </button>
+        </div>
+
+        <div id="mp-content-tasks" class="mp-content" style="display:none;">
+            <div id="mp-tasks-list" style="display:flex; flex-direction:column; gap:8px; max-height:45vh; overflow-y:auto;"></div>
+        </div>
+
+        <div id="mp-content-community" class="mp-content" style="display:none;">
+            <div id="mp-community-list" style="display:flex; flex-direction:column; gap:8px; max-height:45vh; overflow-y:auto;"></div>
+        </div>
+
+        <div id="mp-content-saved" class="mp-content" style="display:none;">
+            <button onclick="fieldApp.openMissionPlanner()" 
+                style="width:100%; margin-bottom:12px; padding:12px; background:rgba(37,99,235,0.08); color:var(--accent); border:1px solid rgba(37,99,235,0.2); border-radius:12px; font-weight:700; cursor:pointer; font-family:inherit;">
+                <i class="fas fa-plus"></i> צור מסלול חדש
+            </button>
+            <div id="mp-saved-list" style="display:flex; flex-direction:column; gap:8px; max-height:40vh; overflow-y:auto;"></div>
+        </div>
+
+        <!-- כפתור צור מסלול -->
+        <button id="mp-create-btn" onclick="fieldApp.createRouteFromPlanner()" style="display:none; width:100%; margin-top:16px; padding:16px; background:linear-gradient(135deg,var(--accent),#1d4ed8); color:white; border:none; border-radius:16px; font-weight:800; font-size:17px; cursor:pointer; font-family:inherit; box-shadow:0 4px 20px rgba(37,99,235,0.4);">
+            <i class="fas fa-check"></i> צור מסלול (<span id="mp-create-count">0</span> תחנות)
+        </button>
+    </div>
+
+    <!-- מסך עריכת מסלול -->
+    <div id="route-edit-sheet" class="f-sheet" style="max-height:92vh; display:none;">
+        <div class="f-sheet-handle"></div>
+        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+        <h3 style="margin:0 0 16px 36px; font-size:20px;"><i class="fas fa-edit" style="color:var(--accent);"></i> עריכת מסלול</h3>
+
+        <input type="text" id="re-route-name" placeholder="שם המסלול" 
+            style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px; box-sizing:border-box; margin-bottom:12px;">
+
+        <div style="display:flex; gap:10px; margin-bottom:16px;">
+            <button onclick="fieldApp.autoSortRoute()" style="flex:1; padding:11px; background:rgba(16,185,129,0.1); color:var(--success); border:1px solid var(--success); border-radius:12px; font-weight:700; cursor:pointer; font-family:inherit; font-size:13px;">
+                <i class="fas fa-magic"></i> סדר אופטימלי
+            </button>
+        </div>
+
+        <div id="re-stops-list" style="display:flex; flex-direction:column; gap:8px; max-height:45vh; overflow-y:auto;"></div>
+
+        <button onclick="fieldApp.startRouteFromEditor()" style="width:100%; margin-top:16px; padding:16px; background:linear-gradient(135deg,var(--success),#059669); color:white; border:none; border-radius:16px; font-weight:800; font-size:17px; cursor:pointer; font-family:inherit; box-shadow:0 4px 20px rgba(16,185,129,0.4);">
+            <i class="fas fa-play"></i> צא למסלול
+        </button>
     </div>
 
     <!-- מגירת הוספת משפחה מהירה -->
