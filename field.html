@@ -584,30 +584,6 @@
         <div id="ffc-content-wrapper" class="ffc-scrollable-content"></div>
     </div>
 
-    <!-- מגירת הוספת משימה מהירה -->
-    <div id="quick-task-sheet" class="bottom-sheet quick-form-sheet">
-        <div class="sheet-handle" onclick="fieldApp.closeQuickTaskForm()"></div>
-        <div class="quick-form-header">
-            <h3>הוסף משימה בשנייה</h3>
-            <button class="btn-icon-only" onclick="fieldApp.expandToFullTaskForm()" title="טופס מלא"><i class="fas fa-expand-arrows-alt"></i></button>
-        </div>
-        <div class="quick-form-body">
-            <div class="smart-chips-container" id="q-task-smart-chips"></div>
-            <div class="f-input-wrapper voice-input-wrapper">
-                <input type="text" id="q-task-title" class="f-input" placeholder="מה צריך לעשות?">
-                <button class="btn-mic" onclick="fieldApp.startTaskVoiceDictation()" id="btn-task-mic">
-                    <i class="fas fa-microphone"></i>
-                </button>
-            </div>
-            <div class="f-input-wrapper">
-                <i class="fas fa-calendar-alt"></i>
-                <input type="date" id="q-task-date" class="f-input">
-            </div>
-            <button id="btn-save-quick-task" class="btn-save-quick" onclick="fieldApp.saveQuickTask()">
-                שמור משימה <i class="fas fa-check"></i>
-            </button>
-        </div>
-    </div>
 
     <!-- ניווט פעיל (HUD) -->
     <div id="active-nav-overlay" class="active-nav-overlay" style="display:none;">
