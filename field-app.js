@@ -170,6 +170,8 @@ const fieldApp = (function () {
                 document.getElementById('f-fab-wrapper').style.display = 'flex';
                 if(map) { renderMarkers(); renderTasks(); renderCommunity(); } 
                 checkForOfficeRoute();
+                // סריקת אנשי קשר אוטומטית (אחרי 3 שניות כדי שהאפליקציה תתייצב)
+                setTimeout(() => scanContacts(false), 3000);
             } catch(e) { setSyncStatus('error'); continueOffline(); }
         } catch (e) { setSyncStatus('offline'); continueOffline(); }
     }
@@ -271,9 +273,25 @@ const fieldApp = (function () {
                 if (activeBuildingFeatureId) map.setFeatureState({source: 'composite', sourceLayer: 'building', id: activeBuildingFeatureId}, { active: false });
                 activeBuildingFeatureId = feature.id;
                 map.setFeatureState({source: 'composite', sourceLayer: 'building', id: feature.id}, { active: true });
-                
-                if (db[addr]) openBuildingCard(addr, false);
-                else showToast("בניין זה לא קיים במאגר. פתח תפריט והוסף משפחה.");
+
+                // חיפוש גמיש — קודם התאמה מדויקת, אח"כ לפי קואורדינטות
+                let matchedKey = null;
+                if (db[addr]) {
+                    matchedKey = addr;
+                } else {
+                    // חיפוש לפי קרבה גיאוגרפית — הבניין הכי קרוב ל-50 מטר
+                    let minDist = 0.0005; // ~50 מטר
+                    Object.keys(db).forEach(key => {
+                        if (key === '__BOARDS__' || key === '__SETTINGS__' || key === 'meta') return;
+                        const c = db[key].info?.coords;
+                        if (!c) return;
+                        const dist = Math.sqrt(Math.pow(c[0]-lngLat.lng,2) + Math.pow(c[1]-lngLat.lat,2));
+                        if (dist < minDist) { minDist = dist; matchedKey = key; }
+                    });
+                }
+
+                if (matchedKey) openBuildingCard(matchedKey, false);
+                else openEmptyBuildingCard(addr, [lngLat.lng, lngLat.lat]);
             } catch(err) { console.error(err); }
         });
         
@@ -401,7 +419,7 @@ const fieldApp = (function () {
         html += `<div style="max-height:30vh; overflow-y:auto;">`;
         apts.forEach((fam, idx) => {
             html += `<div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-body); padding:12px; border-radius:12px; margin-bottom:10px; cursor:pointer;" 
-                onclick="fieldApp.openFamilyCard('${safeBldgEnc}', ${idx})">
+                onclick="fieldApp.openFamilyCardMini('${safeBldgEnc}', ${idx})">
                 <div>
                     <div style="font-weight:bold; font-size:15px;">משפחת ${escapeHTML(fam.name || 'ללא שם')}</div>
                     <div style="font-size:12px; color:var(--text-muted);">${fam.num ? 'דירה ' + escapeHTML(String(fam.num)) : ''}</div>
@@ -826,7 +844,7 @@ const fieldApp = (function () {
         let html = `<button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>`;
         html += `<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; padding-right:35px;"><div><h3 style="margin: 0 0 2px 0; font-size: 22px;">משפחת ${safeName}</h3>${parentsHTML}<div style="color: var(--text-muted); font-size: 14px;"><i class="fas fa-map-marker-alt"></i> ${escapeHTML(bldg)} ${fam.num ? 'דירה '+escapeHTML(String(fam.num)) : ''}</div></div><div style="display:flex; gap:8px;"><button onclick="fieldApp.openFamilyForm('${safeBldgEnc}', ${aptIdx})" style="background:none; border:none; color:var(--accent); font-size:20px; cursor:pointer;"><i class="fas fa-edit"></i></button><button style="width:40px; height:40px; border-radius:50%; background:var(--bg-body); border:1px solid var(--border-light); color:var(--text-main); font-size:16px; cursor:pointer; ${disableStyle}" onclick="fieldApp.callFamilyNumber('${phone}')"><i class="fas fa-phone"></i></button><button style="width:40px; height:40px; border-radius:50%; background:#25D366; border:none; color:white; font-size:16px; cursor:pointer; ${disableStyle}" onclick="window.open('${waLink}', '_blank')"><i class="fab fa-whatsapp"></i></button></div></div>${taskHTML}`;
         html += `<div style="font-size:14px; font-weight:bold; color:var(--text-muted); margin-bottom:10px;">דווח סטטוס ביקור:</div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"><button style="padding: 12px; background: var(--success); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('בוצע')"><i class="fas fa-check"></i> בוצע</button><button style="padding: 12px; background: var(--warning); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('אין מענה')"><i class="fas fa-door-closed"></i> אין מענה</button><button style="padding: 12px; background: var(--text-muted); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('לא רלוונטי')"><i class="fas fa-ban"></i> לא רלוונטי</button><button style="padding: 12px; background: var(--danger); color: white; border: none; border-radius: 12px; font-weight: bold; cursor:pointer;" onclick="fieldApp.openVoiceSummary('לא מעוניינים')"><i class="fas fa-times-circle"></i> לא מעוניינים</button></div>`;
-        if (coords) html += `<div style="display:flex; gap:10px; margin-top:15px;"><button onclick="fieldApp.openExternalNav(${coords[0]}, ${coords[1]}, 'waze')" style="flex:1; padding:8px; background:#33ccff; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;"><i class="fab fa-waze"></i> Waze</button><button onclick="fieldApp.openExternalNav(${coords[0]}, ${coords[1]}, 'google')" style="flex:1; padding:8px; background:#ea4335; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;"><i class="fas fa-map-marker-alt"></i> Google</button></div>`;
+        if (coords) html += ``; // ניווט הוסר — שייך למצב מבצע בלבד
         
         // *** כפתור כרטיס מלא ***
         html += `<button onclick="fieldApp.openFullFamilyCard('${safeBldgEnc}', ${aptIdx})" style="width:100%; margin-top:15px; padding:12px; background:rgba(37,99,235,0.08); color:var(--accent); border:1px solid rgba(37,99,235,0.4); border-radius:12px; font-weight:bold; cursor:pointer; font-family:inherit;"><i class="fas fa-id-card"></i> פתח כרטיס משפחה מלא</button>`;
@@ -1314,6 +1332,8 @@ const fieldApp = (function () {
             document.getElementById('f-add-fam-phone').value = fam.phone || fam.fatherPhone || fam.motherPhone || '';
             document.getElementById('f-add-fam-homephone').value = fam.homePhone || '';
             document.getElementById('f-add-fam-intercom').value = db[bldgDecoded].info?.code || '';
+            const floorEl = document.getElementById('f-add-fam-floor');
+            if (floorEl) floorEl.value = fam.floor || '';
             titleIcon.innerHTML = '<i class="fas fa-user-edit" style="color:var(--accent);"></i> עריכת פרטי משפחה';
             saveBtn.innerHTML = '<i class="fas fa-save"></i> עדכן נתונים';
         } else {
@@ -1355,6 +1375,7 @@ const fieldApp = (function () {
         const aptNum = document.getElementById('f-add-fam-apt').value.trim();
         const homePhone = document.getElementById('f-add-fam-homephone').value.trim();
         const intercom = document.getElementById('f-add-fam-intercom').value.trim();
+        const floor = (document.getElementById('f-add-fam-floor')?.value || '').trim();
 
         let finalCoords = selectedCoords;
         if (!address) { address = NO_ADDRESS_KEY; finalCoords = []; }
@@ -1371,7 +1392,7 @@ const fieldApp = (function () {
             } catch(e) { console.log("Geocoding failed"); }
         }
 
-        const familyData = { name, father: fatherName, mother: motherName, fatherName, motherName, phone, homePhone, num: aptNum };
+        const familyData = { name, father: fatherName, mother: motherName, fatherName, motherName, phone, homePhone, num: aptNum, floor };
         const outbox = storageGet(OUTBOX_KEY) || [];
 
         if (editingFamilyContext) {
@@ -2018,6 +2039,19 @@ const fieldApp = (function () {
         );
     }
 
+
+    function skipMissionTarget() {
+        if (!isMissionActive) return;
+        showToast('⏭ דולג לתחנה הבאה');
+        if (navigator.vibrate) navigator.vibrate([20, 30]);
+        missionCurrentIdx++;
+        if (missionCurrentIdx >= missionWaypoints.length) {
+            showMissionSummary();
+        } else {
+            updateMissionHUD();
+        }
+    }
+
     function _missionWaze() {
         const wp = missionWaypoints[missionCurrentIdx];
         if (!wp) return;
@@ -2101,6 +2135,13 @@ const fieldApp = (function () {
     function closeMissionSummary() {
         document.getElementById('f-mission-summary').style.display = 'none';
         updateAppUIState('CRM');
+        _speedDialOpen = false;
+        const dial = document.getElementById('speed-dial');
+        const overlay = document.getElementById('speed-dial-overlay');
+        const fabBtn = document.getElementById('super-fab-btn');
+        if (dial) dial.classList.remove('open');
+        if (overlay) overlay.style.display = 'none';
+        if (fabBtn) fabBtn.classList.remove('dial-open');
         missionWaypoints = []; missionCurrentIdx = 0; isMissionActive = false;
         if (map && map.getLayer('route')) map.removeLayer('route');
         if (map && map.getSource('route')) map.removeSource('route');
@@ -2674,6 +2715,7 @@ const fieldApp = (function () {
 
         switch (state) {
             case 'CRM':
+                document.body.classList.remove('mission-active');
                 if (navBar)  { navBar.style.display = 'flex'; navBar.style.transform = 'translateY(0)'; }
                 if (fabWrap) { fabWrap.style.display = 'flex'; }
                 if (syncW)   syncW.style.display    = 'flex';
@@ -2701,6 +2743,7 @@ const fieldApp = (function () {
                 if (fabWrap) { fabWrap.style.display = 'none'; }
                 if (syncW)   syncW.style.display    = 'none';
                 if (routeBar) routeBar.classList.remove('visible');
+                document.body.classList.add('mission-active');
                 if (map) map.setPadding({ bottom: 0, top: 0 });
                 break;
         }
@@ -2955,6 +2998,594 @@ const fieldApp = (function () {
         }
     }
 
+
+    // כרטיס בניין ריק — בניין שלא קיים במאגר
+    function openEmptyBuildingCard(addr, coords) {
+        if (!db[addr]) {
+            db[addr] = { info: { coords: coords || null, code: '', rep: '', notes: '' }, apts: [] };
+        }
+        openBuildingCard(addr, false);
+    }
+
+    // כרטיס משפחה מינימלי (מתוך כרטיס בניין)
+    function openFamilyCardMini(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const fam = db[bldg]?.apts[aptIdx];
+        if (!fam) return;
+
+        const phone = fam.phone || fam.fatherPhone || fam.motherPhone || '';
+        const waLink = phone ? `https://wa.me/${phone.replace(/\D/g,'').replace(/^0/,'972')}` : '#';
+        const disableStyle = !phone ? 'opacity:0.4; pointer-events:none;' : '';
+
+        let html = `<button class="sheet-close-btn" onclick="fieldApp.openBuildingCard('${bldg}')"><i class="fas fa-arrow-right"></i></button>`;
+        html += `<div style="padding-right:36px; margin-bottom:16px;">
+            <div style="font-weight:800; font-size:22px;">משפחת ${escapeHTML(fam.name || 'ללא שם')}</div>
+            ${fam.num ? `<div style="color:var(--text-muted); font-size:13px;">דירה ${escapeHTML(String(fam.num))}</div>` : ''}
+        </div>`;
+
+        // פרטי קשר מהירים
+        html += `<div style="display:flex; gap:10px; margin-bottom:16px;">
+            <button style="flex:1; padding:13px; background:rgba(16,185,129,0.1); color:var(--success); border:1px solid var(--success); border-radius:12px; font-weight:700; cursor:pointer; font-family:inherit; ${disableStyle}"
+                onclick="fieldApp.callFamilyNumber('${phone}')"><i class="fas fa-phone"></i> חייג</button>
+            <button style="flex:1; padding:13px; background:rgba(37,196,103,0.1); color:#25D366; border:1px solid #25D366; border-radius:12px; font-weight:700; cursor:pointer; font-family:inherit; ${disableStyle}"
+                onclick="window.open('${waLink}','_blank')"><i class="fab fa-whatsapp"></i> וואטסאפ</button>
+            <button style="flex:1; padding:13px; background:rgba(37,99,235,0.1); color:var(--accent); border:1px solid var(--accent); border-radius:12px; font-weight:700; cursor:pointer; font-family:inherit;"
+                onclick="fieldApp.openFullFamilyCard('${bldgEnc}', ${aptIdx})"><i class="fas fa-id-card"></i> כרטיס מלא</button>
+        </div>`;
+
+        // משימות פתוחות
+        const tasks = (fam.tasks || []).filter(t => !t.done);
+        if (tasks.length > 0) {
+            html += `<div style="font-weight:700; font-size:14px; margin-bottom:8px; color:var(--text-muted);">משימות פתוחות</div>`;
+            html += tasks.map((t, i) => `
+                <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--bg-body); border-radius:10px; margin-bottom:6px;">
+                    <button onclick="fieldApp._quickDoneTask('${bldgEnc}',${aptIdx},${i})" style="width:24px;height:24px;border-radius:50%;border:2px solid var(--border-light);background:white;cursor:pointer;flex-shrink:0;"></button>
+                    <span style="font-size:14px;">${escapeHTML(t.text)}</span>
+                </div>`).join('');
+        }
+
+        openSheet(html, 'auto');
+    }
+
+    function _quickDoneTask(bldgEnc, aptIdx, taskIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        if (db[bldg]?.apts[aptIdx]?.tasks[taskIdx]) {
+            db[bldg].apts[aptIdx].tasks[taskIdx].done = true;
+            storageSet(DATA_KEY, db);
+            showToast('✅ משימה הושלמה');
+            openFamilyCardMini(bldgEnc, aptIdx);
+            if (navigator.vibrate) navigator.vibrate(30);
+        }
+    }
+
+
+    // ==========================================
+    // חיפוש גלובלי
+    // ==========================================
+    let _searchTimeout = null;
+
+    function globalSearch(query) {
+        const clearBtn = document.getElementById('global-search-clear');
+        const results = document.getElementById('global-search-results');
+        if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
+
+        clearTimeout(_searchTimeout);
+        if (!query || query.length < 2) {
+            if (results) results.style.display = 'none';
+            return;
+        }
+
+        // הצג "מחפש..." מיידית
+        if (results) {
+            results.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:13px;"><i class="fas fa-spinner fa-spin" style="margin-left:8px;"></i>מחפש...</div>';
+            results.style.display = 'block';
+        }
+
+        _searchTimeout = setTimeout(() => _runGlobalSearch(query), 350);
+    }
+
+    function globalSearchFocus() {
+        const input = document.getElementById('global-search-input');
+        const results = document.getElementById('global-search-results');
+        if (input?.value?.length >= 2 && results) results.style.display = 'block';
+    }
+
+    function globalSearchClear() {
+        const input = document.getElementById('global-search-input');
+        const results = document.getElementById('global-search-results');
+        const clearBtn = document.getElementById('global-search-clear');
+        if (input) input.value = '';
+        if (results) results.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        input?.blur();
+    }
+
+    async function _runGlobalSearch(query) {
+        if (!db) return;
+        const q = query.trim().toLowerCase();
+        const hits = [];
+
+        // סריקת כל הבניינים והמשפחות
+        Object.keys(db).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+
+            // התאמת כתובת בניין
+            if (bldg.toLowerCase().includes(q)) {
+                hits.push({
+                    type: 'building', icon: 'fas fa-building', iconBg: 'rgba(37,99,235,0.1)', iconColor: 'var(--accent)',
+                    title: bldg, sub: `${(db[bldg].apts||[]).length} משפחות`,
+                    typeLabel: 'בניין',
+                    action: () => openBuildingCard(bldg, false)
+                });
+            }
+
+            // משפחות
+            (db[bldg].apts || []).forEach((apt, aptIdx) => {
+                const name = (apt.name || '').toLowerCase();
+                const father = (apt.father || apt.fatherName || '').toLowerCase();
+                const mother = (apt.mother || apt.motherName || '').toLowerCase();
+                const phone = (apt.phone || apt.fatherPhone || '').toLowerCase();
+
+                if (name.includes(q) || father.includes(q) || mother.includes(q) || phone.includes(q)) {
+                    hits.push({
+                        type: 'family', icon: 'fas fa-users', iconBg: 'rgba(16,185,129,0.1)', iconColor: 'var(--success)',
+                        title: 'משפחת ' + (apt.name || 'ללא שם'),
+                        sub: bldg + (apt.num ? ' דירה ' + apt.num : ''),
+                        typeLabel: 'משפחה',
+                        action: () => {
+                            openBuildingCard(bldg, false);
+                            setTimeout(() => openFamilyCardMini(encodeURIComponent(bldg), aptIdx), 400);
+                        }
+                    });
+                }
+
+                // משימות
+                (apt.tasks || []).filter(t => !t.done).forEach(task => {
+                    if ((task.text||'').toLowerCase().includes(q)) {
+                        hits.push({
+                            type: 'task', icon: 'fas fa-check-circle', iconBg: 'rgba(245,158,11,0.1)', iconColor: 'var(--warning)',
+                            title: task.text, sub: 'משפחת ' + (apt.name||'') + ' · ' + bldg,
+                            typeLabel: 'משימה',
+                            action: () => {
+                                switchView('tasks', document.querySelectorAll('.nav-item')[1]);
+                                const taskInput = document.getElementById('f-task-search');
+                                if (taskInput) { taskInput.value = task.text; renderTasks(); }
+                                globalSearchClear();
+                            }
+                        });
+                    }
+                });
+            });
+        });
+
+        // משימות כלליות
+        (db?.meta?.generalTasks || []).filter(t => !t.done).forEach(task => {
+            if ((task.text||'').toLowerCase().includes(q)) {
+                hits.push({
+                    type: 'task', icon: 'fas fa-tasks', iconBg: 'rgba(245,158,11,0.1)', iconColor: 'var(--warning)',
+                    title: task.text, sub: 'משימה כללית',
+                    typeLabel: 'משימה',
+                    action: () => {
+                        switchView('tasks', document.querySelectorAll('.nav-item')[1]);
+                        globalSearchClear();
+                    }
+                });
+            }
+        });
+
+        // חיפוש כתובות מאומתות מ-Mapbox (אם יש פחות מ-5 תוצאות מקומיות)
+        if (q.length >= 3) {
+            try {
+                const token = mapboxgl.accessToken;
+                const center = map ? map.getCenter() : { lng: 35.2, lat: 31.8 };
+                const res = await fetch(
+                    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?` +
+                    `access_token=${token}&language=he&country=il&types=address,place&proximity=${center.lng},${center.lat}&limit=4`
+                );
+                const data = await res.json();
+                (data.features || []).forEach(f => {
+                    const addr = (f.place_name_he || f.place_name).split(',').slice(0,2).join(',').trim();
+                    const coords = f.center; // [lng, lat]
+                    // אל תוסיף כפילויות עם תוצאות מקומיות
+                    const alreadyExists = hits.some(h => h.title === addr || h.title.includes(addr.split(' ')[0]));
+                    hits.push({
+                        type: 'address',
+                        icon: 'fas fa-map-marker-alt',
+                        iconBg: 'rgba(239,68,68,0.1)',
+                        iconColor: 'var(--danger)',
+                        title: addr,
+                        sub: (f.place_name_he || f.place_name).split(',').slice(2).join(',').trim() || 'כתובת',
+                        typeLabel: 'כתובת',
+                        coords,
+                        action: () => {
+                            if (map) {
+                                map.flyTo({ center: coords, zoom: 18, pitch: 60, duration: 1200 });
+                                switchView('map', document.querySelector('.nav-item'));
+                                // פתח כרטיס בניין (ריק אם לא קיים)
+                                setTimeout(() => {
+                                    // חפש אם יש בניין קרוב במסד
+                                    let matchedKey = null;
+                                    let minDist = 0.0005;
+                                    Object.keys(db).forEach(key => {
+                                        if (key === '__BOARDS__' || key === '__SETTINGS__' || key === 'meta') return;
+                                        const c = db[key].info?.coords;
+                                        if (!c) return;
+                                        const dist = Math.sqrt(Math.pow(c[0]-coords[0],2) + Math.pow(c[1]-coords[1],2));
+                                        if (dist < minDist) { minDist = dist; matchedKey = key; }
+                                    });
+                                    if (matchedKey) openBuildingCard(matchedKey, false);
+                                    else openEmptyBuildingCard(addr, coords);
+                                }, 1300);
+                            }
+                        }
+                    });
+                });
+            } catch(e) { console.log('Geocoding search failed', e); }
+        }
+
+        _renderSearchResults(hits.slice(0, 12));
+    }
+
+    function _renderSearchResults(hits) {
+        const results = document.getElementById('global-search-results');
+        if (!results) return;
+
+        if (hits.length === 0) {
+            results.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:14px;">לא נמצאו תוצאות</div>';
+            results.style.display = 'block';
+            return;
+        }
+
+        results.innerHTML = hits.map((h, i) => `
+            <div class="search-result-item" onclick="fieldApp._searchHitAction(${i})">
+                <div class="search-result-icon" style="background:${h.iconBg}; color:${h.iconColor};">
+                    <i class="${h.icon}"></i>
+                </div>
+                <div style="flex:1; min-width:0;">
+                    <div class="search-result-title">${escapeHTML(h.title)}</div>
+                    <div class="search-result-sub">${escapeHTML(h.sub)}</div>
+                </div>
+                <div class="search-result-type">${h.typeLabel}</div>
+            </div>
+        `).join('');
+        results.style.display = 'block';
+
+        // שמור actions
+        window._searchHits = hits;
+    }
+
+    function _searchHitAction(idx) {
+        const hit = window._searchHits?.[idx];
+        if (!hit) return;
+        globalSearchClear();
+        setTimeout(() => hit.action(), 100);
+    }
+
+    // סגור תוצאות בלחיצה על המסך
+    document.addEventListener('click', (e) => {
+        const bar = document.getElementById('global-search-bar');
+        if (bar && !bar.contains(e.target)) {
+            const results = document.getElementById('global-search-results');
+            if (results) results.style.display = 'none';
+        }
+    });
+
+
+    // ==========================================
+    // סנכרון אנשי קשר (Android Contact Picker API)
+    // ==========================================
+    let _contactMatches = []; // התאמות שנמצאו
+
+    async function scanContacts(isManual = false) {
+        // בדוק תמיכה
+        if (!('contacts' in navigator && 'ContactsManager' in window)) {
+            if (isManual) showToast('אנשי קשר אינם נתמכים בדפדפן זה');
+            return;
+        }
+
+        // בדוק אם כבר נדחה בעבר
+        const dismissed = storageGet('contacts_scan_dismissed');
+        if (dismissed && !isManual) {
+            const daysSince = (Date.now() - parseInt(dismissed)) / (1000*60*60*24);
+            if (daysSince < 7) return; // אל תשאל שוב תוך שבוע
+        }
+
+        try {
+            const props = ['name', 'tel', 'email'];
+            const opts = { multiple: true };
+            showToast('📱 בחר אנשי קשר לסריקה...');
+            const contacts = await navigator.contacts.select(props, opts);
+            if (!contacts || contacts.length === 0) return;
+            _processContactMatches(contacts);
+        } catch(e) {
+            if (e.name !== 'AbortError') showToast('שגיאה בגישה לאנשי קשר');
+        }
+    }
+
+    function _processContactMatches(contacts) {
+        _contactMatches = [];
+
+        contacts.forEach(contact => {
+            const contactFullName = (contact.name?.[0] || '').trim();
+            const contactNameLower = contactFullName.toLowerCase();
+            if (!contactNameLower) return;
+
+            const contactPhone = contact.tel?.[0] || '';
+            const contactEmail = contact.email?.[0] || '';
+
+            Object.keys(db).forEach(bldg => {
+                if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+                (db[bldg].apts || []).forEach((apt, aptIdx) => {
+                    const famName    = (apt.name || '').toLowerCase();
+                    const fatherName = (apt.father || apt.fatherName || '').toLowerCase();
+                    const motherName = (apt.mother || apt.motherName || '').toLowerCase();
+                    const children   = (apt.childrenList || []).map(c => (c.name||'').toLowerCase()).filter(Boolean);
+
+                    // התאמה ראשונית לפי שם משפחה
+                    const familyMatch = famName && (
+                        contactNameLower.includes(famName) || famName.includes(contactNameLower.split(' ').pop())
+                    );
+                    // התאמה לפי שם פרטי
+                    const fatherMatch = fatherName && contactNameLower.includes(fatherName);
+                    const motherMatch = motherName && contactNameLower.includes(motherName);
+                    const childMatch  = children.find(c => c && contactNameLower.includes(c));
+
+                    if (!familyMatch && !fatherMatch && !motherMatch && !childMatch) return;
+
+                    const updates = [];
+
+                    if (contactPhone) {
+                        const existingFatherPhone = apt.fatherPhone || '';
+                        const existingMotherPhone = apt.motherPhone || '';
+                        const existingPhone       = apt.phone || '';
+
+                        // קבע שיוך טלפון
+                        let attribution = null; // 'father' | 'mother' | 'child:X' | 'ask'
+
+                        if (fatherMatch) {
+                            attribution = 'father';
+                        } else if (motherMatch) {
+                            attribution = 'mother';
+                        } else if (childMatch) {
+                            attribution = 'child:' + childMatch;
+                        } else if (familyMatch) {
+                            // שם משפחה בלבד — נסה להסיק מהמייל
+                            if (contactEmail && apt.fatherEmail && contactEmail === apt.fatherEmail) {
+                                attribution = 'father';
+                            } else if (contactEmail && apt.motherEmail && contactEmail === apt.motherEmail) {
+                                attribution = 'mother';
+                            } else {
+                                attribution = 'ask'; // צריך לשאול
+                            }
+                        }
+
+                        // בדוק אם הטלפון חדש
+                        const isNewForFather = attribution === 'father' && contactPhone !== existingFatherPhone;
+                        const isNewForMother = attribution === 'mother' && contactPhone !== existingMotherPhone;
+                        const isNew          = !existingFatherPhone && !existingMotherPhone && !existingPhone;
+
+                        if (attribution === 'ask' || isNewForFather || isNewForMother || isNew) {
+                            updates.push({
+                                field: 'phone',
+                                label: 'טלפון',
+                                value: contactPhone,
+                                icon: 'fas fa-phone',
+                                color: 'var(--success)',
+                                attribution,
+                                apt,
+                                // לתצוגה
+                                attributionLabel: attribution === 'father' ? `לאב · ${apt.father || apt.fatherName || ''}` :
+                                                  attribution === 'mother' ? `לאם · ${apt.mother || apt.motherName || ''}` :
+                                                  attribution?.startsWith('child:') ? `לילד · ${childMatch}` :
+                                                  'לא ברור — יש לשייך'
+                            });
+                        }
+                    }
+
+                    if (contactEmail && !apt.email && !apt.fatherEmail && !apt.motherEmail) {
+                        let attribution = 'ask';
+                        if (fatherMatch) attribution = 'father';
+                        else if (motherMatch) attribution = 'mother';
+
+                        updates.push({
+                            field: 'email',
+                            label: 'מייל',
+                            value: contactEmail,
+                            icon: 'fas fa-envelope',
+                            color: 'var(--accent)',
+                            attribution,
+                            attributionLabel: attribution === 'father' ? `לאב · ${apt.father || apt.fatherName || ''}` :
+                                              attribution === 'mother' ? `לאם · ${apt.mother || apt.motherName || ''}` :
+                                              'לא ברור — יש לשייך'
+                        });
+                    }
+
+                    if (updates.length > 0) {
+                        _contactMatches.push({
+                            bldg, aptIdx, apt,
+                            contactName: contactFullName,
+                            updates
+                        });
+                    }
+                });
+            });
+        });
+
+        if (_contactMatches.length === 0) {
+            showToast('✅ לא נמצאו נתונים חדשים לעדכון');
+            return;
+        }
+
+        _showContactsModal();
+    }
+
+    function _showContactsModal() {
+        const modal = document.getElementById('contacts-sync-modal');
+        const list = document.getElementById('contacts-matches-list');
+        const count = document.getElementById('contacts-match-count');
+        if (!modal || !list) return;
+
+        count.innerText = `נמצאו ${_contactMatches.length} משפחות עם מידע חדש`;
+
+        list.innerHTML = _contactMatches.map((m, mIdx) => `
+            <div style="background:var(--bg-body); border-radius:16px; padding:14px; border:1px solid var(--border-light);">
+                <div style="font-weight:800; font-size:15px; margin-bottom:4px;">
+                    <i class="fas fa-users" style="color:var(--accent); margin-left:6px;"></i>
+                    משפחת ${escapeHTML(m.apt.name || 'ללא שם')}
+                    <span style="font-size:12px; color:var(--text-muted); font-weight:400;"> · ${escapeHTML(m.bldg)}</span>
+                </div>
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+                    מאיש הקשר: ${escapeHTML(m.contactName)}
+                </div>
+                ${m.updates.map((u, uIdx) => `
+                    <div style="background:var(--surface); border-radius:12px; margin-bottom:8px; border:1px solid var(--border-light); overflow:hidden;">
+                        <div style="display:flex; align-items:center; gap:10px; padding:10px 12px;">
+                            <i class="${u.icon}" style="color:${u.color}; width:16px;"></i>
+                            <div style="flex:1;">
+                                <div style="font-size:11px; color:var(--text-muted);">${u.label}</div>
+                                <div style="font-weight:700; font-size:14px;" dir="ltr">${escapeHTML(u.value)}</div>
+                            </div>
+                            ${u.attribution !== 'ask' ? `
+                                <button onclick="fieldApp._approveContactUpdate(${mIdx}, ${uIdx}, this)"
+                                    style="padding:6px 14px; background:rgba(16,185,129,0.1); color:var(--success); border:1px solid var(--success); border-radius:8px; font-weight:700; cursor:pointer; font-size:13px; font-family:inherit;">
+                                    שמור
+                                </button>
+                            ` : ''}
+                        </div>
+                        <!-- שיוך -->
+                        <div style="padding:6px 12px 10px; border-top:1px solid var(--border-light);">
+                            ${u.attribution !== 'ask' ? `
+                                <div style="font-size:12px; color:var(--text-muted);">
+                                    <i class="fas fa-tag" style="margin-left:4px;"></i>
+                                    ${escapeHTML(u.attributionLabel)}
+                                </div>
+                            ` : `
+                                <div style="font-size:12px; color:var(--warning); margin-bottom:8px; font-weight:600;">
+                                    <i class="fas fa-question-circle" style="margin-left:4px;"></i>
+                                    למי לשייך את הטלפון?
+                                </div>
+                                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                    ${m.apt.father || m.apt.fatherName ? `
+                                        <button onclick="fieldApp._assignAndApprove(${mIdx}, ${uIdx}, 'father', this)"
+                                            style="padding:6px 12px; background:rgba(37,99,235,0.1); color:var(--accent); border:1px solid var(--accent); border-radius:8px; font-weight:700; cursor:pointer; font-size:12px; font-family:inherit;">
+                                            👨 ${escapeHTML(m.apt.father || m.apt.fatherName)}
+                                        </button>
+                                    ` : ''}
+                                    ${m.apt.mother || m.apt.motherName ? `
+                                        <button onclick="fieldApp._assignAndApprove(${mIdx}, ${uIdx}, 'mother', this)"
+                                            style="padding:6px 12px; background:rgba(245,158,11,0.1); color:var(--warning); border:1px solid var(--warning); border-radius:8px; font-weight:700; cursor:pointer; font-size:12px; font-family:inherit;">
+                                            👩 ${escapeHTML(m.apt.mother || m.apt.motherName)}
+                                        </button>
+                                    ` : ''}
+                                    ${(m.apt.childrenList||[]).slice(0,3).map(child => `
+                                        <button onclick="fieldApp._assignAndApprove(${mIdx}, ${uIdx}, 'child:${escapeHTML(child.name||'')}', this)"
+                                            style="padding:6px 12px; background:rgba(16,185,129,0.1); color:var(--success); border:1px solid var(--success); border-radius:8px; font-weight:700; cursor:pointer; font-size:12px; font-family:inherit;">
+                                            👦 ${escapeHTML(child.name||'')}
+                                        </button>
+                                    `).join('')}
+                                    <button onclick="fieldApp._assignAndApprove(${mIdx}, ${uIdx}, 'general', this)"
+                                        style="padding:6px 12px; background:var(--bg-body); color:var(--text-muted); border:1px solid var(--border-light); border-radius:8px; font-weight:700; cursor:pointer; font-size:12px; font-family:inherit;">
+                                        כללי
+                                    </button>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `).join('');
+
+        modal.style.display = 'flex';
+        if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+    }
+
+    function _approveContactUpdate(matchIdx, updateIdx, btn) {
+        const match = _contactMatches[matchIdx];
+        if (!match) return;
+        const update = match.updates[updateIdx];
+        if (!update) return;
+        _saveContactField(match, update, update.attribution || 'general');
+        // עדכון ויזואלי
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-check"></i> נשמר';
+            btn.style.background = 'var(--success)';
+            btn.style.color = 'white';
+            btn.style.borderColor = 'var(--success)';
+            btn.disabled = true;
+        }
+        if (navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function _assignAndApprove(matchIdx, updateIdx, attribution, btn) {
+        const match = _contactMatches[matchIdx];
+        if (!match) return;
+        const update = match.updates[updateIdx];
+        if (!update) return;
+        update.attribution = attribution;
+        _saveContactField(match, update, attribution);
+        // עדכן ויזואלי — הסתר כפתורי בחירה והצג "נשמר"
+        const container = btn?.closest('[style*="border-top"]');
+        if (container) {
+            container.innerHTML = `<div style="padding:8px 12px; font-size:12px; color:var(--success); font-weight:700;">
+                <i class="fas fa-check"></i> נשמר עבור ${attribution === 'father' ? 'האב' : attribution === 'mother' ? 'האם' : attribution.startsWith('child:') ? 'הילד' : 'כללי'}
+            </div>`;
+        }
+        if (navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function _saveContactField(match, update, attribution) {
+        const apt = db[match.bldg].apts[match.aptIdx];
+        if (!apt) return;
+
+        if (update.field === 'phone' || update.field === 'phone2') {
+            if (attribution === 'father')        apt.fatherPhone = update.value;
+            else if (attribution === 'mother')   apt.motherPhone = update.value;
+            else if (attribution?.startsWith('child:')) {
+                const childName = attribution.replace('child:', '');
+                const child = (apt.childrenList || []).find(c => c.name === childName);
+                if (child) child.phone = update.value;
+            } else {
+                apt.phone = update.value; // כללי — לשדה הראשי
+            }
+        }
+
+        if (update.field === 'email') {
+            if (attribution === 'father')       apt.fatherEmail = update.value;
+            else if (attribution === 'mother')  apt.motherEmail = update.value;
+            else                                apt.email = update.value;
+        }
+
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({
+            type: 'contact_update',
+            bldg: match.bldg,
+            aptIdx: match.aptIdx,
+            field: update.field,
+            value: update.value,
+            attribution,
+            timestamp: new Date().toISOString()
+        });
+        storageSet(OUTBOX_KEY, outbox);
+    }
+
+    function approveAllContacts() {
+        _contactMatches.forEach((match, mIdx) => {
+            match.updates.forEach((update, uIdx) => {
+                const btn = document.querySelector(`[onclick*="_approveContactUpdate(${mIdx}, ${uIdx}"]`);
+                if (!btn?.disabled) _approveContactUpdate(mIdx, uIdx, btn || document.createElement('button'));
+            });
+        });
+        setTimeout(() => closeContactsSync(), 500);
+        showToast('✅ כל הנתונים עודכנו!');
+    }
+
+    function closeContactsSync() {
+        const modal = document.getElementById('contacts-sync-modal');
+        if (modal) modal.style.display = 'none';
+        storageSet('contacts_scan_dismissed', Date.now().toString());
+    }
+
     // ==========================================
     // חשיפת הפונקציות החוצה
     // ==========================================
@@ -2962,6 +3593,8 @@ const fieldApp = (function () {
         init, login, switchView, toggleFab, toggleActionSheet, toggleSyncDetails, closeOverlays, openRouteMenu, buildRoute, openFamilyForm, saveFamilyForm,
         updateAppUIState, updateMapPadding,
         toggleSpeedDial, openMissionPlanner, mpSwitchTab, _mpToggleStop, _mpLoadSaved, activateMapPickMode, createRouteFromPlanner, _reRemoveStop, startRouteFromEditor,
+        globalSearch, globalSearchFocus, globalSearchClear, _searchHitAction,
+        scanContacts, closeContactsSync, approveAllContacts, _approveContactUpdate, _assignAndApprove,
         openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded,
         openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter,
         callFamilyNumber, toggleDarkMode, toggleMapStyle, forceSync, openExternalNav, searchAddressInput, selectAddressOption,
@@ -2978,6 +3611,7 @@ const fieldApp = (function () {
         // *** פונקציות חדשות חשופות ***
         openFullImage, openFullFamilyCard, _ffcTab, _ffcRender, closeFFCSheet,
         handleCommTouchStart, handleCommTouchMove, handleCommTouchEnd,
+        openEmptyBuildingCard, openFamilyCardMini, _quickDoneTask, skipMissionTarget,
         _ffcSaveDetails, _ffcDelete, _ffcAddTag, _ffcRemoveTag,
         _ffcAddChild, _ffcRemoveChild, _ffcUpdateChild,
         _ffcToggleTask, _ffcAddTask, _ffcDeleteTask,
