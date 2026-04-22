@@ -603,7 +603,7 @@ const fieldApp = (function () {
 
         const html = `
         <style>.ffc-input{width:100%;padding:9px 11px;border:1px solid var(--border-light);border-radius:10px;background:var(--bg-body);color:var(--text-main);font-family:inherit;font-size:14px;box-sizing:border-box;}</style>
-        <button class="sheet-close-btn" onclick="fieldApp.closeOverlays(); document.getElementById('f-sheet').style.height=''"><i class="fas fa-times"></i></button>
+        <button class="sheet-close-btn" onclick="fieldApp.closeFFCSheet()"><i class="fas fa-times"></i></button>
         <div style="overflow-y:auto;max-height:calc(92vh - 50px);padding-bottom:20px;margin-top:15px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
                 <div>
@@ -1226,10 +1226,9 @@ const fieldApp = (function () {
 
     function openRouteMenu() {
         closeOverlays();
-        document.getElementById('f-fab-wrapper').style.display = 'none';
         switchView('map', document.querySelector('.nav-item'));
-        document.getElementById('f-route-sheet').classList.add('open');
-        document.getElementById('f-scrim').style.display = 'block';
+        const routeSheetEl = document.getElementById('f-route-sheet');
+        openSheet(routeSheetEl.innerHTML, 'auto');
     }
 
     function renderCommunity() {
@@ -1251,13 +1250,6 @@ const fieldApp = (function () {
 
             return `
             <div class="community-list-item-wrapper">
-                <div class="swipe-bg bg-call"><i class="fas fa-phone"></i></div>
-                <div class="swipe-bg bg-nav"><i class="fas fa-route"></i></div>
-                <div class="community-card-front"
-                     ondragstart="return false;"
-                     ontouchstart="fieldApp.handleCommTouchStart(event)"
-                     ontouchmove="fieldApp.handleCommTouchMove(event)"
-                     ontouchend="fieldApp.handleCommTouchEnd(event, '${phone}', '${f.bldg}')">
             <div class="expandable-card" oncontextmenu="event.preventDefault();" ontouchstart="fieldApp.handleCardTouchStart(event, '${safeBldgEnc}', ${f.aptIdx})" ontouchend="fieldApp.handleCardTouchEnd()" onmousedown="fieldApp.handleCardTouchStart(event, '${safeBldgEnc}', ${f.aptIdx})" onmouseup="fieldApp.handleCardTouchEnd()" onmouseleave="fieldApp.handleCardTouchEnd()">
                 <div class="expandable-card-header" onclick="this.parentElement.classList.toggle('expanded')">
                     <div>
@@ -1280,7 +1272,6 @@ const fieldApp = (function () {
                     </div>
                 </div>
             </div>
-                </div>
             </div>`;
         }).join('');
     }
@@ -1995,6 +1986,16 @@ const fieldApp = (function () {
     function callFamilyNumber(p) { if(p) window.location.href = `tel:${p}`; else showToast("אין מספר"); }
     function jumpToCenter() { const c = db?.__SETTINGS__?.homeLocation?.coords ? db.__SETTINGS__.homeLocation.coords : [34.8878, 31.9928]; map.flyTo({ center: c, zoom: 18, pitch: 60 }); }
     function recenter() { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => map.flyTo({ center: [p.coords.longitude, p.coords.latitude], zoom: 17, pitch: 60 })); }
+
+    function toggleMapStyle() {
+        if (!map) return;
+        const current = map.getStyle().name || '';
+        const isSatellite = current.toLowerCase().includes('satellite');
+        map.setStyle(isSatellite ? (isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12') : 'mapbox://styles/mapbox/satellite-streets-v12');
+        map.once('style.load', () => { add3DLayer(); renderMarkers(); });
+        showToast(isSatellite ? '🗺️ מפת רחובות' : '🛰️ מפת לוויין');
+    }
+
     function toggleDarkMode() { isDark = !isDark; document.body.classList.toggle('dark-mode', isDark); localStorage.setItem('field_theme', isDark ? 'dark' : 'light'); document.getElementById('f-theme-btn').innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>'; if (map) { map.setStyle(isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12'); map.once('style.load', () => { add3DLayer(); renderMarkers(); }); } }
     function openExternalNav(lng, lat, app) { if(!lng || !lat) { showToast("אין מיקום מדויק"); return; } if (app === 'waze') window.open(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank'); if (app === 'google') window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank'); }
 
@@ -2720,7 +2721,7 @@ const fieldApp = (function () {
         updateAppUIState, updateMapPadding,
         openAddTask, saveNewTask, openBuildingCard, openFamilyCard, openArrivalSheet: openArrivalSheetEncoded,
         openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter,
-        callFamilyNumber, toggleDarkMode, forceSync, openExternalNav, searchAddressInput, selectAddressOption,
+        callFamilyNumber, toggleDarkMode, toggleMapStyle, forceSync, openExternalNav, searchAddressInput, selectAddressOption,
         toggleTargetForRoute, startCustomRoute, saveQuickTask, showToast,
         finishMission, pauseMission, refreshMissionRoute, markAllDoneInBuilding, saveRoute, loadSavedRoutes,
         deleteSavedRoute, toggleTaskLayer, completeMissionTask, switchMissionTab, nextMissionTarget, prevMissionTarget,
