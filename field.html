@@ -24,6 +24,23 @@
         <div class="sync-text" onclick="fieldApp.forceSync(event)">ממתין לסנכרון</div>
     </div>
 
+    <!-- שורת חיפוש גלובלית -->
+    <div id="global-search-bar" class="global-search-bar">
+        <div class="global-search-input-wrap">
+            <i class="fas fa-search global-search-icon"></i>
+            <input type="text" id="global-search-input" class="global-search-input"
+                placeholder="חיפוש משפחה, כתובת, משימה..."
+                oninput="fieldApp.globalSearch(this.value)"
+                onfocus="fieldApp.globalSearchFocus()"
+                autocomplete="off">
+            <button id="global-search-clear" class="global-search-clear" style="display:none"
+                onclick="fieldApp.globalSearchClear()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="global-search-results" class="global-search-results" style="display:none;"></div>
+    </div>
+
     <div id="f-login" class="view-container" style="display:none; padding:40px 20px; text-align:center; height: 100vh; background: var(--bg-body); position: fixed; inset: 0; z-index: 9998;">
         <div style="margin-top: 20vh;">
             <i class="fas fa-user-shield fa-4x" style="color: var(--accent); margin-bottom: 20px;"></i>
@@ -57,7 +74,7 @@
                     style="background:var(--bg-body); color:var(--text-muted); border:1px solid var(--border-light); border-radius:10px; padding:10px 13px; cursor:pointer; flex-shrink:0; font-size:15px; transition:0.2s;">
                     <i class="fas fa-microphone"></i>
                 </button>
-                <button onclick="fieldApp.openAddTask()" style="background:var(--accent); color:white; border:none; border-radius:10px; padding:10px 14px; font-weight:bold; cursor:pointer; flex-shrink:0; font-size:15px;"><i class="fas fa-plus"></i></button>
+                <button onclick="fieldApp.openQuickTaskForm()" style="background:var(--accent); color:white; border:none; border-radius:10px; padding:10px 14px; font-weight:bold; cursor:pointer; flex-shrink:0; font-size:15px;"><i class="fas fa-plus"></i></button>
             </div>
             <!-- 3 כפתורי מצב תצוגה -->
             <div style="display:flex; gap:8px;">
@@ -142,10 +159,15 @@
     </div>
 
     <div id="view-community" class="view-container" style="padding: 80px 20px 20px 20px;">
-        <h2 style="margin-bottom:20px;"><i class="fas fa-users" style="color:var(--success)"></i> קהילה</h2>
-        <button onclick="fieldApp.openFamilyForm()" style="width:100%; margin-bottom:20px; padding:14px; background:rgba(59,130,246,0.1); color:var(--accent); border:1px dashed var(--accent); border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer;">
-            <i class="fas fa-user-plus"></i> הוסף משפחה חדשה
-        </button>
+        <h2 style="margin-bottom:15px;"><i class="fas fa-users" style="color:var(--success)"></i> קהילה</h2>
+        <div style="display:flex; gap:10px; margin-bottom:20px;">
+            <button onclick="fieldApp.openFamilyForm()" style="flex:2; padding:13px; background:rgba(59,130,246,0.1); color:var(--accent); border:1px dashed var(--accent); border-radius:12px; font-weight:bold; font-size:15px; cursor:pointer;">
+                <i class="fas fa-user-plus"></i> הוסף משפחה
+            </button>
+            <button onclick="fieldApp.scanContacts(true)" id="btn-scan-contacts" style="flex:1; padding:13px; background:rgba(16,185,129,0.1); color:var(--success); border:1px solid var(--success); border-radius:12px; font-weight:bold; font-size:13px; cursor:pointer;">
+                <i class="fas fa-address-book"></i> סרוק אנשי קשר
+            </button>
+        </div>
         <div id="f-community-list"></div>
     </div>
 
@@ -223,7 +245,10 @@
             </div>
             <input type="text" id="f-add-fam-apt" placeholder="מס' דירה" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
         </div>
-        <input type="text" id="f-add-fam-intercom" placeholder="קוד אינטרקום / קומה" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+            <input type="text" id="f-add-fam-intercom" placeholder="קוד אינטרקום" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+            <input type="text" id="f-add-fam-floor" placeholder="קומה" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border-light); background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:16px;">
+        </div>
         <button id="f-add-fam-savebtn" style="width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor:pointer;" onclick="fieldApp.saveFamilyForm()"><i class="fas fa-save"></i> שמור נתונים</button>
     </div>
 
@@ -302,6 +327,10 @@
                 <button onclick="fieldApp.nextMissionTarget()"
                     style="flex:1; padding:16px; background:var(--success); border:none; border-radius:14px; color:white; font-weight:800; cursor:pointer; font-family:inherit; font-size:18px; box-shadow:0 4px 15px rgba(16,185,129,0.4);">
                     <i class="fas fa-check"></i> הגעתי!
+                </button>
+                <button onclick="fieldApp.skipMissionTarget()"
+                    style="width:50px; padding:14px 0; background:rgba(245,158,11,0.12); border:1px solid var(--warning); border-radius:14px; color:var(--warning); font-weight:700; cursor:pointer; font-family:inherit; font-size:13px; flex-shrink:0;">
+                    <i class="fas fa-forward"></i>
                 </button>
             </div>
 
@@ -487,6 +516,30 @@
         <button onclick="fieldApp.startRouteFromEditor()" style="width:100%; margin-top:16px; padding:16px; background:linear-gradient(135deg,var(--success),#059669); color:white; border:none; border-radius:16px; font-weight:800; font-size:17px; cursor:pointer; font-family:inherit; box-shadow:0 4px 20px rgba(16,185,129,0.4);">
             <i class="fas fa-play"></i> צא למסלול
         </button>
+    </div>
+
+    <!-- חלון סנכרון אנשי קשר -->
+    <div id="contacts-sync-modal" style="display:none; position:fixed; inset:0; z-index:9800; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); align-items:flex-end; justify-content:center;">
+        <div style="background:var(--surface); border-radius:24px 24px 0 0; width:100%; max-height:85vh; display:flex; flex-direction:column; padding-bottom:var(--safe-b);">
+            <div style="padding:20px 20px 0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+                <div>
+                    <h3 style="margin:0; font-size:20px;"><i class="fas fa-address-book" style="color:var(--accent);"></i> נמצאו עדכונים</h3>
+                    <div id="contacts-match-count" style="font-size:13px; color:var(--text-muted); margin-top:4px;"></div>
+                </div>
+                <button onclick="fieldApp.closeContactsSync()" style="background:var(--bg-body); border:none; border-radius:50%; width:36px; height:36px; cursor:pointer; color:var(--text-muted); font-size:16px;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="contacts-matches-list" style="overflow-y:auto; padding:16px 20px; flex:1; display:flex; flex-direction:column; gap:12px;"></div>
+            <div style="padding:16px 20px; flex-shrink:0; display:flex; gap:10px; border-top:1px solid var(--border-light);">
+                <button onclick="fieldApp.approveAllContacts()" style="flex:1; padding:14px; background:var(--accent); color:white; border:none; border-radius:14px; font-weight:700; font-size:15px; cursor:pointer; font-family:inherit;">
+                    <i class="fas fa-check-double"></i> אשר הכל
+                </button>
+                <button onclick="fieldApp.closeContactsSync()" style="padding:14px 20px; background:var(--bg-body); color:var(--text-muted); border:1px solid var(--border-light); border-radius:14px; font-weight:700; font-size:15px; cursor:pointer; font-family:inherit;">
+                    אחר כך
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- מגירת הוספת משפחה מהירה -->
