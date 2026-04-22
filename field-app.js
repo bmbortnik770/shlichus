@@ -279,10 +279,11 @@ const fieldApp = (function () {
                 if (db[addr]) {
                     matchedKey = addr;
                 } else {
-                    // חיפוש לפי קרבה גיאוגרפית — הבניין הכי קרוב ל-50 מטר
-                    let minDist = 0.0005; // ~50 מטר
+                    // חיפוש לפי קרבה גיאוגרפית — רק עד 15 מטר ועם נתונים
+                    let minDist = 0.00015; // ~15 מטר
                     Object.keys(db).forEach(key => {
                         if (key === '__BOARDS__' || key === '__SETTINGS__' || key === 'meta') return;
+                        if (!db[key].apts?.length) return; // רק בניינים עם משפחות
                         const c = db[key].info?.coords;
                         if (!c) return;
                         const dist = Math.sqrt(Math.pow(c[0]-lngLat.lng,2) + Math.pow(c[1]-lngLat.lat,2));
@@ -454,12 +455,13 @@ const fieldApp = (function () {
     function openFullFamilyCard(bldgEnc, aptIdx) {
         const bldg = decodeURIComponent(bldgEnc);
         if (!db[bldg] || !db[bldg].apts[aptIdx]) return;
+        // סגור כל מגירה פתוחה קודם
+        const fSheet = document.getElementById('f-sheet');
+        if (fSheet) fSheet.classList.remove('open');
+        document.getElementById('f-scrim').style.display = 'none';
         _ffcRender(bldgEnc, aptIdx, 'details');
         const sheet = document.getElementById('ffc-snap-sheet');
-        sheet.className = 'bottom-sheet snap-sheet active state-mini';
-        // סגור scrim אם פתוח (הsnap sheet לא צריך אותו)
-        document.getElementById('f-scrim').style.display = 'none';
-        // אתחל גרירה
+        sheet.className = 'bottom-sheet snap-sheet active state-half';
         _initFFCDrag(sheet);
     }
 
@@ -2436,24 +2438,35 @@ const fieldApp = (function () {
     let _taskVoiceRec = null;
 
     function openQuickTaskForm() {
-        // סגור action-sheet אם פתוח
-        const actionSheet = document.getElementById('action-sheet');
-        const actionOverlay = document.getElementById('action-sheet-overlay');
-        if (actionSheet) actionSheet.classList.remove('active');
-        if (actionOverlay) actionOverlay.classList.remove('active');
+        closeOverlays();
 
-        // אפס שדות
-        document.getElementById('q-task-title').value = '';
-        document.getElementById('q-task-date').value = new Date().toISOString().split('T')[0];
+        const todayVal = new Date().toISOString().split('T')[0];
 
-        // טאגיות חכמות
-        renderSmartChips();
+        const html = `
+            <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
+            <div class="quick-form-header" style="padding-right:36px; margin-bottom:14px;">
+                <h3 style="margin:0; font-size:19px;"><i class="fas fa-tasks" style="color:var(--warning); margin-left:8px;"></i>משימה חדשה</h3>
+            </div>
+            <div class="quick-form-body">
+                <div class="smart-chips-container" id="q-task-smart-chips"></div>
+                <div class="f-input-wrapper" style="margin-bottom:10px;">
+                    <input type="text" id="q-task-title" class="f-input" placeholder="מה צריך לעשות?" style="padding-right:14px;">
+                </div>
+                <div class="f-input-wrapper" style="margin-bottom:14px;">
+                    <i class="fas fa-calendar-alt"></i>
+                    <input type="date" id="q-task-date" class="f-input" value="${todayVal}">
+                </div>
+                <button class="btn-save-quick" onclick="fieldApp.saveQuickTask()">
+                    שמור משימה <i class="fas fa-check"></i>
+                </button>
+            </div>
+        `;
 
-        // פתח מגירה
-        openSheet(document.getElementById('quick-task-sheet').innerHTML, 'auto');
-        if (actionOverlay) actionOverlay.classList.remove('active');
-
-        setTimeout(() => document.getElementById('q-task-title').focus(), 350);
+        openSheet(html, 'auto');
+        setTimeout(() => {
+            renderSmartChips();
+            document.getElementById('q-task-title')?.focus();
+        }, 300);
     }
 
     function closeQuickTaskForm() {
@@ -2785,7 +2798,7 @@ const fieldApp = (function () {
     function openMissionPlanner() {
         mpSelectedStops = [];
         const sheet = document.getElementById('mission-planner-sheet');
-        openSheet(sheet.innerHTML, 'full');
+        openSheet(sheet.innerHTML, 'auto');
         mpSwitchTab('map');
         _mpUpdateBadge();
     }
