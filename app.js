@@ -694,7 +694,9 @@ function getEventDisplayInfo(ev) {
         case 'add_family_task':return { icon:'fa-thumbtack', color:'var(--accent)', desc:`משימה חדשה — ${nameLabel}` };
         case 'delete_family':  return { icon:'fa-trash',   color:'var(--danger)',   desc:`משפחה נמחקה — ${nameLabel}` };
         case 'contact_update': return { icon:'fa-address-book', color:'var(--success)', desc:`איש קשר עודכן — ${nameLabel}` };
-        case 'new_family':     return { icon:'fa-user-plus', color:'var(--success)', desc:`משפחה חדשה — ${nameLabel}` };
+        case 'new_family':
+        case 'add_full_family':return { icon:'fa-user-plus', color:'var(--success)', desc:`משפחה חדשה — ${nameLabel}` };
+        case 'add_general_task': return { icon:'fa-thumbtack', color:'var(--warning)', desc:`משימה כללית חדשה` };
         default:               return { icon:'fa-sync',    color:'var(--text-muted)', desc:`עדכון — ${nameLabel}` };
     }
 }
@@ -831,8 +833,8 @@ function applyOutboxEvent(ev) {
     if (!ev || !ev.type || !ev.bldg) return false;
     const bldgData = db[ev.bldg];
 
-    // ── new_family: משפחה חדשה שנוצרה בשטח ──
-    if (ev.type === 'new_family') {
+    // ── new_family / add_full_family: משפחה חדשה שנוצרה בשטח ──
+    if (ev.type === 'new_family' || ev.type === 'add_full_family') {
         if (!bldgData) {
             db[ev.bldg] = { info: { code:'', rep:'', notes:'', coords: ev.payload?.coords || null }, apts: [] };
         }
@@ -943,6 +945,16 @@ function applyOutboxEvent(ev) {
                 else apt.email = value;
             }
             break;
+        }
+        case 'add_general_task': {
+            if (!db.meta.generalTasks) db.meta.generalTasks = [];
+            db.meta.generalTasks.push({
+                text: ev.payload?.text || '',
+                date: ev.payload?.date || '',
+                done: false
+            });
+            apt.updatedAt = Date.now();
+            return true; // יציאה מוקדמת — אין apt לעדכן
         }
         default:
             console.warn('applyOutboxEvent: unknown type', ev.type);
