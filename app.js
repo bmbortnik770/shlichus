@@ -435,16 +435,38 @@ window.saveFullOnboarding = () => {
     }
 };
 
-window.obUpdateDrawMode = () => {
-    const mode = document.querySelector('input[name="obDrawMode"]:checked').value;
-    document.getElementById('obCitySearchMode').style.display = mode === 'city' ? 'block' : 'none';
-    document.getElementById('obManualDrawMode').style.display = mode === 'manual' ? 'block' : 'none';
+let _drawModeDebounce = null;
+window.obUpdateDrawMode = (mode) => {
+    if(!mode) {
+        const checked = document.querySelector('input[name="obDrawMode"]:checked');
+        mode = checked ? checked.value : 'city';
+    }
+    clearTimeout(_drawModeDebounce);
+    _drawModeDebounce = setTimeout(() => {
+        const radio = document.querySelector(`input[name="obDrawMode"][value="${mode}"]`);
+        if(radio) radio.checked = true;
+        const cityDiv = document.getElementById('obCitySearchMode');
+        const manualDiv = document.getElementById('obManualDrawMode');
+        if(cityDiv) cityDiv.style.display = mode === 'city' ? 'block' : 'none';
+        if(manualDiv) manualDiv.style.display = mode === 'manual' ? 'block' : 'none';
+    }, 20);
 };
 
-window.setUpdateDrawMode = () => {
-    const mode = document.querySelector('input[name="setDrawMode"]:checked').value;
-    document.getElementById('setCitySearchMode').style.display = mode === 'city' ? 'block' : 'none';
-    document.getElementById('setManualDrawMode').style.display = mode === 'manual' ? 'block' : 'none';
+let _setDrawModeDebounce = null;
+window.setUpdateDrawMode = (mode) => {
+    if(!mode) {
+        const checked = document.querySelector('input[name="setDrawMode"]:checked');
+        mode = checked ? checked.value : 'city';
+    }
+    clearTimeout(_setDrawModeDebounce);
+    _setDrawModeDebounce = setTimeout(() => {
+        const radio = document.querySelector(`input[name="setDrawMode"][value="${mode}"]`);
+        if(radio) radio.checked = true;
+        const cityDiv = document.getElementById('setCitySearchMode');
+        const manualDiv = document.getElementById('setManualDrawMode');
+        if(cityDiv) cityDiv.style.display = mode === 'city' ? 'block' : 'none';
+        if(manualDiv) manualDiv.style.display = mode === 'manual' ? 'block' : 'none';
+    }, 20);
 };
 
 // Fetch city/place boundary from Nominatim (OpenStreetMap)
