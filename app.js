@@ -514,48 +514,88 @@ function showTerritoryInfo(name, areaKm2, source) {
 // ── Territory Map Editor (manual drawing) ──
 window.openTerritoryMapEditor = (source) => {
     tempTerritorySource = source || 'onboarding';
-    document.getElementById('territoryMapEditorModal').style.display = 'flex';
     tmPoints = tempTerritoryPolygon ? [...tempTerritoryPolygon] : [];
     tmMode = 'draw';
 
+    // הצג מודל קודם — חשוב! Mapbox צריך גודל אמיתי של ה-container
+    document.getElementById('territoryMapEditorModal').style.display = 'flex';
+
+    // עדכן כפתורי מצב
+    tmSetMode('draw');
+
     setTimeout(() => {
-        if(tmMap) { tmMap.resize(); updateTmLayer(); return; }
-        const center = appSettings.homeLocation ? appSettings.homeLocation.coords : appSettings.center || [35.2, 31.8];
+        if(tmMap) {
+            // מפה קיימת — רק resize ועדכן שכבות
+            tmMap.resize();
+            updateTmLayer();
+            // עדכן מרכז אם יש נקודות
+            if(tmPoints.length > 0) {
+                const cx = tmPoints.reduce((s,p)=>s+p[0],0)/tmPoints.length;
+                const cy = tmPoints.reduce((s,p)=>s+p[1],0)/tmPoints.length;
+                tmMap.flyTo({ center:[cx,cy], zoom:14, duration:600 });
+            }
+            return;
+        }
+        // מפה חדשה
+        const center = (tmPoints.length > 0)
+            ? [tmPoints.reduce((s,p)=>s+p[0],0)/tmPoints.length, tmPoints.reduce((s,p)=>s+p[1],0)/tmPoints.length]
+            : (appSettings.homeLocation?.coords || appSettings.center || [35.2, 31.8]);
+
         tmMap = new mapboxgl.Map({
             container: 'territoryEditorMap',
             style: 'mapbox://styles/mapbox/streets-v12',
-            center, zoom: 13,
+            center, zoom: 14,
             language: 'he'
         });
+
         tmMap.on('load', () => {
-            // Source + layers
             tmMap.addSource('tm-poly', { type: 'geojson', data: buildTmGeoJSON() });
             tmMap.addLayer({ id: 'tm-fill', type: 'fill', source: 'tm-poly', paint: { 'fill-color': '#10b981', 'fill-opacity': 0.12 } });
             tmMap.addLayer({ id: 'tm-line', type: 'line', source: 'tm-poly', paint: { 'line-color': '#10b981', 'line-width': 2.5, 'line-dasharray': [4,2] } });
-            // Points circles source
             tmMap.addSource('tm-pts', { type: 'geojson', data: buildTmPointsGeoJSON() });
-            tmMap.addLayer({ id: 'tm-pts-layer', type: 'circle', source: 'tm-pts', paint: { 'circle-radius': 7, 'circle-color': '#10b981', 'circle-stroke-width': 2, 'circle-stroke-color': 'white' } });
-            
+            tmMap.addLayer({ id: 'tm-pts-layer', type: 'circle', source: 'tm-pts', paint: {
+                'circle-radius': 8,
+                'circle-color': '#10b981',
+                'circle-stroke-width': 2.5,
+                'circle-stroke-color': 'white',
+                'circle-pitch-alignment': 'map'
+            }});
+
             tmMap.on('click', (e) => {
-                if(tmMode === 'draw') {
-                    tmPoints.push([e.lngLat.lng, e.lngLat.lat]);
-                    updateTmLayer();
-                }
+                // אל תוסיף נקודה אם לחצנו על נקודה קיימת במצב מחיקה
+                if(tmMode === 'erase') return;
+                // בדוק שלא לחצנו על שכבת הנקודות
+                const feat = tmMap.queryRenderedFeatures(e.point, { layers: ['tm-pts-layer'] });
+                if(feat.length > 0 && tmMode === 'draw') return; // לחיצה על נקודה קיימת במצב ציור — התעלם
+                tmPoints.push([e.lngLat.lng, e.lngLat.lat]);
+                updateTmLayer();
             });
+
             tmMap.on('click', 'tm-pts-layer', (e) => {
+                e.stopPropagation && e.stopPropagation();
                 if(tmMode === 'erase') {
-                    e.preventDefault();
                     const idx = e.features[0].properties.idx;
                     tmPoints.splice(idx, 1);
                     updateTmLayer();
+                } else if(tmMode === 'draw') {
+                    // במצב ציור — לחיצה על נקודה קיימת מאפשרת גרירה (ignore)
                 }
             });
-            tmMap.on('mouseenter', 'tm-pts-layer', () => { tmMap.getCanvas().style.cursor = tmMode === 'erase' ? 'crosshair' : 'pointer'; });
-            tmMap.on('mouseleave', 'tm-pts-layer', () => { tmMap.getCanvas().style.cursor = ''; });
+
+            tmMap.on('mouseenter', 'tm-pts-layer', () => {
+                tmMap.getCanvas().style.cursor = tmMode === 'erase' ? 'pointer' : 'grab';
+            });
+            tmMap.on('mouseleave', 'tm-pts-layer', () => {
+                tmMap.getCanvas().style.cursor = tmMode === 'draw' ? 'crosshair' : '';
+            });
 
             updateTmLayer();
         });
-    }, 100);
+
+        tmMap.on('error', (e) => {
+            console.warn('TmMap error:', e);
+        });
+    }, 150); // 150ms — מספיק ל-flex display להתפרס לפני Mapbox init
 };
 
 function buildTmGeoJSON() {
@@ -596,6 +636,11 @@ window.tmClearAll = () => { tmPoints = []; updateTmLayer(); };
 
 window.closeTerritoryEditor = () => {
     document.getElementById('territoryMapEditorModal').style.display = 'none';
+    // נאפס את המפה כדי שבפתיחה הבאה היא תתאתחל נכון עם המיקום הנכון
+    if(tmMap) {
+        try { tmMap.remove(); } catch(e) {}
+        tmMap = null;
+    }
 };
 
 window.confirmTerritoryDrawing = () => {
@@ -1276,6 +1321,29 @@ function handleAuth(resp) {
 window.logout = async function() { 
     const proceed = await showCustomDialog({ title: 'התנתקות', message: 'האם אתה בטוח שברצונך להתנתק מהחשבון?', showCancel: true });
     if(proceed) { localStorage.removeItem('gdrive_session'); location.reload(); } 
+};
+
+window.continueWithoutLogin = function() {
+    // סגור את מסך ההתחברות — מצב מקומי בלבד (ללא גיבוי ענן)
+    const authOverlay = document.getElementById('auth-overlay');
+    const splashScreen = document.getElementById('splash-screen');
+    if(authOverlay) authOverlay.style.display = 'none';
+    if(splashScreen) { splashScreen.style.display = 'flex'; }
+    // הצג הודעה קצרה שמסבירה למשתמש את המצב
+    setTimeout(() => {
+        if(splashScreen) {
+            splashScreen.style.opacity = '0';
+            setTimeout(() => { if(splashScreen) splashScreen.style.display = 'none'; }, 600);
+        }
+        showToast('פועל במצב מקומי — הנתונים נשמרים רק במכשיר זה', 'warning');
+    }, 800);
+    // עדכן סטטוס סנכרון
+    const syncStatus = document.getElementById('sync-status');
+    const syncText = document.getElementById('sync-text');
+    const syncIcon = document.getElementById('sync-icon');
+    if(syncText) syncText.innerText = 'מצב מקומי';
+    if(syncIcon) syncIcon.className = 'fas fa-laptop';
+    if(syncStatus) syncStatus.style.color = 'var(--text-muted)';
 };
 async function ensureAuthAndExecute(cb) {
     const session = JSON.parse(localStorage.getItem('gdrive_session') || 'null');
