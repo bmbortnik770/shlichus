@@ -117,6 +117,10 @@ const fieldApp = (function () {
     // אתחול וחיבור לגוגל
     // ==========================================
     async function init() {
+        // זיהוי ייחודי לכל מכשיר — לצורך מעקב מקור עדכונים
+        if (!localStorage.getItem('field_device_id')) {
+            localStorage.setItem('field_device_id', 'field_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+        }
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('field-sw.js').catch(e=>console.log(e));
         window.addEventListener('offline', () => setSyncStatus('offline'));
         window.addEventListener('online', forceSync);
@@ -191,7 +195,57 @@ const fieldApp = (function () {
         }
     }
 
-    async function pushOutboxToDrive() { return true; }
+    // ==========================================
+    // OUTBOX — שליחת שינויים לדרייב
+    // כל שינוי שנעשה בשטח נכנס ל-OUTBOX_KEY ב-localStorage
+    // ובעת סנכרון נכתב לקובץ mobile_update_TIMESTAMP.json בדרייב
+    // המערכת השולחנית קוראת ומוחקת קבצים אלה
+    // ==========================================
+    async function pushOutboxToDrive() {
+        if (!accessToken) return;
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        if (outbox.length === 0) return;
+
+        setSyncStatus('syncing');
+        const ts = Date.now();
+        const filename = `mobile_update_${ts}.json`;
+
+        // כתוב את כל הפריטים ב-outbox לקובץ אחד
+        const payload = {
+            createdAt: new Date().toISOString(),
+            deviceId: localStorage.getItem('field_device_id') || 'unknown',
+            events: outbox
+        };
+
+        try {
+            // צור את הקובץ ב-Drive
+            const meta = { name: filename, mimeType: 'application/json' };
+            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+            form.append('file', blob);
+
+            const res = await fetch(
+                'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+                {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${accessToken}` },
+                    body: form
+                }
+            );
+
+            if (res.ok) {
+                // נקה את ה-outbox רק אחרי שהשמירה הצליחה
+                storageSet(OUTBOX_KEY, []);
+                console.log(`[Outbox] שולח ${outbox.length} אירועים לדרייב → ${filename}`);
+            } else {
+                console.warn('[Outbox] שגיאה בשליחה:', res.status);
+            }
+        } catch (e) {
+            console.error('[Outbox] שגיאת רשת:', e);
+            // ה-outbox נשאר ב-localStorage לניסיון הבא
+        }
+    }
     async function forceSync(event) {
         if (event) event.stopPropagation();
         if (!navigator.onLine) { showToast("אין חיבור רשת"); setSyncStatus('offline'); return; }
