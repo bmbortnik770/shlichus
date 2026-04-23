@@ -586,21 +586,23 @@ async function syncWithDrive(forcePull = false) {
 // לתוך community_data_final.json, ואז מוחק (trash) אותם.
 // ════════════════════════════════════════════════════════
 
+// מצב גלובלי של עדכוני שטח ממתינים
+let pendingFieldUpdateFiles = []; // { fileId, filename, events, deviceId, createdAt }
+
 async function mergeOutboxUpdates() {
     if (!accessToken) return;
     try {
         const q = encodeURIComponent("name contains 'mobile_update_' and trashed = false");
         const listRes = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`,
+            `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,createdTime)&orderBy=createdTime`,
             { headers: { Authorization: `Bearer ${accessToken}` } }
         );
         if (!listRes.ok) return;
         const { files } = await listRes.json();
         if (!files || files.length === 0) return;
 
-        showToast(`נמצאו ${files.length} עדכוני שטח — ממזג...`, 'info');
-        let applied = 0;
-
+        // טען את תוכן כל הקבצים
+        pendingFieldUpdateFiles = [];
         for (const file of files) {
             try {
                 const contentRes = await fetch(
@@ -608,42 +610,218 @@ async function mergeOutboxUpdates() {
                     { headers: { Authorization: `Bearer ${accessToken}` } }
                 );
                 if (!contentRes.ok) continue;
-                const update = await contentRes.json();
-
-                if (applyOutboxEvent(update)) applied++;
-
-                // העבר לאשפה ב-Drive
-                await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
-                    method: 'PATCH',
-                    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ trashed: true })
+                const payload = await contentRes.json();
+                pendingFieldUpdateFiles.push({
+                    fileId: file.id,
+                    filename: file.name,
+                    events: payload.events || [],
+                    deviceId: payload.deviceId || 'unknown',
+                    createdAt: payload.createdAt || file.createdTime
                 });
             } catch (e) {
-                console.error('mergeOutbox: error processing file', file.name, e);
+                console.error('mergeOutbox: error reading file', file.name, e);
             }
         }
 
-        if (applied > 0) {
-            db.meta.lastModified = Date.now();
-            await pushToDrive();
-            saveLocal();
-            refreshMap();
-            handleOmniSearch();
-            showToast(`${applied} עדכוני שטח נמזגו בהצלחה! ✅`, 'success');
-        }
+        if (pendingFieldUpdateFiles.length === 0) return;
+
+        // סכם מספר אירועים
+        const totalEvents = pendingFieldUpdateFiles.reduce((s, f) => s + f.events.length, 0);
+        showFieldUpdatesDialog(pendingFieldUpdateFiles, totalEvents);
+
     } catch (e) {
         console.error('mergeOutboxUpdates error:', e);
     }
+}
+
+// ── הצגת חלון עדכונים מהשטח ──
+function showFieldUpdatesDialog(updateFiles, totalEvents) {
+    // בנה רשימה מאוחדת של כל האירועים
+    const allEvents = [];
+    updateFiles.forEach(file => {
+        file.events.forEach(ev => {
+            allEvents.push({ ...ev, _fileId: file.fileId, _deviceId: file.deviceId });
+        });
+    });
+
+    document.getElementById('fieldUpdatesCount').innerText = `${totalEvents} עדכונים`;
+
+    const list = document.getElementById('fieldUpdatesList');
+    list.innerHTML = allEvents.map((ev, i) => {
+        const time = ev.timestamp ? new Date(ev.timestamp).toLocaleString('he-IL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+        const { icon, color, desc } = getEventDisplayInfo(ev);
+        const hasConflict = detectConflict(ev);
+
+        return `
+        <div class="field-update-row ${hasConflict ? 'has-conflict' : ''}" style="
+            background:var(--surface); border:1px solid ${hasConflict ? 'var(--warning)' : 'var(--border-light)'};
+            border-radius:12px; padding:14px; margin-bottom:10px; display:flex; gap:12px; align-items:flex-start;">
+            <label style="display:flex; gap:12px; align-items:flex-start; cursor:pointer; flex:1;">
+                <input type="checkbox" class="field-update-cb" data-idx="${i}" checked
+                    style="width:18px; height:18px; margin-top:2px; accent-color:var(--accent); cursor:pointer; flex-shrink:0;">
+                <div style="flex:1;">
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:4px; flex-wrap:wrap;">
+                        <i class="fas ${icon}" style="color:${color}; font-size:14px;"></i>
+                        <strong style="font-size:14px; color:var(--text-main);">${desc}</strong>
+                        ${hasConflict ? `<span style="background:rgba(245,158,11,0.15); color:var(--warning); font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px;">⚠️ התנגשות</span>` : ''}
+                    </div>
+                    <div style="font-size:12px; color:var(--text-muted); display:flex; gap:12px; flex-wrap:wrap;">
+                        <span><i class="fas fa-clock"></i> ${time}</span>
+                        <span><i class="fas fa-mobile-alt"></i> ${ev._deviceId}</span>
+                    </div>
+                    ${getEventDetails(ev)}
+                    ${hasConflict ? `<div style="margin-top:8px; padding:8px; background:rgba(245,158,11,0.08); border-radius:8px; font-size:12px; color:var(--warning);"><i class="fas fa-exclamation-triangle"></i> הערך שונה גם באפליקציה וגם במשרד מאז הסנכרון האחרון. בחר מי גובר.</div>` : ''}
+                </div>
+            </label>
+        </div>`;
+    }).join('');
+
+    // שמור מצב עדכונים לשימוש בעת אישור
+    window._pendingFieldEvents = allEvents;
+    document.getElementById('fieldUpdatesModal').style.display = 'flex';
+}
+
+function getEventDisplayInfo(ev) {
+    const nameLabel = ev.aptName ? `משפחת ${escapeHTML(ev.aptName)}` : (ev.bldg ? escapeHTML(ev.bldg) : 'משפחה');
+    switch (ev.type) {
+        case 'visit_log':      return { icon:'fa-walking', color:'var(--success)',  desc:`ביקור נרשם — ${nameLabel}` };
+        case 'call_log':       return { icon:'fa-phone',   color:'var(--accent)',   desc:`שיחה נרשמה — ${nameLabel}` };
+        case 'edit_family':    return { icon:'fa-pen',     color:'var(--warning)',  desc:`פרטים עודכנו — ${nameLabel}` };
+        case 'stage_change':   return { icon:'fa-columns', color:'var(--accent)',   desc:`שלב שונה — ${nameLabel}` };
+        case 'quick_status':   return { icon:'fa-tag',     color:'var(--warning)',  desc:`סטטוס שונה — ${nameLabel}` };
+        case 'task_done':      return { icon:'fa-check-circle', color:'var(--success)', desc:`משימה הושלמה — ${nameLabel}` };
+        case 'task_undone':    return { icon:'fa-undo',    color:'var(--text-muted)', desc:`משימה בוטלה — ${nameLabel}` };
+        case 'add_family_task':return { icon:'fa-thumbtack', color:'var(--accent)', desc:`משימה חדשה — ${nameLabel}` };
+        case 'delete_family':  return { icon:'fa-trash',   color:'var(--danger)',   desc:`משפחה נמחקה — ${nameLabel}` };
+        case 'contact_update': return { icon:'fa-address-book', color:'var(--success)', desc:`איש קשר עודכן — ${nameLabel}` };
+        case 'new_family':     return { icon:'fa-user-plus', color:'var(--success)', desc:`משפחה חדשה — ${nameLabel}` };
+        default:               return { icon:'fa-sync',    color:'var(--text-muted)', desc:`עדכון — ${nameLabel}` };
+    }
+}
+
+function getEventDetails(ev) {
+    let lines = [];
+    if (ev.type === 'visit_log' && ev.payload) {
+        if (ev.payload.note) lines.push(`📝 ${escapeHTML(ev.payload.note)}`);
+        if (ev.payload.result) lines.push(`תוצאה: ${escapeHTML(ev.payload.result)}`);
+    }
+    if (ev.type === 'edit_family' && ev.payload) {
+        const fields = ['father','mother','fatherPhone','motherPhone','style','notes'];
+        fields.forEach(f => { if (ev.payload[f]) lines.push(`${f}: ${escapeHTML(String(ev.payload[f]))}`); });
+    }
+    if (ev.type === 'stage_change' && ev.payload) {
+        lines.push(`${ev.payload.boardId} → ${escapeHTML(ev.payload.stage)}`);
+    }
+    if (ev.type === 'add_family_task' && ev.payload) {
+        lines.push(`✓ ${escapeHTML(ev.payload.taskText)}`);
+    }
+    if (!lines.length) return '';
+    return `<div style="margin-top:6px; padding:6px 10px; background:var(--bg-body); border-radius:8px; font-size:12px; color:var(--text-muted); line-height:1.6;">${lines.join('<br>')}</div>`;
+}
+
+function detectConflict(ev) {
+    if (!ev.bldg || !ev.aptName) return false;
+    const bldgData = db[ev.bldg];
+    if (!bldgData) return false;
+    const apt = bldgData.apts?.find(a => a.name === ev.aptName);
+    if (!apt) return false;
+
+    // בדוק לפי סוג אירוע
+    if (ev.type === 'edit_family' && ev.payload) {
+        const conflictFields = ['father','mother','fatherPhone','motherPhone','style'];
+        for (const field of conflictFields) {
+            if (ev.payload[field] !== undefined && apt[field] !== ev.payload[field]) {
+                // הערך הנוכחי שונה — ייתכן התנגשות
+                // בדוק אם הערך כבר עודכן מהסנכרון האחרון
+                const lastSync = db.meta?.lastModified || 0;
+                if (apt.updatedAt && apt.updatedAt > lastSync) return true;
+            }
+        }
+    }
+    return false;
+}
+
+// ── אישור עדכונים נבחרים ──
+window.applySelectedFieldUpdates = async function() {
+    const cbs = document.querySelectorAll('.field-update-cb:checked');
+    if (cbs.length === 0) { showToast('לא נבחרו עדכונים', 'warning'); return; }
+
+    const allEvents = window._pendingFieldEvents || [];
+    const selectedIndices = new Set([...cbs].map(cb => +cb.dataset.idx));
+
+    let applied = 0;
+    const usedFileIds = new Set();
+
+    allEvents.forEach((ev, idx) => {
+        if (!selectedIndices.has(idx)) return;
+        if (applyOutboxEvent(ev)) {
+            applied++;
+            usedFileIds.add(ev._fileId);
+        }
+    });
+
+    // מחק מדרייב רק את הקבצים שכל האירועים שלהם אושרו
+    const fullyAppliedFiles = pendingFieldUpdateFiles.filter(f => {
+        const fileEvents = allEvents.filter(ev => ev._fileId === f.fileId);
+        return fileEvents.every((ev, idx) => selectedIndices.has(allEvents.indexOf(ev)));
+    });
+
+    for (const file of fullyAppliedFiles) {
+        await trashDriveFile(file.fileId);
+    }
+
+    if (applied > 0) {
+        db.meta.lastModified = Date.now();
+        await pushToDrive();
+        saveLocal();
+        refreshMap();
+        handleOmniSearch();
+    }
+
+    document.getElementById('fieldUpdatesModal').style.display = 'none';
+    pendingFieldUpdateFiles = [];
+    showToast(`✅ ${applied} עדכונים יושמו בהצלחה!`, 'success');
+};
+
+// ── אישור הכל ──
+window.applyAllFieldUpdates = async function() {
+    document.querySelectorAll('.field-update-cb').forEach(cb => cb.checked = true);
+    await window.applySelectedFieldUpdates();
+};
+
+// ── דחיית כל העדכונים ──
+window.dismissFieldUpdates = async function() {
+    const confirmed = await showCustomDialog({
+        title: 'דחיית עדכונים',
+        message: `האם לדחות את ${(window._pendingFieldEvents || []).length} העדכונים ממחיקה? הם יישארו ב-Drive עד הסנכרון הבא.`,
+        showCancel: true
+    });
+    if (confirmed) {
+        document.getElementById('fieldUpdatesModal').style.display = 'none';
+        pendingFieldUpdateFiles = [];
+        showToast('העדכונים נדחו — יוצגו שוב בסנכרון הבא', 'info');
+    }
+};
+
+async function trashDriveFile(fileId) {
+    try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trashed: true })
+        });
+    } catch(e) { console.error('trashDriveFile error:', e); }
 }
 
 /**
  * מחיל event בודד מאפליקציית השטח על ה-db.
  * סכמת event:
  * {
- *   type: 'task_done' | 'visit_log' | 'call_log' | 'stage_change' | 'quick_status',
+ *   type: 'task_done' | 'task_undone' | 'visit_log' | 'call_log' | 'stage_change' | 'quick_status' | 'edit_family' | 'delete_family' | 'add_family_task' | 'contact_update' | 'new_family',
  *   bldg: <מפתח הבניין>,
  *   aptName: <שם המשפחה>,
- *   aptNum: <מספר דירה>,
+ *   aptNum: <מספר דירה> (אופציונלי),
+ *   aptIdx: <אינדקס> (אופציונלי — fallback),
  *   payload: { ... },
  *   timestamp: <ISO string>
  * }
@@ -652,29 +830,68 @@ async function mergeOutboxUpdates() {
 function applyOutboxEvent(ev) {
     if (!ev || !ev.type || !ev.bldg) return false;
     const bldgData = db[ev.bldg];
+
+    // ── new_family: משפחה חדשה שנוצרה בשטח ──
+    if (ev.type === 'new_family') {
+        if (!bldgData) {
+            db[ev.bldg] = { info: { code:'', rep:'', notes:'', coords: ev.payload?.coords || null }, apts: [] };
+        }
+        if (ev.payload) {
+            const fam = { ...ev.payload };
+            fam.updatedAt = Date.now();
+            db[ev.bldg].apts.push(fam);
+        }
+        return true;
+    }
+
     if (!bldgData || !bldgData.apts) return false;
 
-    const apt = bldgData.apts.find(a =>
-        a.name === ev.aptName && String(a.num) === String(ev.aptNum)
-    );
+    // ── delete_family: מחיקת משפחה ──
+    if (ev.type === 'delete_family') {
+        const idx = typeof ev.aptIdx === 'number'
+            ? ev.aptIdx
+            : bldgData.apts.findIndex(a => a.name === ev.aptName);
+        if (idx >= 0 && idx < bldgData.apts.length) {
+            bldgData.apts.splice(idx, 1);
+            return true;
+        }
+        return false;
+    }
+
+    // אתר את הדירה לפי שם (עדיפות) ואחר כך לפי אינדקס
+    let apt = ev.aptName
+        ? bldgData.apts.find(a => a.name === ev.aptName && (ev.aptNum === undefined || String(a.num) === String(ev.aptNum)))
+        : null;
+    if (!apt && typeof ev.aptIdx === 'number') apt = bldgData.apts[ev.aptIdx];
     if (!apt) return false;
 
     const ts = ev.timestamp || new Date().toISOString();
     const dateOnly = ts.split('T')[0];
+    const dateHe = new Date(ts).toLocaleDateString('he-IL');
 
     switch (ev.type) {
         case 'task_done': {
-            const task = (apt.tasks || []).find(t => t.text === ev.payload.taskText && !t.done);
+            const task = (apt.tasks || []).find(t => t.text === ev.payload?.taskText && !t.done);
             if (task) { task.done = true; task.doneAt = ts; }
+            break;
+        }
+        case 'task_undone': {
+            const task = typeof ev.taskIdx === 'number' ? (apt.tasks || [])[ev.taskIdx] : null;
+            if (task) { task.done = false; delete task.doneAt; }
+            break;
+        }
+        case 'add_family_task': {
+            if (!apt.tasks) apt.tasks = [];
+            apt.tasks.push({ text: ev.payload?.taskText || '', date: ev.payload?.taskDate || '', done: false });
             break;
         }
         case 'visit_log': {
             if (!apt.interactions) apt.interactions = [];
             apt.interactions.push({
-                date: dateOnly,
+                date: dateHe,
                 type: 'ביקור',
-                notes: escapeHTML(ev.payload.note || ''),
-                result: ev.payload.result || '',
+                notes: escapeHTML(ev.payload?.note || ''),
+                result: ev.payload?.result || '',
                 source: 'field'
             });
             break;
@@ -682,20 +899,49 @@ function applyOutboxEvent(ev) {
         case 'call_log': {
             if (!apt.interactions) apt.interactions = [];
             apt.interactions.push({
-                date: dateOnly,
+                date: dateHe,
                 type: 'שיחה',
-                notes: escapeHTML(ev.payload.note || ''),
+                notes: escapeHTML(ev.payload?.note || ''),
                 source: 'field'
             });
             break;
         }
         case 'stage_change': {
             if (!apt.boards) apt.boards = {};
-            apt.boards[ev.payload.boardId] = ev.payload.stage;
+            apt.boards[ev.payload?.boardId] = ev.payload?.stage;
             break;
         }
         case 'quick_status': {
-            apt.status = ev.payload.status;
+            apt.status = ev.payload?.status;
+            break;
+        }
+        case 'edit_family': {
+            // מזג את כל השדות מה-payload, מלבד שדות מערך (tasks, interactions, etc.)
+            if (ev.payload) {
+                const protectedKeys = ['tasks','interactions','history','donations','boards','tags','childrenList','customFields'];
+                Object.keys(ev.payload).forEach(k => {
+                    if (!protectedKeys.includes(k)) apt[k] = ev.payload[k];
+                });
+            }
+            break;
+        }
+        case 'contact_update': {
+            // עדכון שדה ספציפי (טלפון/מייל) עם שיוך
+            const { field, value, attribution } = ev;
+            if (field === 'phone' || field === 'phone2') {
+                if (attribution === 'father')       apt.fatherPhone = value;
+                else if (attribution === 'mother')  apt.motherPhone = value;
+                else if (attribution?.startsWith('child:')) {
+                    const childName = attribution.replace('child:', '');
+                    const child = (apt.childrenList || []).find(c => c.name === childName);
+                    if (child) child.phone = value;
+                } else apt.phone = value;
+            }
+            if (field === 'email') {
+                if (attribution === 'father')       apt.fatherEmail = value;
+                else if (attribution === 'mother')  apt.motherEmail = value;
+                else apt.email = value;
+            }
             break;
         }
         default:
