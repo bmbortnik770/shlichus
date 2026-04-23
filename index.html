@@ -70,6 +70,27 @@
     </div>
     
     <div id="kpiAlerts"></div>
+
+    <!-- כיסוי שליחות -->
+    <div id="coverageCard" style="display:none; background:var(--surface); border:1px solid var(--border-light); border-radius:12px; padding:12px; margin-bottom:8px; box-shadow:var(--card-shadow);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;">
+            <span style="font-size:12px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:5px;">
+                <i class="fas fa-chart-pie" style="color:#10b981;"></i> כיסוי השליחות
+            </span>
+            <span id="coveragePctBig" style="font-size:22px; font-weight:900; color:#10b981; line-height:1;">0%</span>
+        </div>
+        <div style="height:8px; background:var(--bg-body); border-radius:10px; overflow:hidden; margin-bottom:7px;">
+            <div id="coverageBarMain" style="height:100%; width:0%; background:linear-gradient(90deg,#10b981,#0ea5e9); transition:width 0.8s ease; border-radius:10px;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted);">
+            <span><b id="coverageFamilies" style="color:var(--text-main);">0</b> משפחות</span>
+            <span>מתוך <b id="coverageTotalUnits" style="color:var(--text-main);">0</b> דירות</span>
+        </div>
+        <div id="coverageVerifiedRow" style="display:none; margin-top:5px; font-size:11px; color:#10b981; font-weight:600; text-align:center;">
+            <i class="fas fa-shield-alt"></i> <span id="coverageVerifiedCount">0</span> בניינים מאומתים ידנית
+        </div>
+    </div>
+
     <div id="geocoder"></div>
 
     <div class="stat-card">
@@ -239,15 +260,171 @@
 <button class="fab-add" onclick="quickAddFamily()" title="הוסף משפחה חדשה מהר"><i class="fas fa-plus"></i></button>
 
 <div id="onboardingModal" class="modal" style="z-index: 100000;">
-    <div class="modal-content modal-small" style="text-align:center;">
-        <h2 style="color:var(--accent); margin-top:0;"><i class="fas fa-hand-sparkles"></i> ברוך הבא למערכת!</h2>
-        <p style="margin-bottom: 20px; color:var(--text-muted);">כדי שנוכל להתחיל, מהו המיקום המרכזי (או בית החב"ד) שלך?</p>
-        <div id="onboardingGeocoderContainer" style="margin-bottom:15px; position:relative; z-index:3002; text-align:right;"></div>
-        <div style="display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom: 25px;">
-            <input type="checkbox" id="onboardingIsChabad" checked>
-            <label for="onboardingIsChabad" style="font-weight:600;">זהו בית חב"ד (הצג סמל 770)</label>
+    <div class="modal-content" style="max-width:580px; padding:0; overflow:hidden; border-radius:20px;">
+        <!-- Step indicators -->
+        <div style="display:flex; background:var(--bg-body); border-bottom:1px solid var(--border-light); padding:0;">
+            <div class="ob-step-tab active" id="obTab1" style="flex:1; padding:14px 10px; text-align:center; font-size:13px; font-weight:700; border-bottom:3px solid var(--accent); color:var(--accent); cursor:default;">
+                <i class="fas fa-map-marker-alt"></i> שלב א׳ – מיקום
+            </div>
+            <div class="ob-step-tab" id="obTab2" style="flex:1; padding:14px 10px; text-align:center; font-size:13px; font-weight:600; border-bottom:3px solid transparent; color:var(--text-muted); cursor:default;">
+                <i class="fas fa-draw-polygon"></i> שלב ב׳ – תיחום
+            </div>
         </div>
-        <button class="btn btn-primary" onclick="saveOnboardingLocation()" style="font-size:16px;">התחל לעבוד 🚀</button>
+
+        <!-- Step 1: location -->
+        <div id="obStep1" style="padding:30px; text-align:center;">
+            <div style="width:60px;height:60px;background:linear-gradient(135deg,var(--accent),#6366f1);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+                <i class="fas fa-synagogue" style="font-size:26px;color:white;"></i>
+            </div>
+            <h2 style="color:var(--text-main); margin:0 0 8px 0; font-size:22px;">ברוך הבא למערכת!</h2>
+            <p style="color:var(--text-muted); margin-bottom:22px; font-size:14px;">נתחיל בהגדרת המיקום המרכזי של השליחות שלך</p>
+            <div id="onboardingGeocoderContainer" style="margin-bottom:15px; position:relative; z-index:3002; text-align:right;"></div>
+            <div style="display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom:24px; background:rgba(59,130,246,0.08); padding:12px; border-radius:12px; border:1px solid rgba(59,130,246,0.2);">
+                <input type="checkbox" id="onboardingIsChabad" checked style="width:16px;height:16px;accent-color:var(--accent);">
+                <label for="onboardingIsChabad" style="font-weight:600; font-size:14px; cursor:pointer;">זהו בית חב"ד (הצג סמל 770)</label>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:center;">
+                <button class="btn btn-outline" onclick="skipOnboarding()" style="width:auto; padding:10px 20px; font-size:14px; color:var(--text-muted);">
+                    <i class="fas fa-forward"></i> דלג להגדרות מאוחר יותר
+                </button>
+                <button class="btn btn-primary" onclick="obGoStep2()" style="width:auto; padding:10px 24px; font-size:15px;">
+                    הבא <i class="fas fa-arrow-left"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2: territory -->
+        <div id="obStep2" style="display:none; padding:24px;">
+            <div style="text-align:center; margin-bottom:18px;">
+                <div style="width:50px;height:50px;background:linear-gradient(135deg,#10b981,#0ea5e9);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+                    <i class="fas fa-draw-polygon" style="font-size:22px;color:white;"></i>
+                </div>
+                <h3 style="margin:0 0 6px 0; color:var(--text-main);">הגדרת אזור השליחות</h3>
+                <p style="color:var(--text-muted); font-size:13px; margin:0;">תחם את האזור שלך על המפה כדי לקבל סטטיסטיקות ותובנות</p>
+            </div>
+
+            <!-- Mission name -->
+            <div class="form-group" style="margin-bottom:14px;">
+                <label style="font-weight:700; font-size:13px;"><i class="fas fa-tag" style="color:var(--accent);"></i> שם מקום השליחות</label>
+                <input type="text" id="obMissionName" class="inline-input" placeholder="למשל: בית חב&quot;ד רעננה, שליחות נחלאות..." style="margin-top:6px;">
+            </div>
+
+            <!-- Draw mode selector -->
+            <div style="background:var(--bg-body); border-radius:12px; border:1px solid var(--border-light); padding:14px; margin-bottom:14px;">
+                <div style="font-weight:700; font-size:13px; margin-bottom:10px; color:var(--text-main);"><i class="fas fa-pencil-ruler" style="color:var(--accent);"></i> אופן תיחום האזור</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <label style="flex:1; min-width:130px; display:flex; align-items:center; gap:8px; background:var(--surface); border:2px solid var(--border-light); border-radius:10px; padding:10px; cursor:pointer; transition:all 0.2s;" id="drawModeCity">
+                        <input type="radio" name="obDrawMode" value="city" checked onchange="obUpdateDrawMode()" style="accent-color:var(--accent);">
+                        <div>
+                            <div style="font-weight:700; font-size:13px;"><i class="fas fa-city"></i> עיר / יישוב</div>
+                            <div style="font-size:11px; color:var(--text-muted);">חפש עיר וצד אוטומטי</div>
+                        </div>
+                    </label>
+                    <label style="flex:1; min-width:130px; display:flex; align-items:center; gap:8px; background:var(--surface); border:2px solid var(--border-light); border-radius:10px; padding:10px; cursor:pointer; transition:all 0.2s;" id="drawModeManual">
+                        <input type="radio" name="obDrawMode" value="manual" onchange="obUpdateDrawMode()" style="accent-color:var(--accent);">
+                        <div>
+                            <div style="font-weight:700; font-size:13px;"><i class="fas fa-draw-polygon"></i> ציור ידני</div>
+                            <div style="font-size:11px; color:var(--text-muted);">שכונה / תת-שכונה</div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- City search mode -->
+                <div id="obCitySearchMode" style="margin-top:12px;">
+                    <div id="obTerritoryGeocoderContainer" style="position:relative; z-index:3001;"></div>
+                </div>
+
+                <!-- Manual draw mode -->
+                <div id="obManualDrawMode" style="margin-top:12px; display:none;">
+                    <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:10px; font-size:13px; color:var(--text-muted); margin-bottom:10px;">
+                        <i class="fas fa-info-circle" style="color:#10b981;"></i> לחץ על המפה שבהגדרות לציור פוליגון. לחיצה על נקודה קיימת עורכת אותה. לחץ "סיים" לסגירת הצורה.
+                    </div>
+                    <button class="btn btn-outline" onclick="openTerritoryMapEditor()" style="width:100%; padding:10px; font-size:13px; border-color:#10b981; color:#10b981;">
+                        <i class="fas fa-map"></i> פתח עורך מפה לציור
+                    </button>
+                    <div id="obDrawStatus" style="margin-top:8px; font-size:12px; color:var(--text-muted); text-align:center;"></div>
+                </div>
+            </div>
+
+            <!-- Area info -->
+            <div id="obTerritoryInfo" style="display:none; background:linear-gradient(135deg,rgba(16,185,129,0.1),rgba(14,165,233,0.1)); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:12px; margin-bottom:14px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-check-circle" style="color:#10b981; font-size:20px;"></i>
+                    <div>
+                        <div style="font-weight:700; font-size:14px; color:var(--text-main);" id="obTerritoryName">אזור תוחם</div>
+                        <div style="font-size:13px; color:var(--text-muted);">שטח: <strong id="obTerritoryArea" style="color:#10b981;">—</strong> קמ"ר</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:space-between; align-items:center; margin-top:6px;">
+                <button class="btn btn-outline" onclick="obGoStep1()" style="width:auto; padding:10px 18px; font-size:13px;">
+                    <i class="fas fa-arrow-right"></i> חזור
+                </button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-outline" onclick="skipOnboarding()" style="width:auto; padding:10px 16px; font-size:13px; color:var(--text-muted);">
+                        <i class="fas fa-forward"></i> דלג
+                    </button>
+                    <button class="btn btn-primary" onclick="saveFullOnboarding()" style="width:auto; padding:10px 24px; font-size:15px;">
+                        <i class="fas fa-rocket"></i> התחל לעבוד!
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- מודל עורך מפה לתיחום אזור השליחות                       -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div id="territoryMapEditorModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200000; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+    <div style="background:var(--surface); border-radius:20px; width:100%; max-width:900px; max-height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <!-- Header -->
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border-light); display:flex; align-items:center; gap:14px; flex-shrink:0;">
+            <div style="width:40px;height:40px;background:linear-gradient(135deg,#10b981,#0ea5e9);border-radius:12px;display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-draw-polygon" style="color:white;font-size:17px;"></i>
+            </div>
+            <div style="flex:1;">
+                <div style="font-weight:800; font-size:16px; color:var(--text-main);">עורך תיחום אזור השליחות</div>
+                <div style="font-size:12px; color:var(--text-muted);" id="tmEditorStatus">לחץ על המפה להוספת נקודות. לחץ על נקודה קיימת להסרתה.</div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <div style="background:var(--bg-body); border:1px solid var(--border-light); border-radius:10px; padding:6px 12px; font-size:13px; color:var(--text-muted);">
+                    שטח: <strong id="tmEditorArea" style="color:#10b981;">—</strong> קמ"ר
+                </div>
+                <button onclick="closeTerritoryEditor()" style="background:var(--bg-body);border:1px solid var(--border-light);width:36px;height:36px;border-radius:50%;cursor:pointer;color:var(--text-muted);font-size:16px;display:flex;align-items:center;justify-content:center;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Toolbar -->
+        <div style="padding:10px 16px; border-bottom:1px solid var(--border-light); display:flex; gap:8px; background:var(--bg-body); flex-shrink:0; align-items:center; flex-wrap:wrap;">
+            <button id="tmBtnDraw" onclick="tmSetMode('draw')" style="padding:7px 14px; border-radius:8px; border:2px solid #10b981; background:#10b981; color:white; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;">
+                <i class="fas fa-plus"></i> הוסף נקודות
+            </button>
+            <button id="tmBtnErase" onclick="tmSetMode('erase')" style="padding:7px 14px; border-radius:8px; border:2px solid var(--border-light); background:var(--surface); color:var(--text-main); font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;">
+                <i class="fas fa-eraser"></i> מחק נקודה
+            </button>
+            <div style="width:1px; height:24px; background:var(--border-light);"></div>
+            <button onclick="tmClearAll()" style="padding:7px 14px; border-radius:8px; border:1px solid var(--danger); background:transparent; color:var(--danger); font-size:13px; cursor:pointer; font-family:inherit;">
+                <i class="fas fa-trash"></i> נקה הכל
+            </button>
+            <div style="flex:1;"></div>
+            <div style="font-size:12px; color:var(--text-muted);">
+                <i class="fas fa-mouse-pointer"></i> <span id="tmPointCount">0</span> נקודות
+            </div>
+        </div>
+        <!-- Map -->
+        <div id="territoryEditorMap" style="flex:1; min-height:400px;"></div>
+        <!-- Footer -->
+        <div style="padding:14px 20px; border-top:1px solid var(--border-light); display:flex; gap:10px; justify-content:flex-end; background:var(--surface); flex-shrink:0;">
+            <button onclick="closeTerritoryEditor()" style="padding:10px 20px;background:var(--bg-body);border:1px solid var(--border-light);border-radius:10px;cursor:pointer;font-size:14px;color:var(--text-muted);font-family:inherit;">
+                ביטול
+            </button>
+            <button onclick="confirmTerritoryDrawing()" style="padding:10px 28px;background:linear-gradient(135deg,#10b981,#0ea5e9);border:none;border-radius:10px;cursor:pointer;font-size:14px;color:white;font-weight:700;font-family:inherit;">
+                <i class="fas fa-check"></i> אשר תיחום
+            </button>
+        </div>
     </div>
 </div>
 
@@ -290,12 +467,52 @@
         </div>
         <div class="crm-tabs">
             <div class="crm-tab active" id="bldgTabBtn-apts" onclick="switchBldgTab('apts')"><i class="fas fa-users"></i> משפחות</div>
+            <div class="crm-tab" id="bldgTabBtn-floors" onclick="switchBldgTab('floors')"><i class="fas fa-building"></i> מפת בניין</div>
             <div class="crm-tab" id="bldgTabBtn-info" onclick="switchBldgTab('info')"><i class="fas fa-info-circle"></i> פרטי בניין</div>
         </div>
         <div id="bldgTab-apts" class="crm-tab-content active">
             <div id="bldgModalAptsList" style="max-height:350px; overflow-y:auto; padding-left:5px; margin-bottom:15px;"></div>
             <button class="btn btn-success" onclick="quickAddAptModal()"><i class="fas fa-plus"></i> הוסף משפחה לבניין</button>
         </div>
+
+        <!-- לשונית מפת בניין (קומות + גרירה) -->
+        <div id="bldgTab-floors" class="crm-tab-content">
+            <!-- Header stats -->
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+                <div style="font-size:13px; color:var(--text-muted);">
+                    <span id="floorsRegistered" style="font-weight:700; color:var(--text-main); font-size:15px;">0</span> משפחות
+                    מתוך <span id="floorsTotalUnits" style="font-weight:700; font-size:15px; color:var(--text-muted);">?</span> דירות
+                    <span id="floorsSourceBadge" style="font-size:11px; padding:2px 7px; border-radius:12px; font-weight:700; margin-right:4px; display:none;"></span>
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button onclick="openUnitsEditor()" class="btn btn-outline" style="width:auto; padding:4px 10px; font-size:12px;">
+                        <i class="fas fa-pen"></i> עריכת דירות
+                    </button>
+                </div>
+            </div>
+            <!-- Coverage mini-bar -->
+            <div style="height:6px; background:var(--bg-body); border-radius:10px; overflow:hidden; margin-bottom:12px;">
+                <div id="floorsCovBar" style="height:100%; width:0%; background:linear-gradient(90deg,var(--accent),#10b981); transition:width 0.5s; border-radius:10px;"></div>
+            </div>
+            <!-- Floor plan container -->
+            <div id="floorPlanContainer" style="max-height:380px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; padding:2px;">
+                <!-- rendered by renderFloorPlan() -->
+            </div>
+            <!-- Legend -->
+            <div style="display:flex; gap:12px; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-light); flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted);">
+                    <div style="width:14px;height:14px;border-radius:3px;background:rgba(59,130,246,0.15);border:1.5px solid #3b82f6;"></div> רשומה
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted);">
+                    <div style="width:14px;height:14px;border-radius:3px;background:var(--bg-body);border:1.5px solid var(--border-light);"></div> ריקה
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted);">
+                    <div style="width:14px;height:14px;border-radius:3px;background:rgba(245,158,11,0.15);border:1.5px solid #f59e0b;"></div> ללא מספר
+                </div>
+                <div style="font-size:11px; color:var(--text-muted); margin-right:auto;"><i class="fas fa-grip-vertical"></i> גרור דירה לשינוי קומה</div>
+            </div>
+        </div>
+
         <div id="bldgTab-info" class="crm-tab-content">
             <div class="form-group"><label>קוד כניסה</label><input type="text" id="bModalCode"></div>
             <div class="form-group"><label>איש קשר בבניין</label><input type="text" id="bModalRep"></div>
@@ -459,6 +676,103 @@
                 </div>
             </div>
         </div>
+
+        <!-- הגדרות מקום השליחות -->
+        <details id="shlichutAreaDetails" style="background:var(--bg-body); padding:0; border-radius:12px; border:1px solid var(--border-light); margin-bottom:15px; overflow:hidden;">
+            <summary style="font-weight:700; cursor:pointer; color:var(--text-main); list-style:none; display:flex; align-items:center; gap:10px; padding:15px;">
+                <div style="width:32px;height:32px;background:linear-gradient(135deg,#10b981,#0ea5e9);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-draw-polygon" style="color:white;font-size:14px;"></i>
+                </div>
+                <span style="flex:1;">הגדרות מקום השליחות</span>
+                <span id="shlichutAreaBadge" style="display:none; background:#10b981; color:white; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600;">מוגדר</span>
+                <i class="fas fa-chevron-down" style="font-size:12px; color:var(--text-muted);"></i>
+            </summary>
+            <div style="padding:0 15px 15px 15px; border-top:1px solid var(--border-light); margin-top:0;">
+                <div style="margin-top:14px;">
+                    <!-- Mission name -->
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label style="font-weight:700; font-size:13px;"><i class="fas fa-tag" style="color:var(--accent);"></i> שם מקום השליחות</label>
+                        <input type="text" id="settingsMissionName" class="inline-input" placeholder="למשל: בית חב&quot;ד רעננה..." style="margin-top:6px;">
+                    </div>
+
+                    <!-- Territory draw section -->
+                    <div style="font-weight:700; font-size:13px; margin-bottom:10px; color:var(--text-main);"><i class="fas fa-pencil-ruler" style="color:var(--accent);"></i> תיחום אזור השליחות</div>
+                    <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                        <label style="flex:1; min-width:120px; display:flex; align-items:center; gap:8px; background:var(--surface); border:2px solid var(--border-light); border-radius:10px; padding:10px; cursor:pointer;" id="setDrawModeCity">
+                            <input type="radio" name="setDrawMode" value="city" checked onchange="setUpdateDrawMode()" style="accent-color:var(--accent);">
+                            <div>
+                                <div style="font-weight:700; font-size:12px;"><i class="fas fa-city"></i> עיר / יישוב</div>
+                                <div style="font-size:11px; color:var(--text-muted);">תיחום אוטומטי</div>
+                            </div>
+                        </label>
+                        <label style="flex:1; min-width:120px; display:flex; align-items:center; gap:8px; background:var(--surface); border:2px solid var(--border-light); border-radius:10px; padding:10px; cursor:pointer;" id="setDrawModeManual">
+                            <input type="radio" name="setDrawMode" value="manual" onchange="setUpdateDrawMode()" style="accent-color:var(--accent);">
+                            <div>
+                                <div style="font-weight:700; font-size:12px;"><i class="fas fa-draw-polygon"></i> ציור ידני</div>
+                                <div style="font-size:11px; color:var(--text-muted);">שכונה / תת-שכונה</div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- City geocoder for settings -->
+                    <div id="setCitySearchMode" style="margin-bottom:10px;">
+                        <div id="settingsTerritoryGeocoderContainer" style="position:relative; z-index:3000;"></div>
+                    </div>
+                    <!-- Manual draw for settings -->
+                    <div id="setManualDrawMode" style="display:none; margin-bottom:10px;">
+                        <button class="btn btn-outline" onclick="openTerritoryMapEditor('settings')" style="width:100%; padding:10px; font-size:13px; border-color:#10b981; color:#10b981;">
+                            <i class="fas fa-map"></i> פתח עורך מפה לציור
+                        </button>
+                    </div>
+
+                    <!-- Current territory info -->
+                    <div id="settingsTerritoryInfo" style="display:none; background:linear-gradient(135deg,rgba(16,185,129,0.08),rgba(14,165,233,0.08)); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:12px; margin-bottom:12px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <i class="fas fa-check-circle" style="color:#10b981; font-size:18px;"></i>
+                            <div style="flex:1;">
+                                <div style="font-weight:700; font-size:13px; color:var(--text-main);" id="settingsTerritoryName">—</div>
+                                <div style="font-size:12px; color:var(--text-muted);">שטח: <strong id="settingsTerritoryArea" style="color:#10b981;">—</strong> קמ"ר</div>
+                            </div>
+                            <button onclick="clearTerritory()" style="padding:5px 10px; background:transparent; border:1px solid var(--danger); border-radius:8px; color:var(--danger); font-size:12px; cursor:pointer; font-family:inherit;">
+                                <i class="fas fa-trash"></i> נקה
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Border display toggle -->
+                    <div style="background:var(--surface); border-radius:10px; border:1px solid var(--border-light); padding:12px;">
+                        <div style="font-weight:700; font-size:13px; margin-bottom:10px;"><i class="fas fa-eye" style="color:var(--accent);"></i> תצוגת גבול על המפה</div>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <label style="display:flex; align-items:center; gap:6px; padding:7px 12px; background:var(--bg-body); border:2px solid var(--border-light); border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">
+                                <input type="radio" name="territoryDisplayMode" value="border" checked onchange="updateTerritoryDisplay()" style="accent-color:var(--accent);"> קו גבול בלבד
+                            </label>
+                            <label style="display:flex; align-items:center; gap:6px; padding:7px 12px; background:var(--bg-body); border:2px solid var(--border-light); border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">
+                                <input type="radio" name="territoryDisplayMode" value="fill" onchange="updateTerritoryDisplay()" style="accent-color:var(--accent);"> צביעה עדינה
+                            </label>
+                            <label style="display:flex; align-items:center; gap:6px; padding:7px 12px; background:var(--bg-body); border:2px solid var(--border-light); border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">
+                                <input type="radio" name="territoryDisplayMode" value="none" onchange="updateTerritoryDisplay()" style="accent-color:var(--accent);"> ללא
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- סריקת דירות מ-GIS עירוני -->
+                    <div style="background:var(--surface); border-radius:10px; border:1px solid var(--border-light); padding:12px; margin-top:12px;">
+                        <div style="font-weight:700; font-size:13px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-city" style="color:var(--accent);"></i> נתוני דירות מ-GIS עירוני
+                        </div>
+                        <div id="unitsScanStatus" style="font-size:12px; color:var(--text-muted); margin-bottom:10px; min-height:18px;"></div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button id="btnScanUnits" onclick="startTerritoryUnitsScan()" class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px; border-color:#10b981; color:#10b981;">
+                                <i class="fas fa-sync-alt"></i> סרוק דירות
+                            </button>
+                            <div id="unitsScanSummary" style="display:none; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:7px 12px; font-size:12px; color:#065f46;">
+                                <i class="fas fa-check-circle"></i> <span id="unitsScanSummaryText"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </details>
 
         <div style="background:var(--bg-body); padding:15px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px;">
             <h4 style="margin:0 0 10px 0;"><i class="fas fa-palette"></i> מראה ותצוגה</h4>
@@ -659,6 +973,39 @@
             <button onclick="applyAllFieldUpdates()" style="padding:10px 24px; background:linear-gradient(135deg,var(--success),#059669); border:none; border-radius:10px; cursor:pointer; font-size:14px; color:white; font-weight:700; font-family:inherit;">
                 <i class="fas fa-check-double"></i> עדכן הכל
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- ════ מודל עריכת מספר דירות ════ -->
+<div id="unitsEditorModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200001;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border-radius:20px;width:100%;max-width:400px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:12px;">
+            <div style="width:38px;height:38px;background:linear-gradient(135deg,var(--accent),#6366f1);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-building" style="color:white;font-size:15px;"></i>
+            </div>
+            <div style="flex:1;">
+                <div style="font-weight:800;font-size:15px;color:var(--text-main);">עריכת מספר דירות</div>
+                <div style="font-size:12px;color:var(--text-muted);" id="unitsEditorBldgName">—</div>
+            </div>
+            <button onclick="document.getElementById('unitsEditorModal').style.display='none'" style="background:var(--bg-body);border:1px solid var(--border-light);width:32px;height:32px;border-radius:50%;cursor:pointer;color:var(--text-muted);font-size:14px;display:flex;align-items:center;justify-content:center;"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="padding:18px 20px;">
+            <div id="unitsEditorCurrentInfo" style="background:var(--bg-body);border:1px solid var(--border-light);border-radius:10px;padding:11px;margin-bottom:14px;font-size:13px;color:var(--text-muted);" id="unitsEditorSourceText"></div>
+            <div class="form-group" style="margin-bottom:14px;">
+                <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block;">מספר דירות אמיתי בבניין:</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <input type="number" id="unitsEditorInput" class="inline-input" min="1" max="999" placeholder="מספר..." style="font-size:22px;font-weight:700;text-align:center;width:110px;flex-shrink:0;">
+                    <span style="font-size:13px;color:var(--text-muted);">דירות בבניין</span>
+                </div>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:8px;margin-bottom:16px;">
+                <i class="fas fa-shield-alt" style="color:#10b981;"></i> לאחר אימות ידני — המספר יוצג בירוק ויחשב כנתון אמת
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button onclick="document.getElementById('unitsEditorModal').style.display='none'" style="flex:1;padding:10px;background:var(--bg-body);border:1px solid var(--border-light);border-radius:10px;cursor:pointer;font-size:13px;color:var(--text-muted);font-family:inherit;">ביטול</button>
+                <button onclick="saveManualUnitsCount()" style="flex:2;padding:10px;background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:10px;cursor:pointer;font-size:14px;color:white;font-weight:700;font-family:inherit;"><i class="fas fa-check"></i> אמת ושמור</button>
+            </div>
         </div>
     </div>
 </div>
