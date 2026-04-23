@@ -63,17 +63,10 @@
     </div>
 
     <div id="view-tasks" class="view-container" style="padding-top:0;">
-        <!-- סרגל עליון: חיפוש + הוספה מהירה -->
+        <!-- סרגל עליון: כפתור הוספה בלבד (חיפוש כללי למעלה) -->
         <div class="f-tasks-toolbar">
-            <div style="display:flex; gap:8px; align-items:center;">
-                <div class="f-tasks-search-box" style="flex:1;">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="f-task-search" placeholder="חיפוש משימה, שם, כתובת..." oninput="fieldApp.renderTasks()">
-                </div>
-                <button id="f-voice-search-btn" onclick="fieldApp.toggleVoiceSearch()" title="חיפוש קולי"
-                    style="background:var(--bg-body); color:var(--text-muted); border:1px solid var(--border-light); border-radius:10px; padding:10px 13px; cursor:pointer; flex-shrink:0; font-size:15px; transition:0.2s;">
-                    <i class="fas fa-microphone"></i>
-                </button>
+            <div style="display:flex; gap:8px; align-items:center; justify-content:space-between;">
+                <h3 style="margin:0; font-size:18px; font-weight:700;"><i class="fas fa-clipboard-list" style="color:var(--accent); margin-left:8px;"></i>משימות</h3>
                 <button onclick="fieldApp.openQuickTaskForm()" style="background:var(--accent); color:white; border:none; border-radius:10px; padding:10px 14px; font-weight:bold; cursor:pointer; flex-shrink:0; font-size:15px;"><i class="fas fa-plus"></i></button>
             </div>
             <!-- 3 כפתורי מצב תצוגה -->
@@ -275,79 +268,53 @@
             <div id="f-mission-progress-bar" style="height:100%; background:var(--accent); transition:width 0.5s ease; width:0%;"></div>
         </div>
 
-        <!-- שורת שליטה עליונה — מינימלית -->
+        <!-- שורת שליטה עליונה — כפתור סיום בולט -->
         <div style="pointer-events:auto; position:absolute; top:calc(var(--safe-t) + 12px); left:12px; right:12px; display:flex; justify-content:space-between; align-items:center;">
-            <!-- התקדמות -->
             <div style="background:rgba(0,0,0,0.55); backdrop-filter:blur(8px); border-radius:20px; padding:7px 14px;">
                 <span id="f-mission-progress-text" style="font-size:13px; color:white; font-weight:700;">יעד 1 מתוך 1</span>
             </div>
-            <!-- כפתורי שליטה -->
-            <div style="display:flex; gap:8px;">
-                <button id="f-mission-pause-btn" onclick="fieldApp.pauseMission()"
-                    style="width:38px; height:38px; border-radius:50%; background:rgba(0,0,0,0.55); backdrop-filter:blur(8px); color:white; border:none; font-size:15px; cursor:pointer;">
-                    <i class="fas fa-pause"></i>
-                </button>
-                <button onclick="fieldApp.finishMission()"
-                    style="width:38px; height:38px; border-radius:50%; background:rgba(239,68,68,0.85); backdrop-filter:blur(8px); color:white; border:none; font-size:15px; cursor:pointer;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
+            <button onclick="fieldApp.finishMission()"
+                style="padding:8px 18px; border-radius:20px; background:rgba(239,68,68,0.9); backdrop-filter:blur(8px); color:white; border:none; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;">
+                <i class="fas fa-times"></i> סיום
+            </button>
         </div>
 
-        <!-- כרטיס תחתון — הלב של ה-HUD -->
+        <!-- כרטיס תחתון — פשוט ונקי -->
         <div style="pointer-events:auto; position:absolute; bottom:0; left:0; right:0;
             background:var(--surface); border-radius:24px 24px 0 0;
             padding:20px 20px calc(20px + var(--safe-b));
             box-shadow:0 -8px 30px rgba(0,0,0,0.15); border-top:1px solid var(--border-light);">
 
-            <!-- שם הבניין + אינטרקום -->
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
-                <div style="flex:1;">
-                    <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px;">יעד נוכחי</div>
-                    <div id="f-mission-target-name" style="font-weight:800; font-size:22px; color:var(--text-main); line-height:1.2;">טוען...</div>
-                    <div id="f-mission-fam-count" style="font-size:13px; color:var(--text-muted); margin-top:4px;"></div>
+            <!-- שם הבניין — לחיצה פותחת כרטיס -->
+            <div onclick="fieldApp.openCurrentMissionCard()"
+                style="cursor:pointer; margin-bottom:16px; padding:12px 16px; background:var(--bg-body); border-radius:14px; border:1px solid var(--border-light); active:background:var(--border-light);">
+                <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px;">
+                    יעד נוכחי <i class="fas fa-chevron-left" style="font-size:10px; margin-right:4px;"></i>
                 </div>
-                <div style="text-align:center; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:8px 14px; margin-right:10px;">
-                    <div style="font-size:10px; color:var(--text-muted); font-weight:600;">אינטרקום</div>
-                    <div id="f-mission-target-code" style="font-size:24px; font-weight:800; color:var(--success);">—</div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div id="f-mission-target-name" style="font-weight:800; font-size:20px; color:var(--text-main);">טוען...</div>
+                    <div style="text-align:center; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:6px 12px;">
+                        <div style="font-size:10px; color:var(--text-muted);">אינטרקום</div>
+                        <div id="f-mission-target-code" style="font-size:20px; font-weight:800; color:var(--success);">—</div>
+                    </div>
                 </div>
+                <div id="f-mission-fam-count" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
             </div>
 
-            <!-- כפתורי פעולה ראשיים -->
-            <div style="display:flex; gap:10px; margin-bottom:12px;">
+            <!-- כפתורי פעולה: אחורה | דלג | הגעתי -->
+            <div style="display:flex; gap:10px;">
                 <button onclick="fieldApp.prevMissionTarget()"
-                    style="width:50px; padding:14px 0; background:var(--bg-body); border:1px solid var(--border-light); border-radius:14px; color:var(--text-main); font-weight:700; cursor:pointer; font-family:inherit; font-size:15px; flex-shrink:0;">
+                    style="width:52px; padding:15px 0; background:var(--bg-body); border:1px solid var(--border-light); border-radius:14px; color:var(--text-main); cursor:pointer; font-size:16px; flex-shrink:0;">
                     <i class="fas fa-arrow-right"></i>
-                </button>
-                <button id="f-mission-waze-btn"
-                    style="width:50px; padding:14px 0; background:#33ccff; border:none; border-radius:14px; color:white; font-weight:700; cursor:pointer; font-family:inherit; font-size:15px; flex-shrink:0;"
-                    onclick="fieldApp._missionWaze()">
-                    <i class="fab fa-waze"></i>
                 </button>
                 <button onclick="fieldApp.nextMissionTarget()"
                     style="flex:1; padding:16px; background:var(--success); border:none; border-radius:14px; color:white; font-weight:800; cursor:pointer; font-family:inherit; font-size:18px; box-shadow:0 4px 15px rgba(16,185,129,0.4);">
                     <i class="fas fa-check"></i> הגעתי!
                 </button>
                 <button onclick="fieldApp.skipMissionTarget()"
-                    style="width:50px; padding:14px 0; background:rgba(245,158,11,0.12); border:1px solid var(--warning); border-radius:14px; color:var(--warning); font-weight:700; cursor:pointer; font-family:inherit; font-size:13px; flex-shrink:0;">
+                    style="width:52px; padding:15px 0; background:rgba(245,158,11,0.1); border:1px solid var(--warning); border-radius:14px; color:var(--warning); cursor:pointer; font-size:16px; flex-shrink:0;">
                     <i class="fas fa-forward"></i>
                 </button>
-            </div>
-
-            <!-- רשימת משפחות/משימות — ניתן להרחבה -->
-            <div style="display:flex; gap:8px; margin-bottom:10px;">
-                <button id="f-mission-tab-fam" onclick="fieldApp.switchMissionTab('fam')"
-                    style="flex:1; padding:7px; border-radius:8px; border:none; background:var(--accent); color:white; font-weight:700; cursor:pointer; font-family:inherit; font-size:13px;">משפחות</button>
-                <button id="f-mission-tab-tasks" onclick="fieldApp.switchMissionTab('tasks')"
-                    style="flex:1; padding:7px; border-radius:8px; border:none; background:var(--bg-body); color:var(--text-muted); font-weight:700; cursor:pointer; font-family:inherit; font-size:13px;">משימות</button>
-                <button onclick="fieldApp.markAllDoneInBuilding()"
-                    style="flex:1; padding:7px; border-radius:8px; border:1px solid rgba(16,185,129,0.4); background:rgba(16,185,129,0.08); color:var(--success); font-weight:700; cursor:pointer; font-family:inherit; font-size:13px;">
-                    <i class="fas fa-check-double"></i> הכל
-                </button>
-            </div>
-            <div style="max-height:28vh; overflow-y:auto;">
-                <div id="f-mission-families-list" style="display:flex; flex-direction:column; gap:6px;"></div>
-                <div id="f-mission-tasks-list" style="display:none; flex-direction:column; gap:6px;"></div>
             </div>
         </div>
     </div>
