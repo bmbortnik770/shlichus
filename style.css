@@ -256,3 +256,87 @@ body { margin:0; padding:0; font-family:'Assistant',sans-serif; display:flex; he
 }
 body.dark-mode .dfab-label { background: var(--surface); color: var(--text-main); border: 1px solid var(--border-light); }
 .dfab-option:hover .dfab-label { transform: translateX(-3px); }
+
+/* ── Territory & Onboarding ── */
+#onboardingModal .modal-content { border-radius: 20px; overflow: hidden; }
+
+.ob-step-tab { transition: color 0.2s, border-color 0.2s; font-family: inherit; }
+
+#shlichutAreaDetails summary::-webkit-details-marker { display: none; }
+#shlichutAreaDetails[open] summary .fa-chevron-down { transform: rotate(180deg); }
+#shlichutAreaDetails summary .fa-chevron-down { transition: transform 0.2s; }
+
+#drawModeCity:has(input:checked),
+#drawModeManual:has(input:checked),
+#setDrawModeCity:has(input:checked),
+#setDrawModeManual:has(input:checked) {
+    border-color: var(--accent) !important;
+    background: rgba(59,130,246,0.06) !important;
+}
+
+input[name="territoryDisplayMode"]:checked + * {
+    color: var(--accent);
+}
+
+label:has(input[name="territoryDisplayMode"]:checked) {
+    border-color: var(--accent) !important;
+    background: rgba(59,130,246,0.06) !important;
+}
+
+#territoryEditorMap canvas { cursor: crosshair; }
+
+/* ══ מפת קומות בניין ══ */
+.floor-row {
+    transition: background 0.15s, border-color 0.15s;
+}
+.floor-row.drag-over {
+    background: rgba(59,130,246,0.08) !important;
+    border-color: var(--accent) !important;
+}
+
+.unit-cell {
+    user-select: none;
+    -webkit-user-select: none;
+}
+.unit-cell.unit-occupied:active { cursor: grabbing; }
+.unit-cell.unit-empty:hover {
+    background: rgba(59,130,246,0.06) !important;
+    border-color: var(--accent) !important;
+}
+
+/* Dragging state */
+.unit-cell[draggable="true"]:active {
+    cursor: grabbing;
+    transform: scale(1.12) !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2) !important;
+    z-index: 10;
+    position: relative;
+}
+
+/* Coverage card animation */
+#coverageCard {
+    transition: opacity 0.3s;
+}
+#coverageBarMain {
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Units editor modal */
+#unitsEditorModal input[type=number] {
+    -moz-appearance: textfield;
+}
+#unitsEditorModal input[type=number]::-webkit-inner-spin-button,
+#unitsEditorModal input[type=number]::-webkit-outer-spin-button {
+    opacity: 1;
+}
+
+/* Floor plan scrollbar */
+#floorPlanContainer::-webkit-scrollbar { width: 5px; }
+#floorPlanContainer::-webkit-scrollbar-track { background: transparent; }
+#floorPlanContainer::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 10px; }
+
+/* Source badge in floors tab */
+#floorsSourceBadge { border-radius: 12px; padding: 2px 8px; }
+
+/* Scan status in settings */
+#unitsScanStatus { min-height: 16px; transition: color 0.2s; }
