@@ -511,7 +511,7 @@
     </div>
 </div>
 
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 <script src="nav.js?v=1"></script>
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">
@@ -615,8 +615,6 @@
 })();
 </script>
 
-</body>
-</html>
 <div id="fieldUpdatesModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
     <div style="background:var(--surface); border-radius:20px; width:100%; max-width:640px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.4); overflow:hidden;">
         <!-- Header -->
@@ -664,22 +662,6 @@
         </div>
     </div>
 </div>
-
-<script>
-// ── בדיקה אוטומטית לעדכוני שטח כל 3 דקות ──
-// הפונקציה mergeOutboxUpdates מוגדרת ב-app.js
-(function startFieldUpdatePolling() {
-    // בדיקה ראשונה — 30 שניות אחרי טעינה (לתת לסנכרון הראשי לסיים)
-    setTimeout(() => {
-        if (typeof mergeOutboxUpdates === 'function') mergeOutboxUpdates();
-    }, 30000);
-
-    // בדיקה כל 3 דקות
-    setInterval(() => {
-        if (typeof mergeOutboxUpdates === 'function') mergeOutboxUpdates();
-    }, 3 * 60 * 1000);
-})();
-</script>
 
 </body>
 </html>
