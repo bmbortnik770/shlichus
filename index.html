@@ -314,15 +314,15 @@
                 <div style="font-weight:700; font-size:13px; margin-bottom:10px; color:var(--text-main);"><i class="fas fa-pencil-ruler" style="color:var(--accent);"></i> אופן תיחום האזור</div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <label style="flex:1; min-width:130px; display:flex; align-items:center; gap:8px; background:var(--surface); border:2px solid var(--border-light); border-radius:10px; padding:10px; cursor:pointer; transition:all 0.2s;" id="drawModeCity">
-                        <input type="radio" name="obDrawMode" value="city" checked onchange="obUpdateDrawMode()" style="accent-color:var(--accent);">
-                        <div>
+                        <input type="radio" name="obDrawMode" value="city" checked onclick="obUpdateDrawMode('city')" style="accent-color:var(--accent); cursor:pointer; flex-shrink:0;">
+                        <div onclick="obUpdateDrawMode('city'); document.querySelector('input[name=obDrawMode][value=city]').checked=true;" style="flex:1;">
                             <div style="font-weight:700; font-size:13px;"><i class="fas fa-city"></i> עיר / יישוב</div>
                             <div style="font-size:11px; color:var(--text-muted);">חפש עיר וצד אוטומטי</div>
                         </div>
                     </label>
                     <label style="flex:1; min-width:130px; display:flex; align-items:center; gap:8px; background:var(--surface); border:2px solid var(--border-light); border-radius:10px; padding:10px; cursor:pointer; transition:all 0.2s;" id="drawModeManual">
-                        <input type="radio" name="obDrawMode" value="manual" onchange="obUpdateDrawMode()" style="accent-color:var(--accent);">
-                        <div>
+                        <input type="radio" name="obDrawMode" value="manual" onclick="obUpdateDrawMode('manual')" style="accent-color:var(--accent); cursor:pointer; flex-shrink:0;">
+                        <div onclick="obUpdateDrawMode('manual'); document.querySelector('input[name=obDrawMode][value=manual]').checked=true;" style="flex:1;">
                             <div style="font-weight:700; font-size:13px;"><i class="fas fa-draw-polygon"></i> ציור ידני</div>
                             <div style="font-size:11px; color:var(--text-muted);">שכונה / תת-שכונה</div>
                         </div>
@@ -702,15 +702,15 @@
                     <div style="font-weight:700; font-size:13px; margin-bottom:10px; color:var(--text-main);"><i class="fas fa-pencil-ruler" style="color:var(--accent);"></i> תיחום אזור השליחות</div>
                     <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
                         <label style="flex:1; min-width:120px; display:flex; align-items:center; gap:8px; background:var(--surface); border:2px solid var(--border-light); border-radius:10px; padding:10px; cursor:pointer;" id="setDrawModeCity">
-                            <input type="radio" name="setDrawMode" value="city" checked onchange="setUpdateDrawMode()" style="accent-color:var(--accent);">
-                            <div>
+                            <input type="radio" name="setDrawMode" value="city" checked onclick="setUpdateDrawMode('city')" style="accent-color:var(--accent); cursor:pointer;">
+                            <div onclick="setUpdateDrawMode('city'); document.querySelector('input[name=setDrawMode][value=city]').checked=true;">
                                 <div style="font-weight:700; font-size:12px;"><i class="fas fa-city"></i> עיר / יישוב</div>
                                 <div style="font-size:11px; color:var(--text-muted);">תיחום אוטומטי</div>
                             </div>
                         </label>
                         <label style="flex:1; min-width:120px; display:flex; align-items:center; gap:8px; background:var(--surface); border:2px solid var(--border-light); border-radius:10px; padding:10px; cursor:pointer;" id="setDrawModeManual">
-                            <input type="radio" name="setDrawMode" value="manual" onchange="setUpdateDrawMode()" style="accent-color:var(--accent);">
-                            <div>
+                            <input type="radio" name="setDrawMode" value="manual" onclick="setUpdateDrawMode('manual')" style="accent-color:var(--accent); cursor:pointer;">
+                            <div onclick="setUpdateDrawMode('manual'); document.querySelector('input[name=setDrawMode][value=manual]').checked=true;">
                                 <div style="font-weight:700; font-size:12px;"><i class="fas fa-draw-polygon"></i> ציור ידני</div>
                                 <div style="font-size:11px; color:var(--text-muted);">שכונה / תת-שכונה</div>
                             </div>
