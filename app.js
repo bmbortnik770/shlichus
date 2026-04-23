@@ -874,59 +874,56 @@ const UNIT_SRC = {
     VERIFIED: { label:'מאומת',        color:'#10b981', text:'#065f46', icon:'✅' }
 };
 
-// ── המר קואורדינטות ITM → WGS84 (קירוב פשוט לישראל) ─────────────
-function itmToWgs84(x, y) {
-    // Approximate conversion for Israel ITM (EPSG:2039) → WGS84
-    const a = 6378137.0, f = 1/298.257223563;
-    const e2 = 2*f - f*f;
-    const k0 = 1.0000067, lat0 = 31.7343936111*Math.PI/180, lng0 = 35.2045169444*Math.PI/180;
-    const N0 = 2885516.9488, E0 = 219529.5840;
-    const N = y - N0, E = x - E0;
-    // Simplified back-projection (good to ~1m for Israel)
-    const M0 = lat0 * (a*(1-e2/4-3*e2*e2/64));
-    const M = M0 + N/k0;
-    const mu = M/(a*(1-e2/4));
-    const e1 = (1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
-    const lat1 = mu + (3*e1/2-27*e1*e1*e1/32)*Math.sin(2*mu) + (21*e1*e1/16)*Math.sin(4*mu);
-    const N1 = a/Math.sqrt(1-e2*Math.sin(lat1)**2);
-    const T1 = Math.tan(lat1)**2, C1 = e2*Math.cos(lat1)**2/(1-e2);
-    const R1 = a*(1-e2)/Math.pow(1-e2*Math.sin(lat1)**2,1.5);
-    const D = E/(N1*k0);
-    const lat = lat1 - (N1*Math.tan(lat1)/R1)*(D*D/2 - (5+3*T1+10*C1-4*C1*C1-9*e2)*D*D*D*D/24);
-    const lng = lng0 + (D - (1+2*T1+C1)*D*D*D/6)/Math.cos(lat1);
-    return [lng*180/Math.PI, lat*180/Math.PI];
+// ── המרת קואורדינטות ITM ↔ WGS84 — נוסחת Transverse Mercator מדויקת ──
+// ITM = Israel Transverse Mercator (EPSG:2039), GRS80 ellipsoid
+// דיוק: < 1 מטר בכל שטח ישראל (אומת ב-round-trip test עם נתוני ירושלים אמיתיים)
+const _ITM = {
+    a:   6378137.0,
+    f:   1/298.257222101,
+    k0:  1.0000067,
+    lat0: 31.7343936111 * Math.PI/180,
+    lng0: 35.2045169444 * Math.PI/180,
+    E0:  219529.584,
+    N0:  626907.390    // False Northing הנכון — לא 2885516!
+};
+function _itmMeridArc(latR) {
+    const {a,f} = _ITM;
+    const b=a*(1-f), e2=1-(b*b)/(a*a), e4=e2*e2, e6=e2*e2*e2;
+    return a*((1-e2/4-3*e4/64-5*e6/256)*latR-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*latR)+(15*e4/256+45*e6/1024)*Math.sin(4*latR)-(35*e6/3072)*Math.sin(6*latR));
+}
+function wgs84ToItm(lng, lat) {
+    const {a,f,k0,lat0,lng0,E0,N0}=_ITM, b=a*(1-f), e2=1-(b*b)/(a*a), ep2=e2/(1-e2);
+    const latR=lat*Math.PI/180, lngR=lng*Math.PI/180;
+    const N=a/Math.sqrt(1-e2*Math.sin(latR)**2), T=Math.tan(latR)**2;
+    const C=ep2*Math.cos(latR)**2, A=Math.cos(latR)*(lngR-lng0);
+    const M=_itmMeridArc(latR), M0=_itmMeridArc(lat0);
+    const x=E0+k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T**2+72*C-58*ep2)*A**5/120);
+    const y=N0+k0*(M-M0+N*Math.tan(latR)*(A**2/2+(5-T+9*C+4*C**2)*A**4/24+(61-58*T+T**2+600*C-330*ep2)*A**6/720));
+    return {x, y};
+}
+function itmToWgs84(E, N) {
+    const {a,f,k0,lat0,lng0,E0,N0}=_ITM, b=a*(1-f), e2=1-(b*b)/(a*a), ep2=e2/(1-e2);
+    const e4=e2*e2, e6=e2*e2*e2;
+    const M0=_itmMeridArc(lat0), M=M0+(N-N0)/k0;
+    const mu=M/(a*(1-e2/4-3*e4/64-5*e6/256));
+    const e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+    const lat1=mu+(3*e1/2-27*e1**3/32)*Math.sin(2*mu)+(21*e1**2/16-55*e1**4/32)*Math.sin(4*mu)+(151*e1**3/96)*Math.sin(6*mu)+(1097*e1**4/512)*Math.sin(8*mu);
+    const N1=a/Math.sqrt(1-e2*Math.sin(lat1)**2), T1=Math.tan(lat1)**2;
+    const C1=ep2*Math.cos(lat1)**2, R1=a*(1-e2)/Math.pow(1-e2*Math.sin(lat1)**2,1.5);
+    const D=(E-E0)/(N1*k0);
+    const latR=lat1-(N1*Math.tan(lat1)/R1)*(D**2/2-(5+3*T1+10*C1-4*C1**2-9*ep2)*D**4/24+(61+90*T1+298*C1+45*T1**2-252*ep2-3*C1**2)*D**6/720);
+    const lngR=lng0+(D-(1+2*T1+C1)*D**3/6+(5-2*C1+28*T1-3*C1**2+8*ep2+24*T1**2)*D**5/120)/Math.cos(lat1);
+    return [lngR*180/Math.PI, latR*180/Math.PI];
 }
 
-// ── זיהוי עיר לפי מרכז פוליגון ─────────────────────────────────
-async function detectCityFromPolygon(polygon) {
-    if(!polygon || polygon.length < 3) return null;
-    const cx = polygon.reduce((s,c)=>s+c[0],0)/polygon.length;
-    const cy = polygon.reduce((s,c)=>s+c[1],0)/polygon.length;
-    try {
-        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${cy}&lon=${cx}&format=json&accept-language=he`);
-        const d = await r.json();
-        const city = (d.address?.city || d.address?.town || d.address?.village || '').toLowerCase();
-        if(city.includes('ירושלים') || city.includes('jerusalem')) return 'jerusalem';
-        if(city.includes('תל אביב') || city.includes('tel aviv')) return 'tel_aviv';
-        if(city.includes('חיפה') || city.includes('haifa')) return 'haifa';
-        return null; // עיר לא מוגדרת — נשתמש ב-Overpass
-    } catch(e) { return null; }
-}
-
-// ── המר פוליגון WGS84 → bbox ITM ───────────────────────────────
+// ── המר פוליגון WGS84 → bbox ITM (מדויק עם wgs84ToItm) ─────────
 function polygonToITMBbox(polygon) {
-    // Rough WGS84→ITM bbox (good enough for API query bbox)
-    // ITM ≈ (lng-35.2)*111000*cos(lat) + 219529, (lat-31.73)*111000 + 2885516
-    const pts = polygon.map(([lng,lat]) => {
-        const x = (lng - 35.2045169444)*111320*Math.cos(lat*Math.PI/180) + 219529.584;
-        const y = (lat - 31.7343936111)*110540 + 2885516.9488;
-        return {x,y};
-    });
+    const pts = polygon.map(([lng,lat]) => wgs84ToItm(lng, lat));
     return {
-        xmin: Math.min(...pts.map(p=>p.x)) - 50,
-        ymin: Math.min(...pts.map(p=>p.y)) - 50,
-        xmax: Math.max(...pts.map(p=>p.x)) + 50,
-        ymax: Math.max(...pts.map(p=>p.y)) + 50
+        xmin: Math.min(...pts.map(p=>p.x)) - 100,
+        ymin: Math.min(...pts.map(p=>p.y)) - 100,
+        xmax: Math.max(...pts.map(p=>p.x)) + 100,
+        ymax: Math.max(...pts.map(p=>p.y)) + 100
     };
 }
 
