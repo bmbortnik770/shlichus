@@ -9,7 +9,7 @@ function getStoredJSON(key, defaultVal) {
 }
 
 const CLIENT_ID = '348261974014-242r9b0dvctlka7rj3aetu81v96ere46.apps.googleusercontent.com';
-const SCOPES = 'email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata';
+const SCOPES = 'email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/contacts.readonly';
 let accessToken = null, driveFileId = null;
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
@@ -3514,4 +3514,268 @@ window.completeGlobalTask = (isGeneral, bEnc, aptIdx, tIdx, btnEl) => {
         showToast('המשימה הושלמה וירדה מהדאשבורד!', 'success');
         renderGlobalTasks();
     }, 500);
+};
+
+
+// ════════════════════════════════════════════════════════
+// ── Google Contacts Integration ──
+// סריקת אנשי קשר, התאמה חכמה, ייבוא והשלמת פרטים
+// ════════════════════════════════════════════════════════
+
+let _allContacts = [];       // רשימה מלאה שנשמרת לאחר טעינה
+let _contactMatches = [];    // התאמות שנמצאו
+
+// ── טעינת כל אנשי הקשר מ-Google People API ──
+async function loadGoogleContacts() {
+    if (!accessToken) { showToast('יש להתחבר לחשבון Google קודם', 'warning'); return []; }
+    setSyncStatus('wait', 'טוען אנשי קשר...');
+    let allPeople = [], nextPageToken = null;
+    try {
+        do {
+            const url = new URL('https://people.googleapis.com/v1/people/me/connections');
+            url.searchParams.set('personFields', 'names,phoneNumbers,emailAddresses');
+            url.searchParams.set('pageSize', '1000');
+            if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
+
+            const res = await fetch(url.toString(), {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+            if (!res.ok) {
+                if (res.status === 403) {
+                    showToast('יש לאשר גישה לאנשי קשר — התחבר מחדש', 'warning');
+                    // אפס session כדי לאלץ login מחדש עם scope חדש
+                    localStorage.removeItem('gdrive_session');
+                    window.handleGoogleLogin();
+                    return [];
+                }
+                throw new Error('Contacts API error: ' + res.status);
+            }
+            const data = await res.json();
+            if (data.connections) allPeople.push(...data.connections);
+            nextPageToken = data.nextPageToken || null;
+        } while (nextPageToken);
+
+        setSyncStatus('ok', 'מסונכרן');
+        return allPeople;
+    } catch(e) {
+        console.error('loadGoogleContacts error:', e);
+        setSyncStatus('error', 'שגיאה');
+        return [];
+    }
+}
+
+// ── המרת רשומת People API לאובייקט פשוט ──
+function parseContact(person) {
+    const names = person.names || [];
+    const phones = (person.phoneNumbers || []).map(p => p.value?.replace(/\D/g,'').replace(/^972/, '0') || '').filter(Boolean);
+    const emails = (person.emailAddresses || []).map(e => e.value || '').filter(Boolean);
+    const displayName = names[0]?.displayName || '';
+    const familyName  = names[0]?.familyName  || '';
+    const givenName   = names[0]?.givenName   || '';
+    return { displayName, familyName, givenName, phones, emails };
+}
+
+// ── התאמה חכמה: מצא לכל איש קשר משפחה תואמת במערכת ──
+function matchContactsToFamilies(contacts) {
+    const matches   = []; // התאמות למשפחות קיימות
+    const newFams   = []; // אנשי קשר שאין להם זוג במערכת
+
+    // בנה אינדקס מהיר: שם_משפחה → { bldg, aptIdx, apt }
+    const familyIndex = {};
+    Object.keys(db).forEach(bldg => {
+        if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+        (db[bldg].apts || []).forEach((apt, aptIdx) => {
+            const key = (apt.name || '').trim().toLowerCase();
+            if (!key) return;
+            if (!familyIndex[key]) familyIndex[key] = [];
+            familyIndex[key].push({ bldg, aptIdx, apt });
+        });
+    });
+
+    contacts.forEach(person => {
+        const c = parseContact(person);
+        if (!c.familyName && !c.displayName) return;
+        if (!c.phones.length && !c.emails.length) return; // אין מה להוסיף
+
+        const searchKey = (c.familyName || c.displayName).trim().toLowerCase();
+        const found = familyIndex[searchKey];
+
+        if (found && found.length > 0) {
+            // התאמה נמצאה — בדוק אילו שדות חסרים
+            found.forEach(({ bldg, aptIdx, apt }) => {
+                const missing = [];
+                if (!apt.fatherPhone && !apt.motherPhone && c.phones[0])
+                    missing.push({ field: 'phone', value: c.phones[0], label: 'טלפון 1' });
+                if (c.phones[1] && !apt.fatherPhone)
+                    missing.push({ field: 'fatherPhone', value: c.phones[1], label: 'טלפון אב' });
+                if (!apt.fatherEmail && !apt.motherEmail && c.emails[0])
+                    missing.push({ field: 'fatherEmail', value: c.emails[0], label: 'מייל' });
+
+                if (missing.length > 0) {
+                    matches.push({ type: 'complete', bldg, aptIdx, apt, contact: c, missing });
+                }
+            });
+        } else {
+            // לא נמצא — הצע להוסיף כמשפחה חדשה
+            newFams.push({ type: 'new', contact: c });
+        }
+    });
+
+    return { matches, newFams };
+}
+
+// ── פתיחת חלון סנכרון אנשי קשר ──
+window.openContactsSync = async function() {
+    showToast('סורק אנשי קשר מגוגל...', 'info');
+    const raw = await loadGoogleContacts();
+    if (!raw.length) return;
+
+    _allContacts = raw.map(parseContact).filter(c => c.phones.length || c.emails.length);
+    const { matches, newFams } = matchContactsToFamilies(raw);
+    _contactMatches = matches;
+
+    renderContactsSyncModal(matches, newFams);
+};
+
+function renderContactsSyncModal(matches, newFams) {
+    const total = matches.length + newFams.length;
+    if (total === 0) {
+        showToast('לא נמצאו עדכונים חדשים מאנשי הקשר 👌', 'success');
+        return;
+    }
+
+    document.getElementById('contacts-sync-count').innerText =
+        `${matches.length} השלמות · ${newFams.length} משפחות חדשות`;
+
+    const list = document.getElementById('contacts-sync-list');
+
+    // --- השלמות ---
+    const completeSections = matches.map((m, mi) => {
+        const fields = m.missing.map((f, fi) => `
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--surface); border-radius:8px; margin-bottom:6px;">
+                <input type="checkbox" class="csync-cb" data-mi="${mi}" data-fi="${fi}" checked
+                    style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;">
+                <div style="flex:1;">
+                    <div style="font-size:12px;color:var(--text-muted);">${escapeHTML(f.label)}</div>
+                    <div style="font-weight:700;font-size:14px;" dir="ltr">${escapeHTML(f.value)}</div>
+                </div>
+            </div>`).join('');
+
+        return `
+        <div style="background:var(--bg-body);border:1px solid var(--border-light);border-radius:14px;padding:14px;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div style="width:36px;height:36px;border-radius:50%;background:rgba(16,185,129,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-user-check" style="color:var(--success);"></i>
+                </div>
+                <div>
+                    <div style="font-weight:700;font-size:15px;">משפחת ${escapeHTML(m.apt.name)}</div>
+                    <div style="font-size:12px;color:var(--text-muted);">${escapeHTML(m.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : m.bldg)} · מאיש קשר: ${escapeHTML(m.contact.displayName)}</div>
+                </div>
+            </div>
+            ${fields}
+        </div>`;
+    }).join('');
+
+    // --- משפחות חדשות ---
+    const newSections = newFams.map((n, ni) => `
+        <div style="background:var(--bg-body);border:1px solid rgba(59,130,246,0.3);border-radius:14px;padding:14px;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <input type="checkbox" class="csync-new-cb" data-ni="${ni}"
+                    style="width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;">
+                <div style="width:36px;height:36px;border-radius:50%;background:rgba(59,130,246,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-user-plus" style="color:var(--accent);"></i>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-weight:700;font-size:15px;">${escapeHTML(n.contact.displayName)}</div>
+                    <div style="font-size:12px;color:var(--text-muted);">
+                        ${n.contact.phones[0] ? `<i class="fas fa-phone"></i> ${escapeHTML(n.contact.phones[0])}` : ''}
+                        ${n.contact.emails[0] ? `&nbsp; <i class="fas fa-envelope"></i> ${escapeHTML(n.contact.emails[0])}` : ''}
+                    </div>
+                </div>
+                <span style="font-size:11px;background:rgba(59,130,246,0.1);color:var(--accent);padding:3px 8px;border-radius:20px;font-weight:700;">חדש</span>
+            </div>
+        </div>`).join('');
+
+    list.innerHTML = `
+        ${matches.length > 0 ? `
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">
+            <i class="fas fa-magic" style="color:var(--success);margin-left:5px;"></i>השלמת פרטים חסרים (${matches.length})
+        </div>
+        ${completeSections}` : ''}
+
+        ${newFams.length > 0 ? `
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 10px 0;">
+            <i class="fas fa-user-plus" style="color:var(--accent);margin-left:5px;"></i>משפחות חדשות לייבוא (${newFams.length})
+        </div>
+        ${newSections}` : ''}`;
+
+    // שמור refs לשימוש בעת אישור
+    window._csyncMatches = matches;
+    window._csyncNewFams = newFams;
+
+    document.getElementById('contacts-sync-modal').style.display = 'flex';
+}
+
+// ── החלת עדכונים שנבחרו ──
+window.applyContactsSync = function() {
+    let applied = 0;
+
+    // השלמות
+    document.querySelectorAll('.csync-cb:checked').forEach(cb => {
+        const mi = +cb.dataset.mi, fi = +cb.dataset.fi;
+        const m = window._csyncMatches[mi];
+        if (!m) return;
+        const field = m.missing[fi];
+        if (!field) return;
+        const apt = db[m.bldg].apts[m.aptIdx];
+        if (!apt) return;
+
+        // שמור לשדה הנכון
+        if (field.field === 'phone')       { apt.fatherPhone = apt.fatherPhone || field.value; apt.phone = apt.phone || field.value; }
+        else if (field.field === 'fatherPhone') apt.fatherPhone = field.value;
+        else if (field.field === 'motherPhone') apt.motherPhone = field.value;
+        else if (field.field === 'fatherEmail') apt.fatherEmail = field.value;
+        else if (field.field === 'motherEmail') apt.motherEmail = field.value;
+        else apt[field.field] = field.value;
+
+        apt.updatedAt = Date.now();
+        applied++;
+    });
+
+    // משפחות חדשות
+    document.querySelectorAll('.csync-new-cb:checked').forEach(cb => {
+        const ni = +cb.dataset.ni;
+        const n = window._csyncNewFams[ni];
+        if (!n) return;
+        const c = n.contact;
+        const key = NO_ADDRESS_KEY;
+        if (!db[key]) db[key] = { info: { code:'', rep:'', notes:'', coords:null }, apts: [] };
+        db[key].apts.push({
+            name: c.familyName || c.displayName,
+            father: c.givenName || '',
+            fatherName: c.givenName || '',
+            mother: '', motherName: '',
+            fatherPhone: c.phones[0] || '',
+            motherPhone: c.phones[1] || '',
+            fatherEmail: c.emails[0] || '',
+            phone: c.phones[0] || '',
+            num: '', style: '', notes: 'יובא מאנשי קשר גוגל',
+            tags: [], boards: {}, childrenList: [],
+            interactions: [], donations: [], tasks: [], customData: {},
+            status: 'חדש', updatedAt: Date.now()
+        });
+        applied++;
+    });
+
+    if (applied > 0) {
+        saveDB();
+        refreshMap();
+        handleOmniSearch();
+        showToast(`✅ ${applied} עדכונים יושמו בהצלחה!`, 'success');
+    }
+    document.getElementById('contacts-sync-modal').style.display = 'none';
+};
+
+window.closeContactsSync = function() {
+    document.getElementById('contacts-sync-modal').style.display = 'none';
 };
