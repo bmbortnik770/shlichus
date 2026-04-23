@@ -2123,15 +2123,51 @@ const fieldApp = (function () {
     function refreshMissionRoute() { showToast("🔄 מחשב מסלול מחדש..."); if (navigator.vibrate) navigator.vibrate(30); const remaining = missionWaypoints.slice(missionCurrentIdx); if (navigator.geolocation) { navigator.geolocation.getCurrentPosition( pos => drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], remaining), () => drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], remaining) ); } }
     function finishMission() { showMissionSummary(); }
 
+
+    function openCurrentMissionCard() {
+        // מוצא את הבניין הנוכחי ופותח כרטיס ביקור
+        const coords = missionWaypoints[missionCurrentIdx];
+        if (!coords) return;
+        let closestBldg = null; let minDist = 0.001;
+        Object.keys(db).forEach(key => {
+            if (key === '__BOARDS__' || key === '__SETTINGS__' || key === 'meta') return;
+            const c = db[key].info?.coords; if (!c) return;
+            const d = Math.sqrt(Math.pow(c[0]-coords[0],2)+Math.pow(c[1]-coords[1],2));
+            if (d < minDist) { minDist = d; closestBldg = key; }
+        });
+        if (closestBldg) openBuildingCard(closestBldg, false);
+        else showToast('לא נמצא בניין במיקום זה');
+    }
+
     function showMissionSummary() {
-        isMissionActive = false; if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-        let visitedCount = Object.keys(getVisited()).length; let completedTasks = 0;
-        Object.keys(db).forEach(bldg => { if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return; (db[bldg].apts || []).forEach(apt => { (apt.tasks || []).forEach(t => { if(t.done) completedTasks++; }); }); });
+        isMissionActive = false;
+        if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+
+        // סיכום לפי המסלול הספציפי בלבד
+        const stopsCount = missionWaypoints.length;
+        let tasksCompletedInMission = 0;
+
+        // ספור משימות שהושלמו בבניינים שהיו במסלול
+        missionWaypoints.forEach(coords => {
+            let closestBldg = null; let minDist = 0.001;
+            Object.keys(db).forEach(key => {
+                if (key === '__BOARDS__' || key === '__SETTINGS__' || key === 'meta') return;
+                const c = db[key].info?.coords; if (!c) return;
+                const d = Math.sqrt(Math.pow(c[0]-coords[0],2)+Math.pow(c[1]-coords[1],2));
+                if (d < minDist) { minDist = d; closestBldg = key; }
+            });
+            if (closestBldg) {
+                (db[closestBldg].apts || []).forEach(apt => {
+                    (apt.tasks || []).forEach(t => { if (t.done && t._doneInSession) tasksCompletedInMission++; });
+                });
+            }
+        });
+
         document.getElementById('f-mission-hud').style.display = 'none';
         document.getElementById('f-mission-summary').style.display = 'flex';
-        document.getElementById('f-summary-families').innerText = visitedCount;
-        document.getElementById('f-summary-tasks').innerText = completedTasks;
-        document.getElementById('f-summary-stops').innerText = missionWaypoints.length;
+        document.getElementById('f-summary-families').innerText = stopsCount;
+        document.getElementById('f-summary-tasks').innerText = tasksCompletedInMission;
+        document.getElementById('f-summary-stops').innerText = missionCurrentIdx + 1;
         if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
     }
 
@@ -3656,7 +3692,7 @@ const fieldApp = (function () {
         openVoiceSummary, toggleVoiceRecording, saveVisitLog, confirmAutoTask, jumpToCenter, recenter,
         callFamilyNumber, toggleDarkMode, toggleMapStyle, forceSync, openExternalNav, searchAddressInput, selectAddressOption,
         toggleTargetForRoute, startCustomRoute, saveQuickTask, showToast,
-        finishMission, pauseMission, refreshMissionRoute, markAllDoneInBuilding, saveRoute, loadSavedRoutes,
+        finishMission, pauseMission, refreshMissionRoute, markAllDoneInBuilding, openCurrentMissionCard, saveRoute, loadSavedRoutes,
         deleteSavedRoute, toggleTaskLayer, completeMissionTask, switchMissionTab, nextMissionTarget, prevMissionTarget, _missionWaze,
         closeMissionSummary, buildRouteFromSaved, openSavedRoutesSheet, routeDialogGoNow, routeDialogSaveLater,
         toggleRouteBuilderMode, promptAddToRoute, openRouteEditor, moveRouteItem, removeRouteItem, saveAndStartEditedRoute,
