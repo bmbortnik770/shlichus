@@ -363,7 +363,7 @@ let tempTerritoryPolygon = null; // GeoJSON polygon coords array
 let tempTerritorySource = 'onboarding'; // 'onboarding' | 'settings'
 let tmMap = null; // mini map inside territory editor
 let tmPoints = []; // array of [lng,lat]
-let tmMode = 'draw'; // 'draw' | 'erase'
+let tmMode = 'draw'; // 'draw' | 'erase' | 'move'
 let territoryGeocoder = null; // geocoder for territory city search
 let settingsTerritoryGeocoder = null;
 
@@ -554,39 +554,76 @@ window.openTerritoryMapEditor = (source) => {
             tmMap.addLayer({ id: 'tm-line', type: 'line', source: 'tm-poly', paint: { 'line-color': '#10b981', 'line-width': 2.5, 'line-dasharray': [4,2] } });
             tmMap.addSource('tm-pts', { type: 'geojson', data: buildTmPointsGeoJSON() });
             tmMap.addLayer({ id: 'tm-pts-layer', type: 'circle', source: 'tm-pts', paint: {
-                'circle-radius': 8,
-                'circle-color': '#10b981',
+                'circle-radius': ['case', ['boolean', ['feature-state','dragging'], false], 11, 8],
+                'circle-color': ['case', ['boolean', ['feature-state','dragging'], false], '#f59e0b', '#10b981'],
                 'circle-stroke-width': 2.5,
                 'circle-stroke-color': 'white',
                 'circle-pitch-alignment': 'map'
             }});
 
+            // ── מצב גרירה ──
+            let draggingIdx = null;
+
+            // לחיצה על נקודה — התחל גרירה במצב 'move'
+            tmMap.on('mousedown', 'tm-pts-layer', (e) => {
+                if(tmMode !== 'move') return;
+                e.preventDefault();
+                draggingIdx = e.features[0].properties.idx;
+                tmMap.getCanvas().style.cursor = 'grabbing';
+                // disable map drag while we drag a point
+                tmMap.dragPan.disable();
+                // highlight
+                tmMap.setFeatureState({ source:'tm-pts', id: draggingIdx }, { dragging: true });
+            });
+
+            // זוז עם העכבר — עדכן מיקום הנקודה
+            tmMap.on('mousemove', (e) => {
+                if(tmMode !== 'move' || draggingIdx === null) return;
+                tmPoints[draggingIdx] = [e.lngLat.lng, e.lngLat.lat];
+                updateTmLayer();
+            });
+
+            // שחרור — סיים גרירה
+            const endDrag = () => {
+                if(draggingIdx === null) return;
+                tmMap.setFeatureState({ source:'tm-pts', id: draggingIdx }, { dragging: false });
+                draggingIdx = null;
+                tmMap.dragPan.enable();
+                tmMap.getCanvas().style.cursor = 'grab';
+                updateTmLayer();
+            };
+            tmMap.on('mouseup', endDrag);
+            tmMap.on('mouseleave', endDrag); // safety net
+
+            // ── לחיצה על המפה (לא על נקודה) — הוסף נקודה במצב ציור ──
             tmMap.on('click', (e) => {
-                // אל תוסיף נקודה אם לחצנו על נקודה קיימת במצב מחיקה
-                if(tmMode === 'erase') return;
-                // בדוק שלא לחצנו על שכבת הנקודות
+                if(tmMode !== 'draw') return;
                 const feat = tmMap.queryRenderedFeatures(e.point, { layers: ['tm-pts-layer'] });
-                if(feat.length > 0 && tmMode === 'draw') return; // לחיצה על נקודה קיימת במצב ציור — התעלם
+                if(feat.length > 0) return; // לחיצה על נקודה קיימת — התעלם
+                if(draggingIdx !== null) return; // היינו בגרירה
                 tmPoints.push([e.lngLat.lng, e.lngLat.lat]);
                 updateTmLayer();
             });
 
+            // ── לחיצה על נקודה קיימת ──
             tmMap.on('click', 'tm-pts-layer', (e) => {
                 e.stopPropagation && e.stopPropagation();
                 if(tmMode === 'erase') {
                     const idx = e.features[0].properties.idx;
                     tmPoints.splice(idx, 1);
                     updateTmLayer();
-                } else if(tmMode === 'draw') {
-                    // במצב ציור — לחיצה על נקודה קיימת מאפשרת גרירה (ignore)
                 }
             });
 
+            // ── קרסורים ──
             tmMap.on('mouseenter', 'tm-pts-layer', () => {
-                tmMap.getCanvas().style.cursor = tmMode === 'erase' ? 'pointer' : 'grab';
+                if(tmMode === 'erase') tmMap.getCanvas().style.cursor = 'pointer';
+                else if(tmMode === 'move') tmMap.getCanvas().style.cursor = 'grab';
+                else tmMap.getCanvas().style.cursor = 'default';
             });
             tmMap.on('mouseleave', 'tm-pts-layer', () => {
-                tmMap.getCanvas().style.cursor = tmMode === 'draw' ? 'crosshair' : '';
+                if(draggingIdx !== null) return;
+                tmMap.getCanvas().style.cursor = tmMode === 'draw' ? 'crosshair' : (tmMode === 'move' ? 'grab' : '');
             });
 
             updateTmLayer();
@@ -604,7 +641,15 @@ function buildTmGeoJSON() {
 }
 
 function buildTmPointsGeoJSON() {
-    return { type: 'FeatureCollection', features: tmPoints.map((p,i) => ({ type: 'Feature', properties: { idx: i }, geometry: { type: 'Point', coordinates: p } })) };
+    return {
+        type: 'FeatureCollection',
+        features: tmPoints.map((p, i) => ({
+            type: 'Feature',
+            id: i, // חשוב! נדרש עבור setFeatureState (גרירה)
+            properties: { idx: i },
+            geometry: { type: 'Point', coordinates: p }
+        }))
+    };
 }
 
 function updateTmLayer() {
@@ -624,12 +669,37 @@ function updateTmLayer() {
 
 window.tmSetMode = (mode) => {
     tmMode = mode;
-    document.getElementById('tmBtnDraw').style.background = mode === 'draw' ? '#10b981' : 'var(--surface)';
-    document.getElementById('tmBtnDraw').style.color = mode === 'draw' ? 'white' : 'var(--text-main)';
-    document.getElementById('tmBtnErase').style.background = mode === 'erase' ? '#ef4444' : 'var(--surface)';
-    document.getElementById('tmBtnErase').style.color = mode === 'erase' ? 'white' : 'var(--text-main)';
-    document.getElementById('tmBtnErase').style.borderColor = mode === 'erase' ? '#ef4444' : 'var(--border-light)';
-    if(tmMap) tmMap.getCanvas().style.cursor = mode === 'draw' ? 'crosshair' : '';
+    const btnDraw  = document.getElementById('tmBtnDraw');
+    const btnErase = document.getElementById('tmBtnErase');
+    const btnMove  = document.getElementById('tmBtnMove');
+
+    // Reset all
+    [btnDraw, btnErase, btnMove].forEach(b => {
+        if(!b) return;
+        b.style.background = 'var(--surface)';
+        b.style.color = 'var(--text-main)';
+        b.style.borderColor = 'var(--border-light)';
+    });
+
+    // Activate current
+    if(mode === 'draw' && btnDraw) {
+        btnDraw.style.background = '#10b981';
+        btnDraw.style.color = 'white';
+        btnDraw.style.borderColor = '#10b981';
+    } else if(mode === 'erase' && btnErase) {
+        btnErase.style.background = '#ef4444';
+        btnErase.style.color = 'white';
+        btnErase.style.borderColor = '#ef4444';
+    } else if(mode === 'move' && btnMove) {
+        btnMove.style.background = '#f59e0b';
+        btnMove.style.color = 'white';
+        btnMove.style.borderColor = '#f59e0b';
+    }
+
+    // עדכן קרסור מפה
+    if(tmMap) {
+        tmMap.getCanvas().style.cursor = mode === 'draw' ? 'crosshair' : (mode === 'move' ? 'grab' : '');
+    }
 };
 
 window.tmClearAll = () => { tmPoints = []; updateTmLayer(); };
@@ -740,7 +810,15 @@ const CITIES_GIS_CONFIG = {
         baseUrl: 'https://gisviewer.jerusalem.muni.il/arcgis/rest/services/BaseLayers/MapServer',
         layerId: '30',
         sr: 2039,
-        fields: { objectId:'OBJECTID', units:'NUM_APTS_C', street:'StreetName1', num:'BLDG_NUM' }
+        fields: {
+            objectId: 'OBJECTID',
+            units:    'NUM_APTS_C',   // מספר דירות
+            street:   'StreetName1',  // שם רחוב
+            num:      'BLDG_NUM',     // מספר בית
+            floors:   'NUM_FLOORS',   // מספר קומות (בונוס!)
+            entrances:'NUM_ENTR',     // מספר כניסות (בונוס!)
+            usage:    'BLDG_CH'       // שימוש במבנה (מגורים/מסחר/...)
+        }
     },
     tel_aviv: {
         name: 'תל אביב',
@@ -837,73 +915,85 @@ async function fetchBuildingsFromArcGIS(cityId, polygon) {
     const bbox = polygonToITMBbox(polygon);
     const geometry = JSON.stringify({ xmin:bbox.xmin, ymin:bbox.ymin, xmax:bbox.xmax, ymax:bbox.ymax, spatialReference:{wkid:cfg.sr} });
     const f = cfg.fields;
-    // outFields: only attribute columns — NO x/y text columns (unreliable)
-    const outFields = [f.objectId, f.units, f.street, f.num].filter(Boolean).join(',');
+
+    // כלול את כל השדות הידועים — כולל bonuses כמו קומות וכניסות
+    const outFields = [f.objectId, f.units, f.street, f.num, f.floors, f.entrances, f.usage].filter(Boolean).join(',');
+
     const url = new URL(`${cfg.baseUrl}/${cfg.layerId}/query`);
     url.searchParams.set('f','json');
     url.searchParams.set('geometryType','esriGeometryEnvelope');
     url.searchParams.set('spatialRel','esriSpatialRelIntersects');
     url.searchParams.set('inSR', String(cfg.sr));
-    url.searchParams.set('outSR', String(cfg.sr)); // get geometry back in same SR (ITM)
+    url.searchParams.set('outSR', String(cfg.sr));
     url.searchParams.set('geometry', geometry);
     url.searchParams.set('outFields', outFields);
-    url.searchParams.set('returnGeometry','true'); // ← always use real geometry
+    url.searchParams.set('returnGeometry','true');
+
+    console.log(`[GIS] ${cfg.name} → ${url.toString().slice(0,120)}...`);
+
     try {
         const resp = await fetch(url.toString());
         if(!resp.ok) throw new Error('HTTP '+resp.status);
         const data = await resp.json();
-        if(!data.features) return null;
+
+        // דיבוג — הצג מה חזר
+        if(data.error) {
+            console.warn(`[GIS] ${cfg.name} server error:`, data.error);
+            return null;
+        }
+        console.log(`[GIS] ${cfg.name} → ${data.features?.length || 0} features returned`);
+        if(!data.features || data.features.length === 0) return null;
+
         const results = {};
         for(const feat of data.features) {
             const a = feat.attributes;
             const street = a[f.street] || '';
-            const num    = String(a[f.num] || '');
-            if(!street) continue;
+            // BLDG_NUM יכול להיות מספר — המר למחרוזת
+            const num = String(a[f.num] ?? '').trim();
+            if(!street || !num || num === '0') continue;
 
-            // ── Extract centroid from real geometry ──────────────────
-            // Supports: esriGeometryPoint { x, y }
-            //           esriGeometryPolygon / rings: [[x,y],...]
-            //           esriGeometryMultipoint / points: [[x,y],...]
+            // ── חלץ מרכז מגיאומטריה אמיתית ──
             let itmX = null, itmY = null;
             const geom = feat.geometry;
             if(geom) {
                 if(geom.x !== undefined && geom.y !== undefined) {
-                    // Point geometry — most reliable
                     itmX = geom.x; itmY = geom.y;
-                } else if(geom.rings && geom.rings.length > 0) {
-                    // Polygon — compute centroid of outer ring
+                } else if(geom.rings?.length > 0) {
+                    // פוליגון — מרכז הטבעת החיצונית
                     const ring = geom.rings[0];
-                    if(ring.length > 0) {
-                        itmX = ring.reduce((s,p)=>s+p[0],0)/ring.length;
-                        itmY = ring.reduce((s,p)=>s+p[1],0)/ring.length;
-                    }
-                } else if(geom.points && geom.points.length > 0) {
-                    // Multipoint — use first point
+                    itmX = ring.reduce((s,p)=>s+p[0],0)/ring.length;
+                    itmY = ring.reduce((s,p)=>s+p[1],0)/ring.length;
+                } else if(geom.points?.length > 0) {
                     itmX = geom.points[0][0]; itmY = geom.points[0][1];
-                } else if(geom.paths && geom.paths.length > 0) {
-                    // Polyline — midpoint of first path
-                    const path = geom.paths[0];
-                    const mid = Math.floor(path.length/2);
+                } else if(geom.paths?.length > 0) {
+                    const path = geom.paths[0], mid = Math.floor(path.length/2);
                     itmX = path[mid][0]; itmY = path[mid][1];
                 }
             }
 
-            // Convert ITM → WGS84
+            // המרת ITM → WGS84
             let coords = null;
             if(itmX !== null && itmY !== null) {
-                try { coords = itmToWgs84(itmX, itmY); } catch(e) {}
+                try { coords = itmToWgs84(itmX, itmY); } catch(e) {
+                    console.warn('[GIS] ITM conversion failed:', itmX, itmY, e.message);
+                }
             }
 
-            // Skip if outside our territory polygon
+            // סינון מדויק לפי פוליגון
             if(coords && !pointInPolygon(coords, polygon)) continue;
 
             const key = `${street} ${num}`.trim();
-            const units = parseInt(a[f.units]) || 0;
-            results[key] = { units, street, num, coords, source: cityId };
+            const units    = parseInt(a[f.units])     || 0;
+            const floors   = parseInt(a[f.floors])    || 0;
+            const entrances= parseInt(a[f.entrances]) || 0;
+            const usage    = a[f.usage]?.trim()       || '';
+
+            results[key] = { units, street, num, coords, source: cityId, floors, entrances, usage };
         }
-        return results;
+        console.log(`[GIS] ${cfg.name} → ${Object.keys(results).length} buildings matched polygon`);
+        return Object.keys(results).length > 0 ? results : null;
     } catch(e) {
-        console.warn(`ArcGIS fetch failed for ${cityId}:`, e);
+        console.warn(`[GIS] ArcGIS fetch failed for ${cityId}:`, e.message);
         return null;
     }
 }
@@ -966,12 +1056,11 @@ function findClosestDbBuilding(coords, maxM=60) {
 }
 
 // ── החל נתוני GIS על db — לא דורס VERIFIED/ESTIMATE ───────────
-function applyGISUnits(bldgKey, gisUnits, sourceId) {
+function applyGISUnits(bldgKey, gisUnits, sourceId, extra) {
     if(!db[bldgKey]) return;
     const existing = db[bldgKey].info?.units;
     if(existing?.source==='VERIFIED') return; // אמת — לא נגע
     if(existing?.source==='ESTIMATE' && (!gisUnits||gisUnits<=0)) return; // הערכה שלנו טובה יותר
-    // עדכן נתוני עירייה
     const prev = db[bldgKey].info.units || {};
     db[bldgKey].info.units = {
         ...prev,
@@ -979,7 +1068,11 @@ function applyGISUnits(bldgKey, gisUnits, sourceId) {
         count: gisUnits>0 ? gisUnits : (prev.count||0),
         cityCount: gisUnits,
         citySource: sourceId,
-        cityUpdatedAt: Date.now()
+        cityUpdatedAt: Date.now(),
+        // שדות בונוס מירושלים
+        ...(extra?.floors    ? { floors: extra.floors }       : {}),
+        ...(extra?.entrances ? { entrances: extra.entrances } : {}),
+        ...(extra?.usage     ? { usage: extra.usage }         : {})
     };
 }
 
@@ -1037,14 +1130,14 @@ async function startTerritoryUnitsScan() {
     for(const [gisKey, gisInfo] of Object.entries(gisData)) {
         // נסה התאמה ישירה
         if(db[gisKey]) {
-            applyGISUnits(gisKey, gisInfo.units, gisInfo.source);
+            applyGISUnits(gisKey, gisInfo.units, gisInfo.source, gisInfo);
             if(gisInfo.coords) db[gisKey].info.coords=gisInfo.coords;
             matched++; continue;
         }
         // התאמה לפי קואורדינטות
         if(gisInfo.coords) {
             const closest=findClosestDbBuilding(gisInfo.coords,60);
-            if(closest){ applyGISUnits(closest,gisInfo.units,gisInfo.source); matched++; continue; }
+            if(closest){ applyGISUnits(closest,gisInfo.units,gisInfo.source,gisInfo); matched++; continue; }
         }
         newBuildings++;
     }
