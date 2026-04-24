@@ -927,7 +927,22 @@ function polygonToITMBbox(polygon) {
     };
 }
 
-// ── שלוף בניינים מ-ArcGIS עירוני ──────────────────────────────
+// ── זיהוי עיר לפי מרכז פוליגון ─────────────────────────────────
+async function detectCityFromPolygon(polygon) {
+    if(!polygon || polygon.length < 3) return null;
+    const cx = polygon.reduce((s,c)=>s+c[0],0)/polygon.length;
+    const cy = polygon.reduce((s,c)=>s+c[1],0)/polygon.length;
+    try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${cy}&lon=${cx}&format=json&accept-language=he`);
+        const d = await r.json();
+        const city = (d.address?.city || d.address?.town || d.address?.village || '').toLowerCase();
+        if(city.includes('ירושלים') || city.includes('jerusalem')) return 'jerusalem';
+        if(city.includes('תל אביב') || city.includes('tel aviv')) return 'tel_aviv';
+        if(city.includes('חיפה') || city.includes('haifa')) return 'haifa';
+        return null;
+    } catch(e) { return null; }
+}
+
 async function fetchBuildingsFromArcGIS(cityId, polygon) {
     const cfg = CITIES_GIS_CONFIG[cityId];
     if(!cfg || cfg.apiType !== 'ARCGIS') return null;
