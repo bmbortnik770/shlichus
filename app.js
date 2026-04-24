@@ -263,9 +263,25 @@ window.onload = () => {
     let lastLogin = localStorage.getItem('last_login_date');
     let todayStr = new Date().toISOString().split('T')[0];
     let welcomeDiv = document.getElementById('welcomeMessage');
-    if(lastLogin === todayStr) { welcomeDiv.innerHTML = "איזה כיף שחזרת! ממשיכים את המומנטום 🚀"; } 
-    else if (lastLogin) { welcomeDiv.innerHTML = "ברוך שובך! פעם קודמת היית אש, בוא נראה מה תעשה היום 🔥"; } 
-    else { welcomeDiv.innerHTML = "ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍"; }
+
+    // שם השליחות לברכה מותאמת אישית
+    const prefs = JSON.parse(localStorage.getItem('crm_prefs') || '{}');
+    const missionName = prefs.missionName || '';
+    const greetingName = missionName ? `${missionName}` : 'למערכת';
+
+    if(lastLogin === todayStr) {
+        welcomeDiv.innerHTML = missionName
+            ? `ברוך הבא, <strong>${missionName}</strong>! ממשיכים את המומנטום 🚀`
+            : `איזה כיף שחזרת! ממשיכים את המומנטום 🚀`;
+    } else if(lastLogin) {
+        welcomeDiv.innerHTML = missionName
+            ? `ברוך שובך, <strong>${missionName}</strong>! בוא נראה מה תעשה היום 🔥`
+            : `ברוך שובך! פעם קודמת היית אש, בוא נראה מה תעשה היום 🔥`;
+    } else {
+        welcomeDiv.innerHTML = missionName
+            ? `ברוך הבא, <strong>${missionName}</strong>! כאן מתחילים להפוך את העולם 🌍`
+            : `ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍`;
+    }
     localStorage.setItem('last_login_date', todayStr);
 
     const obContainer = document.getElementById('onboardingGeocoderContainer');
@@ -420,7 +436,12 @@ window.saveFullOnboarding = () => {
     if(mname) appSettings.missionName = mname;
     // Save territory
     if(tempTerritoryPolygon) {
-        appSettings.territory = { polygon: tempTerritoryPolygon, displayMode: 'border' };
+        const obDrawModeEl = document.querySelector('input[name="obDrawMode"]:checked');
+        appSettings.territory = {
+            polygon: tempTerritoryPolygon,
+            displayMode: 'border',
+            drawMode: obDrawModeEl ? obDrawModeEl.value : 'city'
+        };
     }
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
     saveDB();
@@ -1160,6 +1181,12 @@ async function startTerritoryUnitsScan() {
     }
 
     // החל נתונים
+    // דיבוג — השווה מפתחות GIS מול db
+    const dbKeys = Object.keys(db).filter(k=>k!=='__BOARDS__'&&k!=='meta'&&k!==NO_ADDRESS_KEY&&k!=='__SETTINGS__');
+    const gisKeys = Object.keys(gisData);
+    console.log('[GIS] db-keys:', dbKeys.slice(0,5));
+    console.log('[GIS] gis-keys:', gisKeys.slice(0,5));
+
     let matched=0, newBuildings=0;
     for(const [gisKey, gisInfo] of Object.entries(gisData)) {
         // נסה התאמה ישירה
@@ -1176,12 +1203,26 @@ async function startTerritoryUnitsScan() {
         newBuildings++;
     }
 
-    // שמור נתונים גולמיים לשימוש עתידי
-    appSettings.territory.gisCache = { data:gisData, source:cityId||'osm', ts:Date.now() };
-    appSettings.territory.unitsLastSync = Date.now();
+    // שמור נתונים גולמיים — ללא קואורדינטות מלאות כדי לא לפוצץ localStorage
+    const lightCache = {};
+    for(const [k,v] of Object.entries(gisData)) {
+        lightCache[k] = { units: v.units, street: v.street, num: v.num, source: v.source,
+            floors: v.floors, entrances: v.entrances, usage: v.usage,
+            coords: v.coords }; // coords בלבד (2 מספרים) — בלי rings
+    }
+    try {
+        appSettings.territory.gisCache = { data: lightCache, source: cityId||'osm', ts: Date.now() };
+        appSettings.territory.unitsLastSync = Date.now();
+        localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    } catch(e) {
+        // localStorage מלא — שמור בלי cache אבל עם timestamp
+        console.warn('[GIS] localStorage full, saving without cache:', e.message);
+        delete appSettings.territory.gisCache;
+        appSettings.territory.unitsLastSync = Date.now();
+        localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    }
     unitsEngineState.lastScan = Date.now();
     unitsEngineState.scannedBldgCount = Object.keys(gisData).length;
-    localStorage.setItem('crm_prefs',JSON.stringify(appSettings));
     saveDB();
     updateCoverageStats();
 
@@ -3681,6 +3722,9 @@ window.openSettings=()=>{
         const dispMode = appSettings.territory.displayMode || 'border';
         const radio = document.querySelector(`input[name="territoryDisplayMode"][value="${dispMode}"]`);
         if(radio) radio.checked = true;
+        // ← שחזר את אופן הציור (עיר / ידני)
+        const savedDrawMode = appSettings.territory.drawMode || 'city';
+        setUpdateDrawMode(savedDrawMode);
     } else {
         if(terInfoEl) terInfoEl.style.display = 'none';
         if(badge) badge.style.display = 'none';
@@ -3777,7 +3821,12 @@ window.saveSettingsAndClose = () => {
     if(mname && mname.value.trim()) appSettings.missionName = mname.value.trim();
     if(tempTerritoryPolygon) {
         const dispMode = document.querySelector('input[name="territoryDisplayMode"]:checked');
-        appSettings.territory = { polygon: tempTerritoryPolygon, displayMode: dispMode ? dispMode.value : 'border' };
+        const drawModeEl = document.querySelector('input[name="setDrawMode"]:checked');
+        appSettings.territory = {
+            polygon: tempTerritoryPolygon,
+            displayMode: dispMode ? dispMode.value : 'border',
+            drawMode: drawModeEl ? drawModeEl.value : 'city'  // ← שמור איך צויר
+        };
     }
 
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
