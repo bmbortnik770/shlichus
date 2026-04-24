@@ -4006,10 +4006,9 @@ window.openSettings=()=>{
         if(ta) ta.innerText = areaKm2 < 1 ? (areaKm2*100).toFixed(1)+' דונם' : areaKm2.toFixed(2);
         if(badge) badge.style.display = 'inline';
         tempTerritoryPolygon = appSettings.territory.polygon;
-        // פתח את הסקשן אוטומטית
-        const shBody = document.getElementById('shlichutAreaBody');
-        const shChevron = document.getElementById('shlichutChevron');
-        if(shBody) { shBody.style.display = 'block'; if(shChevron) shChevron.style.transform = 'rotate(180deg)'; }
+        // פתח את ה-details אוטומטית כשיש נתונים
+        const shDetails = document.getElementById('shlichutAreaDetails');
+        if(shDetails) shDetails.open = true;
         // Set display mode radio
         const dispMode = appSettings.territory.displayMode || 'border';
         const radio = document.querySelector(`input[name="territoryDisplayMode"][value="${dispMode}"]`);
