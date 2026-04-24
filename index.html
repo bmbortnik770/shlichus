@@ -805,6 +805,9 @@
                             <button id="btnScanUnits" onclick="startTerritoryUnitsScan()" class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px; border-color:#10b981; color:#10b981;">
                                 <i class="fas fa-sync-alt"></i> סרוק דירות
                             </button>
+                            <button onclick="fixOverwrittenCoords()" class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px; border-color:#f59e0b; color:#b45309;" title="תקן מיקומים שהסריקה שינתה">
+                                <i class="fas fa-map-pin"></i> תקן מיקומים
+                            </button>
                             <div id="unitsScanSummary" style="display:none; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:7px 12px; font-size:12px; color:#065f46;">
                                 <i class="fas fa-check-circle"></i> <span id="unitsScanSummaryText"></span>
                             </div>
@@ -865,8 +868,8 @@
     </div>
 </div>
 
-<script src="app.js?v=17"></script>
-<script src="nav.js?v=1"></script>
+<script src="app.js?v=22"></script>
+
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
