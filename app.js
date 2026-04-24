@@ -1100,6 +1100,29 @@ function haversineM([lng1,lat1],[lng2,lat2]){
 }
 
 // ── חפש בניין קרוב ב-db ───────────────────────────────────────
+// ── התאמה חכמה של שמות רחוב (מקוצר ↔ מלא) ────────────────────
+function findFuzzyBuildingMatch(gisStreet, gisNum) {
+    if(!gisStreet || !gisNum) return null;
+    const numStr = String(gisNum).trim();
+    // חלק את שם הרחוב ל-"מילים" — GIS נותן שם מלא
+    const gisWords = gisStreet.trim().split(/\s+/);
+
+    for(const dbKey of Object.keys(db)) {
+        if(dbKey==='__BOARDS__'||dbKey==='meta'||dbKey===NO_ADDRESS_KEY||dbKey==='__SETTINGS__') continue;
+        // חלץ מספר ורחוב מ-dbKey (פורמט: "שם רחוב מספר")
+        const dbParts = dbKey.trim().split(/\s+/);
+        const dbNum = dbParts[dbParts.length-1];
+        if(dbNum !== numStr) continue; // מספר בית לא תואם — דלג
+
+        const dbStreetWords = dbParts.slice(0, -1);
+        // בדוק שכל מילות הDB קיימות בשם ה-GIS (המלא)
+        // "שמואל תמיר" ⊆ "שמואל תמיר כצנלסון" → match
+        const allWordsMatch = dbStreetWords.every(w => gisWords.includes(w));
+        if(allWordsMatch && dbStreetWords.length > 0) return dbKey;
+    }
+    return null;
+}
+
 function findClosestDbBuilding(coords, maxM=60) {
     let best=null,bestD=Infinity;
     for(const k of Object.keys(db)){
@@ -1187,7 +1210,7 @@ async function startTerritoryUnitsScan() {
     console.log('[GIS] db-keys:', dbKeys.slice(0,5));
     console.log('[GIS] gis-keys:', gisKeys.slice(0,5));
 
-    let matched=0, newBuildings=0;
+    let matched=0, newBuildings=0, fuzzyMatched=0, coordMatched=0;
     for(const [gisKey, gisInfo] of Object.entries(gisData)) {
         // נסה התאמה ישירה
         if(db[gisKey]) {
@@ -1195,13 +1218,21 @@ async function startTerritoryUnitsScan() {
             if(gisInfo.coords) db[gisKey].info.coords=gisInfo.coords;
             matched++; continue;
         }
+        // התאמה חכמה — שם רחוב מקוצר + מספר בית
+        const fuzzyMatch = findFuzzyBuildingMatch(gisInfo.street, gisInfo.num);
+        if(fuzzyMatch) {
+            applyGISUnits(fuzzyMatch, gisInfo.units, gisInfo.source, gisInfo);
+            if(gisInfo.coords) db[fuzzyMatch].info.coords=gisInfo.coords;
+            fuzzyMatched++; matched++; continue;
+        }
         // התאמה לפי קואורדינטות
         if(gisInfo.coords) {
             const closest=findClosestDbBuilding(gisInfo.coords,60);
-            if(closest){ applyGISUnits(closest,gisInfo.units,gisInfo.source,gisInfo); matched++; continue; }
+            if(closest){ applyGISUnits(closest,gisInfo.units,gisInfo.source,gisInfo); coordMatched++; matched++; continue; }
         }
         newBuildings++;
     }
+    console.log(`[GIS] match breakdown: direct=${matched-fuzzyMatched-coordMatched}, fuzzy=${fuzzyMatched}, coords=${coordMatched}, unmatched=${newBuildings}`);
 
     // שמור נתונים גולמיים — ללא קואורדינטות מלאות כדי לא לפוצץ localStorage
     const lightCache = {};
