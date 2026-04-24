@@ -1256,11 +1256,18 @@ async function startTerritoryUnitsScan() {
     unitsEngineState.scannedBldgCount = Object.keys(gisData).length;
     saveDB();
     updateCoverageStats();
+    updateTerritoryStatsDisplay();
+    // עדכן שכבת בניינים על המפה
+    try { renderGISBuildingLayer(); } catch(e) {}
 
-    const msg=`${Object.keys(gisData).length} בניינים מה-GIS — ${matched} תואמו לנתוניך`;
-    if(statusEl) statusEl.innerText=`עודכן: ${msg}`;
-    if(summaryEl){summaryEl.style.display='block'; summaryText.innerText=msg;}
-    showToast(`✓ ${msg}`,'success');
+    const stats = computeTerritoryStats();
+    const msg = `${Object.keys(gisData).length} בניינים מה-GIS — ${matched} תואמו`;
+    const statsMsg = stats.totalUnits > 0
+        ? `נמצאו ${stats.totalBuildings} בניינים · ${stats.totalUnits} דירות בתחום השליחות!`
+        : msg;
+    if(statusEl) statusEl.innerText = `עודכן: ${msg}`;
+    if(summaryEl){ summaryEl.style.display='block'; summaryText.innerText = statsMsg; }
+    showToast(`🏘️ ${statsMsg}`, 'success');
     if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-sync-alt"></i> סרוק דירות';}
 }
 window.startTerritoryUnitsScan = startTerritoryUnitsScan;
@@ -1505,6 +1512,144 @@ window.saveManualUnitsCount = () => {
     updateCoverageStats();
     showToast(`✓ ${v} דירות אומתו לבניין`,'success');
 };
+
+// ── toggle תצוגת בניין: רשימה / קומות ──────────────────────────
+let _currentBldgView = 'list'; // 'list' | 'floors'
+window.setBldgView = (view) => {
+    _currentBldgView = view;
+    const listContainer   = document.getElementById('bldgViewListContainer');
+    const floorsContainer = document.getElementById('bldgViewFloorsContainer');
+    const btnList   = document.getElementById('bldgViewList');
+    const btnFloors = document.getElementById('bldgViewFloors');
+    if(!listContainer) return;
+    if(view === 'list') {
+        listContainer.style.display   = 'block';
+        floorsContainer.style.display = 'none';
+        btnList.style.background   = 'var(--accent)'; btnList.style.color   = 'white';
+        btnFloors.style.background = 'transparent';   btnFloors.style.color = 'var(--text-muted)';
+    } else {
+        listContainer.style.display   = 'none';
+        floorsContainer.style.display = 'block';
+        btnList.style.background   = 'transparent'; btnList.style.color   = 'var(--text-muted)';
+        btnFloors.style.background = 'var(--accent)'; btnFloors.style.color = 'white';
+        renderFloorPlan(currentBldg);
+    }
+};
+
+// ── שמירת סוג בניין (מגורים / מסחרי / לא רלוונטי) ──────────────
+window.saveBldgRelevance = (value) => {
+    if(!db[currentBldg]) return;
+    db[currentBldg].info.relevance = value;
+    saveDB();
+    renderGISBuildingLayer(); // עדכן צבע על המפה
+    showToast(value==='irrelevant'?'סומן כלא רלוונטי':value==='commercial'?'סומן כמסחרי':'סומן כמגורים','success');
+};
+
+// ── שכבת GIS על המפה — צביעת בניינים לפי סטטוס ─────────────────
+function renderGISBuildingLayer() {
+    if(!map || !map.isStyleLoaded()) return;
+    // צור GeoJSON מכל הבניינים ב-db עם קואורדינטות
+    const features = [];
+    for(const [key, bldg] of Object.entries(db)) {
+        if(key==='__BOARDS__'||key==='meta'||key===NO_ADDRESS_KEY||key==='__SETTINGS__') continue;
+        const coords = bldg.info?.coords;
+        if(!coords || !Array.isArray(coords) || coords.length < 2) continue;
+        const units = bldg.info?.units;
+        const relevance = bldg.info?.relevance || 'residential';
+        let status = 'unknown';
+        if(relevance === 'irrelevant') status = 'irrelevant';
+        else if(relevance === 'commercial') status = 'commercial';
+        else if(units?.source === 'VERIFIED') status = 'verified';
+        else if(units?.source === 'CITY') status = 'city';
+        else if(units?.source === 'ESTIMATE') status = 'estimate';
+        features.push({
+            type: 'Feature',
+            properties: { key, status, units: units?.count||0, families: bldg.apts?.length||0 },
+            geometry: { type: 'Point', coordinates: coords }
+        });
+    }
+    const geojson = { type: 'FeatureCollection', features };
+    const sourceId = 'gis-buildings-source';
+    const layerId  = 'gis-buildings-layer';
+    const layerIdBorder = 'gis-buildings-border';
+    if(map.getSource(sourceId)) {
+        map.getSource(sourceId).setData(geojson);
+    } else {
+        map.addSource(sourceId, { type: 'geojson', data: geojson });
+        // מעגל רקע
+        map.addLayer({
+            id: layerId, type: 'circle', source: sourceId,
+            paint: {
+                'circle-radius': 9,
+                'circle-color': [
+                    'match', ['get','status'],
+                    'verified',   '#10b981', // ירוק — מאומת
+                    'city',       '#6b7280', // אפור — נתוני עירייה
+                    'estimate',   '#f59e0b', // צהוב — הערכה
+                    'irrelevant', '#ef4444', // אדום — לא רלוונטי
+                    'commercial', '#8b5cf6', // סגול — מסחרי
+                    '#d1d5db'                // ברירת מחדל — לא ידוע
+                ],
+                'circle-opacity': 0.85,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': 'white',
+                'circle-pitch-alignment': 'map'
+            }
+        }, 'waterway-label');
+        // מספר דירות בתוך המעגל
+        map.addLayer({
+            id: layerIdBorder, type: 'symbol', source: sourceId,
+            layout: {
+                'text-field': ['case',['>', ['get','units'], 0], ['to-string',['get','units']], ''],
+                'text-size': 9, 'text-font': ['Open Sans Bold','Arial Unicode MS Bold'],
+                'text-anchor': 'center'
+            },
+            paint: { 'text-color': 'white' }
+        });
+    }
+}
+
+// ── סטטיסטיקת שליחות (בניינים + דירות) ─────────────────────────
+function computeTerritoryStats() {
+    let totalBuildings = 0, totalUnits = 0, verifiedUnits = 0;
+    for(const [k,v] of Object.entries(db)) {
+        if(k==='__BOARDS__'||k==='meta'||k===NO_ADDRESS_KEY||k==='__SETTINGS__') continue;
+        if(v?.info?.relevance === 'irrelevant') continue;
+        totalBuildings++;
+        const u = v.info?.units;
+        if(u?.count > 0) {
+            totalUnits += u.count;
+            if(u.source === 'VERIFIED') verifiedUnits += u.count;
+        }
+    }
+    return { totalBuildings, totalUnits, verifiedUnits };
+}
+
+function updateTerritoryStatsDisplay() {
+    const stats = computeTerritoryStats();
+    // עדכן בהגדרות
+    const statsEl = document.getElementById('settingsTerritoryStats');
+    if(statsEl && stats.totalBuildings > 0) {
+        statsEl.style.display = 'block';
+        statsEl.innerHTML = `
+            <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:8px;">
+                <div style="text-align:center;">
+                    <div style="font-size:22px; font-weight:900; color:var(--accent);">${stats.totalBuildings}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">בניינים</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:22px; font-weight:900; color:#10b981;">${stats.totalUnits}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">דירות בתחום</div>
+                </div>
+                ${stats.verifiedUnits > 0 ? `<div style="text-align:center;">
+                    <div style="font-size:22px; font-weight:900; color:#6366f1;">${stats.verifiedUnits}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">מאומתות</div>
+                </div>` : ''}
+            </div>`;
+    }
+    // עדכן אחרי סריקה ב-toast
+    return stats;
+}
 
 function handleAuth(resp) {
     // Legacy handler — only called if GIS SDK popup somehow fires
@@ -1752,6 +1897,8 @@ async function syncWithDrive(forcePull = false) {
         geocodeMissingAddresses();
         if(appSettings.territory && appSettings.territory.polygon) renderTerritoryOnMap();
         updateCoverageStats();
+        updateTerritoryStatsDisplay();
+        try { renderGISBuildingLayer(); } catch(e) {}
     }, 800);
 }
 
@@ -2324,9 +2471,25 @@ window.openBuildingModal = function() {
     }).join('');
     document.getElementById('bldgModalAptsList').innerHTML = aptList || '<div class="empty-state"><i class="fas fa-door-open"></i><div>אין משפחות רשומות בבניין.</div></div>';
     document.getElementById('bModalCode').value=b.info.code||''; document.getElementById('bModalRep').value=b.info.rep||''; document.getElementById('bModalNotes').value=b.info.notes||'';
+
+    // GIS status in info tab
+    const gisStatusEl = document.getElementById('bldgGisStatus');
+    if(gisStatusEl) {
+        const u = b.info?.units;
+        if(u) {
+            const src = UNIT_SRC[u.source] || {};
+            gisStatusEl.innerHTML = `${src.icon||''} ${src.label||u.source} — <strong>${u.count||0}</strong> דירות${u.floors?` · <strong>${u.floors}</strong> קומות`:''}${u.entrances?` · <strong>${u.entrances}</strong> כניסות`:''}${u.usage&&u.usage.trim()?` · ${u.usage.trim()}`:''}`;
+        } else { gisStatusEl.innerText = 'לא נסרק עדיין'; }
+    }
+    // Relevance radio
+    const rel = b.info?.relevance || 'residential';
+    const relRadio = document.querySelector(`input[name="bldgRelevance"][value="${rel}"]`);
+    if(relRadio) relRadio.checked = true;
+
+    // Reset to list view
+    setBldgView('list');
     switchBldgTab('apts'); document.getElementById('buildingModal').style.display='flex';
-    // render floor plan (async-safe, after modal visible)
-    setTimeout(()=>{ try{ renderFloorPlan(currentBldg); }catch(e){} }, 50);
+    renderFloorPlan(currentBldg);
 };
 window.switchBldgTab = (tab) => { document.querySelectorAll('#buildingModal .crm-tab, #buildingModal .crm-tab-content').forEach(e=>e.classList.remove('active')); document.getElementById(`bldgTabBtn-${tab}`).classList.add('active'); document.getElementById(`bldgTab-${tab}`).classList.add('active'); };
 
