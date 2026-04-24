@@ -470,49 +470,62 @@
         </div>
         <div class="crm-tabs">
             <div class="crm-tab active" id="bldgTabBtn-apts" onclick="switchBldgTab('apts')"><i class="fas fa-users"></i> משפחות</div>
-            <div class="crm-tab" id="bldgTabBtn-floors" onclick="switchBldgTab('floors')"><i class="fas fa-building"></i> מפת בניין</div>
             <div class="crm-tab" id="bldgTabBtn-info" onclick="switchBldgTab('info')"><i class="fas fa-info-circle"></i> פרטי בניין</div>
         </div>
-        <div id="bldgTab-apts" class="crm-tab-content active">
-            <div id="bldgModalAptsList" style="max-height:350px; overflow-y:auto; padding-left:5px; margin-bottom:15px;"></div>
-            <button class="btn btn-success" onclick="quickAddAptModal()"><i class="fas fa-plus"></i> הוסף משפחה לבניין</button>
-        </div>
 
-        <!-- לשונית מפת בניין (קומות + גרירה) -->
-        <div id="bldgTab-floors" class="crm-tab-content">
-            <!-- Header stats -->
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+        <div id="bldgTab-apts" class="crm-tab-content active">
+            <!-- ── Header: סטטיסטיקה + כפתורי פעולה ── -->
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
                 <div style="font-size:13px; color:var(--text-muted);">
                     <span id="floorsRegistered" style="font-weight:700; color:var(--text-main); font-size:15px;">0</span> משפחות
                     מתוך <span id="floorsTotalUnits" style="font-weight:700; font-size:15px; color:var(--text-muted);">?</span> דירות
                     <span id="floorsSourceBadge" style="font-size:11px; padding:2px 7px; border-radius:12px; font-weight:700; margin-right:4px; display:none;"></span>
                 </div>
-                <div style="display:flex; gap:6px;">
+                <div style="display:flex; gap:5px; align-items:center;">
+                    <!-- toggle בין רשימה למפת קומות -->
+                    <div style="display:flex; background:var(--bg-body); border:1px solid var(--border-light); border-radius:8px; overflow:hidden;">
+                        <button id="bldgViewList" onclick="setBldgView('list')" style="padding:4px 10px; font-size:12px; border:none; background:var(--accent); color:white; cursor:pointer; font-family:inherit; font-weight:700;">
+                            <i class="fas fa-list"></i>
+                        </button>
+                        <button id="bldgViewFloors" onclick="setBldgView('floors')" style="padding:4px 10px; font-size:12px; border:none; background:transparent; color:var(--text-muted); cursor:pointer; font-family:inherit;">
+                            <i class="fas fa-building"></i>
+                        </button>
+                    </div>
                     <button onclick="openUnitsEditor()" class="btn btn-outline" style="width:auto; padding:4px 10px; font-size:12px;">
-                        <i class="fas fa-pen"></i> עריכת דירות
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="btn btn-success" onclick="quickAddAptModal()" style="width:auto; padding:4px 10px; font-size:12px;">
+                        <i class="fas fa-plus"></i> הוסף
                     </button>
                 </div>
             </div>
-            <!-- Coverage mini-bar -->
-            <div style="height:6px; background:var(--bg-body); border-radius:10px; overflow:hidden; margin-bottom:12px;">
+
+            <!-- coverage bar -->
+            <div style="height:5px; background:var(--bg-body); border-radius:10px; overflow:hidden; margin-bottom:10px;">
                 <div id="floorsCovBar" style="height:100%; width:0%; background:linear-gradient(90deg,var(--accent),#10b981); transition:width 0.5s; border-radius:10px;"></div>
             </div>
-            <!-- Floor plan container -->
-            <div id="floorPlanContainer" style="max-height:380px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; padding:2px;">
-                <!-- rendered by renderFloorPlan() -->
+
+            <!-- תצוגת רשימה (ברירת מחדל) -->
+            <div id="bldgViewListContainer">
+                <div id="bldgModalAptsList" style="max-height:320px; overflow-y:auto; padding-left:5px;"></div>
             </div>
-            <!-- Legend -->
-            <div style="display:flex; gap:12px; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-light); flex-wrap:wrap;">
-                <div style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted);">
-                    <div style="width:14px;height:14px;border-radius:3px;background:rgba(59,130,246,0.15);border:1.5px solid #3b82f6;"></div> רשומה
+
+            <!-- תצוגת מפת קומות -->
+            <div id="bldgViewFloorsContainer" style="display:none;">
+                <div id="floorPlanContainer" style="max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; padding:2px;"></div>
+                <!-- legend -->
+                <div style="display:flex; gap:10px; margin-top:8px; padding-top:6px; border-top:1px solid var(--border-light); flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-muted);">
+                        <div style="width:12px;height:12px;border-radius:2px;background:rgba(59,130,246,0.15);border:1.5px solid #3b82f6;"></div> רשומה
+                    </div>
+                    <div style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-muted);">
+                        <div style="width:12px;height:12px;border-radius:2px;background:var(--bg-body);border:1.5px solid var(--border-light);"></div> ריקה
+                    </div>
+                    <div style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-muted);">
+                        <div style="width:12px;height:12px;border-radius:2px;background:rgba(245,158,11,0.15);border:1.5px solid #f59e0b;"></div> ללא מספר
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-right:auto;"><i class="fas fa-arrows-alt"></i> גרור לשינוי קומה</div>
                 </div>
-                <div style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted);">
-                    <div style="width:14px;height:14px;border-radius:3px;background:var(--bg-body);border:1.5px solid var(--border-light);"></div> ריקה
-                </div>
-                <div style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted);">
-                    <div style="width:14px;height:14px;border-radius:3px;background:rgba(245,158,11,0.15);border:1.5px solid #f59e0b;"></div> ללא מספר
-                </div>
-                <div style="font-size:11px; color:var(--text-muted); margin-right:auto;"><i class="fas fa-grip-vertical"></i> גרור דירה לשינוי קומה</div>
             </div>
         </div>
 
@@ -520,7 +533,28 @@
             <div class="form-group"><label>קוד כניסה</label><input type="text" id="bModalCode"></div>
             <div class="form-group"><label>איש קשר בבניין</label><input type="text" id="bModalRep"></div>
             <div class="form-group"><label>הערות</label><textarea id="bModalNotes" rows="3"></textarea></div>
-            <div style="display:flex; gap:10px;"><button class="btn btn-primary" onclick="saveBldgModalInfo()"><i class="fas fa-save"></i> שמור</button></div>
+
+            <!-- סטטוס GIS + רלוונטיות -->
+            <div style="margin-top:12px; background:var(--bg-body); border-radius:10px; border:1px solid var(--border-light); padding:10px;">
+                <div style="font-weight:700; font-size:12px; margin-bottom:8px; color:var(--text-main);"><i class="fas fa-city" style="color:var(--accent);"></i> סטטוס GIS</div>
+                <div id="bldgGisStatus" style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">לא ידוע</div>
+                <div style="font-weight:700; font-size:12px; margin-bottom:6px; color:var(--text-main);">סוג הבניין:</div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <label style="display:flex; align-items:center; gap:5px; font-size:12px; cursor:pointer;">
+                        <input type="radio" name="bldgRelevance" value="residential" onclick="saveBldgRelevance('residential')" style="accent-color:var(--accent);"> מגורים
+                    </label>
+                    <label style="display:flex; align-items:center; gap:5px; font-size:12px; cursor:pointer;">
+                        <input type="radio" name="bldgRelevance" value="commercial" onclick="saveBldgRelevance('commercial')" style="accent-color:#f59e0b;"> מסחרי
+                    </label>
+                    <label style="display:flex; align-items:center; gap:5px; font-size:12px; cursor:pointer;">
+                        <input type="radio" name="bldgRelevance" value="irrelevant" onclick="saveBldgRelevance('irrelevant')" style="accent-color:#ef4444;"> לא רלוונטי
+                    </label>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:12px;">
+                <button class="btn btn-primary" onclick="saveBldgModalInfo()"><i class="fas fa-save"></i> שמור</button>
+            </div>
         </div>
     </div>
 </div>
@@ -736,6 +770,9 @@
                                 <div style="font-weight:700; font-size:13px; color:var(--text-main);" id="settingsTerritoryName">—</div>
                                 <div style="font-size:12px; color:var(--text-muted);">שטח: <strong id="settingsTerritoryArea" style="color:#10b981;">—</strong> קמ"ר</div>
                             </div>
+                            <!-- סטטיסטיקת בניינים ודירות אחרי סריקה -->
+                            <div id="settingsTerritoryStats" style="display:none; border-top:1px solid rgba(16,185,129,0.2); margin-top:8px; padding-top:4px;"></div>
+                            </div>
                             <button onclick="clearTerritory()" style="padding:5px 10px; background:transparent; border:1px solid var(--danger); border-radius:8px; color:var(--danger); font-size:12px; cursor:pointer; font-family:inherit;">
                                 <i class="fas fa-trash"></i> נקה
                             </button>
@@ -828,7 +865,7 @@
     </div>
 </div>
 
-<script src="app.js?v=21"></script>
+<script src="app.js?v=17"></script>
 <script src="nav.js?v=1"></script>
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">
