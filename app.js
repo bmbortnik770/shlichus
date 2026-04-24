@@ -1513,6 +1513,16 @@ window.saveManualUnitsCount = () => {
     showToast(`✓ ${v} דירות אומתו לבניין`,'success');
 };
 
+// ── toggle sections בהגדרות (במקום details/summary שגורם לבאג) ──
+window.toggleSettingsSection = (bodyId, chevronId) => {
+    const body = document.getElementById(bodyId);
+    const chevron = document.getElementById(chevronId);
+    if(!body) return;
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    if(chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+};
+
 // ── toggle תצוגת בניין: רשימה / קומות ──────────────────────────
 let _currentBldgView = 'list'; // 'list' | 'floors'
 window.setBldgView = (view) => {
@@ -1548,65 +1558,149 @@ window.saveBldgRelevance = (value) => {
 // ── שכבת GIS על המפה — צביעת בניינים לפי סטטוס ─────────────────
 function renderGISBuildingLayer() {
     if(!map || !map.isStyleLoaded()) return;
-    // צור GeoJSON מכל הבניינים ב-db עם קואורדינטות
+
     const features = [];
-    for(const [key, bldg] of Object.entries(db)) {
-        if(key==='__BOARDS__'||key==='meta'||key===NO_ADDRESS_KEY||key==='__SETTINGS__') continue;
-        const coords = bldg.info?.coords;
-        if(!coords || !Array.isArray(coords) || coords.length < 2) continue;
-        const units = bldg.info?.units;
-        const relevance = bldg.info?.relevance || 'residential';
-        let status = 'unknown';
-        if(relevance === 'irrelevant') status = 'irrelevant';
+    const gisCache = appSettings.territory?.gisCache?.data || {};
+
+    // ── שלב 1: כל הבניינים מה-GIS cache (אפילו בלי כרטיס ב-db) ──
+    for(const [gisKey, gisInfo] of Object.entries(gisCache)) {
+        if(!gisInfo.coords) continue;
+        // בדוק אם יש כרטיס ב-db (התאמה ישירה או fuzzy)
+        const dbKey = db[gisKey] ? gisKey : findFuzzyBuildingMatch(gisInfo.street, gisInfo.num);
+        const bldg = dbKey ? db[dbKey] : null;
+        const units = bldg?.info?.units;
+        const relevance = bldg?.info?.relevance || 'residential';
+        const families = bldg?.apts?.length || 0;
+
+        let status;
+        if(!bldg) {
+            status = 'gis-only'; // בניין שה-GIS מכיר אבל אין לו כרטיס עדיין
+        } else if(relevance === 'irrelevant') status = 'irrelevant';
         else if(relevance === 'commercial') status = 'commercial';
         else if(units?.source === 'VERIFIED') status = 'verified';
         else if(units?.source === 'CITY') status = 'city';
         else if(units?.source === 'ESTIMATE') status = 'estimate';
+        else status = 'registered'; // יש כרטיס אבל בלי נתוני GIS
+
         features.push({
             type: 'Feature',
-            properties: { key, status, units: units?.count||0, families: bldg.apts?.length||0 },
+            properties: {
+                key: dbKey || gisKey,
+                gisKey,
+                status,
+                units: gisInfo.units || units?.count || 0,
+                families,
+                hasCard: !!bldg
+            },
+            geometry: { type: 'Point', coordinates: gisInfo.coords }
+        });
+    }
+
+    // ── שלב 2: בניינים ב-db עם קואורדינטות שאולי לא ב-GIS ──
+    for(const [key, bldg] of Object.entries(db)) {
+        if(key==='__BOARDS__'||key==='meta'||key===NO_ADDRESS_KEY||key==='__SETTINGS__') continue;
+        const coords = bldg.info?.coords;
+        if(!coords) continue;
+        // בדוק שלא כבר הוספנו אותו מה-GIS
+        const alreadyAdded = features.some(f => f.properties.key === key);
+        if(alreadyAdded) continue;
+        const units = bldg.info?.units;
+        const relevance = bldg.info?.relevance || 'residential';
+        let status = relevance === 'irrelevant' ? 'irrelevant'
+            : relevance === 'commercial' ? 'commercial'
+            : units?.source === 'VERIFIED' ? 'verified'
+            : units?.source === 'CITY' ? 'city'
+            : units?.source === 'ESTIMATE' ? 'estimate'
+            : 'registered';
+        features.push({
+            type: 'Feature',
+            properties: { key, gisKey: key, status, units: units?.count||0, families: bldg.apts?.length||0, hasCard: true },
             geometry: { type: 'Point', coordinates: coords }
         });
     }
+
     const geojson = { type: 'FeatureCollection', features };
     const sourceId = 'gis-buildings-source';
-    const layerId  = 'gis-buildings-layer';
-    const layerIdBorder = 'gis-buildings-border';
+
     if(map.getSource(sourceId)) {
         map.getSource(sourceId).setData(geojson);
-    } else {
-        map.addSource(sourceId, { type: 'geojson', data: geojson });
-        // מעגל רקע
-        map.addLayer({
-            id: layerId, type: 'circle', source: sourceId,
-            paint: {
-                'circle-radius': 9,
-                'circle-color': [
-                    'match', ['get','status'],
-                    'verified',   '#10b981', // ירוק — מאומת
-                    'city',       '#6b7280', // אפור — נתוני עירייה
-                    'estimate',   '#f59e0b', // צהוב — הערכה
-                    'irrelevant', '#ef4444', // אדום — לא רלוונטי
-                    'commercial', '#8b5cf6', // סגול — מסחרי
-                    '#d1d5db'                // ברירת מחדל — לא ידוע
-                ],
-                'circle-opacity': 0.85,
-                'circle-stroke-width': 2,
-                'circle-stroke-color': 'white',
-                'circle-pitch-alignment': 'map'
-            }
-        }, 'waterway-label');
-        // מספר דירות בתוך המעגל
-        map.addLayer({
-            id: layerIdBorder, type: 'symbol', source: sourceId,
-            layout: {
-                'text-field': ['case',['>', ['get','units'], 0], ['to-string',['get','units']], ''],
-                'text-size': 9, 'text-font': ['Open Sans Bold','Arial Unicode MS Bold'],
-                'text-anchor': 'center'
-            },
-            paint: { 'text-color': 'white' }
-        });
+        return;
     }
+
+    map.addSource(sourceId, { type: 'geojson', data: geojson });
+
+    // שכבת עיגול
+    map.addLayer({
+        id: 'gis-buildings-layer', type: 'circle', source: sourceId,
+        paint: {
+            'circle-radius': ['case', ['get','hasCard'], 10, 7],
+            'circle-color': [
+                'match', ['get','status'],
+                'verified',   '#10b981', // ירוק — מאומת ידנית
+                'city',       '#6b7280', // אפור — נתוני עירייה
+                'estimate',   '#f59e0b', // צהוב — הערכה
+                'irrelevant', '#ef4444', // אדום — לא רלוונטי
+                'commercial', '#8b5cf6', // סגול — מסחרי
+                'registered', '#3b82f6', // כחול — רשום ללא GIS
+                '#d1d5db'                // בהיר — GIS בלבד, ללא כרטיס
+            ],
+            'circle-opacity': ['case', ['get','hasCard'], 0.9, 0.5],
+            'circle-stroke-width': ['case', ['get','hasCard'], 2, 1],
+            'circle-stroke-color': 'white',
+            'circle-pitch-alignment': 'map'
+        }
+    }, 'waterway-label');
+
+    // מספר דירות / משפחות בתוך העיגול
+    map.addLayer({
+        id: 'gis-buildings-label', type: 'symbol', source: sourceId,
+        layout: {
+            'text-field': ['case',
+                ['>', ['get','families'], 0], ['to-string',['get','families']],
+                ['>', ['get','units'], 0], ['to-string',['get','units']],
+                ''
+            ],
+            'text-size': 9,
+            'text-font': ['Open Sans Bold','Arial Unicode MS Bold'],
+            'text-anchor': 'center'
+        },
+        paint: { 'text-color': 'white' }
+    });
+
+    // לחיצה על בניין ב-GIS layer — פתח כרטיס או הצע ליצור
+    map.on('click', 'gis-buildings-layer', (e) => {
+        const props = e.features[0].properties;
+        e.stopPropagation && e.stopPropagation();
+        if(props.hasCard && db[props.key]) {
+            currentBldg = props.key;
+            openBuildingModal();
+        } else {
+            // בניין שה-GIS מכיר אבל אין כרטיס — הצע ליצור
+            showCustomDialog({
+                title: `${props.gisKey}`,
+                message: `בניין זה מכיל ${props.units||'?'} דירות לפי העירייה.\nליצור כרטיס בניין?`,
+                showCancel: true
+            }).then(ok => {
+                if(!ok) return;
+                // צור כרטיס בניין חדש
+                const key = props.gisKey;
+                if(!db[key]) {
+                    db[key] = { apts:[], info:{ code:'', rep:'', notes:'',
+                        coords: e.features[0].geometry.coordinates,
+                        units: { source:'CITY', count: props.units||0, cityCount: props.units||0 }
+                    }};
+                    saveDB();
+                    renderGISBuildingLayer();
+                    updateCoverageStats();
+                }
+                currentBldg = key;
+                openBuildingModal();
+            });
+        }
+    });
+
+    map.on('mouseenter', 'gis-buildings-layer', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'gis-buildings-layer', () => { map.getCanvas().style.cursor = ''; });
 }
 
 // ── סטטיסטיקת שליחות (בניינים + דירות) ─────────────────────────
@@ -3912,6 +4006,10 @@ window.openSettings=()=>{
         if(ta) ta.innerText = areaKm2 < 1 ? (areaKm2*100).toFixed(1)+' דונם' : areaKm2.toFixed(2);
         if(badge) badge.style.display = 'inline';
         tempTerritoryPolygon = appSettings.territory.polygon;
+        // פתח את הסקשן אוטומטית
+        const shBody = document.getElementById('shlichutAreaBody');
+        const shChevron = document.getElementById('shlichutChevron');
+        if(shBody) { shBody.style.display = 'block'; if(shChevron) shChevron.style.transform = 'rotate(180deg)'; }
         // Set display mode radio
         const dispMode = appSettings.territory.displayMode || 'border';
         const radio = document.querySelector(`input[name="territoryDisplayMode"][value="${dispMode}"]`);
@@ -3925,6 +4023,8 @@ window.openSettings=()=>{
     }
     // Init geocoder for settings territory search
     setTimeout(() => initSettingsTerritoryGeocoder(), 100);
+    // עדכן סטטיסטיקת שליחות
+    updateTerritoryStatsDisplay();
 
     // Show last scan info
     const scanStatusEl = document.getElementById('unitsScanStatus');
