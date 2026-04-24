@@ -1215,14 +1215,16 @@ async function startTerritoryUnitsScan() {
         // נסה התאמה ישירה
         if(db[gisKey]) {
             applyGISUnits(gisKey, gisInfo.units, gisInfo.source, gisInfo);
-            if(gisInfo.coords) db[gisKey].info.coords=gisInfo.coords;
+            // עדכן קואורדינטות רק אם אין כבר קואורדינטות מדויקות (מ-geocoding)
+            if(gisInfo.coords && !db[gisKey].info.coords) db[gisKey].info.coords = gisInfo.coords;
             matched++; continue;
         }
-        // התאמה חכמה — שם רחוב מקוצר + מספר בית
+        // התאמה חכמה
         const fuzzyMatch = findFuzzyBuildingMatch(gisInfo.street, gisInfo.num);
         if(fuzzyMatch) {
             applyGISUnits(fuzzyMatch, gisInfo.units, gisInfo.source, gisInfo);
-            if(gisInfo.coords) db[fuzzyMatch].info.coords=gisInfo.coords;
+            // עדכן קואורדינטות רק אם אין
+            if(gisInfo.coords && !db[fuzzyMatch].info.coords) db[fuzzyMatch].info.coords = gisInfo.coords;
             fuzzyMatched++; matched++; continue;
         }
         // התאמה לפי קואורדינטות
@@ -1667,40 +1669,25 @@ function renderGISBuildingLayer() {
         paint: { 'text-color': 'white' }
     });
 
-    // לחיצה על בניין ב-GIS layer — פתח כרטיס או הצע ליצור
-    map.on('click', 'gis-buildings-layer', (e) => {
+    map.on('mouseenter', 'gis-buildings-layer', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        // הצג tooltip עם מידע על הבניין
         const props = e.features[0].properties;
-        e.stopPropagation && e.stopPropagation();
-        if(props.hasCard && db[props.key]) {
-            currentBldg = props.key;
-            openBuildingModal();
-        } else {
-            // בניין שה-GIS מכיר אבל אין כרטיס — הצע ליצור
-            showCustomDialog({
-                title: `${props.gisKey}`,
-                message: `בניין זה מכיל ${props.units||'?'} דירות לפי העירייה.\nליצור כרטיס בניין?`,
-                showCancel: true
-            }).then(ok => {
-                if(!ok) return;
-                // צור כרטיס בניין חדש
-                const key = props.gisKey;
-                if(!db[key]) {
-                    db[key] = { apts:[], info:{ code:'', rep:'', notes:'',
-                        coords: e.features[0].geometry.coordinates,
-                        units: { source:'CITY', count: props.units||0, cityCount: props.units||0 }
-                    }};
-                    saveDB();
-                    renderGISBuildingLayer();
-                    updateCoverageStats();
-                }
-                currentBldg = key;
-                openBuildingModal();
-            });
+        const units = props.units > 0 ? `${props.units} דירות` : '';
+        const families = props.families > 0 ? `${props.families} משפחות` : '';
+        const info = [units, families].filter(Boolean).join(' · ');
+        if(info) {
+            hoverPopup && hoverPopup.remove();
+            new mapboxgl.Popup({ closeButton:false, closeOnClick:false, offset:12 })
+                .setLngLat(e.features[0].geometry.coordinates)
+                .setHTML(`<div style="font-size:12px;font-weight:600;">${props.gisKey||props.key}<br><span style="color:#64748b;">${info}</span></div>`)
+                .addTo(map);
         }
     });
-
-    map.on('mouseenter', 'gis-buildings-layer', () => { map.getCanvas().style.cursor = 'pointer'; });
-    map.on('mouseleave', 'gis-buildings-layer', () => { map.getCanvas().style.cursor = ''; });
+    map.on('mouseleave', 'gis-buildings-layer', () => {
+        map.getCanvas().style.cursor = '';
+        hoverPopup && hoverPopup.remove();
+    });
 }
 
 // ── סטטיסטיקת שליחות (בניינים + דירות) ─────────────────────────
@@ -1806,12 +1793,13 @@ async function geocodeMissingAddresses() {
         try {
             const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(b)}.json?country=il&language=he&access_token=${mapboxgl.accessToken}`);
             if(r.status === 429) { 
-                await new Promise(res => setTimeout(res, 4000)); // המתנה במקרה של חסימה זמנית מהשרת
+                await new Promise(res => setTimeout(res, 4000));
                 continue; 
             }
             const d = await r.json();
             if(d.features && d.features.length > 0) {
                 db[b].info.coords = d.features[0].center;
+                db[b].info._coordSource = 'mapbox'; // סמן שהקואורדינטות מ-Mapbox
                 updated = true;
             }
         } catch(e) { console.error("Geocode Error", e); }
@@ -1819,6 +1807,24 @@ async function geocodeMissingAddresses() {
     }
     if(updated) { saveDB(); refreshMap(); }
 }
+
+// ── תקן קואורדינטות שה-GIS דרס — החזר geocoding מ-Mapbox ──────
+window.fixOverwrittenCoords = async () => {
+    showToast('מתקן מיקומים... זה ייקח כמה שניות', 'info');
+    // מחק את כל הקואורדינטות שהגיעו מה-GIS (לא מ-Mapbox)
+    let fixed = 0;
+    for(const k of Object.keys(db)) {
+        if(k==='__BOARDS__'||k==='meta'||k===NO_ADDRESS_KEY||k==='__SETTINGS__') continue;
+        if(db[k].info?._coordSource !== 'mapbox') {
+            // אפס קואורדינטות כדי ש-geocodeMissingAddresses יחשב מחדש
+            db[k].info.coords = null;
+            fixed++;
+        }
+    }
+    await geocodeMissingAddresses();
+    renderGISBuildingLayer();
+    showToast(`✓ תוקנו ${fixed} מיקומים`, 'success');
+};
 
 // merge חכם — מאחד נתונים מקומיים וענן לפי מבנה הקיים
 function mergeDB(local, remote) {
