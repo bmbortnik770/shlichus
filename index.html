@@ -45,10 +45,12 @@
             <button onclick="manualSync()" class="btn btn-outline" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;"><i class="fas fa-sync-alt"></i> סנכרן</button>
             <button onclick="forcePullFromDrive()" class="btn btn-warning" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;"><i class="fas fa-cloud-download-alt"></i> שחזר מענן</button>
         </div>
-        <button onclick="openContactsSync()" class="btn btn-outline" style="width:100%; margin-top:8px; padding:7px; font-size:12px; border-radius:8px; color:var(--accent); border-color:var(--accent);">
+        <button onclick="window._fieldUpdatesSessionHandled=false; mergeOutboxUpdates();" class="btn btn-outline" style="width:100%; margin-top:8px; padding:7px; font-size:12px; border-radius:8px; color:#10b981; border-color:#10b981;">
+            <i class="fas fa-mobile-alt"></i> טען עדכונים מאפליקציית השטח
+        </button>
+        <button onclick="openContactsSync()" class="btn btn-outline" style="width:100%; margin-top:6px; padding:7px; font-size:12px; border-radius:8px; color:var(--accent); border-color:var(--accent);">
             <i class="fas fa-address-book"></i> סנכרן אנשי קשר גוגל
         </button>
-    </div>
 
     <div id="welcomeMessage" style="font-weight:600; color:var(--accent); font-size:14px; text-align:center; padding:10px; background:rgba(59,130,246,0.1); border-radius:8px; margin-bottom:10px;"></div>
     
@@ -982,7 +984,7 @@
                 <div style="font-size:17px; font-weight:800; color:var(--text-main);">עדכונים מאפליקציית השטח</div>
                 <div style="font-size:13px; color:var(--text-muted);">נמצאו <span id="fieldUpdatesCount" style="color:var(--accent); font-weight:700;"></span> ממתינים לאישור</div>
             </div>
-            <button onclick="document.getElementById('fieldUpdatesModal').style.display='none'" style="background:var(--bg-body); border:none; width:36px; height:36px; border-radius:50%; cursor:pointer; color:var(--text-muted); font-size:16px; display:flex; align-items:center; justify-content:center;">
+            <button onclick="document.getElementById('fieldUpdatesModal').style.display='none'; window._fieldUpdatesSessionHandled=true;" style="background:var(--bg-body); border:none; width:36px; height:36px; border-radius:50%; cursor:pointer; color:var(--text-muted); font-size:16px; display:flex; align-items:center; justify-content:center;">
                 <i class="fas fa-times"></i>
             </button>
         </div>
