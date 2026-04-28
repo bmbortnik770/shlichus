@@ -2065,7 +2065,7 @@ let _fieldUpdatesSessionHandled = false; // מניעת הצגה חוזרת בא�
 
 async function mergeOutboxUpdates() {
     if (!accessToken) return;
-    if (_fieldUpdatesSessionHandled) return; // כבר הוצג בסשן זה — לא מציג שוב
+    if (_fieldUpdatesSessionHandled) return;
     try {
         const q = encodeURIComponent("name contains 'mobile_update_' and trashed = false");
         const listRes = await fetch(
@@ -2074,13 +2074,24 @@ async function mergeOutboxUpdates() {
         );
         if (!listRes.ok) return;
         const { files } = await listRes.json();
-        if (!files || files.length === 0) return;
 
-        // מזהי events שכבר עובדו בעבר
+        // אין קבצים כלל — הכל מעודכן
+        if (!files || files.length === 0) {
+            // הצג toast רק אם המשתמש לחץ ידנית (לא polling אוטומטי)
+            if (window._fieldUpdatesManualTrigger) {
+                showToast('✅ הכל מעודכן — אין עדכונים מהשטח', 'success');
+                window._fieldUpdatesManualTrigger = false;
+            }
+            _fieldUpdatesSessionHandled = true;
+            return;
+        }
+
         if (!appSettings.appliedEventIds) appSettings.appliedEventIds = {};
 
-        // טען את תוכן כל הקבצים
         pendingFieldUpdateFiles = [];
+        // מעקב אחר events ייחודיים למניעת כפילויות
+        const seenEventKeys = new Set();
+
         for (const file of files) {
             try {
                 const contentRes = await fetch(
@@ -2090,14 +2101,18 @@ async function mergeOutboxUpdates() {
                 if (!contentRes.ok) continue;
                 const payload = await contentRes.json();
 
-                // סנן events שכבר עובדו
                 const allEvents = payload.events || [];
                 const newEvents = allEvents.filter(ev => {
                     const evId = ev.id || `${ev.type}_${ev.bldg}_${ev.aptName}_${ev.timestamp}`;
-                    return !appSettings.appliedEventIds[evId];
+                    // סנן כבר-עובדו
+                    if (appSettings.appliedEventIds[evId]) return false;
+                    // סנן כפילויות — אותו סוג+בניין+משפחה+תוכן
+                    const dedupeKey = `${ev.type}_${ev.bldg}_${ev.aptName}_${JSON.stringify(ev.payload)}`;
+                    if (seenEventKeys.has(dedupeKey)) return false;
+                    seenEventKeys.add(dedupeKey);
+                    return true;
                 });
 
-                // אם כל ה-events בקובץ כבר עובדו — מחק את הקובץ מ-Drive
                 if (newEvents.length === 0) {
                     await trashDriveFile(file.id);
                     continue;
@@ -2116,8 +2131,16 @@ async function mergeOutboxUpdates() {
             }
         }
 
-        if (pendingFieldUpdateFiles.length === 0) return;
+        if (pendingFieldUpdateFiles.length === 0) {
+            if (window._fieldUpdatesManualTrigger) {
+                showToast('✅ הכל מעודכן — אין עדכונים חדשים מהשטח', 'success');
+                window._fieldUpdatesManualTrigger = false;
+            }
+            _fieldUpdatesSessionHandled = true;
+            return;
+        }
 
+        window._fieldUpdatesManualTrigger = false;
         const totalEvents = pendingFieldUpdateFiles.reduce((s, f) => s + f.events.length, 0);
         showFieldUpdatesDialog(pendingFieldUpdateFiles, totalEvents);
 
