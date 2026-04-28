@@ -1787,19 +1787,32 @@ async function ensureAuthAndExecute(cb) {
 
 async function geocodeMissingAddresses() {
     const bldgs = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== NO_ADDRESS_KEY && k !== 'meta' && db[k] && db[k].info && (!db[k].info.coords || isNaN(db[k].info.coords[0])));
-    if(bldgs.length > 0) showToast("מתבצע עדכון מיקומים ברקע...", "info");
+    if(bldgs.length === 0) return;
+    showToast(`מתבצע עדכון מיקומים ברקע (${bldgs.length} בניינים)...`, "info");
+
+    // proximity לפי מרכז האזור המוגדר — מבטיח תוצאות מאזורנו בלבד
+    const homeCoords = appSettings.homeLocation?.coords || appSettings.center || null;
+    const proximityParam = homeCoords
+        ? `&proximity=${homeCoords[0]},${homeCoords[1]}`
+        : '';
+    // bbox צר סביב הבית (רדיוס ~5 ק"מ) למניעת תוצאות מרוחקות
+    const bboxParam = homeCoords
+        ? `&bbox=${homeCoords[0]-0.07},${homeCoords[1]-0.05},${homeCoords[0]+0.07},${homeCoords[1]+0.05}`
+        : '';
+
     let updated = false;
     for(let b of bldgs) {
         try {
-            const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(b)}.json?country=il&language=he&access_token=${mapboxgl.accessToken}`);
-            if(r.status === 429) { 
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(b)}.json?country=il&language=he${proximityParam}${bboxParam}&access_token=${mapboxgl.accessToken}`;
+            const r = await fetch(url);
+            if(r.status === 429) {
                 await new Promise(res => setTimeout(res, 4000));
-                continue; 
+                continue;
             }
             const d = await r.json();
             if(d.features && d.features.length > 0) {
                 db[b].info.coords = d.features[0].center;
-                db[b].info._coordSource = 'mapbox'; // סמן שהקואורדינטות מ-Mapbox
+                db[b].info._coordSource = 'mapbox';
                 updated = true;
             }
         } catch(e) { console.error("Geocode Error", e); }
@@ -1807,6 +1820,43 @@ async function geocodeMissingAddresses() {
     }
     if(updated) { saveDB(); refreshMap(); }
 }
+
+// ── תיקון מיקומים — geocode מחדש לכל הבניינים עם proximity נכון ──
+window.regeocodeAllBuildings = async function() {
+    const bldgs = Object.keys(db).filter(k =>
+        k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== NO_ADDRESS_KEY && k !== 'meta'
+        && db[k] && db[k].info
+    );
+    if(bldgs.length === 0) { showToast('אין בניינים לעדכון', 'info'); return; }
+    showToast(`מתקן מיקומים של ${bldgs.length} בניינים... זה ייקח כחצי דקה`, 'info');
+
+    const homeCoords = appSettings.homeLocation?.coords || appSettings.center || null;
+    const proximityParam = homeCoords ? `&proximity=${homeCoords[0]},${homeCoords[1]}` : '';
+    const bboxParam = homeCoords
+        ? `&bbox=${homeCoords[0]-0.07},${homeCoords[1]-0.05},${homeCoords[0]+0.07},${homeCoords[1]+0.05}`
+        : '';
+
+    let updated = 0, failed = 0;
+    for(let b of bldgs) {
+        try {
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(b)}.json?country=il&language=he${proximityParam}${bboxParam}&access_token=${mapboxgl.accessToken}`;
+            const r = await fetch(url);
+            if(r.status === 429) { await new Promise(res => setTimeout(res, 5000)); continue; }
+            const d = await r.json();
+            if(d.features && d.features.length > 0) {
+                db[b].info.coords = d.features[0].center;
+                db[b].info._coordSource = 'mapbox';
+                updated++;
+            } else {
+                failed++;
+            }
+        } catch(e) { failed++; }
+        await new Promise(res => setTimeout(res, 300));
+    }
+    saveDB();
+    refreshMap();
+    showToast(`✅ תוקנו ${updated} מיקומים${failed > 0 ? ` (${failed} לא נמצאו)` : ''}`, 'success');
+};
 
 // ── תקן קואורדינטות שה-GIS דרס — החזר geocoding מ-Mapbox ──────
 window.fixOverwrittenCoords = async () => {
@@ -2024,6 +2074,9 @@ async function mergeOutboxUpdates() {
         const { files } = await listRes.json();
         if (!files || files.length === 0) return;
 
+        // מזהי events שכבר עובדו בעבר
+        if (!appSettings.appliedEventIds) appSettings.appliedEventIds = {};
+
         // טען את תוכן כל הקבצים
         pendingFieldUpdateFiles = [];
         for (const file of files) {
@@ -2034,10 +2087,25 @@ async function mergeOutboxUpdates() {
                 );
                 if (!contentRes.ok) continue;
                 const payload = await contentRes.json();
+
+                // סנן events שכבר עובדו
+                const allEvents = payload.events || [];
+                const newEvents = allEvents.filter(ev => {
+                    const evId = ev.id || `${ev.type}_${ev.bldg}_${ev.aptName}_${ev.timestamp}`;
+                    return !appSettings.appliedEventIds[evId];
+                });
+
+                // אם כל ה-events בקובץ כבר עובדו — מחק את הקובץ מ-Drive
+                if (newEvents.length === 0) {
+                    await trashDriveFile(file.id);
+                    continue;
+                }
+
                 pendingFieldUpdateFiles.push({
                     fileId: file.id,
                     filename: file.name,
-                    events: payload.events || [],
+                    events: newEvents,
+                    allEventsCount: allEvents.length,
                     deviceId: payload.deviceId || 'unknown',
                     createdAt: payload.createdAt || file.createdTime
                 });
@@ -2048,7 +2116,6 @@ async function mergeOutboxUpdates() {
 
         if (pendingFieldUpdateFiles.length === 0) return;
 
-        // סכם מספר אירועים
         const totalEvents = pendingFieldUpdateFiles.reduce((s, f) => s + f.events.length, 0);
         showFieldUpdatesDialog(pendingFieldUpdateFiles, totalEvents);
 
@@ -2174,6 +2241,8 @@ window.applySelectedFieldUpdates = async function() {
     const allEvents = window._pendingFieldEvents || [];
     const selectedIndices = new Set([...cbs].map(cb => +cb.dataset.idx));
 
+    if (!appSettings.appliedEventIds) appSettings.appliedEventIds = {};
+
     let applied = 0;
     const usedFileIds = new Set();
 
@@ -2182,17 +2251,29 @@ window.applySelectedFieldUpdates = async function() {
         if (applyOutboxEvent(ev)) {
             applied++;
             usedFileIds.add(ev._fileId);
+            // רשום את ה-event כמעובד
+            const evId = ev.id || `${ev.type}_${ev.bldg}_${ev.aptName}_${ev.timestamp}`;
+            appSettings.appliedEventIds[evId] = Date.now();
         }
     });
 
-    // מחק מדרייב רק את הקבצים שכל האירועים שלהם אושרו
+    // מחק מ-Drive קבצים שכל ה-events שלהם עובדו (נבחרו או היו כבר מעובדים)
     const fullyAppliedFiles = pendingFieldUpdateFiles.filter(f => {
         const fileEvents = allEvents.filter(ev => ev._fileId === f.fileId);
-        return fileEvents.every((ev, idx) => selectedIndices.has(allEvents.indexOf(ev)));
+        return fileEvents.every((ev, localIdx) => {
+            const globalIdx = allEvents.indexOf(ev);
+            return selectedIndices.has(globalIdx);
+        });
     });
 
     for (const file of fullyAppliedFiles) {
         await trashDriveFile(file.fileId);
+    }
+
+    // נקה appliedEventIds ישנים (מעל 30 יום) כדי לא לתפוח
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    for (const id of Object.keys(appSettings.appliedEventIds)) {
+        if (appSettings.appliedEventIds[id] < cutoff) delete appSettings.appliedEventIds[id];
     }
 
     if (applied > 0) {
