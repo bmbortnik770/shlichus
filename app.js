@@ -766,7 +766,59 @@ function tmInitPanelCityGeocoder() {
     });
 }
 
-// ── מעבר בין לשוניות ──
+// ── לוויין בעורך התיחום ──
+let tmIsSatellite = false;
+window.tmToggleSatellite = () => {
+    if (!tmMap) return;
+    tmIsSatellite = !tmIsSatellite;
+    const style = tmIsSatellite
+        ? 'mapbox://styles/mapbox/satellite-streets-v12'
+        : 'mapbox://styles/mapbox/streets-v12';
+    const btn = document.getElementById('tmSatelliteBtn');
+    if (btn) {
+        btn.style.background = tmIsSatellite ? '#1e293b' : 'white';
+        btn.style.color = tmIsSatellite ? 'white' : '#374151';
+        btn.innerHTML = tmIsSatellite
+            ? '<i class="fas fa-map"></i> מפה'
+            : '<i class="fas fa-satellite"></i> לוויין';
+    }
+    tmMap.setStyle(style);
+    // אחרי שינוי סטייל — צריך להוסיף מחדש את השכבות
+    tmMap.once('style.load', () => {
+        tmMap.addSource('tm-poly', { type: 'geojson', data: buildTmGeoJSON() });
+        tmMap.addLayer({ id: 'tm-fill', type: 'fill', source: 'tm-poly', paint: { 'fill-color': '#10b981', 'fill-opacity': 0.12 } });
+        tmMap.addLayer({ id: 'tm-line', type: 'line', source: 'tm-poly', paint: { 'line-color': '#10b981', 'line-width': 2.5, 'line-dasharray': [4,2] } });
+        tmMap.addSource('tm-pts', { type: 'geojson', data: buildTmPointsGeoJSON() });
+        tmMap.addLayer({ id: 'tm-pts-layer', type: 'circle', source: 'tm-pts', paint: {
+            'circle-radius': 8,
+            'circle-color': '#10b981',
+            'circle-stroke-width': 2.5,
+            'circle-stroke-color': 'white',
+        }});
+        tmMap.addLayer({
+            id: 'tm-buildings-highlight',
+            source: 'composite',
+            'source-layer': 'building',
+            type: 'fill-extrusion',
+            minzoom: 13,
+            paint: {
+                'fill-extrusion-color': [
+                    'case',
+                    ['boolean', ['feature-state', 'tmRemoved'], false], '#ef4444',
+                    ['boolean', ['feature-state', 'tmAdded'], false],   '#10b981',
+                    ['boolean', ['feature-state', 'tmInside'], false],  '#3b82f6',
+                    tmIsSatellite ? '#ffffff' : '#d1d5db'
+                ],
+                'fill-extrusion-height': ['get', 'height'],
+                'fill-extrusion-base': ['get', 'min_height'],
+                'fill-extrusion-opacity': 0.75
+            }
+        });
+        if (tmCurrentTab === 'buildings' || tmCurrentTab === 'classify') {
+            setTimeout(() => tmCountBuildings(), 500);
+        }
+    });
+};
 window.switchTmTab = (tab) => {
     tmCurrentTab = tab;
     ['draw','buildings','classify'].forEach(t => {
@@ -1167,8 +1219,7 @@ window.confirmTerritoryDrawing = () => {
 // ── Territory rendering on main map ──
 function renderTerritoryOnMap() {
     if(!appSettings.territory || !appSettings.territory.polygon) {
-        // Remove layers if exist
-        ['territory-fill','territory-line'].forEach(id => { try { if(map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+        ['territory-fill','territory-line','territory-buildings'].forEach(id => { try { if(map.getLayer(id)) map.removeLayer(id); } catch(e){} });
         ['territory-source'].forEach(id => { try { if(map.getSource(id)) map.removeSource(id); } catch(e){} });
         return;
     }
@@ -1183,8 +1234,73 @@ function renderTerritoryOnMap() {
     } else {
         map.getSource('territory-source').setData(geoData);
     }
-    // Apply display mode
+
     applyTerritoryDisplayMode(displayMode);
+    renderBuildingClassifyOnMap();
+}
+
+// ── צביעת מבנים מסווגים על המפה הראשית ──
+function renderBuildingClassifyOnMap() {
+    try { if(map.getLayer('territory-buildings')) map.removeLayer('territory-buildings'); } catch(e){}
+
+    const classify = appSettings.territory?.buildingClassify || {};
+    const categories = appSettings.territory?.categories || [];
+    const manualBuildings = appSettings.territory?.manualBuildings || {};
+    const polygon = appSettings.territory?.polygon;
+
+    if (!polygon || (Object.keys(classify).length === 0 && Object.keys(manualBuildings).length === 0)) return;
+
+    // בנה color expression לפי featureState
+    const colorExpr = ['case'];
+    categories.forEach(cat => {
+        if (cat.id === 'irrelevant') return; // לא רלוונטי = אפור — לא צובעים
+        colorExpr.push(['boolean', ['feature-state', `cat_${cat.id}`], false]);
+        colorExpr.push(cat.color);
+    });
+    colorExpr.push('#d1d5db'); // ברירת מחדל
+
+    if (!map.getLayer('territory-buildings')) {
+        map.addLayer({
+            id: 'territory-buildings',
+            source: 'composite',
+            'source-layer': 'building',
+            type: 'fill-extrusion',
+            minzoom: 13,
+            paint: {
+                'fill-extrusion-color': colorExpr,
+                'fill-extrusion-height': ['get', 'height'],
+                'fill-extrusion-base': ['get', 'min_height'],
+                'fill-extrusion-opacity': 0.7
+            }
+        });
+    }
+
+    // הפעל featureState על מבנים מסווגים
+    if (map.isStyleLoaded()) {
+        const features = map.queryRenderedFeatures({ layers: ['territory-buildings'] });
+        features.forEach(f => {
+            const center = tmBuildingCenterFromFeature(f);
+            if (!center) return;
+            const key = `${center[0].toFixed(5)},${center[1].toFixed(5)}`;
+            const catId = classify[key];
+            if (!catId) return;
+            const state = {};
+            categories.forEach(c => { state[`cat_${c.id}`] = c.id === catId; });
+            try { map.setFeatureState({ source:'composite', sourceLayer:'building', id: f.id }, state); } catch(e){}
+        });
+    }
+}
+
+// ── כרטיס מבנה לפי סיווג — לחיצה על מבנה במפה הראשית ──
+function tmBuildingCenterFromFeature(f) {
+    try {
+        const type = f.geometry?.type;
+        const coords = f.geometry?.coordinates;
+        if (!coords) return null;
+        let pts = type === 'Polygon' ? coords[0] : coords[0]?.[0];
+        if (!pts?.length) return null;
+        return [pts.reduce((s,p)=>s+p[0],0)/pts.length, pts.reduce((s,p)=>s+p[1],0)/pts.length];
+    } catch(e) { return null; }
 }
 
 function applyTerritoryDisplayMode(mode) {
@@ -2734,12 +2850,14 @@ window.dismissFieldUpdates = async function() {
 
 async function trashDriveFile(fileId) {
     try {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+        // במקום מחיקה (דורשת scope מלא) — מסמנים את הקובץ כ"עובד"
+        // אפליקציית השטח תזהה את הסימן ותמחק בעצמה
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
             method: 'PATCH',
             headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ trashed: true })
+            body: JSON.stringify({ _processed: true, processedAt: Date.now() })
         });
-    } catch(e) { console.error('trashDriveFile error:', e); }
+    } catch(e) { console.error('markProcessed error:', e); }
 }
 
 /**
