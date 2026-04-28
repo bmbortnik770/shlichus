@@ -2061,9 +2061,11 @@ async function syncWithDrive(forcePull = false) {
 
 // מצב גלובלי של עדכוני שטח ממתינים
 let pendingFieldUpdateFiles = []; // { fileId, filename, events, deviceId, createdAt }
+let _fieldUpdatesSessionHandled = false; // מניעת הצגה חוזרת באותה סשן
 
 async function mergeOutboxUpdates() {
     if (!accessToken) return;
+    if (_fieldUpdatesSessionHandled) return; // כבר הוצג בסשן זה — לא מציג שוב
     try {
         const q = encodeURIComponent("name contains 'mobile_update_' and trashed = false");
         const listRes = await fetch(
@@ -2285,6 +2287,7 @@ window.applySelectedFieldUpdates = async function() {
     }
 
     document.getElementById('fieldUpdatesModal').style.display = 'none';
+    _fieldUpdatesSessionHandled = true;
     pendingFieldUpdateFiles = [];
     showToast(`✅ ${applied} עדכונים יושמו בהצלחה!`, 'success');
 };
@@ -2299,13 +2302,14 @@ window.applyAllFieldUpdates = async function() {
 window.dismissFieldUpdates = async function() {
     const confirmed = await showCustomDialog({
         title: 'דחיית עדכונים',
-        message: `האם לדחות את ${(window._pendingFieldEvents || []).length} העדכונים ממחיקה? הם יישארו ב-Drive עד הסנכרון הבא.`,
+        message: `האם לדחות את ${(window._pendingFieldEvents || []).length} העדכונים? הם יישארו ב-Drive ולא יוצגו שוב עד שתבחר "טען עדכונים" ידנית.`,
         showCancel: true
     });
     if (confirmed) {
         document.getElementById('fieldUpdatesModal').style.display = 'none';
+        _fieldUpdatesSessionHandled = true;
         pendingFieldUpdateFiles = [];
-        showToast('העדכונים נדחו — יוצגו שוב בסנכרון הבא', 'info');
+        showToast('העדכונים נדחו — לחץ "טען עדכונים" כדי לראות שוב', 'info');
     }
 };
 
