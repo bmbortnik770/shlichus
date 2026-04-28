@@ -45,7 +45,7 @@
             <button onclick="manualSync()" class="btn btn-outline" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;"><i class="fas fa-sync-alt"></i> סנכרן</button>
             <button onclick="forcePullFromDrive()" class="btn btn-warning" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;"><i class="fas fa-cloud-download-alt"></i> שחזר מענן</button>
         </div>
-        <button onclick="window._fieldUpdatesSessionHandled=false; mergeOutboxUpdates();" class="btn btn-outline" style="width:100%; margin-top:8px; padding:7px; font-size:12px; border-radius:8px; color:#10b981; border-color:#10b981;">
+        <button onclick="window._fieldUpdatesSessionHandled=false; window._fieldUpdatesManualTrigger=true; mergeOutboxUpdates();" class="btn btn-outline" style="width:100%; margin-top:8px; padding:7px; font-size:12px; border-radius:8px; color:#10b981; border-color:#10b981;">
             <i class="fas fa-mobile-alt"></i> טען עדכונים מאפליקציית השטח
         </button>
         <button onclick="openContactsSync()" class="btn btn-outline" style="width:100%; margin-top:6px; padding:7px; font-size:12px; border-radius:8px; color:var(--accent); border-color:var(--accent);">
