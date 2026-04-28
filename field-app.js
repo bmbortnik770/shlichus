@@ -163,6 +163,9 @@ const fieldApp = (function () {
     async function loadDataFromDrive() {
         setSyncStatus('syncing');
         try {
+            // בדוק ומחק קבצי outbox שסומנו כ-processed על ידי המשרד
+            await cleanProcessedOutboxFiles();
+
             const query = encodeURIComponent(`name='community_data_final.json' and trashed=false`);
             const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&spaces=appDataFolder,drive&orderBy=modifiedTime desc&fields=files(id,name)`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const searchData = await searchRes.json();
@@ -178,6 +181,39 @@ const fieldApp = (function () {
                 setTimeout(() => scanContacts(false), 3000);
             } catch(e) { setSyncStatus('error'); continueOffline(); }
         } catch (e) { setSyncStatus('offline'); continueOffline(); }
+    }
+
+    // ── בדיקת קבצי outbox שסומנו כ-processed ומחיקתם ──
+    async function cleanProcessedOutboxFiles() {
+        if (!accessToken) return;
+        const savedFileIds = storageGet('outbox_file_ids') || [];
+        if (savedFileIds.length === 0) return;
+
+        const toDelete = [];
+        for (const entry of savedFileIds) {
+            try {
+                const res = await fetch(
+                    `https://www.googleapis.com/drive/v3/files/${entry.fileId}?alt=media`,
+                    { headers: { Authorization: `Bearer ${accessToken}` } }
+                );
+                if (!res.ok) { toDelete.push(entry.fileId); continue; } // כבר נמחק
+                const content = await res.json();
+                if (content._processed) {
+                    // המשרד סימן כעובד — מחק
+                    await fetch(`https://www.googleapis.com/drive/v3/files/${entry.fileId}`, {
+                        method: 'DELETE',
+                        headers: { Authorization: `Bearer ${accessToken}` }
+                    });
+                    toDelete.push(entry.fileId);
+                    console.log(`[Outbox] קובץ ${entry.filename} עובד ונמחק`);
+                }
+            } catch(e) { console.warn('[Outbox] clean error:', e); }
+        }
+
+        if (toDelete.length > 0) {
+            const remaining = savedFileIds.filter(e => !toDelete.includes(e.fileId));
+            storageSet('outbox_file_ids', remaining);
+        }
     }
 
     function continueOffline() {
@@ -235,6 +271,13 @@ const fieldApp = (function () {
             );
 
             if (res.ok) {
+                const created = await res.json();
+                // שמור את ה-fileId כדי שנוכל למחוק את הקובץ אחרי עיבוד
+                const savedFileIds = storageGet('outbox_file_ids') || [];
+                savedFileIds.push({ fileId: created.id, filename, ts });
+                // שמור רק 20 אחרונים
+                if (savedFileIds.length > 20) savedFileIds.splice(0, savedFileIds.length - 20);
+                storageSet('outbox_file_ids', savedFileIds);
                 // נקה את ה-outbox רק אחרי שהשמירה הצליחה
                 storageSet(OUTBOX_KEY, []);
                 console.log(`[Outbox] שולח ${outbox.length} אירועים לדרייב → ${filename}`);
