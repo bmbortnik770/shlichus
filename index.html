@@ -387,15 +387,17 @@
 
     <!-- מפה גדולה — 80% -->
     <div id="territoryEditorMap" style="flex:1; position:relative;">
-        <!-- כלי ציור — Draw מוסיף כפתורים בעצמו, אנחנו רק מוסיפים נקה הכל -->
+        <!-- כלי ציור ברורים -->
         <div id="tmDrawToolbar" style="position:absolute; top:16px; right:16px; z-index:10; display:flex; flex-direction:column; gap:8px;">
-            <div style="background:white; border-radius:10px; padding:10px 14px; font-size:12px; color:#374151; box-shadow:0 2px 8px rgba(0,0,0,0.2); max-width:180px; line-height:1.6;">
-                <div style="font-weight:700; margin-bottom:4px; color:#10b981;"><i class="fas fa-info-circle"></i> הוראות</div>
-                <div>• לחץ על המפה להוספת נקודה</div>
-                <div>• גרור נקודה להזזתה</div>
-                <div>• לחץ על קודקוד למחיקתו</div>
-                <div>• לחץ <kbd style="background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:11px;">Enter</kbd> לסיום</div>
-            </div>
+            <button id="tmBtnDraw" onclick="window.tmSetMode('draw')" style="padding:9px 16px; border-radius:10px; border:2px solid #10b981; background:#10b981; color:white; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                <i class="fas fa-plus"></i> הוסף נקודה
+            </button>
+            <button id="tmBtnMove" onclick="window.tmSetMode('move')" style="padding:9px 16px; border-radius:10px; border:2px solid white; background:white; color:#374151; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                <i class="fas fa-arrows-alt"></i> הזז נקודה
+            </button>
+            <button id="tmBtnErase" onclick="window.tmSetMode('erase')" style="padding:9px 16px; border-radius:10px; border:2px solid white; background:white; color:#374151; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                <i class="fas fa-eraser"></i> מחק נקודה
+            </button>
             <button onclick="window.tmClearAll()" style="padding:9px 16px; border-radius:10px; border:2px solid #ef4444; background:white; color:#ef4444; font-size:13px; cursor:pointer; font-family:inherit; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
                 <i class="fas fa-trash"></i> נקה הכל
             </button>
