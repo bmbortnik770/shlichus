@@ -3321,6 +3321,7 @@ window.openClientCard = function(idx) {
     tempTasks=JSON.parse(JSON.stringify(a.tasks||[])); renderTasks();
     tempCustom=JSON.parse(JSON.stringify(a.customData || a.customFields ||{})); renderCustomFields();
     tempBoards=JSON.parse(JSON.stringify(a.boards||{})); renderModalBoards();
+    tempMilestones=JSON.parse(JSON.stringify(a.milestones||[])); renderMilestones();
     
     const tStr = new Date().toISOString().split('T')[0];
     document.getElementById('newLogDate').value = tStr; 
@@ -3421,6 +3422,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.fatherEmail=document.getElementById('cFatherEmail').value; a.motherEmail=document.getElementById('cMotherEmail').value;
     a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
     a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customData={...tempCustom}; a.customFields=a.customData; // backward compat
+    a.milestones=[...tempMilestones];
     a.updatedAt = Date.now();
     if(a.num) ensureMinimumUnits(currentBldg, a.num);
     isDirty=false; isCreatingNew=false; saveDB(); if(window.haptic) haptic('success'); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
@@ -5939,4 +5941,872 @@ window.applyContactsSync = function() {
 
 window.closeContactsSync = function() {
     document.getElementById('contacts-sync-modal').style.display = 'none';
+};
+
+// ════════════════════════════════════════════════════════════
+// ██  מודול ציוני דרך — Milestones  ██
+// ════════════════════════════════════════════════════════════
+
+let tempMilestones = [];
+let _msInputMode = 'greg'; // 'greg' | 'heb'
+
+// ── אתחול UI כשנפתחת הלשונית ──
+window.switchCrmTab = (tab) => {
+    document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content')
+        .forEach(e => e.classList.remove('active'));
+    document.getElementById(`tabBtn-${tab}`).classList.add('active');
+    document.getElementById(`crm-${tab}`).classList.add('active');
+    if (tab === 'milestones') _initMilestonesTab();
+};
+
+function _initMilestonesTab() {
+    // הצג תאריך עברי של היום
+    if (window.HebrewDate) {
+        const today = HebrewDate.todayHebrew();
+        const el = document.getElementById('ms-today-display');
+        if (el) el.textContent = today.display;
+    }
+    // אתחל dropdowns
+    _populateHebDaySelect();
+    _populateHebMonthSelect();
+    // אפס טופס
+    document.getElementById('ms-new-label').value = '';
+    document.getElementById('ms-new-greg-date').value = '';
+    document.getElementById('ms-greg-preview').style.display = 'none';
+    document.getElementById('ms-heb-preview-text').textContent = 'בחר יום וחודש';
+    setMsInputMode('greg');
+}
+
+// ── מילוי dropdown ימים (א–ל) ──
+function _populateHebDaySelect() {
+    const sel = document.getElementById('ms-new-heb-day');
+    if (!sel || sel.options.length > 1) return;
+    sel.innerHTML = '<option value="">יום</option>';
+    for (let d = 1; d <= 30; d++) {
+        sel.innerHTML += `<option value="${d}">${d}</option>`;
+    }
+    sel.onchange = _updateHebPreview;
+}
+
+// ── מילוי dropdown חודשים עבריים ──
+function _populateHebMonthSelect() {
+    const sel = document.getElementById('ms-new-heb-month');
+    if (!sel || sel.options.length > 1) return;
+    if (!window.HebrewDate) return;
+    sel.innerHTML = '<option value="">חודש</option>';
+    HebrewDate.MONTHS_FOR_UI.forEach(m => {
+        sel.innerHTML += `<option value="${m.en}">${m.he}</option>`;
+    });
+    sel.onchange = _updateHebPreview;
+}
+
+// ── עדכון preview תאריך עברי ──
+function _updateHebPreview() {
+    if (!window.HebrewDate) return;
+    const day = parseInt(document.getElementById('ms-new-heb-day').value);
+    const monthName = document.getElementById('ms-new-heb-month').value;
+    const el = document.getElementById('ms-heb-preview-text');
+    if (!day || !monthName) { el.textContent = 'בחר יום וחודש'; return; }
+    const monthHe = HebrewDate.MONTH_HE[monthName] || monthName;
+    const next = HebrewDate.nextOccurrence(monthName, day);
+    const greg = next.gregDate.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    el.textContent = `${day} ${monthHe} — בפעם הבאה: ${greg} (עוד ${next.daysUntil} ימים)`;
+}
+
+// ── שינוי מצב קלט: לועזי / עברי ──
+window.setMsInputMode = function(mode) {
+    _msInputMode = mode;
+    document.getElementById('ms-greg-input').style.display = mode === 'greg' ? 'block' : 'none';
+    document.getElementById('ms-heb-input').style.display  = mode === 'heb'  ? 'block' : 'none';
+    const btnGreg = document.getElementById('ms-mode-greg');
+    const btnHeb  = document.getElementById('ms-mode-heb');
+    btnGreg.style.background    = mode === 'greg' ? 'var(--accent)' : 'var(--surface)';
+    btnGreg.style.color         = mode === 'greg' ? 'white' : 'var(--text-muted)';
+    btnGreg.style.borderColor   = mode === 'greg' ? 'var(--accent)' : 'var(--border-light)';
+    btnHeb.style.background     = mode === 'heb'  ? 'var(--accent)' : 'var(--surface)';
+    btnHeb.style.color          = mode === 'heb'  ? 'white' : 'var(--text-muted)';
+    btnHeb.style.borderColor    = mode === 'heb'  ? 'var(--accent)' : 'var(--border-light)';
+};
+
+// ── כשבוחרים תאריך לועזי — הצג המרה לעברי ──
+window.onMsGregDateChange = function() {
+    if (!window.HebrewDate) return;
+    const val = document.getElementById('ms-new-greg-date').value;
+    const preview = document.getElementById('ms-greg-preview');
+    const previewText = document.getElementById('ms-greg-preview-text');
+    if (!val) { preview.style.display = 'none'; return; }
+    const hDate = HebrewDate.fromGregorian(new Date(val + 'T12:00:00'));
+    previewText.textContent = `${hDate.display} (${hDate.short})`;
+    preview.style.display = 'block';
+};
+
+// ── כשמשנים סוג אירוע — placeholder חכם ──
+window.onMsTypeChange = function() {
+    const type = document.getElementById('ms-new-type').value;
+    const placeholders = {
+        birthday:    'לדוגמה: יום הולדת אבא, יום הולדת דוד...',
+        yahrzeit:    'לדוגמה: יארצייט סבא, יארצייט אמא ז״ל...',
+        anniversary: 'לדוגמה: יום נישואין',
+        bar_mitzva:  'לדוגמה: בר מצווה של יוסי',
+        bat_mitzva:  'לדוגמה: בת מצווה של שרה',
+        wedding:     'לדוגמה: חתונת הבן',
+        other:       'תאר את האירוע...',
+    };
+    document.getElementById('ms-new-label').placeholder = placeholders[type] || 'מה זה?';
+};
+
+// ── הוספת ציון דרך חדש ──
+window.addMilestone = function() {
+    if (!window.HebrewDate) { showToast('מנוע תאריכים לא נטען', 'error'); return; }
+
+    const type  = document.getElementById('ms-new-type').value;
+    const label = document.getElementById('ms-new-label').value.trim();
+    if (!label) { showToast('יש להזין תיאור לאירוע', 'warning'); return; }
+
+    let monthName, day, gregDateStr;
+
+    if (_msInputMode === 'greg') {
+        const gregVal = document.getElementById('ms-new-greg-date').value;
+        if (!gregVal) { showToast('יש לבחור תאריך', 'warning'); return; }
+        const hDate = HebrewDate.fromGregorian(new Date(gregVal + 'T12:00:00'));
+        monthName   = hDate.monthName;
+        day         = hDate.day;
+        gregDateStr = gregVal;
+    } else {
+        day       = parseInt(document.getElementById('ms-new-heb-day').value);
+        monthName = document.getElementById('ms-new-heb-month').value;
+        if (!day || !monthName) { showToast('יש לבחור יום וחודש עבריים', 'warning'); return; }
+    }
+
+    const ms = {
+        id:         Date.now(),
+        type,
+        label,
+        monthName,
+        day,
+        gregDate:   gregDateStr || null, // שמור אם הוזן לועזי
+        createdAt:  new Date().toISOString(),
+    };
+
+    tempMilestones.push(ms);
+    markDirty();
+    renderMilestones();
+
+    // אפס טופס
+    document.getElementById('ms-new-label').value = '';
+    document.getElementById('ms-new-greg-date').value = '';
+    document.getElementById('ms-greg-preview').style.display = 'none';
+    document.getElementById('ms-new-heb-day').value = '';
+    document.getElementById('ms-new-heb-month').value = '';
+    document.getElementById('ms-heb-preview-text').textContent = 'בחר יום וחודש';
+
+    showToast('ציון דרך נוסף ✓', 'success');
+};
+
+// ── מחיקת ציון דרך ──
+window.deleteMilestone = function(id) {
+    tempMilestones = tempMilestones.filter(m => m.id !== id);
+    markDirty();
+    renderMilestones();
+};
+
+// ── רינדור רשימת ציוני הדרך ──
+window.renderMilestones = function() {
+    const container = document.getElementById('ms-list');
+    if (!container) return;
+
+    if (!tempMilestones.length) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:24px; color:var(--text-muted); font-size:14px;">
+                <i class="fas fa-star-of-david" style="font-size:28px; margin-bottom:10px; opacity:0.3; display:block;"></i>
+                אין ציוני דרך עדיין<br>
+                <span style="font-size:12px;">הוסף יארצייט, יום הולדת, בר מצווה ועוד</span>
+            </div>`;
+        return;
+    }
+
+    // מיין לפי קרבה
+    let items = [...tempMilestones];
+    if (window.HebrewDate) {
+        items = items.map(ms => {
+            try {
+                const occ = HebrewDate.nextOccurrence(ms.monthName, ms.day);
+                return { ...ms, _daysUntil: occ.daysUntil, _nextGreg: occ.gregDate };
+            } catch(e) {
+                return { ...ms, _daysUntil: 9999, _nextGreg: null };
+            }
+        }).sort((a, b) => a._daysUntil - b._daysUntil);
+    }
+
+    const TYPE_ICONS = {
+        birthday:    { icon: 'fa-birthday-cake', color: '#f59e0b' },
+        yahrzeit:    { icon: 'fa-candle',         color: '#64748b' },
+        anniversary: { icon: 'fa-heart',           color: '#ec4899' },
+        bar_mitzva:  { icon: 'fa-star-of-david',  color: '#8b5cf6' },
+        bat_mitzva:  { icon: 'fa-star-of-david',  color: '#8b5cf6' },
+        wedding:     { icon: 'fa-ring',            color: '#ec4899' },
+        other:       { icon: 'fa-calendar-alt',    color: '#3b82f6' },
+    };
+
+    container.innerHTML = items.map(ms => {
+        const typeDef = TYPE_ICONS[ms.type] || TYPE_ICONS.other;
+        const monthHe = window.HebrewDate ? (HebrewDate.MONTH_HE[ms.monthName] || ms.monthName) : ms.monthName;
+        const dateStr = `${ms.day} ${monthHe}`;
+
+        let urgencyBadge = '';
+        let nextLine = '';
+        if (ms._daysUntil !== undefined && ms._daysUntil !== 9999 && window.HebrewDate) {
+            urgencyBadge = HebrewDate.formatDaysUntil(ms._daysUntil);
+            if (ms._nextGreg) {
+                const greg = ms._nextGreg.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric' });
+                nextLine = `<div style="font-size:11px; color:var(--text-muted); margin-top:3px;">
+                    <i class="fas fa-calendar-check"></i> בפעם הבאה: ${greg}
+                </div>`;
+            }
+        }
+
+        // צבע רקע לפי דחיפות
+        let urgencyBg = 'var(--surface)';
+        let urgencyBorder = 'var(--border-light)';
+        if (ms._daysUntil <= 7)  { urgencyBg = 'rgba(239,68,68,0.05)';  urgencyBorder = 'rgba(239,68,68,0.3)'; }
+        else if (ms._daysUntil <= 30) { urgencyBg = 'rgba(245,158,11,0.05)'; urgencyBorder = 'rgba(245,158,11,0.3)'; }
+
+        return `
+        <div style="background:${urgencyBg}; border:1px solid ${urgencyBorder};
+                    border-radius:12px; padding:12px 14px;
+                    display:flex; align-items:center; gap:12px;">
+            <div style="width:38px; height:38px; border-radius:50%;
+                        background:${typeDef.color}22; display:flex; align-items:center;
+                        justify-content:center; flex-shrink:0;">
+                <i class="fas ${typeDef.icon}" style="color:${typeDef.color}; font-size:16px;"></i>
+            </div>
+            <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:14px; color:var(--text-main);">${escapeHTML(ms.label)}</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+                    <i class="fas fa-star-of-david" style="font-size:10px;"></i> ${dateStr}
+                    ${urgencyBadge ? `&nbsp;·&nbsp; ${urgencyBadge}` : ''}
+                </div>
+                ${nextLine}
+            </div>
+            <button onclick="deleteMilestone(${ms.id})"
+                style="background:none; border:none; color:var(--danger);
+                       cursor:pointer; padding:4px 8px; border-radius:6px; font-size:14px;
+                       opacity:0.6;" title="מחק">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>`;
+    }).join('');
+};
+
+// ════════════════════════════════════════════════════════════
+// ██  KPI — התראות אירועים קרובים בסיידבר  ██
+// ════════════════════════════════════════════════════════════
+
+function checkUpcomingMilestonesAlerts() {
+    if (!window.HebrewDate) return;
+
+    // אסוף את כל המשפחות עם milestones
+    const families = [];
+    Object.entries(db).forEach(([bldg, bldgData]) => {
+        if (!bldgData || !bldgData.apts) return;
+        bldgData.apts.forEach(apt => {
+            if ((apt.milestones || []).length > 0) {
+                families.push({ bldg, apt });
+            }
+        });
+    });
+
+    const upcoming = HebrewDate.getUpcomingEvents(families, 14);
+    if (!upcoming.length) return;
+
+    // הצג badge ב-KPI alerts
+    const alertsEl = document.getElementById('kpiAlerts');
+    if (!alertsEl) return;
+
+    const existingMs = alertsEl.querySelector('.ms-upcoming-card');
+    if (existingMs) existingMs.remove();
+
+    const card = document.createElement('div');
+    card.className = 'ms-upcoming-card stat-card';
+    card.style.cssText = 'margin-bottom:8px; padding:10px 12px; border:1px solid rgba(245,158,11,0.3); background:rgba(245,158,11,0.05);';
+
+    const rows = upcoming.slice(0, 4).map(ev => {
+        const days = HebrewDate.formatDaysUntil(ev.daysUntil);
+        return `<div style="display:flex; justify-content:space-between; align-items:center;
+                             padding:4px 0; border-bottom:1px solid var(--border-light); font-size:12px;">
+            <span style="color:var(--text-main);">${escapeHTML(ev.label)} — ${escapeHTML(ev.aptName)}</span>
+            <span style="white-space:nowrap;">${days}</span>
+        </div>`;
+    }).join('');
+
+    card.innerHTML = `
+        <div style="font-size:12px; font-weight:700; color:var(--warning); margin-bottom:6px;">
+            <i class="fas fa-bell"></i> אירועים קרובים (14 יום)
+        </div>
+        ${rows}`;
+
+    alertsEl.prepend(card);
+
+    // בדוק אם צריך ליצור משימות אוטומטיות
+    const alertsToday = HebrewDate.getAlertsDueToday(families);
+    alertsToday.forEach(ev => {
+        const taskText = `${ev.label} — ${ev.aptName} (${HebrewDate.formatDaysUntil(ev.daysUntil)})`;
+        if (!db.meta) db.meta = {};
+        if (!db.meta.generalTasks) db.meta.generalTasks = [];
+        // בדוק שאין כבר משימה כזו
+        const exists = db.meta.generalTasks.some(t => t.text === taskText && !t.done);
+        if (!exists) {
+            db.meta.generalTasks.push({
+                text: taskText,
+                date: new Date().toLocaleDateString('he-IL'),
+                done: false,
+                autoCreated: true,
+            });
+            showToast(`נוצרה משימה אוטומטית: ${ev.label}`, 'info');
+        }
+    });
+
+    if (alertsToday.length > 0) saveDB();
+}
+
+// הפעל בדיקה אחרי טעינת נתונים
+setTimeout(() => {
+    if (window.db && window.HebrewDate) checkUpcomingMilestonesAlerts();
+}, 3000);
+
+
+// ════════════════════════════════════════════════════════════
+// ██  מודול סטטוס משפחה — נפטר/ת + פיצול  ██
+// ════════════════════════════════════════════════════════════
+
+// ── טעינת סטטוס בפתיחת כרטיס ──
+function _loadFamilyStatus() {
+    const a = db[currentBldg]?.apts[currentAptIdx];
+    if (!a) return;
+
+    const badge  = document.getElementById('family-status-badge');
+    const btnDec = document.getElementById('btn-deceased');
+    const btnRes = document.getElementById('btn-restore-active');
+
+    if (!badge) return;
+
+    if (a.lifeStatus === 'deceased') {
+        const who = a.deceasedInfo?.who;
+        const whoLabel = who === 'father' ? 'האב נפטר' : who === 'mother' ? 'האם נפטרה' : 'שניהם נפטרו';
+        const dateLabel = a.deceasedInfo?.date
+            ? new Date(a.deceasedInfo.date).toLocaleDateString('he-IL') : '';
+        badge.innerHTML = `<span style="background:rgba(100,116,139,0.15); color:#64748b;
+            font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px;">
+            🕯️ ${whoLabel}${dateLabel ? ' — ' + dateLabel : ''}</span>`;
+        if (btnDec) btnDec.style.display = 'none';
+        if (btnRes) btnRes.style.display = 'flex';
+    } else if (a.lifeStatus === 'split') {
+        badge.innerHTML = `<span style="background:rgba(124,58,237,0.1); color:#7c3aed;
+            font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px;">
+            🔀 פוצל מ-${a.splitInfo?.originalName || ''}</span>`;
+        if (btnDec) btnDec.style.display = 'flex';
+        if (btnRes) btnRes.style.display = 'flex';
+    } else {
+        badge.innerHTML = '';
+        if (btnDec) btnDec.style.display = 'flex';
+        if (btnRes) btnRes.style.display = 'none';
+    }
+}
+
+// קרא אחרי openClientCard — הוסף לסוף הפונקציה הקיימת
+const _origOpenClientCard = window.openClientCard;
+window.openClientCard = function(idx) {
+    _origOpenClientCard(idx);
+    _loadFamilyStatus();
+};
+
+// ══════════════════════════════════════════════
+//  סימון נפטר/ת
+// ══════════════════════════════════════════════
+
+window.openDeceasedDialog = function() {
+    const a = db[currentBldg]?.apts[currentAptIdx];
+    if (!a) return;
+
+    // עדכן subtitle
+    document.getElementById('deceased-subtitle').textContent =
+        `משפחת ${a.name || ''}`;
+
+    // ברירת מחדל לתאריך — היום
+    document.getElementById('deceased-date').value =
+        new Date().toISOString().split('T')[0];
+    onDeceasedDateChange();
+
+    document.getElementById('deceasedModal').style.display = 'flex';
+};
+
+window.onDeceasedDateChange = function() {
+    const val = document.getElementById('deceased-date').value;
+    const preview = document.getElementById('deceased-heb-preview');
+    const text    = document.getElementById('deceased-heb-text');
+    const offer   = document.getElementById('deceased-yahrzeit-offer');
+    const yzPreview = document.getElementById('deceased-yahrzeit-preview');
+
+    if (!val || !window.HebrewDate) { preview.style.display = 'none'; offer.style.display = 'none'; return; }
+
+    const hDate = HebrewDate.fromGregorian(new Date(val + 'T12:00:00'));
+    text.textContent = hDate.display;
+    preview.style.display = 'block';
+
+    // הצג הצעת יארצייט
+    offer.style.display = 'block';
+    const next = HebrewDate.nextOccurrence(hDate.monthName, hDate.day);
+    const nextGreg = next.gregDate.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric' });
+    yzPreview.textContent = `יארצייט: ${hDate.short} — בפעם הבאה: ${nextGreg}`;
+};
+
+window.onDeceasedWhoChange = function() {
+    // עתיד: אפשר להתאים placeholder לפי הבחירה
+};
+
+window.confirmDeceased = function() {
+    const a = db[currentBldg]?.apts[currentAptIdx];
+    if (!a) return;
+
+    const who  = document.getElementById('deceased-who').value;
+    const date = document.getElementById('deceased-date').value;
+    const addYahrzeit = document.getElementById('deceased-add-yahrzeit').checked;
+
+    // שמור סטטוס
+    a.lifeStatus = 'deceased';
+    a.deceasedInfo = { who, date, recordedAt: new Date().toISOString() };
+
+    // הוסף יארצייט אוטומטי
+    if (addYahrzeit && date && window.HebrewDate) {
+        const hDate = HebrewDate.fromGregorian(new Date(date + 'T12:00:00'));
+        const whoLabel = who === 'father' ? 'האב' : who === 'mother' ? 'האם' : 'ע"ה';
+        if (!a.milestones) a.milestones = [];
+        a.milestones.push({
+            id:        Date.now(),
+            type:      'yahrzeit',
+            label:     `יארצייט ${whoLabel} — ${a.name || ''}`,
+            monthName: hDate.monthName,
+            day:       hDate.day,
+            gregDate:  date,
+            autoCreated: true,
+            createdAt: new Date().toISOString(),
+        });
+        // עדכן גם tempMilestones אם הכרטיס עדיין פתוח
+        tempMilestones = [...(a.milestones)];
+    }
+
+    a.updatedAt = Date.now();
+    saveDB();
+    document.getElementById('deceasedModal').style.display = 'none';
+    _loadFamilyStatus();
+
+    const whoLabel = who === 'father' ? 'האב' : who === 'mother' ? 'האם' : 'שניהם';
+    showToast(`${whoLabel} סומן/ה כנפטר/ה${addYahrzeit ? ' · יארצייט נוסף' : ''}`, 'info');
+};
+
+// ── שחזור לסטטוס פעיל ──
+window.restoreActiveStatus = async function() {
+    const confirmed = await showCustomDialog({
+        title: 'שחזור לפעיל',
+        message: 'האם לשחזר את המשפחה לסטטוס פעיל?',
+        showCancel: true,
+    });
+    if (!confirmed) return;
+
+    const a = db[currentBldg]?.apts[currentAptIdx];
+    if (!a) return;
+    delete a.lifeStatus;
+    delete a.deceasedInfo;
+    a.updatedAt = Date.now();
+    saveDB();
+    _loadFamilyStatus();
+    showToast('הכרטיס שוחזר לסטטוס פעיל', 'success');
+};
+
+// ══════════════════════════════════════════════
+//  פיצול משפחה
+// ══════════════════════════════════════════════
+
+window.openSplitFamilyDialog = function() {
+    const a = db[currentBldg]?.apts[currentAptIdx];
+    if (!a) return;
+
+    // הצע שם ברירת מחדל
+    document.getElementById('split-new-name').value = `${a.name || ''} (חדש)`;
+
+    // בנה רשימת ילדים לבחירה
+    const list = document.getElementById('split-children-list');
+    const children = a.childrenList || [];
+
+    if (children.length === 0) {
+        list.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">אין ילדים רשומים בכרטיס זה</div>';
+    } else {
+        list.innerHTML = children.map((c, i) => `
+            <label style="display:flex; align-items:center; gap:8px; padding:8px 10px;
+                          background:var(--bg-body); border-radius:8px; cursor:pointer; font-size:13px;">
+                <input type="checkbox" class="split-child-cb" data-idx="${i}"
+                       style="width:16px; height:16px; accent-color:var(--accent);">
+                <span>${escapeHTML(c.name || 'ילד/ה ללא שם')}</span>
+                ${c.dob ? `<span style="font-size:11px; color:var(--text-muted);">
+                    (${new Date(c.dob).toLocaleDateString('he-IL')})</span>` : ''}
+            </label>`
+        ).join('');
+    }
+
+    document.getElementById('splitFamilyModal').style.display = 'flex';
+};
+
+window.confirmSplitFamily = async function() {
+    const a = db[currentBldg]?.apts[currentAptIdx];
+    if (!a) return;
+
+    const newName = document.getElementById('split-new-name').value.trim();
+    if (!newName) { showToast('יש להזין שם לכרטיס החדש', 'warning'); return; }
+
+    const reason        = document.getElementById('split-reason').value;
+    const copyHistory   = document.getElementById('split-copy-history').checked;
+    const copyTags      = document.getElementById('split-copy-tags').checked;
+    const copyMilestones= document.getElementById('split-copy-milestones').checked;
+
+    // אילו ילדים עוברים
+    const selectedChildIdxs = [...document.querySelectorAll('.split-child-cb:checked')]
+        .map(cb => parseInt(cb.dataset.idx));
+
+    // בנה כרטיס חדש — עותק עמוק
+    const newApt = {
+        num:         '',
+        name:        newName,
+        father:      reason === 'divorce' ? a.father  : '',
+        mother:      reason === 'divorce' ? a.mother  : '',
+        fatherPhone: reason === 'divorce' ? a.fatherPhone : '',
+        motherPhone: reason === 'divorce' ? a.motherPhone : '',
+        fatherEmail: reason === 'divorce' ? a.fatherEmail : '',
+        motherEmail: reason === 'divorce' ? a.motherEmail : '',
+        style:       copyTags ? a.style : (appSettings.styles[0] || ''),
+        tags:        copyTags ? [...(a.tags || [])] : [],
+        notes:       '',
+        boards:      {},
+        tasks:       [],
+        donations:   [],
+        customData:  {},
+        customFields:{},
+        // היסטוריה — העתק עם סימון "לפני פיצול"
+        interactions: copyHistory
+            ? (a.interactions || []).map(l => ({ ...l, note: `[לפני פיצול] ${l.note || ''}`.trim() }))
+            : [],
+        milestones: copyMilestones
+            ? JSON.parse(JSON.stringify(a.milestones || []))
+            : [],
+        childrenList: selectedChildIdxs.map(i => ({ ...a.childrenList[i] })),
+        lifeStatus:  'split',
+        splitInfo: {
+            reason,
+            originalName:  a.name || '',
+            originalBldg:  currentBldg,
+            splitAt:       new Date().toISOString(),
+        },
+        createdAt:   new Date().toISOString(),
+        updatedAt:   Date.now(),
+    };
+
+    // הוסף לאותו בניין
+    db[currentBldg].apts.push(newApt);
+
+    // סמן גם את הכרטיס המקורי
+    a.splitInfo = {
+        reason,
+        splitAt:   new Date().toISOString(),
+        newCardName: newName,
+    };
+    a.updatedAt = Date.now();
+
+    // הסר ילדים שעברו מהכרטיס המקורי
+    if (selectedChildIdxs.length > 0) {
+        a.childrenList = (a.childrenList || []).filter((_, i) => !selectedChildIdxs.includes(i));
+        tempChildren = [...a.childrenList];
+        renderModalChildren();
+    }
+
+    saveDB();
+    document.getElementById('splitFamilyModal').style.display = 'none';
+    _loadFamilyStatus();
+
+    showToast(`כרטיס חדש נוצר: "${newName}" — נמצא באותו בניין`, 'success');
+
+    // שאל אם לפתוח את הכרטיס החדש
+    const openNew = await showCustomDialog({
+        title: 'כרטיס נוצר!',
+        message: `האם לפתוח כעת את הכרטיס החדש של "${newName}"?`,
+        showCancel: true,
+    });
+    if (openNew) {
+        const newIdx = db[currentBldg].apts.length - 1;
+        openClientCard(newIdx);
+    }
+};
+
+
+// ════════════════════════════════════════════════════════════
+// ██  לשונית אירועים ראשית — Events View  ██
+// ════════════════════════════════════════════════════════════
+
+// ── הרחב את switchMainView לתמוך ב-events ──
+const _origSwitchMainViewEvents = window.switchMainView;
+window.switchMainView = function(viewName) {
+    // הסתר/הצג events-container
+    const evCont = document.getElementById('events-container');
+    if (evCont) evCont.style.display = viewName === 'events' ? 'flex' : 'none';
+
+    // body class
+    document.body.classList.remove('view-events');
+
+    if (viewName === 'events') {
+        document.body.classList.add('view-events');
+        currentMainView = 'events';
+        document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+        const tab = document.getElementById('tab-events');
+        if (tab) tab.classList.add('active');
+        // אתחל ורנדר
+        _initEventsView();
+        renderEventsView();
+        return;
+    }
+
+    _origSwitchMainViewEvents(viewName);
+};
+
+// ── אתחול חד-פעמי ──
+function _initEventsView() {
+    if (!window.HebrewDate) return;
+    const todayEl = document.getElementById('events-today-heb');
+    if (todayEl && !todayEl.textContent) {
+        todayEl.textContent = HebrewDate.todayHebrew().display;
+    }
+}
+
+// ── אסוף את כל המשפחות עם milestones מה-DB ──
+function _getAllFamiliesWithMilestones() {
+    const families = [];
+    Object.entries(db).forEach(([bldg, bldgData]) => {
+        if (!bldgData || !bldgData.apts) return;
+        bldgData.apts.forEach((apt, aptIdx) => {
+            if ((apt.milestones || []).length > 0) {
+                families.push({ bldg, aptIdx, apt });
+            }
+        });
+    });
+    return families;
+}
+
+// ── רינדור ראשי ──
+window.renderEventsView = function() {
+    if (!window.HebrewDate) {
+        document.getElementById('events-timeline').innerHTML =
+            '<div style="text-align:center;color:var(--text-muted);padding:40px;">מנוע תאריכים לא נטען</div>';
+        return;
+    }
+
+    const days       = parseInt(document.getElementById('events-window')?.value || 30);
+    const typeFilter = document.getElementById('events-type-filter')?.value || '';
+    const families   = _getAllFamiliesWithMilestones();
+    let   events     = HebrewDate.getUpcomingEvents(families, days);
+
+    // סנן לפי סוג
+    if (typeFilter) events = events.filter(ev => ev.type === typeFilter);
+
+    // KPI
+    _renderEventsKPI(events, days);
+
+    // ריק?
+    const timeline = document.getElementById('events-timeline');
+    const empty    = document.getElementById('events-empty');
+    if (!events.length) {
+        timeline.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+
+    // קבץ לפי יום
+    _renderEventsTimeline(events);
+};
+
+// ── KPI בראש ──
+function _renderEventsKPI(events, days) {
+    const kpiEl = document.getElementById('events-kpi-row');
+    if (!kpiEl) return;
+
+    const total    = events.length;
+    const today    = events.filter(e => e.daysUntil === 0).length;
+    const week     = events.filter(e => e.daysUntil <= 7).length;
+    const yahrzeit = events.filter(e => e.type === 'yahrzeit').length;
+
+    const kpis = [
+        { label: `ב-${days} ימים הקרובים`, value: total,    color: 'var(--accent)',   icon: 'fa-calendar-alt' },
+        { label: 'היום',                   value: today,    color: 'var(--danger)',   icon: 'fa-exclamation-circle' },
+        { label: 'השבוע',                  value: week,     color: 'var(--warning)',  icon: 'fa-clock' },
+        { label: 'יארצייטים',              value: yahrzeit, color: '#64748b',         icon: 'fa-candle' },
+    ];
+
+    kpiEl.innerHTML = kpis.map(k => `
+        <div style="background:var(--surface); border:1px solid var(--border-light);
+                    border-radius:14px; padding:14px 16px; text-align:center;
+                    box-shadow:var(--card-shadow);">
+            <i class="fas ${k.icon}" style="color:${k.color}; font-size:18px; margin-bottom:6px; display:block;"></i>
+            <div style="font-size:28px; font-weight:900; color:${k.color}; line-height:1;">${k.value}</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${k.label}</div>
+        </div>`
+    ).join('');
+}
+
+// ── ציר זמן מקובץ לפי יום ──
+function _renderEventsTimeline(events) {
+    const timeline = document.getElementById('events-timeline');
+
+    // קבץ לפי daysUntil
+    const groups = {};
+    events.forEach(ev => {
+        const key = ev.daysUntil;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(ev);
+    });
+
+    const TYPE_META = {
+        birthday:    { icon: 'fa-birthday-cake', color: '#f59e0b', label: 'יום הולדת' },
+        yahrzeit:    { icon: 'fa-candle',         color: '#64748b', label: 'יארצייט'   },
+        anniversary: { icon: 'fa-heart',           color: '#ec4899', label: 'יום נישואין' },
+        bar_mitzva:  { icon: 'fa-star-of-david',  color: '#8b5cf6', label: 'בר מצווה'  },
+        bat_mitzva:  { icon: 'fa-star-of-david',  color: '#8b5cf6', label: 'בת מצווה'  },
+        wedding:     { icon: 'fa-ring',            color: '#ec4899', label: 'חתונה'     },
+        other:       { icon: 'fa-calendar-alt',    color: '#3b82f6', label: 'אחר'       },
+    };
+
+    timeline.innerHTML = Object.keys(groups)
+        .sort((a, b) => parseInt(a) - parseInt(b))
+        .map(daysKey => {
+            const daysNum = parseInt(daysKey);
+            const evs     = groups[daysKey];
+
+            // כותרת יום
+            let dayLabel, dayBg, dayColor;
+            if (daysNum === 0) {
+                dayLabel = '🔴 היום!'; dayBg = 'rgba(239,68,68,0.08)'; dayColor = 'var(--danger)';
+            } else if (daysNum === 1) {
+                dayLabel = '🟠 מחר'; dayBg = 'rgba(234,88,12,0.08)'; dayColor = '#ea580c';
+            } else if (daysNum <= 7) {
+                dayLabel = `🟡 עוד ${daysNum} ימים`; dayBg = 'rgba(245,158,11,0.06)'; dayColor = 'var(--warning)';
+            } else {
+                dayLabel = `עוד ${daysNum} ימים`; dayBg = 'var(--surface)'; dayColor = 'var(--text-muted)';
+            }
+
+            // תאריך לועזי + עברי של הפעם הבאה
+            const gregStr = evs[0]._nextGreg
+                ? evs[0]._nextGreg.toLocaleDateString('he-IL', { weekday:'long', day:'2-digit', month:'long', year:'numeric' })
+                : '';
+
+            const rows = evs.map(ev => {
+                const meta = TYPE_META[ev.type] || TYPE_META.other;
+                const monthHe = window.HebrewDate
+                    ? (HebrewDate.MONTH_HE[ev.ms.monthName] || ev.ms.monthName) : ev.ms.monthName;
+                const hebDate = `${ev.ms.day} ${monthHe}`;
+
+                return `
+                <div style="display:flex; align-items:center; gap:12px; padding:10px 14px;
+                            background:var(--bg-body); border-radius:10px; cursor:pointer;"
+                     onclick="openClientCardFromEvent('${encodeURIComponent(ev.bldg)}', ${ev.aptIdx})">
+                    <div style="width:36px; height:36px; border-radius:50%; flex-shrink:0;
+                                background:${meta.color}18; display:flex; align-items:center; justify-content:center;">
+                        <i class="fas ${meta.icon}" style="color:${meta.color}; font-size:15px;"></i>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-weight:700; font-size:14px; color:var(--text-main);">
+                            ${escapeHTML(ev.label)}
+                        </div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+                            משפחת ${escapeHTML(ev.aptName)}
+                            &nbsp;·&nbsp;
+                            <i class="fas fa-star-of-david" style="font-size:9px;"></i> ${hebDate}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-shrink:0;">
+                        <!-- שלח וואטסאפ -->
+                        <button onclick="event.stopPropagation(); sendEventWhatsApp('${encodeURIComponent(ev.bldg)}', ${ev.aptIdx}, '${encodeURIComponent(ev.label)}')"
+                            style="padding:5px 10px; border-radius:8px; border:none; background:rgba(37,211,102,0.12);
+                                   color:#25D366; cursor:pointer; font-size:12px;" title="שלח וואטסאפ">
+                            <i class="fab fa-whatsapp"></i>
+                        </button>
+                        <!-- הוסף משימה -->
+                        <button onclick="event.stopPropagation(); addTaskFromEvent('${encodeURIComponent(ev.bldg)}', ${ev.aptIdx}, '${encodeURIComponent(ev.label)}', ${daysNum})"
+                            style="padding:5px 10px; border-radius:8px; border:none; background:rgba(59,130,246,0.1);
+                                   color:var(--accent); cursor:pointer; font-size:12px;" title="הוסף משימה">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+
+            return `
+            <div style="background:${dayBg}; border:1px solid ${daysNum <= 1 ? dayColor + '40' : 'var(--border-light)'};
+                        border-radius:14px; overflow:hidden;">
+                <!-- כותרת קבוצה -->
+                <div style="padding:10px 16px; display:flex; justify-content:space-between; align-items:center;
+                            border-bottom:1px solid var(--border-light);">
+                    <span style="font-weight:800; font-size:14px; color:${dayColor};">${dayLabel}</span>
+                    <span style="font-size:12px; color:var(--text-muted);">${gregStr}</span>
+                </div>
+                <!-- שורות אירועים -->
+                <div style="padding:8px; display:flex; flex-direction:column; gap:6px;">
+                    ${rows}
+                </div>
+            </div>`;
+        }).join('');
+}
+
+// ── פתח כרטיס משפחה מלחיצה באירועים ──
+window.openClientCardFromEvent = function(bldgEnc, aptIdx) {
+    const bldg = decodeURIComponent(bldgEnc);
+    currentBldg = bldg;
+    openClientCard(aptIdx);
+    // עבור לציוני דרך
+    setTimeout(() => switchCrmTab('milestones'), 100);
+};
+
+// ── שלח וואטסאפ עם הודעה מותאמת ──
+window.sendEventWhatsApp = function(bldgEnc, aptIdx, labelEnc) {
+    const bldg  = decodeURIComponent(bldgEnc);
+    const label = decodeURIComponent(labelEnc);
+    const apt   = db[bldg]?.apts[aptIdx];
+    if (!apt) return;
+
+    const phones = [apt.fatherPhone, apt.motherPhone].filter(Boolean);
+    if (!phones.length) { showToast('אין מספר טלפון לשלוח', 'warning'); return; }
+
+    const name = apt.name || 'משפחה';
+    const msg  = encodeURIComponent(`שלום משפחת ${name}! מאחלים לכם ${label} שמח 🎉`);
+    const phone = phones[0].replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/972${phone.replace(/^0/, '')}?text=${msg}`, '_blank');
+};
+
+// ── הוסף משימה מאירוע ──
+window.addTaskFromEvent = function(bldgEnc, aptIdx, labelEnc, daysUntil) {
+    const bldg  = decodeURIComponent(bldgEnc);
+    const label = decodeURIComponent(labelEnc);
+    const apt   = db[bldg]?.apts[aptIdx];
+    if (!apt) return;
+
+    const taskText = `${label} — משפחת ${apt.name || ''} (עוד ${daysUntil} ימים)`;
+    if (!db.meta) db.meta = {};
+    if (!db.meta.generalTasks) db.meta.generalTasks = [];
+
+    const exists = db.meta.generalTasks.some(t => t.text === taskText && !t.done);
+    if (exists) { showToast('משימה כזו כבר קיימת', 'info'); return; }
+
+    db.meta.generalTasks.push({
+        text: taskText,
+        date: new Date().toLocaleDateString('he-IL'),
+        done: false,
+        fromEvent: true,
+    });
+    saveDB();
+    showToast('משימה נוספה ✓', 'success');
 };
