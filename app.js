@@ -675,7 +675,15 @@ window.openTerritoryMapEditor = (source) => {
             });
         });
 
-        // ── אירועי Draw ──
+        // ── הסתר כפתורי Draw המובנים — אנחנו משתמשים בכפתורים שלנו ──
+        const drawControls = document.querySelector('.mapboxgl-ctrl-group');
+        if (drawControls) drawControls.style.display = 'none';
+        // הסר כל כפתורי draw שמופיעים
+        tmMap.once('idle', () => {
+            document.querySelectorAll('.mapbox-gl-draw_ctrl-draw-btn, .mapboxgl-ctrl-group').forEach(el => {
+                if (el.closest('#territoryEditorMap')) el.style.display = 'none';
+            });
+        });
         tmMap.on('draw.create', tmUpdateFromDraw);
         tmMap.on('draw.update', tmUpdateFromDraw);
         tmMap.on('draw.delete', () => {
@@ -711,22 +719,38 @@ function tmUpdateFromDraw() {
 }
 
 window.tmSetMode = (mode) => {
-    if (!tmDraw) return;
+    if (!tmDraw || !tmMap) return;
+
+    // עדכן כפתורים
+    const colors = { draw: '#10b981', move: '#f59e0b', erase: '#ef4444' };
+    ['draw','move','erase'].forEach(m => {
+        const btn = document.getElementById(`tmBtn${m.charAt(0).toUpperCase()+m.slice(1)}`);
+        if (!btn) return;
+        const isActive = m === mode;
+        btn.style.background = isActive ? colors[m] : 'white';
+        btn.style.color = isActive ? 'white' : '#374151';
+        btn.style.borderColor = isActive ? colors[m] : 'white';
+    });
+
+    const features = tmDraw.getAll().features;
+
     if (mode === 'draw') {
-        tmDraw.changeMode('draw_polygon');
-    } else if (mode === 'move' || mode === 'erase') {
-        const features = tmDraw.getAll().features;
+        if (features.length === 0) {
+            tmDraw.changeMode('draw_polygon');
+        } else {
+            // יש כבר פוליגון — עבור ל-direct_select כדי להוסיף נקודות
+            tmDraw.changeMode('direct_select', { featureId: features[0].id });
+        }
+        tmMap.getCanvas().style.cursor = 'crosshair';
+    } else if (mode === 'move') {
         if (features.length > 0) tmDraw.changeMode('direct_select', { featureId: features[0].id });
         else tmDraw.changeMode('simple_select');
+        tmMap.getCanvas().style.cursor = 'grab';
+    } else if (mode === 'erase') {
+        if (features.length > 0) tmDraw.changeMode('direct_select', { featureId: features[0].id });
+        else tmDraw.changeMode('simple_select');
+        tmMap.getCanvas().style.cursor = 'pointer';
     }
-    ['tmBtnDraw','tmBtnMove','tmBtnErase'].forEach(id => {
-        const b = document.getElementById(id);
-        if (!b) return;
-        b.style.background = 'white'; b.style.color = '#374151'; b.style.borderColor = 'white';
-    });
-    const colors = { draw: '#10b981', move: '#f59e0b', erase: '#ef4444' };
-    const btn = document.getElementById({ draw:'tmBtnDraw', move:'tmBtnMove', erase:'tmBtnErase' }[mode]);
-    if (btn) { btn.style.background = colors[mode]; btn.style.color = 'white'; btn.style.borderColor = colors[mode]; }
 };
 
 window.tmClearAll = () => {
@@ -989,8 +1013,21 @@ function tmHandleClassifyClick(e) {
     const currentEntry = tmBuildingClassify[key];
     const currentCat = currentEntry?.catId || 'residential';
     const currentName = currentEntry?.name || '';
+
+    // שמור גיאומטריה — נבנה polygon מרובע סביב המרכז אם הגיאומטריה חתוכה
+    let geometry = f.geometry;
+    if (!geometry || !geometry.coordinates?.length) {
+        // fallback — צור מרובע קטן סביב המרכז
+        if (center) {
+            const [cx, cy] = center;
+            const d = 0.00015;
+            geometry = { type: 'Polygon', coordinates: [[[cx-d,cy-d],[cx+d,cy-d],[cx+d,cy+d],[cx-d,cy+d],[cx-d,cy-d]]] };
+        }
+    }
+
     window._tmPendingGeometry = window._tmPendingGeometry || {};
-    window._tmPendingGeometry[key] = { geometry: f.geometry, center };
+    window._tmPendingGeometry[key] = { geometry, center };
+
     new mapboxgl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '300px' })
         .setLngLat(center || e.lngLat)
         .setHTML(`
@@ -3103,10 +3140,11 @@ map.on('mousemove', '3d-buildings', (e) => {
         if(hoveredStateId!==null) map.setFeatureState({source:'composite',sourceLayer:'building',id:hoveredStateId},{hover:false});
         hoveredStateId=e.features[0].id;
         map.setFeatureState({source:'composite',sourceLayer:'building',id:hoveredStateId},{hover:true});
+
+        // בדוק אם מבנה מסווג — הצג מידע רק אם כן
         const f = e.features[0];
         const classify = appSettings.territory?.buildingClassify || {};
         const categories = appSettings.territory?.categories || [];
-        let hoverHtml = '<div style="font-weight:600;font-size:12px;color:var(--accent);"><i class="fas fa-hand-pointer"></i> ניהול בניין</div>';
         try {
             const coords = f.geometry?.coordinates;
             let pts = f.geometry?.type === 'Polygon' ? coords[0] : coords[0]?.[0];
@@ -3120,21 +3158,34 @@ map.on('mousemove', '3d-buildings', (e) => {
                     const name = typeof entry === 'object' ? entry.name : '';
                     const cat = categories.find(c => c.id === catId);
                     if (cat) {
-                        hoverHtml = '<div style="direction:rtl;font-family:inherit;padding:2px 0;">'
+                        const html = '<div style="direction:rtl;font-family:inherit;padding:2px 0;">'
                             + '<div style="display:flex;align-items:center;gap:6px;">'
                             + '<span style="width:10px;height:10px;border-radius:50%;background:'+cat.color+';display:inline-block;flex-shrink:0;"></span>'
                             + '<span style="font-weight:700;font-size:12px;color:#111;">'+cat.name+'</span>'
                             + '</div>'
                             + (name ? '<div style="font-size:11px;color:#374151;margin-top:3px;">'+name+'</div>' : '')
                             + '</div>';
+                        hoverPopup.setLngLat(e.lngLat).setHTML(html).addTo(map);
+                        return;
                     }
                 }
             }
         } catch(err){}
-        hoverPopup.setLngLat(e.lngLat).setHTML(hoverHtml).addTo(map);
+        // מבנה לא מסווג — הצג tooltip פשוט
+        hoverPopup.setLngLat(e.lngLat).setHTML('<div style="font-weight:600;font-size:12px;color:var(--accent);"><i class="fas fa-hand-pointer"></i> ניהול בניין</div>').addTo(map);
     }
 });
-map.on('mouseleave', '3d-buildings', () => { map.getCanvas().style.cursor=''; if(hoveredStateId!==null) map.setFeatureState({source:'composite',sourceLayer:'building',id:hoveredStateId},{hover:false}); hoveredStateId=null; hoverPopup.remove(); });
+map.on('mouseleave', '3d-buildings', () => {
+    map.getCanvas().style.cursor='';
+    if(hoveredStateId!==null) map.setFeatureState({source:'composite',sourceLayer:'building',id:hoveredStateId},{hover:false});
+    hoveredStateId=null;
+    hoverPopup.remove();
+});
+map.on('mousemove', (e) => {
+    // הסר popup אם לא על מבנה
+    const features = map.queryRenderedFeatures(e.point, { layers: ['3d-buildings'] });
+    if (!features.length) hoverPopup.remove();
+});
 map.on('click', '3d-buildings', async (e) => { hoverPopup.remove(); try { const r=await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${e.lngLat.lng},${e.lngLat.lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`); const d=await r.json(); let addr=`מיקום (${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)})`; if(d.features&&d.features.length>0) addr=(d.features[0].place_name_he||d.features[0].place_name).split(',')[0].trim(); currentBldg=addr; if(!db[currentBldg]) db[currentBldg]={info:{code:'',rep:'',notes:'',coords:[e.lngLat.lng,e.lngLat.lat]},apts:[]}; openBuildingModal(); } catch(err){showToast("שגיאת כתובת","warning");} });
 
 function getAllPhones(a) { return [a.fatherPhone, a.motherPhone, ...(a.childrenList||[]).map(c=>c.phone)].filter(Boolean); }
