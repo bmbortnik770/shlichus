@@ -21,6 +21,8 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
 
+    <script src="https://unpkg.com/jewish-date@2.0.23/dist/umd/index.js"></script>
+    <script src="hebrew-date-engine.js"></script>
     <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
@@ -113,6 +115,7 @@
             <div class="main-tab" onclick="switchMainView('kanban')" id="tab-kanban"><i class="fas fa-project-diagram"></i> פרויקטים</div>
             <div class="main-tab" onclick="switchMainView('comm')" id="tab-comm"><i class="fas fa-bullhorn"></i> תקשורת</div>
             <div class="main-tab" onclick="switchMainView('tasks')" id="tab-tasks"><i class="fas fa-check-double"></i> מרכז משימות</div>
+            <div class="main-tab" onclick="switchMainView('events')" id="tab-events"><i class="fas fa-star-of-david"></i> אירועים</div>
         </div>
     </div>
 
@@ -260,6 +263,69 @@
         </div>
         <h3 style="margin:0 0 15px 0; color:var(--text-main); font-size:18px;"><i class="fas fa-inbox" style="color:var(--text-muted);"></i> כל המשימות הפתוחות במערכת</h3>
         <div id="globalTasksList"></div>
+    </div>
+</div>
+
+<!-- ══ לשונית אירועים ══ -->
+<div id="events-container" style="display:none; flex-grow:1; flex-direction:column;
+     background:var(--bg-body); overflow:hidden; padding:0; gap:0;">
+
+    <!-- כותרת -->
+    <div class="kanban-hub-header">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <h2 style="margin:0; color:var(--primary);">
+                <i class="fas fa-star-of-david" style="color:var(--accent);"></i> אירועי הקהילה
+            </h2>
+            <!-- תאריך היום בעברי -->
+            <span id="events-today-heb" style="font-size:13px; color:var(--text-muted);
+                  background:var(--bg-body); padding:4px 12px; border-radius:20px;
+                  border:1px solid var(--border-light);"></span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <!-- חלון זמן -->
+            <select id="events-window" onchange="renderEventsView()"
+                style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-light);
+                       background:var(--surface); font-family:inherit; font-size:13px; color:var(--text-main);">
+                <option value="7">7 ימים קדימה</option>
+                <option value="14">14 ימים</option>
+                <option value="30" selected>30 ימים</option>
+                <option value="60">60 ימים</option>
+                <option value="90">90 ימים</option>
+            </select>
+            <!-- סינון לפי סוג -->
+            <select id="events-type-filter" onchange="renderEventsView()"
+                style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-light);
+                       background:var(--surface); font-family:inherit; font-size:13px; color:var(--text-main);">
+                <option value="">כל הסוגים</option>
+                <option value="yahrzeit">🕯️ יארצייטים</option>
+                <option value="birthday">🎂 ימי הולדת</option>
+                <option value="anniversary">💍 ימי נישואין</option>
+                <option value="bar_mitzva">✡️ בר/בת מצווה</option>
+                <option value="wedding">💒 חתונות</option>
+                <option value="other">📅 אחר</option>
+            </select>
+            <button onclick="renderEventsView()" class="btn btn-outline"
+                style="width:auto; padding:8px 14px; font-size:13px;">
+                <i class="fas fa-sync-alt"></i> רענן
+            </button>
+        </div>
+    </div>
+
+    <!-- אזור תוכן -->
+    <div style="flex-grow:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px;">
+
+        <!-- KPI סיכום -->
+        <div id="events-kpi-row" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;"></div>
+
+        <!-- ציר זמן -->
+        <div id="events-timeline" style="display:flex; flex-direction:column; gap:8px;"></div>
+
+        <!-- ריק -->
+        <div id="events-empty" style="display:none; text-align:center; padding:60px 20px; color:var(--text-muted);">
+            <i class="fas fa-star-of-david" style="font-size:40px; opacity:0.2; display:block; margin-bottom:16px;"></i>
+            <div style="font-size:16px; font-weight:600;">אין אירועים בטווח הנבחר</div>
+            <div style="font-size:13px; margin-top:8px;">הוסף ציוני דרך בכרטיסי המשפחות</div>
+        </div>
     </div>
 </div>
 
@@ -741,6 +807,7 @@
             <div class="crm-tab" onclick="switchCrmTab('tasks')" id="tabBtn-tasks"><i class="fas fa-check-square"></i> משימות</div>
             <div class="crm-tab" onclick="switchCrmTab('logs')" id="tabBtn-logs"><i class="fas fa-history"></i> קשר</div>
             <div class="crm-tab" onclick="switchCrmTab('donations')" id="tabBtn-donations"><i class="fas fa-hand-holding-heart"></i> תרומות</div>
+            <div class="crm-tab" onclick="switchCrmTab('milestones')" id="tabBtn-milestones"><i class="fas fa-star-of-david"></i> ציוני דרך</div>
         </div>
 
         <div id="crm-details" class="crm-tab-content active">
@@ -797,6 +864,39 @@
             </div>
             <div id="cCustomFieldsContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
             <div class="form-group"><label>הערות</label><textarea id="cNotes" rows="2" placeholder="הקלד..." oninput="markDirty()"></textarea></div>
+
+            <!-- ══ סטטוס משפחה ══ -->
+            <div id="family-status-bar" style="margin-top:14px; padding:12px 14px;
+                border-radius:12px; border:1px solid var(--border-light);
+                background:var(--bg-body);">
+                <div style="font-size:12px; font-weight:700; color:var(--text-muted);
+                            margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+                    <i class="fas fa-info-circle"></i> סטטוס משפחה
+                    <span id="family-status-badge" style="margin-right:auto;"></span>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button onclick="openDeceasedDialog()"
+                        id="btn-deceased"
+                        style="padding:7px 12px; border-radius:8px; font-size:12px; font-weight:600;
+                               border:1px solid rgba(100,116,139,0.4); background:rgba(100,116,139,0.08);
+                               color:#64748b; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:5px;">
+                        <i class="fas fa-candle"></i> סמן נפטר/ת
+                    </button>
+                    <button onclick="openSplitFamilyDialog()"
+                        style="padding:7px 12px; border-radius:8px; font-size:12px; font-weight:600;
+                               border:1px solid rgba(139,92,246,0.4); background:rgba(139,92,246,0.08);
+                               color:#7c3aed; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:5px;">
+                        <i class="fas fa-code-branch"></i> פיצול משפחה
+                    </button>
+                    <button onclick="restoreActiveStatus()"
+                        id="btn-restore-active"
+                        style="display:none; padding:7px 12px; border-radius:8px; font-size:12px; font-weight:600;
+                               border:1px solid rgba(16,185,129,0.4); background:rgba(16,185,129,0.08);
+                               color:#059669; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:5px;">
+                        <i class="fas fa-undo"></i> שחזר לפעיל
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div id="crm-tasks" class="crm-tab-content">
@@ -826,8 +926,254 @@
                 <button class="btn btn-success" style="font-size:13px; padding:6px;" onclick="addDonation()"><i class="fas fa-plus"></i> הוסף תרומה</button>
             </div>
         </div>
+        <!-- ══ לשונית ציוני דרך ══ -->
+        <div id="crm-milestones" class="crm-tab-content">
+
+            <!-- תצוגת היום בעברי -->
+            <div id="ms-today-bar" style="background:var(--bg-body); border:1px solid var(--border-light);
+                border-radius:10px; padding:8px 14px; margin-bottom:14px;
+                display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-muted);">
+                <i class="fas fa-calendar-alt" style="color:var(--accent);"></i>
+                <span>היום: <strong id="ms-today-display" style="color:var(--text-main);"></strong></span>
+            </div>
+
+            <!-- רשימת אירועים קיימים -->
+            <div id="ms-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;"></div>
+
+            <!-- הוספת אירוע חדש -->
+            <div style="background:var(--bg-body); border:1px solid var(--border-light);
+                        border-radius:12px; padding:14px;">
+                <h5 style="margin:0 0 12px 0; color:var(--accent); font-size:14px;">
+                    <i class="fas fa-plus-circle"></i> הוסף ציון דרך
+                </h5>
+
+                <!-- סוג האירוע -->
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label style="font-size:12px;">סוג אירוע</label>
+                    <select id="ms-new-type" class="inline-input" onchange="onMsTypeChange()">
+                        <option value="birthday">🎂 יום הולדת</option>
+                        <option value="yahrzeit">🕯️ יארצייט</option>
+                        <option value="anniversary">💍 יום נישואין</option>
+                        <option value="bar_mitzva">✡️ בר מצווה</option>
+                        <option value="bat_mitzva">✡️ בת מצווה</option>
+                        <option value="wedding">💒 חתונה</option>
+                        <option value="other">📅 אחר</option>
+                    </select>
+                </div>
+
+                <!-- תיאור חופשי -->
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label style="font-size:12px;">תיאור (לדוגמה: יום הולדת אבא, יארצייט סבתא...)</label>
+                    <input type="text" id="ms-new-label" class="inline-input"
+                           placeholder="מה זה?" oninput="markDirty()">
+                </div>
+
+                <!-- בחירת תאריך — שני מצבים -->
+                <div id="ms-input-mode-toggle" style="display:flex; gap:8px; margin-bottom:10px;">
+                    <button id="ms-mode-greg" onclick="setMsInputMode('greg')"
+                        style="flex:1; padding:7px; border-radius:8px; border:2px solid var(--accent);
+                               background:var(--accent); color:white; font-family:inherit; font-size:13px; cursor:pointer; font-weight:600;">
+                        📅 תאריך לועזי
+                    </button>
+                    <button id="ms-mode-heb" onclick="setMsInputMode('heb')"
+                        style="flex:1; padding:7px; border-radius:8px; border:2px solid var(--border-light);
+                               background:var(--surface); color:var(--text-muted); font-family:inherit; font-size:13px; cursor:pointer;">
+                        🗓️ תאריך עברי
+                    </button>
+                </div>
+
+                <!-- קלט לועזי -->
+                <div id="ms-greg-input">
+                    <div class="form-group" style="margin-bottom:10px;">
+                        <label style="font-size:12px;">תאריך לועזי</label>
+                        <input type="date" id="ms-new-greg-date" class="inline-input"
+                               onchange="onMsGregDateChange()">
+                    </div>
+                    <div id="ms-greg-preview" style="font-size:12px; color:var(--accent);
+                         padding:6px 10px; background:rgba(59,130,246,0.07);
+                         border-radius:8px; display:none; margin-bottom:10px;">
+                        📅 <span id="ms-greg-preview-text"></span>
+                    </div>
+                </div>
+
+                <!-- קלט עברי ישיר -->
+                <div id="ms-heb-input" style="display:none;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+                        <div class="form-group">
+                            <label style="font-size:12px;">יום</label>
+                            <select id="ms-new-heb-day" class="inline-input"></select>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size:12px;">חודש</label>
+                            <select id="ms-new-heb-month" class="inline-input"></select>
+                        </div>
+                    </div>
+                    <div id="ms-heb-preview" style="font-size:12px; color:var(--accent);
+                         padding:6px 10px; background:rgba(59,130,246,0.07);
+                         border-radius:8px; margin-bottom:10px;">
+                        <span id="ms-heb-preview-text">בחר יום וחודש</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" style="font-size:13px; padding:8px 16px; width:100%;"
+                        onclick="addMilestone()">
+                    <i class="fas fa-plus"></i> הוסף ציון דרך
+                </button>
+            </div>
+        </div>
+        <!-- ══ סוף לשונית ציוני דרך ══ -->
+
         <div style="margin-top:20px; display:flex; gap:10px;">
             <button id="saveClientBtn" class="btn btn-primary" onclick="saveClientWithAuthCheck()"><i class="fas fa-save"></i> שמור פרטים</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ דיאלוג סימון נפטר/ת ══ -->
+<div id="deceasedModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+     z-index:99999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+    <div style="background:var(--surface); border-radius:20px; width:100%; max-width:460px;
+                padding:28px; box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+            <div style="width:44px; height:44px; background:rgba(100,116,139,0.15); border-radius:12px;
+                        display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <i class="fas fa-candle" style="color:#64748b; font-size:20px;"></i>
+            </div>
+            <div>
+                <div style="font-size:17px; font-weight:800; color:var(--text-main);">סימון נפטר/ת</div>
+                <div style="font-size:13px; color:var(--text-muted);" id="deceased-subtitle"></div>
+            </div>
+        </div>
+
+        <!-- מי נפטר -->
+        <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:13px;">מי נפטר/ה?</label>
+            <select id="deceased-who" class="inline-input" onchange="onDeceasedWhoChange()">
+                <option value="father">האב</option>
+                <option value="mother">האם</option>
+                <option value="both">שניהם</option>
+            </select>
+        </div>
+
+        <!-- תאריך פטירה -->
+        <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:13px;">תאריך פטירה (לועזי)</label>
+            <input type="date" id="deceased-date" class="inline-input"
+                   onchange="onDeceasedDateChange()">
+            <div id="deceased-heb-preview" style="font-size:12px; color:var(--text-muted);
+                 margin-top:5px; display:none;">
+                <i class="fas fa-star-of-david" style="font-size:10px;"></i>
+                <span id="deceased-heb-text"></span>
+            </div>
+        </div>
+
+        <!-- הצעת יארצייט -->
+        <div id="deceased-yahrzeit-offer" style="display:none; background:rgba(100,116,139,0.08);
+             border:1px solid rgba(100,116,139,0.25); border-radius:10px; padding:12px; margin-bottom:14px;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
+                <input type="checkbox" id="deceased-add-yahrzeit" checked
+                       style="width:16px; height:16px; accent-color:var(--accent);">
+                <span>הוסף יארצייט אוטומטי לכרטיס זה</span>
+            </label>
+            <div id="deceased-yahrzeit-preview" style="font-size:12px; color:var(--text-muted);
+                 margin-top:6px; padding-right:24px;"></div>
+        </div>
+
+        <!-- אזהרה -->
+        <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.2);
+             border-radius:10px; padding:10px 12px; margin-bottom:18px; font-size:12px; color:var(--text-muted);">
+            <i class="fas fa-info-circle" style="color:var(--danger);"></i>
+            הנתונים נשמרים לעד. האדם יוסר מרשימות התפוצה אוטומטית.
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button onclick="document.getElementById('deceasedModal').style.display='none'"
+                style="padding:10px 20px; background:var(--bg-body); border:1px solid var(--border-light);
+                       border-radius:10px; cursor:pointer; font-family:inherit; font-size:14px; color:var(--text-muted);">
+                ביטול
+            </button>
+            <button onclick="confirmDeceased()"
+                style="padding:10px 24px; background:#64748b; border:none; border-radius:10px;
+                       cursor:pointer; font-size:14px; color:white; font-weight:700; font-family:inherit;">
+                <i class="fas fa-check"></i> אשר
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ דיאלוג פיצול משפחה ══ -->
+<div id="splitFamilyModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+     z-index:99999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+    <div style="background:var(--surface); border-radius:20px; width:100%; max-width:500px;
+                padding:28px; box-shadow:0 20px 60px rgba(0,0,0,0.4); max-height:85vh; overflow-y:auto;">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+            <div style="width:44px; height:44px; background:rgba(124,58,237,0.12); border-radius:12px;
+                        display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <i class="fas fa-code-branch" style="color:#7c3aed; font-size:20px;"></i>
+            </div>
+            <div>
+                <div style="font-size:17px; font-weight:800; color:var(--text-main);">פיצול משפחה</div>
+                <div style="font-size:13px; color:var(--text-muted);">גירושין / ילד שמתחתן ועוזב</div>
+            </div>
+        </div>
+
+        <!-- סיבת פיצול -->
+        <div class="form-group" style="margin-bottom:14px;">
+            <label style="font-size:13px;">סיבת הפיצול</label>
+            <select id="split-reason" class="inline-input">
+                <option value="divorce">גירושין</option>
+                <option value="child_left">ילד/ה שמתחתן/ת ועוזב/ת</option>
+                <option value="other">אחר</option>
+            </select>
+        </div>
+
+        <!-- שם הכרטיס החדש -->
+        <div class="form-group" style="margin-bottom:14px;">
+            <label style="font-size:13px;">שם הכרטיס החדש</label>
+            <input type="text" id="split-new-name" class="inline-input"
+                   placeholder="לדוגמה: כהן (אמא), לוי (הבן החדש)...">
+        </div>
+
+        <!-- בחירת ילדים -->
+        <div id="split-children-section" style="margin-bottom:14px;">
+            <label style="font-size:13px; font-weight:600; display:block; margin-bottom:8px;">
+                <i class="fas fa-child" style="color:var(--accent);"></i>
+                אילו ילדים עוברים לכרטיס החדש?
+            </label>
+            <div id="split-children-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+                * ילדים שלא נבחרו נשארים בכרטיס המקורי
+            </div>
+        </div>
+
+        <!-- מה עובר לכרטיס החדש -->
+        <div style="background:var(--bg-body); border-radius:10px; padding:12px; margin-bottom:18px; font-size:12px;">
+            <div style="font-weight:700; margin-bottom:8px; color:var(--text-main);">מה עובר לכרטיס החדש:</div>
+            <label style="display:flex; align-items:center; gap:8px; margin-bottom:5px; cursor:pointer;">
+                <input type="checkbox" id="split-copy-history" checked style="accent-color:var(--accent);">
+                <span>היסטוריית ביקורים וקשר (עד היום)</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; margin-bottom:5px; cursor:pointer;">
+                <input type="checkbox" id="split-copy-tags" checked style="accent-color:var(--accent);">
+                <span>תגיות וסגנון</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="split-copy-milestones" checked style="accent-color:var(--accent);">
+                <span>ציוני דרך</span>
+            </label>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button onclick="document.getElementById('splitFamilyModal').style.display='none'"
+                style="padding:10px 20px; background:var(--bg-body); border:1px solid var(--border-light);
+                       border-radius:10px; cursor:pointer; font-family:inherit; font-size:14px; color:var(--text-muted);">
+                ביטול
+            </button>
+            <button onclick="confirmSplitFamily()"
+                style="padding:10px 24px; background:#7c3aed; border:none; border-radius:10px;
+                       cursor:pointer; font-size:14px; color:white; font-weight:700; font-family:inherit;">
+                <i class="fas fa-code-branch"></i> צור כרטיס חדש
+            </button>
         </div>
     </div>
 </div>
