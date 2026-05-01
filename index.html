@@ -33,7 +33,21 @@
 
 <div id="sidebar">
     <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:15px; border-bottom:1px solid var(--border-light);">
-        <h2 style="margin:0; color:var(--text-main); font-size:22px; font-weight:700;"><i class="fas fa-users" style="color:var(--accent); margin-left:8px;"></i>ניהול קהילה</h2>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+            <img id="community-logo" src="" alt="" style="width:36px; height:36px; border-radius:8px;
+                 object-fit:cover; display:none; flex-shrink:0; border:1px solid var(--border-light);">
+            <div id="community-logo-placeholder" style="width:36px; height:36px; border-radius:8px;
+                 background:var(--accent); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <i class="fas fa-star-of-david" style="color:white; font-size:16px;"></i>
+            </div>
+            <h2 id="community-name-display" style="margin:0; color:var(--text-main); font-size:20px; font-weight:700; line-height:1.2;">ניהול קהילה</h2>
+            <button onclick="openBrandingSettings()" title="הגדרות מיתוג"
+                style="margin-right:auto; background:none; border:none; color:var(--text-muted);
+                       cursor:pointer; padding:4px 6px; border-radius:6px; font-size:13px; opacity:0.6;"
+                onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">
+                <i class="fas fa-paint-brush"></i>
+            </button>
+        </div>
         <div style="display:flex; gap:8px;">
             <button onclick="toggleDarkMode()" class="btn-icon" title="מצב כהה/בהיר"><i class="fas fa-moon" id="darkModeIcon"></i></button>
             <button class="btn-icon" onclick="openSettings()" title="הגדרות"><i class="fas fa-cog"></i></button>
@@ -807,7 +821,7 @@
             <div class="crm-tab" onclick="switchCrmTab('tasks')" id="tabBtn-tasks"><i class="fas fa-check-square"></i> משימות</div>
             <div class="crm-tab" onclick="switchCrmTab('logs')" id="tabBtn-logs"><i class="fas fa-history"></i> קשר</div>
             <div class="crm-tab" onclick="switchCrmTab('donations')" id="tabBtn-donations"><i class="fas fa-hand-holding-heart"></i> תרומות</div>
-            <div class="crm-tab" onclick="switchCrmTab('milestones')" id="tabBtn-milestones"><i class="fas fa-star-of-david"></i> ציוני דרך</div>
+            <div class="crm-tab" onclick="switchCrmTab('milestones')" id="tabBtn-milestones"><i class="fas fa-calendar-alt"></i> אירועים</div>
         </div>
 
         <div id="crm-details" class="crm-tab-content active">
@@ -926,7 +940,7 @@
                 <button class="btn btn-success" style="font-size:13px; padding:6px;" onclick="addDonation()"><i class="fas fa-plus"></i> הוסף תרומה</button>
             </div>
         </div>
-        <!-- ══ לשונית ציוני דרך ══ -->
+        <!-- ══ לשונית אירועים ══ -->
         <div id="crm-milestones" class="crm-tab-content">
 
             <!-- תצוגת היום בעברי -->
@@ -937,91 +951,116 @@
                 <span>היום: <strong id="ms-today-display" style="color:var(--text-main);"></strong></span>
             </div>
 
-            <!-- רשימת אירועים קיימים -->
+            <!-- טוגל ספירלי / חד פעמי -->
+            <div style="display:flex; gap:6px; margin-bottom:14px; background:var(--bg-body);
+                        border-radius:10px; padding:4px; border:1px solid var(--border-light);">
+                <button id="ms-tab-recurring" onclick="switchMsTab('recurring')"
+                    style="flex:1; padding:7px; border-radius:8px; border:none; cursor:pointer;
+                           font-family:inherit; font-size:13px; font-weight:600;
+                           background:var(--accent); color:white;">
+                    🔄 ספירלי
+                </button>
+                <button id="ms-tab-onetime" onclick="switchMsTab('onetime')"
+                    style="flex:1; padding:7px; border-radius:8px; border:none; cursor:pointer;
+                           font-family:inherit; font-size:13px; font-weight:600;
+                           background:transparent; color:var(--text-muted);">
+                    📌 חד פעמי
+                </button>
+            </div>
+
+            <!-- רשימת אירועים -->
             <div id="ms-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;"></div>
 
-            <!-- הוספת אירוע חדש -->
-            <div style="background:var(--bg-body); border:1px solid var(--border-light);
-                        border-radius:12px; padding:14px;">
+            <!-- הוספת אירוע -->
+            <div style="background:var(--bg-body); border:1px solid var(--border-light); border-radius:12px; padding:14px;">
                 <h5 style="margin:0 0 12px 0; color:var(--accent); font-size:14px;">
-                    <i class="fas fa-plus-circle"></i> הוסף ציון דרך
+                    <i class="fas fa-plus-circle"></i> <span id="ms-add-title">הוסף אירוע</span>
                 </h5>
 
-                <!-- סוג האירוע -->
+                <!-- סוג -->
                 <div class="form-group" style="margin-bottom:10px;">
-                    <label style="font-size:12px;">סוג אירוע</label>
-                    <select id="ms-new-type" class="inline-input" onchange="onMsTypeChange()">
-                        <option value="birthday">🎂 יום הולדת</option>
-                        <option value="yahrzeit">🕯️ יארצייט</option>
-                        <option value="anniversary">💍 יום נישואין</option>
-                        <option value="bar_mitzva">✡️ בר מצווה</option>
-                        <option value="bat_mitzva">✡️ בת מצווה</option>
-                        <option value="wedding">💒 חתונה</option>
-                        <option value="other">📅 אחר</option>
-                    </select>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label style="font-size:12px;">סוג אירוע</label>
+                        <button onclick="openManageEventTypes()" style="background:none; border:none; font-size:11px; color:var(--accent); cursor:pointer; padding:0; font-family:inherit;">⚙️ נהל סוגים</button>
+                    </div>
+                    <select id="ms-new-type" class="inline-input" onchange="onMsTypeChange()"></select>
                 </div>
 
-                <!-- תיאור חופשי -->
+                <!-- תיאור -->
                 <div class="form-group" style="margin-bottom:10px;">
-                    <label style="font-size:12px;">תיאור (לדוגמה: יום הולדת אבא, יארצייט סבתא...)</label>
-                    <input type="text" id="ms-new-label" class="inline-input"
-                           placeholder="מה זה?" oninput="markDirty()">
+                    <label style="font-size:12px;">תיאור</label>
+                    <input type="text" id="ms-new-label" class="inline-input" placeholder="לדוגמה: יום הולדת אבא..." oninput="markDirty()">
                 </div>
 
-                <!-- בחירת תאריך — שני מצבים -->
+                <!-- שיוך לילד -->
+                <div id="ms-child-section" style="display:none; margin-bottom:10px;">
+                    <div class="form-group">
+                        <label style="font-size:12px;">שייך לילד</label>
+                        <select id="ms-new-child" class="inline-input">
+                            <option value="">— לא משויך לילד ספציפי —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- בחירת תאריך -->
                 <div id="ms-input-mode-toggle" style="display:flex; gap:8px; margin-bottom:10px;">
-                    <button id="ms-mode-greg" onclick="setMsInputMode('greg')"
-                        style="flex:1; padding:7px; border-radius:8px; border:2px solid var(--accent);
-                               background:var(--accent); color:white; font-family:inherit; font-size:13px; cursor:pointer; font-weight:600;">
-                        📅 תאריך לועזי
-                    </button>
-                    <button id="ms-mode-heb" onclick="setMsInputMode('heb')"
-                        style="flex:1; padding:7px; border-radius:8px; border:2px solid var(--border-light);
-                               background:var(--surface); color:var(--text-muted); font-family:inherit; font-size:13px; cursor:pointer;">
-                        🗓️ תאריך עברי
-                    </button>
+                    <button id="ms-mode-greg" onclick="setMsInputMode('greg')" style="flex:1; padding:7px; border-radius:8px; border:2px solid var(--accent); background:var(--accent); color:white; font-family:inherit; font-size:13px; cursor:pointer; font-weight:600;">📅 תאריך לועזי</button>
+                    <button id="ms-mode-heb" onclick="setMsInputMode('heb')" style="flex:1; padding:7px; border-radius:8px; border:2px solid var(--border-light); background:var(--surface); color:var(--text-muted); font-family:inherit; font-size:13px; cursor:pointer;">🗓️ תאריך עברי</button>
                 </div>
 
                 <!-- קלט לועזי -->
                 <div id="ms-greg-input">
                     <div class="form-group" style="margin-bottom:10px;">
                         <label style="font-size:12px;">תאריך לועזי</label>
-                        <input type="date" id="ms-new-greg-date" class="inline-input"
-                               onchange="onMsGregDateChange()">
+                        <input type="date" id="ms-new-greg-date" class="inline-input" onchange="onMsGregDateChange()">
                     </div>
-                    <div id="ms-greg-preview" style="font-size:12px; color:var(--accent);
-                         padding:6px 10px; background:rgba(59,130,246,0.07);
-                         border-radius:8px; display:none; margin-bottom:10px;">
+                    <div id="ms-greg-preview" style="font-size:12px; color:var(--accent); padding:6px 10px; background:rgba(59,130,246,0.07); border-radius:8px; display:none; margin-bottom:10px;">
                         📅 <span id="ms-greg-preview-text"></span>
                     </div>
                 </div>
 
-                <!-- קלט עברי ישיר -->
+                <!-- קלט עברי -->
                 <div id="ms-heb-input" style="display:none;">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
-                        <div class="form-group">
-                            <label style="font-size:12px;">יום</label>
-                            <select id="ms-new-heb-day" class="inline-input"></select>
-                        </div>
-                        <div class="form-group">
-                            <label style="font-size:12px;">חודש</label>
-                            <select id="ms-new-heb-month" class="inline-input"></select>
-                        </div>
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label style="font-size:12px;">שנה עברית</label>
+                        <select id="ms-new-heb-year" class="inline-input" onchange="onMsHebYearChange()"></select>
                     </div>
-                    <div id="ms-heb-preview" style="font-size:12px; color:var(--accent);
-                         padding:6px 10px; background:rgba(59,130,246,0.07);
-                         border-radius:8px; margin-bottom:10px;">
-                        <span id="ms-heb-preview-text">בחר יום וחודש</span>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+                        <div class="form-group"><label style="font-size:12px;">חודש</label><select id="ms-new-heb-month" class="inline-input"></select></div>
+                        <div class="form-group"><label style="font-size:12px;">יום</label><select id="ms-new-heb-day" class="inline-input"></select></div>
+                    </div>
+                    <div id="ms-heb-preview" style="font-size:12px; color:var(--accent); padding:6px 10px; background:rgba(59,130,246,0.07); border-radius:8px; margin-bottom:10px;">
+                        <span id="ms-heb-preview-text">בחר שנה, חודש ויום</span>
                     </div>
                 </div>
 
-                <button class="btn btn-primary" style="font-size:13px; padding:8px 16px; width:100%;"
-                        onclick="addMilestone()">
-                    <i class="fas fa-plus"></i> הוסף ציון דרך
+                <!-- פרטי אירוע חד פעמי -->
+                <div id="ms-onetime-details" style="display:none;">
+                    <div style="height:1px; background:var(--border-light); margin:10px 0;"></div>
+                    <div style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:8px;">פרטי האירוע (אופציונלי)</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                        <div class="form-group"><label style="font-size:12px;">מיקום</label><input type="text" id="ms-detail-location" class="inline-input" placeholder="איפה?"></div>
+                        <div class="form-group"><label style="font-size:12px;">שעה</label><input type="time" id="ms-detail-time" class="inline-input"></div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label style="font-size:12px;">הערות</label>
+                        <textarea id="ms-detail-notes" class="inline-input" rows="2" placeholder="מה חשוב לזכור?"></textarea>
+                    </div>
+                    <div style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px;">משימות לאירוע זה</div>
+                    <div id="ms-event-tasks-list" style="margin-bottom:6px;"></div>
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="ms-new-task-text" class="inline-input" placeholder="הוסף משימה..." style="flex:1;" onkeydown="if(event.key==='Enter') addEventTask()">
+                        <button onclick="addEventTask()" style="padding:8px 12px; background:var(--accent); color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px;"><i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+
+                <div style="height:10px;"></div>
+                <button class="btn btn-primary" style="font-size:13px; padding:8px 16px; width:100%;" onclick="addMilestone()">
+                    <i class="fas fa-plus"></i> הוסף אירוע
                 </button>
             </div>
         </div>
-        <!-- ══ סוף לשונית ציוני דרך ══ -->
+        <!-- ══ סוף לשונית אירועים ══ -->
 
         <div style="margin-top:20px; display:flex; gap:10px;">
             <button id="saveClientBtn" class="btn btn-primary" onclick="saveClientWithAuthCheck()"><i class="fas fa-save"></i> שמור פרטים</button>
@@ -1173,6 +1212,130 @@
                 style="padding:10px 24px; background:#7c3aed; border:none; border-radius:10px;
                        cursor:pointer; font-size:14px; color:white; font-weight:700; font-family:inherit;">
                 <i class="fas fa-code-branch"></i> צור כרטיס חדש
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ דיאלוג הגדרות מיתוג ══ -->
+<div id="brandingModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+     z-index:99999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+    <div style="background:var(--surface); border-radius:20px; width:100%; max-width:480px;
+                padding:28px; box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;">
+            <div style="width:44px; height:44px; background:rgba(59,130,246,0.1); border-radius:12px;
+                        display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <i class="fas fa-paint-brush" style="color:var(--accent); font-size:20px;"></i>
+            </div>
+            <div>
+                <div style="font-size:17px; font-weight:800; color:var(--text-main);">הגדרות מיתוג</div>
+                <div style="font-size:13px; color:var(--text-muted);">התאם את המראה לקהילה שלך</div>
+            </div>
+        </div>
+
+        <!-- שם קהילה -->
+        <div class="form-group" style="margin-bottom:16px;">
+            <label style="font-size:13px; font-weight:600;">שם הקהילה / השליחות</label>
+            <input type="text" id="branding-name" class="inline-input"
+                   placeholder="לדוגמה: חב״ד רחובות, בית חב״ד תל אביב...">
+        </div>
+
+        <!-- צבע ראשי -->
+        <div class="form-group" style="margin-bottom:16px;">
+            <label style="font-size:13px; font-weight:600;">צבע ראשי</label>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <!-- צבעים מוגדרים מראש -->
+                <div id="branding-presets" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+                <!-- בורר חופשי -->
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <input type="color" id="branding-color" value="#3b82f6"
+                           style="width:36px; height:36px; border:none; border-radius:8px;
+                                  cursor:pointer; padding:2px; background:var(--bg-body);">
+                    <span style="font-size:12px; color:var(--text-muted);">בחר צבע חופשי</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- לוגו -->
+        <div class="form-group" style="margin-bottom:16px;">
+            <label style="font-size:13px; font-weight:600;">לוגו (URL לתמונה)</label>
+            <input type="url" id="branding-logo" class="inline-input"
+                   placeholder="https://... (JPG, PNG, SVG)"
+                   oninput="previewBrandingLogo()">
+            <div id="branding-logo-preview" style="margin-top:8px; display:none;">
+                <img id="branding-logo-img" src="" alt="לוגו"
+                     style="height:48px; border-radius:8px; border:1px solid var(--border-light); object-fit:contain;">
+            </div>
+        </div>
+
+        <!-- תצוגה מקדימה -->
+        <div style="background:var(--bg-body); border:1px solid var(--border-light);
+                    border-radius:12px; padding:14px; margin-bottom:20px;">
+            <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">תצוגה מקדימה:</div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div id="branding-preview-logo" style="width:36px; height:36px; border-radius:8px;
+                     display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <i class="fas fa-star-of-david" style="color:white; font-size:16px;"></i>
+                </div>
+                <span id="branding-preview-name" style="font-size:16px; font-weight:700; color:var(--text-main);">ניהול קהילה</span>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button onclick="document.getElementById('brandingModal').style.display='none'"
+                style="padding:10px 20px; background:var(--bg-body); border:1px solid var(--border-light);
+                       border-radius:10px; cursor:pointer; font-family:inherit; font-size:14px; color:var(--text-muted);">
+                ביטול
+            </button>
+            <button onclick="saveBrandingSettings()"
+                style="padding:10px 24px; background:var(--accent); border:none; border-radius:10px;
+                       cursor:pointer; font-size:14px; color:white; font-weight:700; font-family:inherit;">
+                <i class="fas fa-save"></i> שמור
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ דיאלוג ניהול סוגי אירועים ══ -->
+<div id="eventTypesModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+     z-index:99999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+    <div style="background:var(--surface); border-radius:20px; width:100%; max-width:480px;
+                padding:28px; box-shadow:0 20px 60px rgba(0,0,0,0.4); max-height:85vh; overflow-y:auto;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+            <div style="font-size:17px; font-weight:800; color:var(--text-main);">⚙️ ניהול סוגי אירועים</div>
+            <button onclick="document.getElementById('eventTypesModal').style.display='none'"
+                style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-muted);">✕</button>
+        </div>
+
+        <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:8px;">סוגים מובנים</div>
+        <div id="builtin-types-list" style="margin-bottom:16px;"></div>
+
+        <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:8px;">סוגים מותאמים אישית</div>
+        <div id="custom-types-list" style="margin-bottom:14px;"></div>
+
+        <div style="background:var(--bg-body); border-radius:10px; padding:12px; border:1px solid var(--border-light);">
+            <div style="font-size:13px; font-weight:600; margin-bottom:10px;">הוסף סוג חדש</div>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <input type="text" id="new-type-emoji" class="inline-input" placeholder="😊" style="width:60px; text-align:center; font-size:20px;">
+                <input type="text" id="new-type-label" class="inline-input" placeholder="שם הסוג..." style="flex:1;">
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center;">
+                <input type="color" id="new-type-color" value="#3b82f6" style="width:36px; height:36px; border:none; border-radius:8px; cursor:pointer; padding:2px;">
+                <div style="display:flex; gap:6px; flex:1;">
+                    <button id="new-type-recurring-btn" onclick="setNewTypeRecurring(true)"
+                        style="flex:1; padding:6px; border-radius:8px; border:2px solid var(--accent); background:var(--accent); color:white; font-size:12px; cursor:pointer; font-family:inherit; font-weight:600;">
+                        🔄 ספירלי
+                    </button>
+                    <button id="new-type-onetime-btn" onclick="setNewTypeRecurring(false)"
+                        style="flex:1; padding:6px; border-radius:8px; border:2px solid var(--border-light); background:transparent; color:var(--text-muted); font-size:12px; cursor:pointer; font-family:inherit;">
+                        📌 חד פעמי
+                    </button>
+                </div>
+            </div>
+            <button onclick="addCustomEventType()"
+                style="width:100%; padding:8px; background:var(--accent); color:white; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:700; font-family:inherit;">
+                <i class="fas fa-plus"></i> הוסף
             </button>
         </div>
     </div>
@@ -1384,7 +1547,7 @@
     </div>
 </div>
 
-<script src="app.js?v=28"></script>
+<script src="app.js?v=27"></script>
 
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">
