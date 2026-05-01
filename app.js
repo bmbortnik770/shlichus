@@ -5966,9 +5966,10 @@ function _initMilestonesTab() {
         const el = document.getElementById('ms-today-display');
         if (el) el.textContent = today.display;
     }
-    // אתחל dropdowns
-    _populateHebDaySelect();
+    // אתחל dropdowns — קודם שנה, אחר כך חודשים, אחר כך ימים
+    _populateHebYearSelect();
     _populateHebMonthSelect();
+    _populateHebDaySelect();
     // אפס טופס
     document.getElementById('ms-new-label').value = '';
     document.getElementById('ms-new-greg-date').value = '';
@@ -5978,39 +5979,123 @@ function _initMilestonesTab() {
 }
 
 // ── מילוי dropdown ימים (א–ל) ──
-function _populateHebDaySelect() {
+function _populateHebDaySelect(monthName, year) {
     const sel = document.getElementById('ms-new-heb-day');
-    if (!sel || sel.options.length > 1) return;
-    sel.innerHTML = '<option value="">יום</option>';
-    for (let d = 1; d <= 30; d++) {
-        sel.innerHTML += `<option value="${d}">${d}</option>`;
+    if (!sel) return;
+
+    // חשב כמה ימים יש בחודש הנבחר בשנה הנבחרת
+    let maxDays = 30;
+    if (monthName && year && window.jewishDate) {
+        try {
+            maxDays = jewishDate.calcDaysInMonth(parseInt(year), monthName) || 30;
+        } catch(e) { maxDays = 30; }
     }
+
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">יום</option>';
+    for (let d = 1; d <= maxDays; d++) {
+        let hebLetter = d.toString();
+        try { hebLetter = jewishDate.convertNumberToHebrew(d, false, false) || d.toString(); } catch(e) {}
+        sel.innerHTML += `<option value="${d}">${hebLetter}</option>`;
+    }
+
+    // שחזר ערך אם עדיין תקין
+    if (currentVal && parseInt(currentVal) <= maxDays) sel.value = currentVal;
     sel.onchange = _updateHebPreview;
 }
 
-// ── מילוי dropdown חודשים עבריים ──
-function _populateHebMonthSelect() {
+// ── מילוי dropdown חודשים — תלוי בשנה (מעוברת/רגילה) ──
+function _populateHebMonthSelect(year) {
     const sel = document.getElementById('ms-new-heb-month');
-    if (!sel || sel.options.length > 1) return;
-    if (!window.HebrewDate) return;
+    if (!sel) return;
+    if (!window.HebrewDate || !window.jewishDate) return;
+
+    const currentVal = sel.value;
+    const isLeap = year ? jewishDate.isLeapYear(parseInt(year)) : false;
+
     sel.innerHTML = '<option value="">חודש</option>';
     HebrewDate.MONTHS_FOR_UI.forEach(m => {
+        // בשנה רגילה — הסתר אדר א' ואדר ב' (רק אדר)
+        // בשנה מעוברת — הסתר אדר (רק אדר א' ואדר ב')
+        if (!isLeap && (m.en === 'AdarI' || m.en === 'AdarII')) return;
+        if (isLeap && m.en === 'Adar') return;
         sel.innerHTML += `<option value="${m.en}">${m.he}</option>`;
     });
-    sel.onchange = _updateHebPreview;
+
+    // שחזר ערך אם עדיין קיים
+    if (currentVal) {
+        const exists = [...sel.options].some(o => o.value === currentVal);
+        if (exists) sel.value = currentVal;
+    }
+
+    sel.onchange = function() {
+        const yr = document.getElementById('ms-new-heb-year')?.value;
+        _populateHebDaySelect(this.value, yr);
+        _updateHebPreview();
+    };
 }
 
-// ── עדכון preview תאריך עברי ──
+// ── מילוי dropdown שנות עברי — 10 שנים אחורה + 20 קדימה ──
+function _populateHebYearSelect() {
+    const sel = document.getElementById('ms-new-heb-year');
+    if (!sel || sel.options.length > 1) return;
+    if (!window.jewishDate) return;
+
+    const currentYear = jewishDate.toJewishDate(new Date()).year;
+    sel.innerHTML = '<option value="">שנה</option>';
+
+    for (let y = currentYear - 10; y <= currentYear + 20; y++) {
+        const isLeap = jewishDate.isLeapYear(y);
+        // המר לגימטריה קצרה
+        let hebYear = y.toString();
+        try { hebYear = jewishDate.convertYearToShortHebrew(y); } catch(e) {}
+        const label = `${hebYear}${isLeap ? ' (מעוברת)' : ''}`;
+        const opt = `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${label}</option>`;
+        sel.innerHTML += opt;
+    }
+
+    // טען חודשים לפי שנה ברירת מחדל
+    _populateHebMonthSelect(currentYear);
+    _populateHebDaySelect('', currentYear);
+}
+
+// ── כשמשנים שנה — רענן חודשים וימים ──
+window.onMsHebYearChange = function() {
+    const year = document.getElementById('ms-new-heb-year')?.value;
+    const month = document.getElementById('ms-new-heb-month')?.value;
+    _populateHebMonthSelect(year);
+    _populateHebDaySelect(month, year);
+    _updateHebPreview();
+};
+
+// ── עדכון preview ──
 function _updateHebPreview() {
     if (!window.HebrewDate) return;
-    const day = parseInt(document.getElementById('ms-new-heb-day').value);
-    const monthName = document.getElementById('ms-new-heb-month').value;
-    const el = document.getElementById('ms-heb-preview-text');
-    if (!day || !monthName) { el.textContent = 'בחר יום וחודש'; return; }
+    const day       = parseInt(document.getElementById('ms-new-heb-day')?.value);
+    const monthName = document.getElementById('ms-new-heb-month')?.value;
+    const year      = parseInt(document.getElementById('ms-new-heb-year')?.value);
+    const el        = document.getElementById('ms-heb-preview-text');
+    if (!el) return;
+    if (!day || !monthName) { el.textContent = 'בחר שנה, חודש ויום'; return; }
+
     const monthHe = HebrewDate.MONTH_HE[monthName] || monthName;
+    let hebDay = day.toString();
+    try { hebDay = jewishDate.convertNumberToHebrew(day, false, false) || day.toString(); } catch(e) {}
+
+    if (year) {
+        // הצג תאריך לועזי מדויק לשנה הספציפית
+        try {
+            const greg = new Date(jewishDate.toGregorianDate({ year, monthName, day }));
+            const gregStr = greg.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric' });
+            el.textContent = `${hebDay} ${monthHe} — ${gregStr}`;
+            return;
+        } catch(e) {}
+    }
+
+    // fallback — הפעם הבאה
     const next = HebrewDate.nextOccurrence(monthName, day);
-    const greg = next.gregDate.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    el.textContent = `${day} ${monthHe} — בפעם הבאה: ${greg} (עוד ${next.daysUntil} ימים)`;
+    const greg = next.gregDate.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric' });
+    el.textContent = `${hebDay} ${monthHe} — בפעם הבאה: ${greg} (עוד ${next.daysUntil} ימים)`;
 }
 
 // ── שינוי מצב קלט: לועזי / עברי ──
@@ -6075,7 +6160,15 @@ window.addMilestone = function() {
     } else {
         day       = parseInt(document.getElementById('ms-new-heb-day').value);
         monthName = document.getElementById('ms-new-heb-month').value;
+        const yr  = parseInt(document.getElementById('ms-new-heb-year')?.value);
         if (!day || !monthName) { showToast('יש לבחור יום וחודש עבריים', 'warning'); return; }
+        // שמור גם את התאריך הלועזי המדויק אם יש שנה
+        if (yr && window.jewishDate) {
+            try {
+                const greg = new Date(jewishDate.toGregorianDate({ year: yr, monthName, day }));
+                gregDateStr = greg.toISOString().split('T')[0];
+            } catch(e) {}
+        }
     }
 
     const ms = {
@@ -6084,7 +6177,7 @@ window.addMilestone = function() {
         label,
         monthName,
         day,
-        gregDate:   gregDateStr || null, // שמור אם הוזן לועזי
+        gregDate:   gregDateStr || null,
         createdAt:  new Date().toISOString(),
     };
 
@@ -6098,7 +6191,7 @@ window.addMilestone = function() {
     document.getElementById('ms-greg-preview').style.display = 'none';
     document.getElementById('ms-new-heb-day').value = '';
     document.getElementById('ms-new-heb-month').value = '';
-    document.getElementById('ms-heb-preview-text').textContent = 'בחר יום וחודש';
+    document.getElementById('ms-heb-preview-text').textContent = 'בחר שנה, חודש ויום';
 
     showToast('ציון דרך נוסף ✓', 'success');
 };
