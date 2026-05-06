@@ -359,15 +359,19 @@ if (window.gsap) {
 }
 
 // ── 12. SEARCH CLEAR BUTTON ──────────────────────────────
-ready(function() {
-    const search = document.getElementById('smartSearch');
-    const clearBtn = document.getElementById('searchClearBtn');
-    if (search && clearBtn) {
-        search.addEventListener('input', () => {
-            clearBtn.style.display = search.value ? 'flex' : 'none';
-        });
+(function() {
+    function init() {
+        const search = document.getElementById('smartSearch');
+        const clearBtn = document.getElementById('searchClearBtn');
+        if (search && clearBtn) {
+            search.addEventListener('input', () => {
+                clearBtn.style.display = search.value ? 'flex' : 'none';
+            });
+        }
     }
-});
+    if (document.readyState !== 'loading') init();
+    else document.addEventListener('DOMContentLoaded', init);
+})();
 
 // ── 13. PROGRESS BAR ANIMATED ENTRANCE ──────────────────
 if (window.gsap) {
@@ -386,4 +390,3 @@ if (window.gsap) {
     const barEl = document.getElementById('goalProgressBar');
     if (barEl) goalBarObserver.observe(barEl, { attributes: true, attributeFilter: ['style'] });
 }
-
