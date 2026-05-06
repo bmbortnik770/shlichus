@@ -7,7 +7,7 @@
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src='https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css' rel='stylesheet' />
@@ -15,17 +15,17 @@
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
     <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.5.1/mapbox-gl-draw.js'></script>
     <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.5.1/mapbox-gl-draw.css' type='text/css' />
-    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+    <script src='https://unpkg.com/@turf/turf@6/turf.min.js' defer></script>
     
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
 
     <script src="jewish-date-browser.js"></script>
     <script src="hebrew-date-engine.js"></script>
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
     <link rel="stylesheet" href="style-additions.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
 </head>
 <body>
 
@@ -116,22 +116,7 @@
         </div>
     </div>
     
-    <div style="background:var(--bg-body); padding:10px 15px; border-radius:12px; border:1px solid var(--border-light); font-size:13px; margin-bottom:5px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-weight:600; color:var(--text-main);">Google Drive:</span>
-            <span id="sync-status" style="display:flex; align-items:center; gap:5px; color:var(--warning); font-weight:600;"><i id="sync-icon" class="fas fa-spinner fa-spin"></i> <span id="sync-text">ממתין...</span></span>
-        </div>
-        <div class="gdrive-sync-row" style="display:flex; gap:6px;">
-            <button onclick="manualSync()" class="btn btn-outline" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;"><i class="fas fa-sync-alt"></i> סנכרן</button>
-            <button onclick="forcePullFromDrive()" class="btn btn-warning" style="flex:1; padding:6px 8px; font-size:12px; border-radius:8px; width:auto;"><i class="fas fa-cloud-download-alt"></i> שחזר מענן</button>
-        </div>
-        <button onclick="window._fieldUpdatesSessionHandled=false; window._fieldUpdatesManualTrigger=true; mergeOutboxUpdates();" class="btn btn-outline" style="width:100%; margin-top:8px; padding:7px; font-size:12px; border-radius:8px; color:#10b981; border-color:#10b981;">
-            <i class="fas fa-mobile-alt"></i> טען עדכונים מאפליקציית השטח
-        </button>
-        <button onclick="openContactsSync()" class="btn btn-outline" style="width:100%; margin-top:6px; padding:7px; font-size:12px; border-radius:8px; color:var(--accent); border-color:var(--accent);">
-            <i class="fas fa-address-book"></i> סנכרן אנשי קשר גוגל
-        </button>
-    </div>
+
 
     <!-- ══ Welcome ══ -->
     <div id="welcomeMessage" style="font-weight:700; color:var(--accent); font-size:13px; text-align:center;
@@ -1858,5 +1843,6 @@
     </div>
 </div>
 
+<script src="animations.js" defer></script>
 </body>
 </html>
