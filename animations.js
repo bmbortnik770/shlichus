@@ -314,3 +314,76 @@ ready(function() {
 });
 
 })();
+
+// ── 11. KPI NUMBER COUNTER ANIMATION ────────────────────
+if (window.gsap) {
+    // Override refresh/update functions לאנים את המספרים
+    function animateCounter(el, targetVal) {
+        if (!el || !window.gsap) return;
+        const num = parseInt(String(targetVal).replace(/[^0-9]/g, '')) || 0;
+        gsap.fromTo({ val: 0 },
+            { val: 0 },
+            {
+                val: num, duration: 1.2, ease: 'power2.out',
+                onUpdate: function() {
+                    el.textContent = Math.round(this.targets()[0].val);
+                }
+            }
+        );
+    }
+
+    // פעם ב-3 שניות בדוק אם KPI השתנה
+    let _lastTotal = null, _lastUrgent = null;
+    setInterval(() => {
+        const totalEl  = document.getElementById('kpiTotal');
+        const urgentEl = document.getElementById('kpiUrgent');
+        if (!totalEl || !urgentEl) return;
+
+        const t = parseInt(totalEl.textContent) || 0;
+        const u = parseInt(urgentEl.textContent) || 0;
+
+        if (_lastTotal !== null && t !== _lastTotal) animateCounter(totalEl, t);
+        if (_lastUrgent !== null && u !== _lastUrgent) animateCounter(urgentEl, u);
+
+        _lastTotal  = t;
+        _lastUrgent = u;
+    }, 3000);
+
+    // counter בטעינה ראשונה
+    setTimeout(() => {
+        const totalEl  = document.getElementById('kpiTotal');
+        const urgentEl = document.getElementById('kpiUrgent');
+        if (totalEl  && totalEl.textContent  !== '0') animateCounter(totalEl,  totalEl.textContent);
+        if (urgentEl && urgentEl.textContent !== '0') animateCounter(urgentEl, urgentEl.textContent);
+    }, 1200);
+}
+
+// ── 12. SEARCH CLEAR BUTTON ──────────────────────────────
+ready(function() {
+    const search = document.getElementById('smartSearch');
+    const clearBtn = document.getElementById('searchClearBtn');
+    if (search && clearBtn) {
+        search.addEventListener('input', () => {
+            clearBtn.style.display = search.value ? 'flex' : 'none';
+        });
+    }
+});
+
+// ── 13. PROGRESS BAR ANIMATED ENTRANCE ──────────────────
+if (window.gsap) {
+    const goalBarObserver = new MutationObserver(() => {
+        const bar = document.getElementById('goalProgressBar');
+        if (bar && bar.style.width && bar.style.width !== '0%') {
+            const target = bar.style.width;
+            bar.style.width = '0%';
+            gsap.to(bar, {
+                width: target, duration: 1.2,
+                ease: 'power3.out', delay: .3,
+            });
+            goalBarObserver.disconnect();
+        }
+    });
+    const barEl = document.getElementById('goalProgressBar');
+    if (barEl) goalBarObserver.observe(barEl, { attributes: true, attributeFilter: ['style'] });
+}
+
