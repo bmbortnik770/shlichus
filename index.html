@@ -24,6 +24,7 @@
     <script src="jewish-date-browser.js"></script>
     <script src="hebrew-date-engine.js"></script>
     <link rel="stylesheet" href="style.css?v=5">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 </head>
 <body>
 
@@ -129,7 +130,7 @@
             <div class="main-tab" onclick="switchMainView('kanban')" id="tab-kanban"><i class="fas fa-project-diagram"></i> פרויקטים</div>
             <div class="main-tab" onclick="switchMainView('comm')" id="tab-comm"><i class="fas fa-bullhorn"></i> תקשורת</div>
             <div class="main-tab" onclick="switchMainView('tasks')" id="tab-tasks"><i class="fas fa-check-double"></i> מרכז משימות</div>
-            <div class="main-tab" onclick="switchMainView('events')" id="tab-events"><i class="fas fa-star-of-david"></i> אירועים</div>
+            <div class="main-tab" onclick="switchMainView('events')" id="tab-events"><i class="fas fa-calendar-alt"></i> אירועים</div>
         </div>
     </div>
 
@@ -288,15 +289,13 @@
     <div class="kanban-hub-header">
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
             <h2 style="margin:0; color:var(--primary);">
-                <i class="fas fa-star-of-david" style="color:var(--accent);"></i> אירועי הקהילה
+                <i class="fas fa-calendar-alt" style="color:var(--accent);"></i> אירועי הקהילה
             </h2>
-            <!-- תאריך היום בעברי -->
             <span id="events-today-heb" style="font-size:13px; color:var(--text-muted);
                   background:var(--bg-body); padding:4px 12px; border-radius:20px;
                   border:1px solid var(--border-light);"></span>
         </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <!-- חלון זמן -->
             <select id="events-window" onchange="renderEventsView()"
                 style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-light);
                        background:var(--surface); font-family:inherit; font-size:13px; color:var(--text-main);">
@@ -306,17 +305,10 @@
                 <option value="60">60 ימים</option>
                 <option value="90">90 ימים</option>
             </select>
-            <!-- סינון לפי סוג -->
             <select id="events-type-filter" onchange="renderEventsView()"
                 style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-light);
                        background:var(--surface); font-family:inherit; font-size:13px; color:var(--text-main);">
                 <option value="">כל הסוגים</option>
-                <option value="yahrzeit">🕯️ יארצייטים</option>
-                <option value="birthday">🎂 ימי הולדת</option>
-                <option value="anniversary">💍 ימי נישואין</option>
-                <option value="bar_mitzva">✡️ בר/בת מצווה</option>
-                <option value="wedding">💒 חתונות</option>
-                <option value="other">📅 אחר</option>
             </select>
             <button onclick="renderEventsView()" class="btn btn-outline"
                 style="width:auto; padding:8px 14px; font-size:13px;">
@@ -325,10 +317,27 @@
         </div>
     </div>
 
+    <!-- טאבים ספירלי / חד פעמי -->
+    <div style="display:flex; gap:6px; padding:12px 20px 0; background:var(--bg-body);">
+        <button id="ev-main-tab-recurring" onclick="switchEventsMainTab('recurring')"
+            style="padding:8px 20px; border-radius:10px; border:none; cursor:pointer;
+                   font-family:inherit; font-size:13px; font-weight:700;
+                   background:var(--accent); color:white;">
+            🔄 ספירלי
+        </button>
+        <button id="ev-main-tab-onetime" onclick="switchEventsMainTab('onetime')"
+            style="padding:8px 20px; border-radius:10px; border:none; cursor:pointer;
+                   font-family:inherit; font-size:13px; font-weight:700;
+                   background:var(--surface); color:var(--text-muted);
+                   border:1px solid var(--border-light);">
+            📌 חד פעמי
+        </button>
+    </div>
+
     <!-- אזור תוכן -->
     <div style="flex-grow:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px;">
 
-        <!-- KPI סיכום -->
+        <!-- KPI -->
         <div id="events-kpi-row" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;"></div>
 
         <!-- ציר זמן -->
@@ -336,9 +345,9 @@
 
         <!-- ריק -->
         <div id="events-empty" style="display:none; text-align:center; padding:60px 20px; color:var(--text-muted);">
-            <i class="fas fa-star-of-david" style="font-size:40px; opacity:0.2; display:block; margin-bottom:16px;"></i>
+            <i class="fas fa-calendar-alt" style="font-size:40px; opacity:0.2; display:block; margin-bottom:16px;"></i>
             <div style="font-size:16px; font-weight:600;">אין אירועים בטווח הנבחר</div>
-            <div style="font-size:13px; margin-top:8px;">הוסף ציוני דרך בכרטיסי המשפחות</div>
+            <div style="font-size:13px; margin-top:8px;">הוסף אירועים בכרטיסי המשפחות</div>
         </div>
     </div>
 </div>
@@ -1548,6 +1557,7 @@
 </div>
 
 <script src="app.js?v=27"></script>
+<script src="animations.js"></script>
 
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">
