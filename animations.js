@@ -28,12 +28,13 @@ ready(function() {
         pill.id = 'tab-pill';
         pill.style.cssText = `
             position: absolute;
-            border-radius: inherit;
             background: linear-gradient(135deg, #3b82f6, #4f46e5);
             box-shadow: 0 4px 16px rgba(59,130,246,.4);
             pointer-events: none;
             z-index: 0;
             border-radius: 14px;
+            width: 0; height: 0;
+            top: 0; left: 0;
         `;
         tabsContainer.style.position = 'relative';
         tabsContainer.insertBefore(pill, tabsContainer.firstChild);
@@ -236,36 +237,45 @@ ready(function() {
         });
     }
 
-    // ── 8. VIEW TRANSITIONS ──────────────────────────────────
+    // ── 8+10. VIEW TRANSITIONS + PILL UPDATE (משולב) ────────
     if (window.gsap) {
-        // Override switchMainView להוסיף page transition
         const _origSwitch = window.switchMainView;
         window.switchMainView = function(viewName) {
-            // fade out תוכן נוכחי
-            const containers = document.querySelectorAll(
-                '#map-container, #list-container, #kanban-container, #comm-container, #tasks-container, #events-container'
-            );
-            const visible = [...containers].filter(c => c.style.display !== 'none' && c.style.display !== '');
+            // 1. קרא ל-original
+            _origSwitch && _origSwitch(viewName);
 
-            if (visible.length && gsap) {
-                gsap.to(visible, {
-                    opacity: 0, y: -12, duration: .18,
-                    ease: 'power2.in',
-                    onComplete: () => {
-                        _origSwitch(viewName);
-                        // fade in תוכן חדש
-                        setTimeout(() => {
-                            const newVisible = [...containers].filter(c => c.style.display !== 'none' && c.style.display !== '');
-                            gsap.fromTo(newVisible,
-                                { opacity: 0, y: 16 },
-                                { opacity: 1, y: 0, duration: .35, ease: 'power3.out' }
-                            );
-                        }, 30);
-                    }
+            // 2. fade in תוכן חדש
+            setTimeout(() => {
+                const containers = document.querySelectorAll(
+                    '#map-container, #list-container, #kanban-container, #comm-container, #tasks-container, #events-container'
+                );
+                const newVisible = [...containers].filter(c => {
+                    const d = c.style.display;
+                    return d && d !== 'none';
                 });
-            } else {
-                _origSwitch(viewName);
-            }
+                if (newVisible.length) {
+                    gsap.fromTo(newVisible,
+                        { opacity: 0, y: 10 },
+                        { opacity: 1, y: 0, duration: .3, ease: 'power2.out' }
+                    );
+                }
+
+                // 3. עדכן pill
+                const tabsEl = document.querySelector('.main-tabs');
+                const pillEl = document.getElementById('tab-pill');
+                if (!tabsEl || !pillEl) return;
+                const active = tabsEl.querySelector('.main-tab.active');
+                if (!active) return;
+                const tabRect  = active.getBoundingClientRect();
+                const wrapRect = tabsEl.getBoundingClientRect();
+                gsap.to(pillEl, {
+                    x: tabRect.left - wrapRect.left,
+                    y: tabRect.top  - wrapRect.top,
+                    width: tabRect.width,
+                    height: tabRect.height,
+                    duration: .38, ease: 'back.out(1.4)',
+                });
+            }, 20);
         };
     }
 
@@ -286,29 +296,7 @@ ready(function() {
         }
     }
 
-    // ── 10. PILL עדכון כשה-app משנה טאב ──────────────────
-    // patch ל-switchMainView שמעדכן גם את ה-pill
-    const origSMV = window.switchMainView;
-    window.switchMainView = function(viewName) {
-        origSMV && origSMV(viewName);
-        // עדכן pill
-        setTimeout(() => {
-            const tabsEl = document.querySelector('.main-tabs');
-            const pillEl = document.getElementById('tab-pill');
-            if (!tabsEl || !pillEl || !window.gsap) return;
-            const active = tabsEl.querySelector('.main-tab.active');
-            if (!active) return;
-            const tabRect  = active.getBoundingClientRect();
-            const wrapRect = tabsEl.getBoundingClientRect();
-            gsap.to(pillEl, {
-                x: tabRect.left - wrapRect.left,
-                y: tabRect.top  - wrapRect.top,
-                width: tabRect.width,
-                height: tabRect.height,
-                duration: .42, ease: 'back.out(1.4)',
-            });
-        }, 10);
-    };
+
 
     console.log('✅ animations.js loaded — GSAP premium animations active');
 });
@@ -359,19 +347,15 @@ if (window.gsap) {
 }
 
 // ── 12. SEARCH CLEAR BUTTON ──────────────────────────────
-(function() {
-    function init() {
-        const search = document.getElementById('smartSearch');
-        const clearBtn = document.getElementById('searchClearBtn');
-        if (search && clearBtn) {
-            search.addEventListener('input', () => {
-                clearBtn.style.display = search.value ? 'flex' : 'none';
-            });
-        }
+ready(function() {
+    const search = document.getElementById('smartSearch');
+    const clearBtn = document.getElementById('searchClearBtn');
+    if (search && clearBtn) {
+        search.addEventListener('input', () => {
+            clearBtn.style.display = search.value ? 'flex' : 'none';
+        });
     }
-    if (document.readyState !== 'loading') init();
-    else document.addEventListener('DOMContentLoaded', init);
-})();
+});
 
 // ── 13. PROGRESS BAR ANIMATED ENTRANCE ──────────────────
 if (window.gsap) {
