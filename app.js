@@ -8067,10 +8067,10 @@ window._ensureClosedRing = function(coords) {
 // ── תיקון 8: fetch בלי try/catch — Drive file read ──
 // תיקון ל-syncWithDrive שיש בו fetch לא מוגן
 const _origSyncWithDrive = window.syncWithDrive;
-if (typeof syncWithDrive === 'function') {
+if (typeof _origSyncWithDrive === 'function') {
     window.syncWithDrive = async function(forcePull) {
         try {
-            return await syncWithDrive(forcePull);
+            return await _origSyncWithDrive(forcePull);
         } catch(e) {
             console.error('syncWithDrive error:', e);
             setSyncStatus('error', 'שגיאת סנכרון');
