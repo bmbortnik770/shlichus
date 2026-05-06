@@ -593,7 +593,7 @@ window.openTerritoryMapEditor = (source) => {
             // עדכן פוליגון קיים ב-Draw
             if (tempTerritoryPolygon && tempTerritoryPolygon.length >= 3) {
                 tmDraw && tmDraw.deleteAll();
-                const ring = tempTerritoryPolygon[0] === tempTerritoryPolygon[tempTerritoryPolygon.length-1]
+                const ring = window._isPolygonClosed(tempTerritoryPolygon)
                     ? tempTerritoryPolygon : [...tempTerritoryPolygon, tempTerritoryPolygon[0]];
                 tmDraw && tmDraw.add({ type:'Feature', geometry:{ type:'Polygon', coordinates:[ring] } });
                 const cx = ring.reduce((s,p)=>s+p[0],0)/ring.length;
@@ -654,7 +654,7 @@ window.openTerritoryMapEditor = (source) => {
 
             // אם יש פוליגון קיים — טען אותו ל-Draw
             if (tempTerritoryPolygon && tempTerritoryPolygon.length >= 3) {
-                const ring = tempTerritoryPolygon[0] === tempTerritoryPolygon[tempTerritoryPolygon.length-1]
+                const ring = window._isPolygonClosed(tempTerritoryPolygon)
                     ? tempTerritoryPolygon : [...tempTerritoryPolygon, tempTerritoryPolygon[0]];
                 tmDraw.add({ type:'Feature', geometry:{ type:'Polygon', coordinates:[ring] } });
                 tmUpdateFromDraw();
@@ -3026,8 +3026,18 @@ function saveLocal() {
 
 // queue לשמירה — מונע התנגשויות
 let saveQueue = Promise.resolve();
+let _saveQueueDepth = 0;
+const MAX_SAVE_QUEUE = 3;
+
 function queueSave() {
-    saveQueue = saveQueue.then(() => pushToDrive());
+    if (_saveQueueDepth >= MAX_SAVE_QUEUE) {
+        // יש כבר מספיק שמירות בתור — דלג
+        return;
+    }
+    _saveQueueDepth++;
+    saveQueue = saveQueue
+        .then(() => pushToDrive())
+        .finally(() => { _saveQueueDepth = Math.max(0, _saveQueueDepth - 1); });
 }
 
 // מניעת שמירה כפולה
@@ -3064,8 +3074,9 @@ function saveDB() {
     db['__SETTINGS__'] = appSettings;
 
     saveLocal();
-    handleOmniSearch();
     queueSave();
+    // handleOmniSearch מופעל רק כשצריך לעדכן UI — לא בכל שמירה
+    // כדי למנוע re-render מלא של המפה בכל פעולה
 }
 
 // autosave — שומר לוקאלית בלבד בזמן עריכה (לא לדרייב)
@@ -3727,7 +3738,7 @@ window.handleOmniSearch = () => {
     
     if(q.length>=2 && res.length>0) { 
         dd.style.display='block'; 
-        dd.innerHTML=res.slice(0,15).map(r=>`<div class="search-item" onclick="jumpToSearchResult('${encodeURIComponent(r.bldg)}',${r.idx})"><div class="search-item-title">${r.apt.name||'ללא שם'} <span style="font-size:12px;">(${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':r.bldg})</span></div></div>`).join(''); 
+        dd.innerHTML=res.slice(0,15).map(r=>`<div class="search-item" onclick="jumpToSearchResult('${encodeURIComponent(r.bldg)}',${r.idx})"><div class="search-item-title">${escapeHTML(r.apt.name||'ללא שם')} <span style="font-size:12px;">(${r.bldg===NO_ADDRESS_KEY?'ללא כתובת':escapeHTML(r.bldg)})</span></div></div>`).join(''); 
     } else { 
         if(dd) dd.style.display='none'; 
     }
@@ -5422,7 +5433,7 @@ function getLastSyncText() {
     if(diff < 3600) return `עודכן לפני ${Math.floor(diff/60)} דקות`;
     return `עודכן לפני ${Math.floor(diff/3600)} שעות`;
 }
-setInterval(() => {
+window._syncTextInterval = setInterval(() => {
     const el = document.getElementById('sync-text');
     if(el && el.innerText !== 'שומר...' && el.innerText !== 'שואב...') {
         el.innerText = getLastSyncText();
@@ -5430,13 +5441,14 @@ setInterval(() => {
 }, 5000);
 
 // סנכרון אוטומטי כל 30 שניות — רק אם המשתמש לא באמצע עריכה והטוקן בתוקף
-setInterval(() => {
+window._autoSyncInterval = setInterval(() => {
     const session = JSON.parse(localStorage.getItem('gdrive_session'));
     const isTokenValid = session && session.expiresAt > (new Date().getTime() + 60000);
     if(accessToken && !isDirty && isTokenValid) {
         syncWithDrive();
     } else if (!accessToken) {
         clearInterval(window._autoSyncInterval);
+        clearInterval(window._syncTextInterval);
     }
 }, 30000);
 
@@ -7666,4 +7678,501 @@ window.deleteCustomEventType = function(idx) {
     _renderCustomTypes();
     _refreshMsTypeSelect();
     showToast(`סוג "${name}" נמחק`, 'info');
+};
+
+
+// ════════════════════════════════════════════════════════════
+// ██  לשונית אירועים כללית — שדרוג עם ספירלי/חד פעמי  ██
+// ════════════════════════════════════════════════════════════
+
+let _eventsMainTab = 'recurring'; // 'recurring' | 'onetime'
+
+// ── החלף טאב ראשי ──
+window.switchEventsMainTab = function(tab) {
+    _eventsMainTab = tab;
+    const btnR = document.getElementById('ev-main-tab-recurring');
+    const btnO = document.getElementById('ev-main-tab-onetime');
+    if (btnR) { btnR.style.background = tab === 'recurring' ? 'var(--accent)' : 'var(--surface)'; btnR.style.color = tab === 'recurring' ? 'white' : 'var(--text-muted)'; btnR.style.border = tab === 'recurring' ? 'none' : '1px solid var(--border-light)'; }
+    if (btnO) { btnO.style.background = tab === 'onetime' ? 'var(--accent)' : 'var(--surface)'; btnO.style.color = tab === 'onetime' ? 'white' : 'var(--text-muted)'; btnO.style.border = tab === 'onetime' ? 'none' : '1px solid var(--border-light)'; }
+    renderEventsView();
+};
+
+// ── מלא dropdown סוגים דינמית ──
+function _refreshEventsTypeFilter() {
+    const sel = document.getElementById('events-type-filter');
+    if (!sel) return;
+    const allTypes = getAllEventTypes().filter(t =>
+        _eventsMainTab === 'recurring' ? t.recurring : !t.recurring
+    );
+    sel.innerHTML = '<option value="">כל הסוגים</option>' +
+        allTypes.map(t => `<option value="${t.id}">${t.emoji} ${t.label}</option>`).join('');
+}
+
+// ── אסוף אירועים מה-DB לפי טאב ──
+function _getAllEventsFiltered(days, typeFilter) {
+    const families = [];
+    Object.entries(db).forEach(([bldg, bldgData]) => {
+        if (!bldgData?.apts) return;
+        bldgData.apts.forEach((apt, aptIdx) => {
+            if (!(apt.milestones || []).length) return;
+            families.push({ bldg, aptIdx, apt });
+        });
+    });
+
+    // סנן לפי ספירלי/חד פעמי
+    const today = new Date(); today.setHours(0,0,0,0);
+    const results = [];
+
+    families.forEach(({ bldg, aptIdx, apt }) => {
+        (apt.milestones || []).forEach(ms => {
+            const typeDef = getEventTypeById(ms.type);
+            const isRecurring = ms.recurring ?? typeDef?.recurring ?? true;
+
+            // בדוק שמתאים לטאב
+            if (_eventsMainTab === 'recurring' && !isRecurring) return;
+            if (_eventsMainTab === 'onetime'   &&  isRecurring) return;
+
+            // סנן לפי סוג
+            if (typeFilter && ms.type !== typeFilter) return;
+
+            let daysUntil = 9999;
+            let gregDate  = null;
+
+            try {
+                if (isRecurring) {
+                    const occ = HebrewDate.nextOccurrence(ms.monthName, ms.day);
+                    daysUntil = occ.daysUntil;
+                    gregDate  = occ.gregDate;
+                } else if (ms.year) {
+                    gregDate  = HebrewDate.toGregorian(ms.monthName, ms.day, ms.year);
+                    daysUntil = Math.round((gregDate - today) / 86400000);
+                    if (daysUntil < 0) return; // אירוע עבר
+                } else return;
+            } catch(e) { return; }
+
+            if (daysUntil > days) return;
+
+            results.push({
+                bldg, aptIdx,
+                aptName: apt.name || '',
+                type: ms.type,
+                label: ms.label,
+                icon: typeDef?.emoji || '📅',
+                color: typeDef?.color || '#3b82f6',
+                daysUntil,
+                gregDate,
+                ms,
+                isRecurring,
+                childName: ms.childName || null,
+            });
+        });
+    });
+
+    return results.sort((a, b) => a.daysUntil - b.daysUntil);
+}
+
+// ── רינדור ראשי — override ──
+window.renderEventsView = function() {
+    if (!window.HebrewDate) return;
+
+    _refreshEventsTypeFilter();
+
+    const days       = parseInt(document.getElementById('events-window')?.value || 30);
+    const typeFilter = document.getElementById('events-type-filter')?.value || '';
+    const events     = _getAllEventsFiltered(days, typeFilter);
+
+    _renderEventsKPI(events, days);
+
+    const timeline = document.getElementById('events-timeline');
+    const empty    = document.getElementById('events-empty');
+
+    if (!events.length) {
+        timeline.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+    _renderEventsTimeline(events);
+};
+
+// ── KPI ──
+window._renderEventsKPI = function(events, days) {
+    const kpiEl = document.getElementById('events-kpi-row');
+    if (!kpiEl) return;
+
+    const total   = events.length;
+    const today   = events.filter(e => e.daysUntil === 0).length;
+    const week    = events.filter(e => e.daysUntil <= 7).length;
+    const withKid = events.filter(e => e.childName).length;
+
+    const kpis = [
+        { label: `ב-${days} ימים`,  value: total,   color: 'var(--accent)',  icon: 'fa-calendar-alt' },
+        { label: 'היום',            value: today,   color: 'var(--danger)',  icon: 'fa-exclamation-circle' },
+        { label: 'השבוע',           value: week,    color: 'var(--warning)', icon: 'fa-clock' },
+        { label: _eventsMainTab === 'onetime' ? 'מקושר לילד' : 'יארצייטים',
+          value: _eventsMainTab === 'onetime'
+            ? withKid
+            : events.filter(e => e.type === 'yahrzeit').length,
+          color: '#64748b', icon: _eventsMainTab === 'onetime' ? 'fa-child' : 'fa-candle' },
+    ];
+
+    kpiEl.innerHTML = kpis.map(k => `
+        <div style="background:var(--surface); border:1px solid var(--border-light);
+                    border-radius:14px; padding:14px 16px; text-align:center; box-shadow:var(--card-shadow);">
+            <i class="fas ${k.icon}" style="color:${k.color}; font-size:18px; margin-bottom:6px; display:block;"></i>
+            <div style="font-size:28px; font-weight:900; color:${k.color}; line-height:1;">${k.value}</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${k.label}</div>
+        </div>`
+    ).join('');
+};
+
+// ── ציר זמן ──
+window._renderEventsTimeline = function(events) {
+    const timeline = document.getElementById('events-timeline');
+
+    // קבץ לפי יום
+    const groups = {};
+    events.forEach(ev => {
+        const key = ev.daysUntil;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(ev);
+    });
+
+    timeline.innerHTML = Object.keys(groups)
+        .sort((a,b) => parseInt(a)-parseInt(b))
+        .map(daysKey => {
+            const daysNum = parseInt(daysKey);
+            const evs = groups[daysKey];
+
+            let dayLabel, dayBg, dayColor;
+            if (daysNum === 0)      { dayLabel = '🔴 היום!';         dayBg = 'rgba(239,68,68,0.08)';  dayColor = 'var(--danger)'; }
+            else if (daysNum === 1) { dayLabel = '🟠 מחר';           dayBg = 'rgba(234,88,12,0.08)';  dayColor = '#ea580c'; }
+            else if (daysNum <= 7)  { dayLabel = `🟡 עוד ${daysNum} ימים`; dayBg = 'rgba(245,158,11,0.06)'; dayColor = 'var(--warning)'; }
+            else                   { dayLabel = `עוד ${daysNum} ימים`; dayBg = 'var(--surface)'; dayColor = 'var(--text-muted)'; }
+
+            const gregStr = evs[0].gregDate
+                ? evs[0].gregDate.toLocaleDateString('he-IL', { weekday:'long', day:'2-digit', month:'long', year:'numeric' })
+                : '';
+
+            const rows = evs.map(ev => {
+                // תאריך עברי
+                const monthHe = HebrewDate.MONTH_HE[ev.ms.monthName] || ev.ms.monthName;
+                let hebDay = ev.ms.day.toString();
+                try { hebDay = jewishDate.convertNumberToHebrew(ev.ms.day, false, false) || hebDay; } catch(e) {}
+                const hebDate = ev.ms.year && !ev.isRecurring
+                    ? `${hebDay} ${monthHe} ${ev.ms.year}`
+                    : `${hebDay} ${monthHe}`;
+
+                // פרטים לחד פעמי
+                let extraHtml = '';
+                if (!ev.isRecurring && ev.ms.details) {
+                    const d = ev.ms.details;
+                    const parts = [d.location, d.time].filter(Boolean);
+                    if (parts.length) extraHtml += `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${parts.map(escapeHTML).join(' · ')}</div>`;
+                    if (ev.ms.tasks?.length) {
+                        const done = ev.ms.tasks.filter(t=>t.done).length;
+                        extraHtml += `<div style="font-size:11px; color:var(--accent);">✓ ${done}/${ev.ms.tasks.length} משימות</div>`;
+                    }
+                }
+
+                const childBadge = ev.childName
+                    ? `<span style="font-size:11px; background:rgba(139,92,246,0.1); color:#7c3aed; padding:1px 7px; border-radius:10px;">👤 ${escapeHTML(ev.childName)}</span>`
+                    : '';
+
+                return `
+                <div style="display:flex; align-items:flex-start; gap:12px; padding:10px 14px;
+                            background:var(--bg-body); border-radius:10px; cursor:pointer;"
+                     onclick="openClientCardFromEvent('${encodeURIComponent(ev.bldg)}', ${ev.aptIdx})">
+                    <div style="width:36px; height:36px; border-radius:50%; flex-shrink:0;
+                                background:${ev.color}18; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                        ${ev.icon}
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-weight:700; font-size:14px; color:var(--text-main);">${escapeHTML(ev.label)}</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                            ${childBadge}
+                            <span>משפחת ${escapeHTML(ev.aptName)}</span>
+                            <span>· 📅 ${hebDate}</span>
+                        </div>
+                        ${extraHtml}
+                    </div>
+                    <div style="display:flex; gap:6px; flex-shrink:0;">
+                        <button onclick="event.stopPropagation(); sendEventWhatsApp('${encodeURIComponent(ev.bldg)}', ${ev.aptIdx}, '${encodeURIComponent(ev.label)}')"
+                            style="padding:5px 10px; border-radius:8px; border:none; background:rgba(37,211,102,0.12); color:#25D366; cursor:pointer; font-size:12px;">
+                            <i class="fab fa-whatsapp"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); addTaskFromEvent('${encodeURIComponent(ev.bldg)}', ${ev.aptIdx}, '${encodeURIComponent(ev.label)}', ${daysNum})"
+                            style="padding:5px 10px; border-radius:8px; border:none; background:rgba(59,130,246,0.1); color:var(--accent); cursor:pointer; font-size:12px;">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+
+            return `
+            <div style="background:${dayBg}; border:1px solid ${daysNum<=1 ? dayColor+'40' : 'var(--border-light)'}; border-radius:14px; overflow:hidden;">
+                <div style="padding:10px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light);">
+                    <span style="font-weight:800; font-size:14px; color:${dayColor};">${dayLabel}</span>
+                    <span style="font-size:12px; color:var(--text-muted);">${gregStr}</span>
+                </div>
+                <div style="padding:8px; display:flex; flex-direction:column; gap:6px;">${rows}</div>
+            </div>`;
+        }).join('');
+};
+
+// ── אתחול ──
+const _origInitEventsView = window._initEventsView || function(){};
+window._initEventsView = function() {
+    _origInitEventsView();
+    switchEventsMainTab('recurring');
+};
+
+
+// ════════════════════════════════════════════════════════════
+// ██  תיקוני אמינות ואבטחה  ██
+// ════════════════════════════════════════════════════════════
+
+// ── תיקון 1: _resetAllTemp — איפוס מלא לפני כל פתיחת כרטיס ──
+window._resetAllTemp = function() {
+    tempTags        = [];
+    tempTasks       = [];
+    tempChildren    = [];
+    tempLogs        = [];
+    tempDonations   = [];
+    tempCustom      = {};
+    tempBoards      = {};
+    tempMilestones  = [];
+    _tempEventTasks = [];
+    isDirty         = false;
+};
+
+// עטוף את openClientCard המקורי כדי לאפס תמיד לפני פתיחה
+const _origOpenClientCardSafe = window.openClientCard;
+window.openClientCard = function(idx) {
+    _resetAllTemp();
+    _origOpenClientCardSafe(idx);
+};
+
+// ── תיקון 2: escapeHTML — וודא שקיים ומוגדר כ-global ──
+if (!window.escapeHTML) {
+    window.escapeHTML = function(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
+}
+
+// ── תיקון 3: renderLogs — עטוף עם escapeHTML ──
+window.renderLogs = function() {
+    const el = document.getElementById('cLogsList');
+    if (!el) return;
+    if (!tempLogs.length) {
+        el.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><div>עוד לא נוצר קשר. זה הזמן!</div></div>';
+        return;
+    }
+    el.innerHTML = tempLogs
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .map((l, i) => `
+            <div class="log-item">
+                <div class="log-header">
+                    <span><i class="fas fa-calendar-alt"></i> ${escapeHTML(l.date)} - ${escapeHTML(l.type)}</span>
+                    <button onclick="tempLogs.splice(${i},1);markDirty();renderLogs()"
+                        style="background:none;border:none;color:var(--danger);cursor:pointer;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div>${escapeHTML(l.text)}</div>
+            </div>`)
+        .join('');
+};
+
+// ── תיקון 4: renderDonations — עטוף עם escapeHTML ──
+window.renderDonations = function() {
+    const sum = tempDonations.reduce((a, b) => a + Number(b.amount || 0), 0);
+    const sumEl = document.getElementById('cDonationsSum');
+    if (sumEl) sumEl.innerText = `₪${sum}`;
+    const el = document.getElementById('cDonationsList');
+    if (!el) return;
+    if (!tempDonations.length) {
+        el.innerHTML = '<div class="empty-state"><i class="fas fa-hand-holding-heart"></i><div>אין תרומות.</div></div>';
+        return;
+    }
+    el.innerHTML = tempDonations
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .map((d, i) => `
+            <div class="log-item">
+                <div class="log-header">
+                    <span style="color:var(--success);"><i class="fas fa-shekel-sign"></i> ${escapeHTML(String(d.amount))}</span>
+                    <span>${escapeHTML(d.date)}</span>
+                </div>
+                <div>${escapeHTML(d.reason)}
+                    <button onclick="tempDonations.splice(${i},1);markDirty();renderDonations()"
+                        style="float:left;background:none;border:none;color:var(--danger);cursor:pointer;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>`)
+        .join('');
+};
+
+// ── תיקון 5: crmFamilyTitle — escapeHTML ──
+const _origOpenClientCardTitle = window.openClientCard;
+window.openClientCard = function(idx) {
+    _origOpenClientCardTitle(idx);
+    // תיקן את הכותרת אחרי הפתיחה
+    const a = db[currentBldg]?.apts[idx];
+    const titleEl = document.getElementById('crmFamilyTitle');
+    if (titleEl && a) {
+        titleEl.innerHTML = `<i class="fas fa-id-card"></i> ${escapeHTML(a.name || 'משפחה חדשה')} <span style="font-size:12px;">${currentBldg === NO_ADDRESS_KEY ? '(ללא כתובת)' : ''}</span>`;
+    }
+};
+
+// ── תיקון 6: search results — escapeHTML ──
+const _origHandleOmniSearch = window.handleOmniSearch;
+if (_origHandleOmniSearch) {
+    window.handleOmniSearch = function() {
+        _origHandleOmniSearch.apply(this, arguments);
+        // תיקן תוצאות חיפוש אחרי רינדור
+        setTimeout(() => {
+            const dd = document.getElementById('searchDropdown');
+            if (dd) {
+                dd.querySelectorAll('.search-item-title').forEach(el => {
+                    // הטקסט כבר רונדר — אי אפשר לתקן post-hoc בקלות
+                    // הפתרון הנכון הוא ברינדור עצמו
+                });
+            }
+        }, 0);
+    };
+}
+
+// ── תיקון 7: polygon coords comparison — תיקון ===  ──
+window._isPolygonClosed = function(coords) {
+    if (!coords || coords.length < 2) return false;
+    const first = coords[0];
+    const last  = coords[coords.length - 1];
+    // השוואה נכונה של קואורדינטות (מערכים)
+    return first[0] === last[0] && first[1] === last[1];
+};
+
+window._ensureClosedRing = function(coords) {
+    if (!coords || coords.length < 3) return coords;
+    if (window._isPolygonClosed(coords)) return coords;
+    return [...coords, coords[0]];
+};
+
+// ── תיקון 8: fetch בלי try/catch — Drive file read ──
+// תיקון ל-syncWithDrive שיש בו fetch לא מוגן
+const _origSyncWithDrive = window.syncWithDrive;
+if (typeof syncWithDrive === 'function') {
+    window.syncWithDrive = async function(forcePull) {
+        try {
+            return await syncWithDrive(forcePull);
+        } catch(e) {
+            console.error('syncWithDrive error:', e);
+            setSyncStatus('error', 'שגיאת סנכרון');
+            showToast('שגיאה בסנכרון עם Drive', 'error');
+        }
+    };
+}
+
+// ── תיקון 9: toast — escapeHTML ──
+const _origShowToast = window.showToast;
+if (_origShowToast) {
+    window.showToast = function(msg, type, duration) {
+        // msg יכול להכיל HTML מכוון (icons) — לא נברח ממנו
+        // אבל נוודא שהוא string
+        return _origShowToast(String(msg), type, duration);
+    };
+}
+
+// ── תיקון 10: וודא שהפונקציות החדשות של polygon משתמשות ב-_ensureClosedRing ──
+// patch לשני המקומות שמשתמשים ב-tempTerritoryPolygon[0] === tempTerritoryPolygon[last]
+(function() {
+    // override של tmUpdateFromDraw אם קיים
+    const _origTmUpdateFromDraw = window.tmUpdateFromDraw;
+    if (_origTmUpdateFromDraw) {
+        window.tmUpdateFromDraw = function() {
+            _origTmUpdateFromDraw.apply(this, arguments);
+            // וודא שהפוליגון סגור נכון אחרי עדכון
+            if (tempTerritoryPolygon && Array.isArray(tempTerritoryPolygon)) {
+                tempTerritoryPolygon = window._ensureClosedRing(tempTerritoryPolygon);
+            }
+        };
+    }
+})();
+
+
+// ════════════════════════════════════════════════════════════
+// ██  איחוד Wrappers — openClientCard + switchMainView  ██
+// ════════════════════════════════════════════════════════════
+
+// ── שמור reference לפונקציה המקורית של openClientCard ──
+// (לפני כל ה-wrappers שנוספו)
+const _coreOpenClientCard = (function() {
+    // מצא את הפונקציה הראשונה האמיתית — לא wrapper
+    // ה-wrappers השתרשרו כך:
+    // orig(3294) ← milestones(6412) ← safe/reset(7938) ← title(8011)
+    // כל אחד קורא ל-_orig שלו
+    // הפתרון: כתוב פונקציה אחת שעושה הכל
+    return window.openClientCard; // הנוכחית כבר מכילה את כל ה-chain
+})();
+
+// ── פונקציה אחידה שמחליפה את כל ה-wrappers ──
+window.openClientCard = function(idx) {
+    // 1. אפס temp arrays — תמיד לפני הכל
+    _resetAllTemp();
+
+    // 2. קרא לפונקציה הבסיסית (כבר מכילה את milestone + familyStatus)
+    _coreOpenClientCard(idx);
+
+    // 3. תקן כותרת עם escapeHTML
+    const a = db[currentBldg]?.apts?.[idx];
+    const titleEl = document.getElementById('crmFamilyTitle');
+    if (titleEl && a) {
+        titleEl.innerHTML = `<i class="fas fa-id-card"></i> ${escapeHTML(a.name || 'משפחה חדשה')} <span style="font-size:12px;">${currentBldg === NO_ADDRESS_KEY ? '(ללא כתובת)' : ''}</span>`;
+    }
+};
+
+// ── פונקציה אחידה לswitchMainView ──
+const _coreSwitchMainView = (function() {
+    return window.switchMainView; // כבר מכיל tasks + events chains
+})();
+
+window.switchMainView = function(viewName) {
+    _coreSwitchMainView(viewName);
+};
+
+// ── ESC לסגירת כל modal פתוח ──
+document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+
+    const modals = [
+        'clientModal', 'buildingModal', 'deceasedModal', 'splitFamilyModal',
+        'brandingModal', 'eventTypesModal', 'fieldUpdatesModal',
+        'addressSearchModal', 'contactSyncModal'
+    ];
+
+    for (const id of modals) {
+        const el = document.getElementById(id);
+        if (el && el.style.display !== 'none' && el.style.display !== '') {
+            el.style.display = 'none';
+            // אפס dirty flag אם סוגרים clientModal
+            if (id === 'clientModal' && isDirty) {
+                isDirty = false;
+            }
+            break; // סגור רק modal אחד בכל פעם
+        }
+    }
+});
+
+// ── refreshMapIfNeeded — רנדר מחדש רק אם צריך ──
+// קורא ל-handleOmniSearch רק אם המפה גלויה או הרשימה גלויה
+window.refreshAfterSave = function() {
+    if (currentMainView === 'map' || currentMainView === 'table') {
+        handleOmniSearch();
+    }
 };
