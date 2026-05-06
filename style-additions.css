@@ -1,0 +1,117 @@
+/*
+ ══════════════════════════════════════════════════
+  style-additions.css
+  תוספות CSS לשדרוגי ה-HTML
+  לטעון אחרי style.css
+ ══════════════════════════════════════════════════
+*/
+
+/* ── KPI number counter animation ── */
+@keyframes countUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+#kpiTotal, #kpiUrgent {
+    animation: countUp .5s ease both;
+}
+
+/* ── Welcome message auto-show ── */
+#welcomeMessage:not(:empty) { display: block !important; }
+
+/* ── Search clear button show/hide ── */
+#smartSearch:not(:placeholder-shown) ~ #searchClearBtn,
+#smartSearch:focus:not(:placeholder-shown) ~ #searchClearBtn {
+    display: flex !important;
+    align-items: center;
+}
+
+/* ── Sidebar header gradient title ── */
+#community-name-display {
+    background: var(--accent-grad);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+body.dark-mode #community-name-display {
+    background: linear-gradient(135deg, #60a5fa, #818cf8);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+/* ── Sync card dark mode ── */
+body.dark-mode #sync-card {
+    background: rgba(37,99,235,.08);
+    border-color: rgba(37,99,235,.2);
+}
+
+/* ── KPI cards hover glow ── */
+#kpi-total-card:hover {
+    box-shadow: 0 8px 32px rgba(37,99,235,.15) !important;
+}
+#kpi-urgent-card:hover {
+    box-shadow: 0 8px 32px rgba(239,68,68,.15) !important;
+}
+
+/* ── Search wrapper animated border ── */
+.search-wrapper {
+    transition: border-color .2s, box-shadow .2s, background .2s;
+}
+.search-wrapper:focus-within {
+    border-color: var(--accent) !important;
+    box-shadow: var(--focus-ring), var(--card-shadow) !important;
+}
+
+/* ── Scrollbar in sidebar ── */
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border-solid); border-radius: 10px; }
+#sidebar::-webkit-scrollbar-thumb:hover { background: var(--accent-mid); }
+
+/* ── Goal progress bar shimmer ── */
+@keyframes shimmer {
+    0%   { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+}
+#goalProgressBar::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+    animation: shimmer 2s infinite;
+    border-radius: inherit;
+}
+
+/* ── Map container rounded corners glow on hover ── */
+#map-container:hover {
+    box-shadow: var(--hover-shadow) !important;
+    transition: box-shadow .3s;
+}
+
+/* ── Tab pill transition ── */
+#tab-pill {
+    transition: none; /* נשלט ע"י GSAP */
+}
+
+/* ── Action buttons in sidebar row ── */
+#sidebar-header .btn-icon {
+    background: var(--surface-2);
+    border-color: var(--border-light);
+}
+#sidebar-header .btn-icon:hover {
+    background: var(--accent-light);
+    border-color: var(--accent-mid);
+    transform: translateY(-1px);
+}
+
+/* ── coverageCard premium ── */
+#coverageCard {
+    background: var(--surface) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius-lg) !important;
+}
+
+/* ── Search dropdown items ── */
+.search-item {
+    transition: background .15s, padding-right .15s;
+}
+.search-item:first-child { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.search-item:last-child  { border-radius: 0 0 var(--radius-lg) var(--radius-lg); border: none; }
