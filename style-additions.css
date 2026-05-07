@@ -234,6 +234,142 @@ body.dark-mode #sync-card {
     to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ══════════════════════════════════════════════════════
+   VISUAL DEPTH — Mesh Gradient + Noise Texture
+   ══════════════════════════════════════════════════════ */
+
+/* blob 1 — כחול שמאל עליון */
+/* blob 2 — סגול ימין עליון */
+/* blob 3 — ירוק ימין תחתון */
+/* blob 4 — כתום מרכז */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    will-change: transform;
+    background:
+        radial-gradient(ellipse 75% 60% at 8%  20%, rgba(59,130,246,.22) 0%, transparent 62%),
+        radial-gradient(ellipse 55% 50% at 92% 10%, rgba(99,102,241,.17) 0%, transparent 55%),
+        radial-gradient(ellipse 65% 55% at 78% 88%, rgba(16,185,129,.13) 0%, transparent 55%),
+        radial-gradient(ellipse 45% 38% at 38% 62%, rgba(245,158,11,.08) 0%, transparent 52%);
+    animation: meshFloat 20s ease-in-out infinite alternate;
+}
+body.dark-mode::before {
+    background:
+        radial-gradient(ellipse 75% 60% at 8%  20%, rgba(59,130,246,.14) 0%, transparent 62%),
+        radial-gradient(ellipse 55% 50% at 92% 10%, rgba(99,102,241,.11) 0%, transparent 55%),
+        radial-gradient(ellipse 65% 55% at 78% 88%, rgba(16,185,129,.08) 0%, transparent 55%),
+        radial-gradient(ellipse 45% 38% at 38% 62%, rgba(245,158,11,.05) 0%, transparent 52%);
+}
+@keyframes meshFloat {
+    0%   { transform: scale(1)    translate(0,     0);    }
+    25%  { transform: scale(1.02) translate(-1.5%,  1%);  }
+    50%  { transform: scale(1.01) translate( 1%,  -1.5%); }
+    75%  { transform: scale(1.03) translate(-0.5%, 1.5%); }
+    100% { transform: scale(1.02) translate( 1.5%,-0.5%); }
+}
+
+/* Grain / noise */
+body::after {
+    content: '';
+    position: fixed;
+    inset: -100px;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .028;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 300px 300px;
+}
+body.dark-mode::after { opacity: .042; }
+
+/* content above mesh */
+#sidebar       { z-index: 10 !important; }
+#main-content  { position: relative; z-index: 1; }
+#toast-container, .modal, #splash-screen, #auth-overlay { z-index: 99999 !important; }
+
+/* ══════════════════════════════════════════════════════
+   ENHANCED GLASSMORPHISM
+   ══════════════════════════════════════════════════════ */
+
+#sidebar {
+    background: rgba(255,255,255,.72) !important;
+    backdrop-filter: blur(32px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(32px) saturate(180%) !important;
+    border-left: 1px solid rgba(255,255,255,.55) !important;
+    box-shadow:
+        12px 0 48px rgba(15,23,42,.07),
+        1px 0 0 rgba(255,255,255,.65) inset !important;
+}
+body.dark-mode #sidebar {
+    background: rgba(8,15,30,.80) !important;
+    backdrop-filter: blur(32px) saturate(140%) !important;
+    border-left: 1px solid rgba(255,255,255,.07) !important;
+    box-shadow: 12px 0 48px rgba(0,0,0,.38) !important;
+}
+
+.main-tabs {
+    background: rgba(255,255,255,.65) !important;
+    backdrop-filter: blur(20px) saturate(160%) !important;
+    border: 1px solid rgba(255,255,255,.55) !important;
+    box-shadow:
+        0 4px 24px rgba(15,23,42,.07),
+        0 1px 0 rgba(255,255,255,.7) inset !important;
+}
+body.dark-mode .main-tabs {
+    background: rgba(15,23,42,.70) !important;
+    border: 1px solid rgba(255,255,255,.07) !important;
+}
+
+.kpi-box {
+    background: rgba(255,255,255,.80) !important;
+    backdrop-filter: blur(18px) saturate(160%) !important;
+    border: 1px solid rgba(255,255,255,.68) !important;
+    box-shadow:
+        0 2px 8px  rgba(15,23,42,.06),
+        0 1px 0 rgba(255,255,255,.9) inset,
+        0 -1px 0 rgba(15,23,42,.03) inset !important;
+    transition: transform .3s, box-shadow .3s !important;
+}
+body.dark-mode .kpi-box {
+    background: rgba(15,23,42,.78) !important;
+    border: 1px solid rgba(255,255,255,.07) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.32),
+                0 1px 0 rgba(255,255,255,.05) inset !important;
+}
+
+/* card shine sweep on hover */
+.kpi-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -120%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.38), transparent);
+    transform: skewX(-18deg);
+    pointer-events: none;
+    z-index: 2;
+}
+.kpi-box:hover::before {
+    animation: cardShine .65s ease forwards;
+}
+@keyframes cardShine {
+    0%   { left: -120%; opacity: 1; }
+    100% { left:  160%; opacity: .2; }
+}
+
+/* search bar glass */
+.search-wrapper {
+    background: rgba(255,255,255,.80) !important;
+    backdrop-filter: blur(20px) saturate(160%) !important;
+    border: 1.5px solid rgba(255,255,255,.6) !important;
+    box-shadow: 0 2px 12px rgba(15,23,42,.06) !important;
+}
+body.dark-mode .search-wrapper {
+    background: rgba(15,23,42,.75) !important;
+    border-color: rgba(255,255,255,.08) !important;
+}
+
 /* ══ TYPOGRAPHY UPGRADE — יותר אוויר, יותר קריאות ══ */
 
 /* בסיס — גופן גדול יותר ומרווח יותר */

@@ -298,9 +298,117 @@ ready(function() {
 
 
 
+    // ── 3D CARD TILT ─────────────────────────────────────────
+    if (window.gsap) {
+        let _tiltTarget = null;
+
+        document.addEventListener('mousemove', e => {
+            const card = e.target.closest('.kpi-box, .stat-card');
+
+            // leaving previous card → reset
+            if (_tiltTarget && _tiltTarget !== card) {
+                gsap.to(_tiltTarget, {
+                    rotateX: 0, rotateY: 0, scale: 1,
+                    ease: 'elastic.out(1, .45)',
+                    duration: .9,
+                    overwrite: 'auto',
+                });
+            }
+            _tiltTarget = card;
+            if (!card) return;
+
+            const r = card.getBoundingClientRect();
+            const x = (e.clientX - r.left)  / r.width  - .5; // -0.5..0.5
+            const y = (e.clientY - r.top)   / r.height - .5;
+
+            gsap.to(card, {
+                rotateY:              x * 16,
+                rotateX:              y * -16,
+                scale:                1.03,
+                transformPerspective: 650,
+                ease:                 'power2.out',
+                duration:             .22,
+                overwrite:            'auto',
+            });
+        });
+    }
+
+    // ── CURSOR SPOTLIGHT ─────────────────────────────────────
+    const spotlight = document.createElement('div');
+    spotlight.id = 'cursor-spotlight';
+    spotlight.style.cssText = [
+        'position:fixed',
+        'width:480px', 'height:480px',
+        'border-radius:50%',
+        'pointer-events:none',
+        'z-index:0',
+        'background:radial-gradient(circle, rgba(59,130,246,.09) 0%, transparent 70%)',
+        'transform:translate(-50%,-50%)',
+        'will-change:left,top',
+        'transition:opacity .4s',
+        'opacity:0',
+    ].join(';');
+    document.body.appendChild(spotlight);
+
+    let _spotActive = false;
+    document.addEventListener('mousemove', e => {
+        spotlight.style.left = e.clientX + 'px';
+        spotlight.style.top  = e.clientY + 'px';
+        if (!_spotActive) { spotlight.style.opacity = '1'; _spotActive = true; }
+    });
+    document.addEventListener('mouseleave', () => {
+        spotlight.style.opacity = '0'; _spotActive = false;
+    });
+
     console.log('✅ animations.js loaded — GSAP premium animations active');
 });
 
+})();
+
+// ── MAGNETIC BUTTONS ──────────────────────────────────────────
+(function initMagnetic() {
+    if (!window.gsap) return;
+
+    function applyMagnetic(selector, pull) {
+        document.querySelectorAll(selector).forEach(el => {
+            if (el.dataset.magnetic) return;
+            el.dataset.magnetic = '1';
+
+            el.addEventListener('mousemove', e => {
+                const r  = el.getBoundingClientRect();
+                const cx = r.left + r.width  / 2;
+                const cy = r.top  + r.height / 2;
+                gsap.to(el, {
+                    x: (e.clientX - cx) * pull,
+                    y: (e.clientY - cy) * pull,
+                    ease: 'power2.out',
+                    duration: .28,
+                    overwrite: 'auto',
+                });
+            });
+            el.addEventListener('mouseleave', () => {
+                gsap.to(el, {
+                    x: 0, y: 0,
+                    ease: 'elastic.out(1, .5)',
+                    duration: .7,
+                    overwrite: 'auto',
+                });
+            });
+        });
+    }
+
+    function runMagnetic() {
+        applyMagnetic('.btn-primary',          .32);
+        applyMagnetic('.fab-add, #desktopFab', .42);
+        applyMagnetic('.btn-icon',             .22);
+    }
+
+    // הפעל מיד + כל פעם שנוספים כפתורים חדשים (modals וכו')
+    if (document.readyState !== 'loading') runMagnetic();
+    else document.addEventListener('DOMContentLoaded', runMagnetic);
+
+    const mo = new MutationObserver(runMagnetic);
+    mo.observe(document.body, { childList: true, subtree: true });
 })();
 
 // ── 11. KPI NUMBER COUNTER ANIMATION ────────────────────
