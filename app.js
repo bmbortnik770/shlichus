@@ -3097,7 +3097,7 @@ window.switchMainView = function(viewName) {
     if (dtab) dtab.classList.add('active');
 
     // body view class — CSS uses this to show/hide elements per view
-    document.body.classList.remove('view-map','view-table','view-kanban','view-tasks','view-comm');
+    document.body.classList.remove('view-map','view-table','view-kanban','view-tasks','view-comm','view-events');
     document.body.classList.add('view-' + viewName);
 
     document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
@@ -3105,12 +3105,14 @@ window.switchMainView = function(viewName) {
     document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
     document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
     document.getElementById('tasks-container').style.display = viewName==='tasks'?'flex':'none';
+    document.getElementById('events-container').style.display = viewName==='events'?'flex':'none';
 
     if(viewName==='map') map.resize();
     if(viewName==='tasks') {
         document.getElementById('globalTaskDate').value = new Date().toISOString().split('T')[0];
         renderGlobalTasks();
     }
+    if(viewName==='events') renderEventsView();
     handleOmniSearch();
 };;
 
