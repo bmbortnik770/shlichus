@@ -115,3 +115,133 @@ body.dark-mode #sync-card {
 }
 .search-item:first-child { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .search-item:last-child  { border-radius: 0 0 var(--radius-lg) var(--radius-lg); border: none; }
+
+/* ── Welcome message — gradient pill ── */
+#welcomeMessage:not(:empty) {
+    background: var(--accent-grad) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: var(--radius-xl) !important;
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+    box-shadow: var(--glow-blue) !important;
+    animation: welcomePulse 3s ease-in-out infinite;
+}
+@keyframes welcomePulse {
+    0%, 100% { box-shadow: var(--glow-blue); }
+    50%       { box-shadow: var(--glow-blue-lg); }
+}
+
+/* ── KPI cards — gradient overlay on hover ── */
+.kpi-box {
+    position: relative;
+    overflow: hidden;
+    transition: var(--smooth), box-shadow .3s;
+}
+.kpi-box::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent-grad);
+    opacity: 0;
+    transition: opacity .3s ease;
+    pointer-events: none;
+    border-radius: inherit;
+}
+.kpi-box:hover::after { opacity: 0.06; }
+#kpi-urgent-card::after { background: var(--danger-grad); }
+
+/* ── Stat cards — gradient overlay on hover ── */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+    transition: var(--smooth), box-shadow .3s;
+}
+.stat-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent-grad);
+    opacity: 0;
+    transition: opacity .3s ease;
+    pointer-events: none;
+    border-radius: inherit;
+}
+.stat-card:hover::after { opacity: 0.04; }
+
+/* ── Filter chip buttons ── */
+.filter-chip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    border: 1.5px solid var(--border-light);
+    background: var(--surface);
+    backdrop-filter: var(--backdrop);
+    color: var(--text-muted);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--smooth);
+    box-shadow: var(--card-shadow);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.filter-chip-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light);
+    transform: translateY(-1px);
+    box-shadow: var(--focus-ring), var(--card-shadow);
+}
+.filter-chip-btn.active {
+    background: var(--accent-grad);
+    color: white;
+    border-color: transparent;
+    box-shadow: var(--glow-blue);
+}
+.filter-chip-btn i { font-size: 11px; opacity: .8; }
+
+/* ── Quick filter chips row ── */
+#quickFilterChips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* ── Tab pill glow ── */
+#tab-pill {
+    box-shadow: 0 4px 20px rgba(59,130,246,.45) !important;
+}
+
+/* ── Kanban column headers ── */
+.kanban-col-header {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 12px 16px;
+    font-weight: 800;
+    font-size: 13px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.kanban-col-count {
+    background: rgba(255,255,255,.25);
+    border-radius: var(--radius-full);
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+/* ── Smooth view transitions (backup if GSAP not loaded) ── */
+#map-container, #list-container, #kanban-container,
+#comm-container, #tasks-container, #events-container {
+    animation: viewFadeIn .25s ease both;
+}
+@keyframes viewFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}

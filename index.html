@@ -244,6 +244,20 @@
         <select id="fStyle" style="display:none" onchange="applyAdvFilters()"><option value="">כל הסגנונות</option></select>
         <select id="fTag" style="display:none" onchange="applyAdvFilters()"><option value="">כל התגיות</option></select>
         <select id="fStatus" style="display:none" onchange="applyAdvFilters()"><option value="">כל הסטטוסים</option><option value="green">קשר טרי (ירוק)</option><option value="orange">קשר בינוני (כתום)</option><option value="red">לטיפול (אדום/אפור)</option></select>
+        <div id="quickFilterChips">
+            <button class="filter-chip-btn" onclick="document.getElementById('fStatus').value='green'; applyAdvFilters(); this.classList.toggle('active');">
+                <i class="fas fa-circle" style="color:#10b981;"></i> קשר טרי
+            </button>
+            <button class="filter-chip-btn" onclick="document.getElementById('fStatus').value='orange'; applyAdvFilters(); this.classList.toggle('active');">
+                <i class="fas fa-circle" style="color:#f59e0b;"></i> בינוני
+            </button>
+            <button class="filter-chip-btn" onclick="document.getElementById('fStatus').value='red'; applyAdvFilters(); this.classList.toggle('active');">
+                <i class="fas fa-circle" style="color:#ef4444;"></i> לטיפול
+            </button>
+            <button class="filter-chip-btn" onclick="document.getElementById('fStatus').value=''; applyAdvFilters(); document.querySelectorAll('#quickFilterChips .filter-chip-btn').forEach(b=>b.classList.remove('active'));">
+                <i class="fas fa-times"></i> הכל
+            </button>
+        </div>
         <div id="chipFiltersContainer" class="filter-chips-wrapper"></div>
     </div>
 
