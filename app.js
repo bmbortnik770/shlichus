@@ -2571,6 +2571,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.updatedAt = Date.now();
     if(a.num) ensureMinimumUnits(currentBldg, a.num);
     isDirty=false; isCreatingNew=false; saveDB(); if(window.haptic) haptic('success'); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
+    handleOmniSearch();
     updateCoverageStats();
     if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
 });
@@ -3480,7 +3481,7 @@ function refreshMap(filteredRes = null) {
         let maxVal=0, showBldg=false;
         
         db[k].apts.forEach((a,i) => {
-            total++; if(stats[a.style]!==undefined) stats[a.style]++; else {stats[a.style]=1; if(a.style && !appSettings.styles.includes(a.style)) appSettings.styles.push(a.style);}
+            total++; const _sk = a.style || 'ללא סגנון'; if(stats[_sk]!==undefined) stats[_sk]++; else {stats[_sk]=1; if(a.style && !appSettings.styles.includes(a.style)) appSettings.styles.push(a.style);}
             const c = getStatusColor(a); if (c === '#ef4444' || c === '#94a3b8') urgent++; const v = c === '#94a3b8' ? 0 : (c === '#10b981' ? 1 : (c === '#f59e0b' ? 2 : 3)); if (v > maxVal) maxVal = v;
             if(!filteredRes || filteredRes.find(r=>r.bldg===k && r.idx===i)) showBldg=true;
 
@@ -3539,17 +3540,27 @@ function refreshMap(filteredRes = null) {
     document.getElementById('kpiTotal').innerText=total; document.getElementById('kpiUrgent').innerText=urgent;
     const alDiv = document.getElementById('kpiAlerts'); alDiv.innerHTML='';
     if(alerts.length>0) alDiv.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border-light); padding:10px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><div style="color:var(--text-main); margin-bottom:5px;">התראות השבוע:</div><ul style="margin:0; padding:0; list-style:none; font-weight:normal;">${alerts.slice(0,6).join('')}${alerts.length>6?'<li style="padding-top:5px; color:var(--text-muted);">ועוד...</li>':''}</ul></div>`;
-    if(chart) chart.destroy(); const chartColors = Object.keys(stats).map(s => getColorForString(s, 'style')); chart = new Chart(document.getElementById('styleChart'), { type:'doughnut', data:{labels:Object.keys(stats), datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000'}}}, cutout:'65%'} });
+    if(chart) { chart.destroy(); chart = null; }
+    const _chartLabels = Object.keys(stats);
+    if(_chartLabels.length > 0) {
+        const _chartColors = _chartLabels.map(s => getColorForString(s, 'style'));
+        const _cvs = document.getElementById('styleChart');
+        if(_cvs) {
+            _cvs.style.display = 'block';
+            chart = new Chart(_cvs, { type:'doughnut', data:{labels:_chartLabels, datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:_chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000', font:{size:11}}}}, cutout:'65%', animation:{duration:400}} });
+        }
+    }
     
     updateGoalTracker();
     updateHomeButton();
 }
 
-window.markTaskDoneFromDash = (bldgEnc, aptIdx, taskIdx) => { 
-    const bldg = decodeURIComponent(bldgEnc); 
-    db[bldg].apts[aptIdx].tasks[taskIdx].done = true; 
-    saveDB(); 
-    showToast("המשימה הושלמה! " + getRandomCompliment(), "success"); 
+window.markTaskDoneFromDash = (bldgEnc, aptIdx, taskIdx) => {
+    const bldg = decodeURIComponent(bldgEnc);
+    db[bldg].apts[aptIdx].tasks[taskIdx].done = true;
+    saveDB();
+    handleOmniSearch();
+    showToast("המשימה הושלמה! " + getRandomCompliment(), "success");
 };
 
 window.toggleDarkMode=() => {document.body.classList.toggle('dark-mode');localStorage.setItem('darkMode',document.body.classList.contains('dark-mode'));document.getElementById('darkModeIcon').className=document.body.classList.contains('dark-mode')?'fas fa-sun':'fas fa-moon';if(chart)refreshMap();};
@@ -3777,6 +3788,7 @@ window.sendCommWhatsApp = async () => {
             });
         } else {
             showToast('פותח וואטסאפ...', 'success');
+            if(window.autoLogSentMessage) autoLogSentMessage('whatsapp', commRecipients.filter(r=>r.key), text);
             commRecipients = [];
             renderRecipientsList('whatsapp');
             document.getElementById('waRecipientCount').innerText = 0;
@@ -3829,6 +3841,7 @@ window.sendCommEmail = async () => {
     }
 
     showToast('נפתחה תוכנת המייל', 'success');
+    if(window.autoLogSentMessage) autoLogSentMessage('email', commRecipients.filter(r=>r.key), textInput);
     commRecipients = [];
     renderRecipientsList('email');
     document.getElementById('emRecipientCount').innerText = 0;

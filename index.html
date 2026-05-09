@@ -80,6 +80,9 @@
 
     </div>
 
+    <!-- ══ Welcome Greeting ══ -->
+    <div id="welcomeMessage" style="display:none; font-size:12px; text-align:center;"></div>
+
     <!-- ══ Address Search ══ -->
     <div id="geocoder"></div>
 
@@ -224,8 +227,6 @@ function toggleDrivePanel() {
 </script>
 
 <div id="main-content">
-    <div id="welcomeMessage" style="font-weight:700; color:white; font-size:13px; text-align:center;
-         padding:8px 16px; margin:8px 16px 0 16px; border-radius:10px; display:none;"></div>
     <div class="top-nav-bar">
         <div class="main-tabs">
             <div class="main-tab active" onclick="switchMainView('map')" id="tab-map"><i class="fas fa-map-marker-alt"></i> מפה</div>
@@ -293,13 +294,14 @@ function toggleDrivePanel() {
         <div class="kanban-hub-header">
             <h2 style="margin:0; color:var(--primary);"><i class="fas fa-satellite-dish" style="color:var(--accent);"></i> מרכז תקשורת קהילתי</h2>
             <div style="display:flex; gap:10px;">
-                <span class="tag-badge" style="font-size:14px; padding:6px 10px;"><i class="fas fa-paper-plane"></i> 0 הודעות נשלחו החודש</span>
+                <span class="tag-badge" style="font-size:14px; padding:6px 10px;"><i class="fas fa-paper-plane"></i> <span id="commMonthlyCount">0 הודעות נשלחו החודש</span></span>
             </div>
         </div>
         
         <div class="crm-tabs" style="margin: 20px 20px 0 20px; background: var(--surface); border-radius: 8px 8px 0 0; padding-top: 10px; border: 1px solid var(--border-light); border-bottom: none;">
             <div class="crm-tab active" onclick="switchCommTab('whatsapp')" id="commTabBtn-whatsapp"><i class="fab fa-whatsapp" style="color:#25D366;"></i> וואטסאפ</div>
             <div class="crm-tab" onclick="switchCommTab('email')" id="commTabBtn-email"><i class="fas fa-envelope" style="color:#ea4335;"></i> אימייל</div>
+            <div class="crm-tab" onclick="switchCommTab('sms')" id="commTabBtn-sms"><i class="fas fa-sms" style="color:#0ea5e9;"></i> SMS</div>
             <div class="crm-tab" onclick="switchCommTab('phone')" id="commTabBtn-phone"><i class="fas fa-phone" style="color:var(--success);"></i> רשימות חיוג</div>
             <div class="crm-tab" onclick="switchCommTab('templates')" id="commTabBtn-templates"><i class="fas fa-file-alt"></i> תבניות הודעה</div>
             <div class="crm-tab" onclick="switchCommTab('logs')" id="commTabBtn-logs"><i class="fas fa-history"></i> היסטוריה</div>
@@ -356,7 +358,55 @@ function toggleDrivePanel() {
                 <button class="btn btn-primary" onclick="sendCommEmail()" style="background:#ea4335; border-color:#ea4335;"><i class="fas fa-paper-plane"></i> פתח תוכנת מייל לשליחה</button>
             </div>
 
-            <div id="comm-phone" class="comm-tab-content"><h3 style="margin-top:0;">רשימות חיוג (Call Center)</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
+            <div id="comm-sms" class="comm-tab-content">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                    <h3 style="margin:0;color:#0ea5e9;"><i class="fas fa-sms"></i> שליחת SMS</h3>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span id="smsProviderBadge" style="font-size:12px;background:var(--bg-body);padding:4px 10px;border-radius:8px;border:1px solid var(--border-light);font-weight:600;">📱 SMS מקומי (sms:)</span>
+                        <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="openCommServices()"><i class="fas fa-cog"></i> שירותים</button>
+                    </div>
+                </div>
+                <div style="background:var(--bg-body);padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid var(--border-light);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span><strong>נמענים:</strong> <span id="smsRecipientCount" style="color:#0ea5e9;font-weight:bold;font-size:16px;">0</span></span>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addSMSFromDB()"><i class="fas fa-users"></i> בחר מרשימה</button>
+                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addSMSManually()"><i class="fas fa-plus"></i> הוסף ידנית</button>
+                        </div>
+                    </div>
+                    <div id="smsRecipientsList" style="max-height:140px;overflow-y:auto;"></div>
+                </div>
+                <div class="form-group">
+                    <label>בחר תבנית:</label>
+                    <select id="smsTemplateSelect" onchange="previewSMSTemplate()" style="width:100%;"><option value="">-- בחר תבנית --</option></select>
+                </div>
+                <div class="form-group">
+                    <label>תוכן ה-SMS:</label>
+                    <textarea id="smsMessageText" rows="4" placeholder="הקלד הודעת SMS... (השתמש ב-[שם] לשילוב שם המשפחה)" class="inline-input" style="width:100%;"></textarea>
+                </div>
+                <button class="btn btn-primary" style="background:#0ea5e9;border-color:#0ea5e9;" onclick="sendCommSMS()"><i class="fas fa-paper-plane"></i> שלח SMS לנמענים</button>
+            </div>
+
+            <div id="comm-phone" class="comm-tab-content">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                    <h3 style="margin:0;color:var(--success);"><i class="fas fa-phone"></i> מרכז חיוג — <span id="callListCount">0</span> משפחות</h3>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <select onchange="setCallSort(this.value)" class="inline-input" style="padding:5px 8px;font-size:12px;width:auto;">
+                            <option value="urgency">מיון: דחיפות</option>
+                            <option value="name">מיון: שם</option>
+                            <option value="last_contact">קשר אחרון</option>
+                        </select>
+                        <input type="text" placeholder="חיפוש..." oninput="setCallSearch(this.value)" class="inline-input" style="padding:5px 10px;font-size:12px;width:130px;">
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+                    <button class="call-filter-btn active" data-f="all" onclick="setCallFilter('all')">הכל</button>
+                    <button class="call-filter-btn" data-f="need_contact" onclick="setCallFilter('need_contact')"><i class="fas fa-exclamation-circle" style="color:var(--danger);"></i> ניהל קשר</button>
+                    <button class="call-filter-btn" data-f="has_tasks" onclick="setCallFilter('has_tasks')"><i class="fas fa-tasks" style="color:var(--warning);"></i> יש משימות</button>
+                    <button class="call-filter-btn" data-f="no_phone" onclick="setCallFilter('no_phone')"><i class="fas fa-phone-slash"></i> ללא טלפון</button>
+                </div>
+                <div id="callListContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
 
             <div id="comm-templates" class="comm-tab-content">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
@@ -369,7 +419,21 @@ function toggleDrivePanel() {
                 <div id="templatesListContainer"></div>
             </div>
 
-            <div id="comm-logs" class="comm-tab-content"><h3 style="margin-top:0;">היסטוריית תקשורת</h3><p style="color:var(--text-muted);">טוען נתונים...</p></div>
+            <div id="comm-logs" class="comm-tab-content">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                    <h3 style="margin:0;"><i class="fas fa-history" style="color:var(--accent);"></i> היסטוריית תקשורת — <span id="logsCount">0</span> רשומות</h3>
+                    <input type="text" placeholder="חיפוש..." oninput="setLogsSearch(this.value)" class="inline-input" style="padding:5px 10px;font-size:12px;width:140px;">
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+                    <button class="log-filter-btn active" data-f="" onclick="setLogsFilter('')">הכל</button>
+                    <button class="log-filter-btn" data-f="whatsapp" onclick="setLogsFilter('whatsapp')"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp</button>
+                    <button class="log-filter-btn" data-f="email" onclick="setLogsFilter('email')"><i class="fas fa-envelope" style="color:#ea4335;"></i> מייל</button>
+                    <button class="log-filter-btn" data-f="sms" onclick="setLogsFilter('sms')"><i class="fas fa-sms" style="color:#0ea5e9;"></i> SMS</button>
+                    <button class="log-filter-btn" data-f="phone" onclick="setLogsFilter('phone')"><i class="fas fa-phone" style="color:var(--success);"></i> שיחה</button>
+                    <button class="log-filter-btn" data-f="visit" onclick="setLogsFilter('visit')"><i class="fas fa-walking" style="color:var(--accent);"></i> ביקור</button>
+                </div>
+                <div id="commLogsTimeline" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
         </div>
     </div>
 
@@ -1671,11 +1735,120 @@ function toggleDrivePanel() {
     </div>
 </div>
 
+<!-- ══ Quick Call Log Modal ══ -->
+<div id="quickCallModal" class="modal" style="display:none; z-index:10002;">
+    <div class="modal-content" style="max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="margin:0;color:var(--primary);"><i class="fas fa-phone" style="color:var(--success);"></i> תיעוד שיחה</h3>
+            <button class="btn-icon" onclick="document.getElementById('quickCallModal').style.display='none'" style="border:none;font-size:18px;"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="background:var(--bg-body);padding:12px;border-radius:10px;margin-bottom:14px;border:1px solid var(--border-light);">
+            <div style="font-size:13px;color:var(--text-muted);">משפחה:</div>
+            <div id="qcFamilyName" style="font-size:17px;font-weight:800;color:var(--text-main);"></div>
+        </div>
+        <div class="form-group">
+            <label>תוצאת השיחה:</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+                <button class="qc-result-btn" data-r="answered" onclick="setQCResult(this)"><i class="fas fa-check-circle" style="color:var(--success);"></i> ענו</button>
+                <button class="qc-result-btn" data-r="no_answer" onclick="setQCResult(this)"><i class="fas fa-phone-slash" style="color:var(--danger);"></i> לא ענו</button>
+                <button class="qc-result-btn" data-r="busy" onclick="setQCResult(this)"><i class="fas fa-circle" style="color:var(--warning);"></i> תפוס</button>
+                <button class="qc-result-btn" data-r="callback" onclick="setQCResult(this)"><i class="fas fa-redo" style="color:var(--accent);"></i> יחזור</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>הערות:</label>
+            <textarea id="qcNotes" rows="3" class="inline-input" style="width:100%;" placeholder="רשום הערות על השיחה..."></textarea>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('quickCallModal').style.display='none'">ביטול</button>
+            <button class="btn btn-primary" style="flex:2;" onclick="saveQuickCallLog()"><i class="fas fa-save"></i> שמור תיעוד</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ SMS Queue Helper Modal ══ -->
+<div id="smsHelperModal" class="modal" style="display:none; z-index:10002;">
+    <div class="modal-content" style="max-width:460px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="margin:0;color:#0ea5e9;"><i class="fas fa-sms"></i> שליחת SMS</h3>
+            <span id="smsHelperProgress" style="font-weight:700;font-size:14px;color:var(--text-muted);">1 / 1</span>
+        </div>
+        <div style="background:var(--bg-body);padding:14px;border-radius:10px;margin-bottom:14px;border:1px solid var(--border-light);">
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">נמען:</div>
+            <div style="font-size:16px;font-weight:800;" id="smsHelperName"></div>
+            <div style="font-size:14px;color:var(--text-muted);direction:ltr;" id="smsHelperPhone"></div>
+        </div>
+        <div style="background:var(--accent-light);padding:12px;border-radius:10px;margin-bottom:14px;border:1px solid var(--accent-mid);font-size:13px;white-space:pre-wrap;word-break:break-word;" id="smsHelperText"></div>
+        <div style="display:flex;gap:8px;">
+            <a id="smsHelperLink" href="#" class="btn btn-primary" style="flex:2;text-align:center;text-decoration:none;" onclick="setTimeout(_smsQueueNext,800)"><i class="fas fa-paper-plane"></i> פתח SMS ← הבא</a>
+            <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('smsHelperModal').style.display='none'; cancelSMSQueue();">סגור</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ Comm Services Modal ══ -->
+<div id="commServicesModal" class="modal" style="display:none; z-index:10002;">
+    <div class="modal-content" style="max-width:480px; max-height:90vh; overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h3 style="margin:0;color:var(--primary);"><i class="fas fa-cogs" style="color:var(--accent);"></i> שירותי תקשורת חיצוניים</h3>
+            <button class="btn-icon" onclick="closeCommServices()" style="border:none;font-size:18px;"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="background:var(--bg-body);padding:14px;border-radius:12px;margin-bottom:14px;border:1px solid var(--border-light);">
+            <h4 style="margin:0 0 12px 0;color:var(--accent);font-size:14px;"><i class="fas fa-sms"></i> שירות SMS</h4>
+            <div class="form-group" style="margin-bottom:10px;">
+                <label>ספק SMS:</label>
+                <select id="csProvider" class="inline-input" style="width:100%;" onchange="_toggleCommServiceFields()">
+                    <option value="none">📱 SMS מקומי (sms: URI)</option>
+                    <option value="twilio">🌐 Twilio API</option>
+                    <option value="infobip">🌐 Infobip</option>
+                    <option value="dbs">🌐 019 SMS</option>
+                </select>
+            </div>
+            <div id="twilioFields" style="display:none;">
+                <div class="form-group">
+                    <label>Twilio Account SID:</label>
+                    <input type="text" id="csTwilioSid" class="inline-input" style="width:100%;" placeholder="ACxxxxxxxxxx">
+                </div>
+                <div class="form-group">
+                    <label>Twilio Auth Token:</label>
+                    <input type="password" id="csTwilioToken" class="inline-input" style="width:100%;" placeholder="Auth Token">
+                </div>
+                <div class="form-group" style="margin-bottom:8px;">
+                    <label>Twilio מספר שולח:</label>
+                    <input type="text" id="csTwilioFrom" class="inline-input" style="width:100%;" placeholder="+1xxxxxxxxxx">
+                </div>
+                <button class="btn btn-outline" style="width:auto;padding:5px 14px;font-size:12px;" onclick="testTwilio()"><i class="fas fa-plug"></i> בדוק חיבור</button>
+            </div>
+        </div>
+        <div style="background:var(--bg-body);padding:14px;border-radius:12px;margin-bottom:16px;border:1px solid var(--border-light);">
+            <h4 style="margin:0 0 12px 0;color:#ea4335;font-size:14px;"><i class="fas fa-envelope"></i> שירות מייל</h4>
+            <div class="form-group" style="margin-bottom:10px;">
+                <label>ספק מייל:</label>
+                <select id="csEmailProvider" class="inline-input" style="width:100%;" onchange="_toggleCommServiceFields()">
+                    <option value="native">📧 תוכנת מייל מקומית</option>
+                    <option value="sendgrid">🌐 SendGrid API</option>
+                </select>
+            </div>
+            <div id="sendGridFields" style="display:none;">
+                <div class="form-group">
+                    <label>SendGrid API Key:</label>
+                    <input type="password" id="csSendGridKey" class="inline-input" style="width:100%;" placeholder="SG.xxxxxxxxxx">
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="closeCommServices()">ביטול</button>
+            <button class="btn btn-primary" style="flex:2;" onclick="saveCommServices()"><i class="fas fa-save"></i> שמור הגדרות</button>
+        </div>
+    </div>
+</div>
+
 <script src="app.js?v=29"></script>
 <script src="drive.js"></script>
 <script src="kanban.js"></script>
 <script src="tasks.js"></script>
 <script src="events.js"></script>
+<script src="comm.js"></script>
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">

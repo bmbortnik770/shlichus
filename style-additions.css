@@ -15,8 +15,6 @@
     animation: countUp .5s ease both;
 }
 
-/* ── Welcome message auto-show ── */
-#welcomeMessage:not(:empty) { display: block !important; }
 
 /* ── Search clear button show/hide ── */
 #smartSearch:not(:placeholder-shown) ~ #searchClearBtn,
@@ -123,20 +121,24 @@ body.dark-mode #sync-panel {
 .search-item:first-child { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .search-item:last-child  { border-radius: 0 0 var(--radius-lg) var(--radius-lg); border: none; }
 
-/* ── Welcome message — gradient pill ── */
+/* ── Welcome message — sidebar greeting pill ── */
 #welcomeMessage:not(:empty) {
+    display: block !important;
     background: var(--accent-grad) !important;
     color: white !important;
     border: none !important;
-    border-radius: var(--radius-xl) !important;
-    padding: 10px 16px !important;
-    font-size: 13px !important;
+    border-radius: 12px !important;
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1.4 !important;
     box-shadow: var(--glow-blue) !important;
-    animation: welcomePulse 3s ease-in-out infinite;
+    animation: welcomePulse 4s ease-in-out infinite;
+    margin-bottom: 2px;
 }
 @keyframes welcomePulse {
-    0%, 100% { box-shadow: var(--glow-blue); }
-    50%       { box-shadow: var(--glow-blue-lg); }
+    0%, 100% { box-shadow: var(--glow-blue); opacity: 1; }
+    50%       { box-shadow: var(--glow-blue-lg); opacity: .9; }
 }
 
 /* ── KPI cards — gradient overlay on hover ── */
@@ -422,4 +424,144 @@ h4 {
     font-weight: 700 !important;
     letter-spacing: 0.02em;
     text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════════════════════
+   COMM MODULE — Call Center, SMS, Logs
+   ══════════════════════════════════════════════════════ */
+
+/* ── Filter + Log filter buttons ── */
+.call-filter-btn,
+.log-filter-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 20px;
+    border: 1.5px solid var(--border-light);
+    background: var(--bg-body);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all .2s;
+    font-family: inherit;
+}
+.call-filter-btn:hover, .call-filter-btn.active,
+.log-filter-btn:hover,  .log-filter-btn.active {
+    background: var(--accent-light);
+    border-color: var(--accent-mid);
+    color: var(--accent);
+}
+
+/* ── Call list row ── */
+.call-list-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-body);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+}
+.call-list-row:hover {
+    background: var(--table-hover);
+    box-shadow: 0 2px 8px rgba(15,23,42,.06);
+}
+.call-row-status { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.call-row-info   { flex:1; min-width:0; }
+.call-row-name   { font-size:13px; font-weight:700; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.call-row-addr,
+.call-row-last   { font-size:11px; color:var(--text-muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.call-row-actions { display:flex; gap:5px; align-items:center; flex-shrink:0; flex-wrap:wrap; }
+
+/* ── Phone / WhatsApp action links ── */
+.call-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 8px;
+    border: 1.5px solid rgba(16,185,129,.3);
+    background: rgba(16,185,129,.07);
+    color: #10b981;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s;
+}
+.call-btn:hover { background: rgba(16,185,129,.15); }
+.call-btn.wa-btn { background: rgba(37,211,102,.07); border-color: rgba(37,211,102,.3); color:#25D366; }
+.call-btn.wa-btn:hover { background: rgba(37,211,102,.15); }
+.call-log-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 8px;
+    border: 1.5px solid var(--border-light);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .15s;
+}
+.call-log-btn:hover { background:var(--accent-light); border-color:var(--accent-mid); color:var(--accent); }
+.call-tasks-badge {
+    font-size: 11px; font-weight: 700;
+    padding: 3px 8px; border-radius: 20px;
+    background: rgba(245,158,11,.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245,158,11,.2);
+}
+
+/* ── Quick Call result buttons ── */
+.qc-result-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 10px;
+    border: 1.5px solid var(--border-light);
+    background: var(--bg-body);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+}
+.qc-result-btn:hover, .qc-result-btn.active {
+    background: var(--accent-light);
+    border-color: var(--accent-mid);
+    color: var(--accent);
+    box-shadow: 0 2px 8px rgba(37,99,235,.1);
+}
+
+/* ── Comm logs timeline ── */
+.comm-log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-body);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.comm-log-entry:hover { background: var(--table-hover); }
+.comm-log-icon {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+}
+.comm-log-body  { flex:1; min-width:0; }
+.comm-log-title { font-size:13px; font-weight:700; color:var(--text-main); }
+.comm-log-meta  { font-size:11px; color:var(--text-muted); margin-top:2px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.comm-log-notes {
+    font-size: 12px; color: var(--text-main); margin-top:4px;
+    padding: 6px 8px;
+    background: var(--surface); border-radius:6px; border:1px solid var(--border-light);
+    white-space: pre-wrap; word-break: break-word;
 }

@@ -887,7 +887,6 @@ body.dark-mode .dfab-label { background: var(--surface-2); color: var(--text-mai
     animation: shimmer 2s infinite; border-radius: inherit;
 }
 
-#welcomeMessage:not(:empty) { display: block !important; }
 
 /* ─── Coverage card ──────────────────────────────────────────── */
 #coverageCard {

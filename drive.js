@@ -606,14 +606,13 @@ window.dismissFieldUpdates = async function() {
 
 async function trashDriveFile(fileId) {
     try {
-        // במקום מחיקה (דורשת scope מלא) — מסמנים את הקובץ כ"עובד"
-        // אפליקציית השטח תזהה את הסימן ותמחק בעצמה
-        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        // drive.file scope allows trashing files the app created
+        await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
             method: 'PATCH',
             headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ _processed: true, processedAt: Date.now() })
+            body: JSON.stringify({ trashed: true })
         });
-    } catch(e) { console.error('markProcessed error:', e); }
+    } catch(e) { console.error('trashDriveFile error:', e); }
 }
 
 /**
@@ -631,7 +630,21 @@ async function trashDriveFile(fileId) {
  * מחזיר true אם הצליח לאתר ולעדכן את הדירה.
  */
 function applyOutboxEvent(ev) {
-    if (!ev || !ev.type || !ev.bldg) return false;
+    if (!ev || !ev.type) return false;
+
+    // ── add_general_task: משימה כללית (לא שייכת למשפחה ספציפית) ──
+    if (ev.type === 'add_general_task') {
+        if (!db.meta) db.meta = {};
+        if (!db.meta.generalTasks) db.meta.generalTasks = [];
+        db.meta.generalTasks.push({
+            text: ev.payload?.text || '',
+            date: ev.payload?.date || '',
+            done: false
+        });
+        return true;
+    }
+
+    if (!ev.bldg) return false;
     const bldgData = db[ev.bldg];
 
     // ── new_family / add_full_family: משפחה חדשה שנוצרה בשטח ──
@@ -746,16 +759,6 @@ function applyOutboxEvent(ev) {
                 else apt.email = value;
             }
             break;
-        }
-        case 'add_general_task': {
-            if (!db.meta.generalTasks) db.meta.generalTasks = [];
-            db.meta.generalTasks.push({
-                text: ev.payload?.text || '',
-                date: ev.payload?.date || '',
-                done: false
-            });
-            apt.updatedAt = Date.now();
-            return true; // יציאה מוקדמת — אין apt לעדכן
         }
         default:
             console.warn('applyOutboxEvent: unknown type', ev.type);

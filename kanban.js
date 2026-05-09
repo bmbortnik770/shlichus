@@ -132,6 +132,8 @@ window.dropCard = (e, stage) => {
     if(data) {
         const [encBldg, idx] = data.split('|'); const bldg = decodeURIComponent(encBldg);
         const activeBoardId = document.getElementById('activeKanbanBoard').value;
+        if(!db[bldg]?.apts[idx]) return;
+        if(!db[bldg].apts[idx].boards) db[bldg].apts[idx].boards = {};
         db[bldg].apts[idx].boards[activeBoardId] = stage;
         saveDB(); showToast(`הועבר ל-${stage}`, 'info');
     }
