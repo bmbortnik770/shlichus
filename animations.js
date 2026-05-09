@@ -301,8 +301,13 @@ ready(function() {
     // ── 3D CARD TILT ─────────────────────────────────────────
     if (window.gsap) {
         let _tiltTarget = null;
+        let _tiltRaf = false;
 
         document.addEventListener('mousemove', e => {
+            if (_tiltRaf) return;
+            _tiltRaf = true;
+            requestAnimationFrame(() => { _tiltRaf = false; });
+
             const card = e.target.closest('.kpi-box, .stat-card');
 
             // leaving previous card → reset
@@ -407,7 +412,11 @@ ready(function() {
     if (document.readyState !== 'loading') runMagnetic();
     else document.addEventListener('DOMContentLoaded', runMagnetic);
 
-    const mo = new MutationObserver(runMagnetic);
+    let _magneticTimer;
+    const mo = new MutationObserver(() => {
+        clearTimeout(_magneticTimer);
+        _magneticTimer = setTimeout(runMagnetic, 400);
+    });
     mo.observe(document.body, { childList: true, subtree: true });
 })();
 

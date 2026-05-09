@@ -157,48 +157,6 @@ body.dark-mode #sync-card {
     transition: var(--smooth), box-shadow .3s;
 }
 
-/* ── Filter chip buttons ── */
-.filter-chip-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 8px 14px;
-    border-radius: var(--radius-full);
-    border: 1.5px solid var(--border-light);
-    background: var(--surface);
-    backdrop-filter: var(--backdrop);
-    color: var(--text-muted);
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: var(--smooth);
-    box-shadow: var(--card-shadow);
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-.filter-chip-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: var(--accent-light);
-    transform: translateY(-1px);
-    box-shadow: var(--focus-ring), var(--card-shadow);
-}
-.filter-chip-btn.active {
-    background: var(--accent-grad);
-    color: white;
-    border-color: transparent;
-    box-shadow: var(--glow-blue);
-}
-.filter-chip-btn i { font-size: 11px; opacity: .8; }
-
-/* ── Quick filter chips row ── */
-#quickFilterChips {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-}
 
 /* ── Tab pill glow ── */
 #tab-pill {
@@ -323,8 +281,7 @@ body.dark-mode .main-tabs {
 }
 
 .kpi-box {
-    background: rgba(255,255,255,.80) !important;
-    backdrop-filter: blur(18px) saturate(160%) !important;
+    background: rgba(255,255,255,.88) !important;
     border: 1px solid rgba(255,255,255,.68) !important;
     box-shadow:
         0 2px 8px  rgba(15,23,42,.06),
@@ -333,7 +290,7 @@ body.dark-mode .main-tabs {
     transition: transform .3s, box-shadow .3s !important;
 }
 body.dark-mode .kpi-box {
-    background: rgba(15,23,42,.78) !important;
+    background: rgba(15,23,42,.88) !important;
     border: 1px solid rgba(255,255,255,.07) !important;
     box-shadow: 0 2px 8px rgba(0,0,0,.32),
                 0 1px 0 rgba(255,255,255,.05) inset !important;
@@ -404,7 +361,7 @@ h4 {
 }
 
 /* תגיות סטטוס */
-.tag-badge, .filter-chip-btn {
+.tag-badge {
     font-size: 13px !important;
 }
 
