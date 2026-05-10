@@ -3343,8 +3343,10 @@ window.renderListView = (filteredRes = null) => {
         if(phones.length > 0) {
             let cleanPhone = phones[0].replace(/\D/g, '');
             let waPhone = cleanPhone.startsWith('0') ? '972' + cleanPhone.substring(1) : cleanPhone;
+            const smsPhone = cleanPhone.startsWith('0') ? '+972' + cleanPhone.substring(1) : '+' + cleanPhone;
             contactIcons += `<a href="tel:${cleanPhone}" class="row-action-btn" style="color:var(--success);" onclick="event.stopPropagation()" title="חייג"><i class="fas fa-phone"></i></a>`;
             contactIcons += `<a href="https://wa.me/${waPhone}" target="_blank" class="row-action-btn" style="color:#25D366;" onclick="event.stopPropagation()" title="וואטסאפ"><i class="fab fa-whatsapp"></i></a>`;
+            contactIcons += `<a href="sms:${smsPhone}" class="row-action-btn" style="color:#0ea5e9;" onclick="event.stopPropagation()" title="SMS"><i class="fas fa-sms"></i></a>`;
         }
         if(emails.length > 0) {
             contactIcons += `<a href="mailto:${emails[0]}" class="row-action-btn" style="color:#ea4335;" onclick="event.stopPropagation()" title="שלח מייל"><i class="fas fa-envelope"></i></a>`;
@@ -3852,29 +3854,65 @@ window.sendCommEmail = async () => {
         }
     }
 
-    const choice = await showChoiceDialog('בחירת פלטפורמה', 'איך תרצה לשלוח?', 'ג\'ימייל בדפדפן', 'תוכנה במחשב');
-    if(!choice) return;
-
     const emails = validRecipients.map(r => r.email);
     const finalSubj = subjInput.replace(/\[\s*שם\s*\]/g, '');
     const finalText = textInput.replace(/\[\s*שם\s*\]/g, 'משפחה יקרה');
+    const logRecipients = commRecipients.filter(r=>r.key);
 
-    if (choice === '1') {
-        const link = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&bcc=${emails.join(',')}&su=${encodeURIComponent(finalSubj)}&body=${encodeURIComponent(finalText)}`;
-        const newWin = window.open(link, '_blank');
-        if (!newWin) {
-            showCustomDialog({ title: 'שגיאת דפדפן', message: 'אנא אשר חלונות קופצים בדפדפן.', showCancel: false });
-            return;
-        }
-    } else {
-        window.location.href = `mailto:?bcc=${emails.join(',')}&subject=${encodeURIComponent(finalSubj)}&body=${encodeURIComponent(finalText)}`;
+    const prov = appSettings.emailProvider;
+    if (!prov) {
+        window._pendingEmailData = { subj: finalSubj, text: finalText, emails, logRecipients, rawText: textInput };
+        const m = document.getElementById('emailProviderModal');
+        if (m) m.style.display = 'flex';
+        return;
     }
-
-    showToast('נפתחה תוכנת המייל', 'success');
-    if(window.autoLogSentMessage) autoLogSentMessage('email', commRecipients.filter(r=>r.key), textInput);
+    _doSendEmail(prov, finalSubj, finalText, emails);
+    if(window.autoLogSentMessage) autoLogSentMessage('email', logRecipients, textInput);
     commRecipients = [];
     renderRecipientsList('email');
     document.getElementById('emRecipientCount').innerText = 0;
+};
+
+window._doSendEmail = function(prov, subj, text, emails) {
+    const bcc = emails.join(',');
+    const su = encodeURIComponent(subj), bo = encodeURIComponent(text);
+    let ok = true;
+    switch(prov) {
+        case 'gmail':
+            ok = !!window.open(`https://mail.google.com/mail/?view=cm&fs=1&tf=1&bcc=${encodeURIComponent(bcc)}&su=${su}&body=${bo}`, '_blank');
+            break;
+        case 'outlook':
+            window.open(`https://outlook.live.com/mail/0/deeplink/compose?subject=${su}&body=${bo}`, '_blank');
+            break;
+        case 'yahoo':
+            window.open(`https://compose.mail.yahoo.com/?bcc=${encodeURIComponent(bcc)}&subject=${su}&body=${bo}`, '_blank');
+            break;
+        default:
+            window.location.href = `mailto:?bcc=${bcc}&subject=${subj}&body=${text}`;
+    }
+    if (!ok) { showCustomDialog({ title: 'שגיאת דפדפן', message: 'אנא אשר חלונות קופצים.', showCancel: false }); return; }
+    showToast('נפתח ממשק שליחת מייל ✅', 'success');
+};
+
+window.pickEmailProvider = function(prov) {
+    const remember = document.getElementById('emailProvRemember')?.checked;
+    if (remember) { appSettings.emailProvider = prov; localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); }
+    document.getElementById('emailProviderModal').style.display = 'none';
+    const d = window._pendingEmailData;
+    if (!d) return;
+    window._pendingEmailData = null;
+    _doSendEmail(prov, d.subj, d.text, d.emails);
+    if(window.autoLogSentMessage) autoLogSentMessage('email', d.logRecipients, d.rawText);
+    commRecipients = [];
+    renderRecipientsList('email');
+    const el = document.getElementById('emRecipientCount');
+    if (el) el.innerText = 0;
+};
+
+window.resetEmailProvider = function() {
+    delete appSettings.emailProvider;
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    showToast('בחירת ספק מייל אופסה — תישאל בפעם הבאה', 'info');
 };
 
 // --- מערכת ניהול תור (Queue) ודיאלוגים בחירה ---

@@ -330,7 +330,23 @@ function toggleDrivePanel() {
                     <button class="aud-seg-btn" onclick="applyAudSegment('orange',this)" style="border-color:#f59e0b;color:#f59e0b;"><i class="fas fa-circle"></i> כתום</button>
                 </div>
                 <!-- Style pills -->
-                <div id="audStylePills" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;"></div>
+                <div id="audStylePills" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;"></div>
+                <!-- Advanced filter builder -->
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                    <button id="audAdvToggleBtn" class="aud-seg-btn" onclick="toggleAdvFilters()" style="font-size:11px;">
+                        <i class="fas fa-sliders-h"></i> סינון מתקדם
+                        <span class="aud-adv-badge" style="display:none;background:var(--accent);color:#fff;border-radius:8px;padding:0 5px;font-size:10px;margin-right:4px;"></span>
+                    </button>
+                    <button class="aud-seg-btn" onclick="clearAdvFilters()" style="font-size:11px;color:var(--text-hint);" title="נקה כל התנאים">
+                        <i class="fas fa-times"></i> נקה תנאים
+                    </button>
+                </div>
+                <div id="audAdvBody" style="display:none;background:var(--bg-body);border:1px solid var(--border-light);border-radius:9px;padding:10px 12px 8px;margin-bottom:10px;">
+                    <div id="audAdvRows"></div>
+                    <button class="aud-seg-btn" onclick="addAdvFilter()" style="margin-top:8px;font-size:12px;">
+                        <i class="fas fa-plus"></i> הוסף תנאי
+                    </button>
+                </div>
                 <!-- Search + select all -->
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                     <input id="audSearch" type="text" class="inline-input" placeholder="חיפוש לפי שם או בניין..." style="flex:1;padding:6px 10px;font-size:13px;" oninput="filterAudList(this.value)">
@@ -401,7 +417,10 @@ function toggleDrivePanel() {
                     <label>תוכן המייל:</label>
                     <textarea id="emMessageText" rows="5" placeholder="הקלד את תוכן המייל..." class="inline-input" style="width:100%;"></textarea>
                 </div>
-                <button class="btn btn-primary" onclick="sendCommEmail()" style="background:#ea4335; border-color:#ea4335;"><i class="fas fa-paper-plane"></i> פתח תוכנת מייל לשליחה</button>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="sendCommEmail()" style="background:#ea4335; border-color:#ea4335;"><i class="fas fa-paper-plane"></i> שלח מייל</button>
+                    <button class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:12px;" onclick="resetEmailProvider()"><i class="fas fa-exchange-alt"></i> שנה ספק מייל</button>
+                </div>
             </div>
 
             <div id="comm-sms" class="comm-tab-content">
@@ -2093,6 +2112,40 @@ function toggleDrivePanel() {
             <span><kbd>↑↓</kbd> ניווט</span>
             <span><kbd>Enter</kbd> בחירה</span>
             <span><kbd>Ctrl+K</kbd> פתח/סגור</span>
+        </div>
+    </div>
+</div>
+
+<!-- ── Email Provider Modal ── -->
+<div id="emailProviderModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border-radius:18px;padding:24px 28px;max-width:400px;width:92%;box-shadow:0 24px 60px rgba(0,0,0,.3);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+            <i class="fas fa-paper-plane" style="color:var(--accent);font-size:20px;"></i>
+            <h3 style="margin:0;font-size:17px;">כיצד לשלוח את המייל?</h3>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
+            <button class="email-prov-btn" onclick="pickEmailProvider('gmail')">
+                <i class="fab fa-google" style="color:#ea4335;font-size:16px;width:22px;"></i>
+                Gmail <span class="email-prov-sub">פותח Gmail בדפדפן</span>
+            </button>
+            <button class="email-prov-btn" onclick="pickEmailProvider('outlook')">
+                <i class="fab fa-microsoft" style="color:#0078d4;font-size:16px;width:22px;"></i>
+                Outlook.com <span class="email-prov-sub">פותח Outlook.com בדפדפן</span>
+            </button>
+            <button class="email-prov-btn" onclick="pickEmailProvider('yahoo')">
+                <i class="fas fa-envelope-open-text" style="color:#6001d2;font-size:16px;width:22px;"></i>
+                Yahoo Mail <span class="email-prov-sub">פותח Yahoo בדפדפן</span>
+            </button>
+            <button class="email-prov-btn" onclick="pickEmailProvider('local')">
+                <i class="fas fa-desktop" style="color:var(--text-muted);font-size:16px;width:22px;"></i>
+                תוכנה מקומית <span class="email-prov-sub">Outlook / Apple Mail / Thunderbird</span>
+            </button>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" id="emailProvRemember" style="accent-color:var(--accent);"> זכור בחירה זו תמיד
+            </label>
+            <button class="btn btn-outline" style="width:auto;padding:5px 14px;font-size:12px;" onclick="document.getElementById('emailProviderModal').style.display='none'">ביטול</button>
         </div>
     </div>
 </div>

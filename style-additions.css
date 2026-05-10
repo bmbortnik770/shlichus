@@ -869,3 +869,92 @@ body.density-spacious .data-table th {
     font-weight: 600;
     white-space: nowrap;
 }
+
+/* ── Advanced Filter Builder ── */
+.aud-flt-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 0;
+    flex-wrap: wrap;
+}
+.aud-flt-row + .aud-flt-row { border-top: 1px solid var(--border-light); margin-top: 4px; padding-top: 9px; }
+
+.aud-flt-sel {
+    background: var(--surface);
+    border: 1px solid var(--border-solid);
+    border-radius: 7px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--text);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.aud-flt-sel:focus { outline: none; border-color: var(--accent); }
+
+.aud-flt-field { min-width: 130px; }
+.aud-flt-op    { min-width: 110px; }
+
+.aud-flt-inp {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    width: 70px;
+    flex-shrink: 0;
+}
+
+.aud-flt-val-wrap {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+    min-width: 0;
+}
+
+.aud-flt-unit { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+.aud-flt-no-val { font-size: 12px; color: var(--text-hint); padding: 0 4px; }
+
+.aud-flt-remove {
+    background: none;
+    border: none;
+    color: var(--text-hint);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    transition: color .15s, background .15s;
+}
+.aud-flt-remove:hover { color: var(--danger); background: rgba(239,68,68,.08); }
+
+.aud-adv-badge {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 8px;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* ── Email Provider Modal buttons ── */
+.email-prov-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border-light);
+    background: var(--bg-body);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .15s;
+    text-align: right;
+}
+.email-prov-btn:hover { border-color: var(--accent); background: var(--accent-light); }
+.email-prov-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-right: auto; }
