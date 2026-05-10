@@ -308,6 +308,8 @@ window.onload = () => {
     // Set initial body view class for CSS targeting
     document.body.classList.add('view-' + currentMainView);
     if(localStorage.getItem('darkMode')==='true') { document.body.classList.add('dark-mode'); document.getElementById('darkModeIcon').className='fas fa-sun'; }
+    const _savedDensity = appSettings.tableDensity;
+    if (_savedDensity && _savedDensity !== 'normal') document.body.classList.add('density-' + _savedDensity);
     populateFilterDropdowns();
     // debounce לחיפוש — מונע ריצות מיותרות
     function debounce(fn, delay = 300) {
@@ -3289,18 +3291,38 @@ window.renderListView = (filteredRes = null) => {
         </select>
     `;
 
+    const _density = appSettings.tableDensity || 'normal';
+    const _densityHtml = `
+        <div style="display:flex; gap:2px; border:1px solid var(--border-light); border-radius:8px; padding:3px; background:var(--bg-body);" title="צפיפות תצוגה">
+            <button class="density-btn${_density==='compact'?' active':''}" onclick="setDensity('compact')" title="צפוף"><i class="fas fa-grip-lines"></i></button>
+            <button class="density-btn${_density==='normal'?' active':''}" onclick="setDensity('normal')" title="רגיל"><i class="fas fa-align-justify"></i></button>
+            <button class="density-btn${_density==='spacious'?' active':''}" onclick="setDensity('spacious')" title="מרווח"><i class="fas fa-expand-arrows-alt"></i></button>
+        </div>`;
+
     let html = `
         <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <h2 style="margin:0;"><i class="fas fa-list"></i> אינדקס קהילה</h2>
+            <span style="font-size:13px; color:var(--text-muted); font-weight:600;">${arr.length} משפחות</span>
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
             ${smartSortHtml}
+            ${_densityHtml}
             ${columnsMenuHtml}
-            <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא לאקסל</button>
+            <button class="btn btn-success" style="width:auto; padding:8px 15px;" onclick="exportTableToCSV()"><i class="fas fa-file-excel"></i> ייצוא</button>
         </div>
-    </div>
-    <div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
+    </div>`;
+
+    if (arr.length === 0) {
+        inner.innerHTML = html + `<div class="empty-state-box">
+            <i class="fas fa-users" style="font-size:40px; opacity:.2; color:var(--text-muted); margin-bottom:12px;"></i>
+            <h4 style="margin:0 0 6px 0; color:var(--text-muted);">אין משפחות להצגה</h4>
+            <p style="color:var(--text-hint); font-size:13px; margin:0;">נסה לנקות את הסינון, או הוסף משפחה ראשונה</p>
+        </div>`;
+        return;
+    }
+
+    html += `<div style="width:100%; overflow-x:auto; padding-bottom:80px; padding-left: 2px; padding-right: 2px;">
     <table class="data-table"><thead><tr>${theadHtml}</tr></thead><tbody>`;
 
     arr.forEach(r => {
@@ -3321,11 +3343,11 @@ window.renderListView = (filteredRes = null) => {
         if(phones.length > 0) {
             let cleanPhone = phones[0].replace(/\D/g, '');
             let waPhone = cleanPhone.startsWith('0') ? '972' + cleanPhone.substring(1) : cleanPhone;
-            contactIcons += `<a href="tel:${cleanPhone}" class="btn-icon" style="color:var(--success); border-color:var(--success); margin-left:5px; text-decoration:none;" onclick="event.stopPropagation()" title="חייג"><i class="fas fa-phone"></i></a>`;
-            contactIcons += `<a href="https://wa.me/${waPhone}" target="_blank" class="btn-icon" style="color:#25D366; border-color:#25D366; margin-left:5px; text-decoration:none;" onclick="event.stopPropagation()" title="וואטסאפ"><i class="fab fa-whatsapp"></i></a>`;
+            contactIcons += `<a href="tel:${cleanPhone}" class="row-action-btn" style="color:var(--success);" onclick="event.stopPropagation()" title="חייג"><i class="fas fa-phone"></i></a>`;
+            contactIcons += `<a href="https://wa.me/${waPhone}" target="_blank" class="row-action-btn" style="color:#25D366;" onclick="event.stopPropagation()" title="וואטסאפ"><i class="fab fa-whatsapp"></i></a>`;
         }
         if(emails.length > 0) {
-            contactIcons += `<a href="mailto:${emails[0]}" class="btn-icon" style="color:#ea4335; border-color:#ea4335; text-decoration:none;" onclick="event.stopPropagation()" title="שלח מייל"><i class="fas fa-envelope"></i></a>`;
+            contactIcons += `<a href="mailto:${emails[0]}" class="row-action-btn" style="color:#ea4335;" onclick="event.stopPropagation()" title="שלח מייל"><i class="fas fa-envelope"></i></a>`;
         }
 
         const safeName = escapeHTML(a.name || '(ללא שם)');
@@ -3360,13 +3382,21 @@ window.renderListView = (filteredRes = null) => {
                 const val = customObj[fName] || '';
                 content = val ? `<span style="font-size:13px; color:var(--text-main);">${escapeHTML(val)}</span>` : '<i class="fas fa-minus" style="opacity:0.3;"></i>';
             }
-            else if(col.id === 'actions') content = contactIcons || '-';
+            else if(col.id === 'actions') content = contactIcons ? `<div class="row-actions">${contactIcons}</div>` : '<i class="fas fa-minus" style="opacity:.25;"></i>';
             cellsHtml += `<td data-label="${escapeHTML(col.label)}">${content}</td>`;
         });
 
         html += `<tr oncontextmenu="showContextMenu(event,'${enc}',${r.idx})" onclick="currentBldg='${r.bldg}'; openClientCard(${r.idx})">${cellsHtml}</tr>`;
     });
     inner.innerHTML = html + `</tbody></table></div>`;
+};
+
+window.setDensity = function(d) {
+    appSettings.tableDensity = d;
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    document.body.classList.remove('density-compact', 'density-spacious');
+    if (d !== 'normal') document.body.classList.add('density-' + d);
+    handleOmniSearch();
 };
 
 window.exportTableToCSV = () => {

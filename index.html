@@ -228,7 +228,13 @@ function toggleDrivePanel() {
 
 <div id="main-content">
     <div class="top-nav-bar">
+        <button class="cmd-trigger-btn" onclick="openPalette()" title="פתח פלטת פקודות (Ctrl+K)">
+            <i class="fas fa-search"></i>
+            <span>חיפוש מהיר</span>
+            <kbd>Ctrl+K</kbd>
+        </button>
         <div class="main-tabs">
+
             <div class="main-tab active" onclick="switchMainView('map')" id="tab-map"><i class="fas fa-map-marker-alt"></i> מפה</div>
             <div class="main-tab" onclick="switchMainView('table')" id="tab-table"><i class="fas fa-list"></i> רשימה</div>
             <div class="main-tab" onclick="switchMainView('kanban')" id="tab-kanban"><i class="fas fa-project-diagram"></i> פרויקטים</div>
@@ -290,15 +296,16 @@ function toggleDrivePanel() {
         <div id="kanban-board-scroll"></div>
     </div>
 
-    <div id="comm-container" style="display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; padding:20px 0 0 0; gap:15px;">
-        <div class="kanban-hub-header">
+    <div id="comm-container" style="display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; padding:16px 20px 20px 20px; gap:0;">
+        <div class="kanban-hub-header" style="flex-shrink:0; padding:0 0 12px 0; margin:0;">
             <h2 style="margin:0; color:var(--primary);"><i class="fas fa-satellite-dish" style="color:var(--accent);"></i> מרכז תקשורת קהילתי</h2>
             <div style="display:flex; gap:10px;">
                 <span class="tag-badge" style="font-size:14px; padding:6px 10px;"><i class="fas fa-paper-plane"></i> <span id="commMonthlyCount">0 הודעות נשלחו החודש</span></span>
             </div>
         </div>
-        
-        <div class="crm-tabs" style="margin: 20px 20px 0 20px; background: var(--surface); border-radius: 8px 8px 0 0; padding-top: 10px; border: 1px solid var(--border-light); border-bottom: none;">
+
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; border-radius:14px; border:1px solid var(--border-light); box-shadow:var(--card-shadow);">
+        <div class="crm-tabs" style="margin:0; padding:8px 12px 0 12px; background:var(--surface); flex-shrink:0; border-radius:14px 14px 0 0; overflow-x:auto;">
             <div class="crm-tab active" onclick="switchCommTab('whatsapp')" id="commTabBtn-whatsapp"><i class="fab fa-whatsapp" style="color:#25D366;"></i> וואטסאפ</div>
             <div class="crm-tab" onclick="switchCommTab('email')" id="commTabBtn-email"><i class="fas fa-envelope" style="color:#ea4335;"></i> אימייל</div>
             <div class="crm-tab" onclick="switchCommTab('sms')" id="commTabBtn-sms"><i class="fas fa-sms" style="color:#0ea5e9;"></i> SMS</div>
@@ -307,7 +314,7 @@ function toggleDrivePanel() {
             <div class="crm-tab" onclick="switchCommTab('logs')" id="commTabBtn-logs"><i class="fas fa-history"></i> היסטוריה</div>
         </div>
 
-        <div id="comm-content-area" style="flex-grow:1; padding:20px; overflow-y:auto; background:var(--surface); margin:0 20px 20px 20px; border-radius:16px; border:1px solid var(--border-light); box-shadow:var(--card-shadow);">
+        <div id="comm-content-area" style="flex:1; min-height:0; padding:20px; overflow-y:auto; background:var(--surface); border-radius:0 0 14px 14px;">
             <div id="comm-whatsapp" class="comm-tab-content active">
                 <h3 style="margin-top:0; color:#25D366;"><i class="fab fa-whatsapp"></i> שליחת הודעות וואטסאפ</h3>
                 <div style="background:var(--bg-body); padding:12px; border-radius:8px; margin-bottom:10px; border:1px solid var(--border-light);">
@@ -435,6 +442,7 @@ function toggleDrivePanel() {
                 <div id="commLogsTimeline" style="display:flex;flex-direction:column;gap:6px;"></div>
             </div>
         </div>
+        </div><!-- /comm-tabs-card -->
     </div>
 
     <div id="tasks-container" style="display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; padding:20px 0 0 0; gap:15px;">
@@ -2032,6 +2040,24 @@ function toggleDrivePanel() {
     </div>
 </div>
 
+<!-- ══ Command Palette ══ -->
+<div id="cmdPalette">
+    <div id="cmdBox">
+        <div id="cmdInputRow">
+            <i class="fas fa-search" style="color:var(--text-muted); font-size:15px; flex-shrink:0;"></i>
+            <input id="cmdInput" type="text" placeholder="חפש משפחה, פקודה, ניווט..." autocomplete="off" spellcheck="false">
+            <kbd id="cmdEscKbd" onclick="closePalette()">ESC</kbd>
+        </div>
+        <div id="cmdResults"></div>
+        <div id="cmdFooter">
+            <span><kbd>↑↓</kbd> ניווט</span>
+            <span><kbd>Enter</kbd> בחירה</span>
+            <span><kbd>Ctrl+K</kbd> פתח/סגור</span>
+        </div>
+    </div>
+</div>
+
 <script src="animations.js?v=3" defer></script>
+<script src="palette.js"></script>
 </body>
 </html>
