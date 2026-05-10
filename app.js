@@ -2463,6 +2463,7 @@ window.openClientCard = function(idx) {
 
     tempTags=[...(a.tags||[])]; renderModalTags();
     tempChildren=JSON.parse(JSON.stringify(a.childrenList||[])); renderModalChildren();
+    refreshMemberDropdowns();
     tempLogs=JSON.parse(JSON.stringify(a.interactions||[])); renderLogs();
     tempDonations=JSON.parse(JSON.stringify(a.donations||[])); renderDonations();
     tempTasks=JSON.parse(JSON.stringify(a.tasks||[])); renderTasks();
@@ -2518,7 +2519,8 @@ window.addModalBoard = async () => {
 function renderModalTags() { document.getElementById('cTagsContainer').innerHTML = appSettings.tags.map(t => `<span class="tag-bubble ${tempTags.includes(t)?'active':''}" onclick="toggleTempTag('${t}')">${t}</span>`).join(''); }
 window.toggleTempTag = (t) => { markDirty(); if(tempTags.includes(t)) tempTags=tempTags.filter(x=>x!==t); else tempTags.push(t); renderModalTags(); };
 
-window.renderModalChildren = () => { 
+window.renderModalChildren = () => {
+    refreshMemberDropdowns && refreshMemberDropdowns();
     document.getElementById('childrenWrapper').innerHTML = tempChildren.map((c,i) => `
         <div style="display:flex; flex-direction:column; gap:5px; padding:8px; background:var(--surface); border:1px solid var(--border-light); border-radius:6px;">
             <div style="display:flex; gap:5px; align-items:center;">
@@ -2542,24 +2544,207 @@ function renderCustomFields() {
     appSettings.customFields.forEach(f => { c.innerHTML += `<div class="form-group"><label>${f}</label><input type="text" placeholder="הזן ערך..." value="${tempCustom[f]||''}" oninput="tempCustom['${f}']=this.value;markDirty()"></div>`; });
 }
 
-function renderTasks() {
-    document.getElementById('cTasksList').innerHTML = tempTasks.length===0 ? '<div class="empty-state"><i class="fas fa-check-double"></i><div>אין משימות פתוחות.</div></div>' : tempTasks.map((t,i) => `
-        <div class="log-item" style="opacity:${t.done?0.6:1};"><div class="log-header"><span style="text-decoration:${t.done?'line-through':'none'};"><input type="checkbox" ${t.done?'checked':''} onchange="tempTasks[${i}].done=this.checked;markDirty();renderTasks()" style="margin-left:8px;">${t.text}</span><div><span style="color:var(--text-muted);font-size:11px;margin-left:10px;">${t.date||''}</span><button onclick="tempTasks.splice(${i},1);markDirty();renderTasks()" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button></div></div></div>
-    `).join('');
+// ── Member attribution helpers ─────────────────────────────
+function _getMemberLabel(key) {
+    if (!key || key === 'family') return null;
+    if (key === 'father') return (document.getElementById('cFather')?.value?.trim()) || 'אבא';
+    if (key === 'mother') return (document.getElementById('cMother')?.value?.trim()) || 'אמא';
+    if (key.startsWith('child:')) return key.slice(6);
+    return key;
 }
-window.addTask = (text='', date='') => { const t=text||document.getElementById('newTaskText').value, d=date||document.getElementById('newTaskDate').value; if(!t){ showToast('יש להזין תוכן למשימה', 'warning'); return; } markDirty(); tempTasks.push({text:t,date:d,done:false}); document.getElementById('newTaskText').value=''; renderTasks(); };
 
-function renderLogs() { document.getElementById('cLogsList').innerHTML = tempLogs.length===0 ? '<div class="empty-state"><i class="fas fa-comments"></i><div>עוד לא נוצר קשר. זה הזמן!</div></div>' : tempLogs.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((l,i) => `<div class="log-item"><div class="log-header"><span><i class="fas fa-calendar-alt"></i> ${l.date} - ${l.type}</span><button onclick="tempLogs.splice(${i},1);markDirty();renderLogs()" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-times"></i></button></div><div>${l.text}</div></div>`).join(''); }
-window.addInteractionLog = () => { const d=document.getElementById('newLogDate').value, t=document.getElementById('newLogType').value, txt=document.getElementById('newLogText').value; if(!d||!txt){ showToast('יש למלא תאריך ותיאור', 'warning'); return; } markDirty(); tempLogs.push({date:d,type:t,text:txt}); document.getElementById('newLogText').value=''; renderLogs(); };
+function _memberBadge(key) {
+    const label = _getMemberLabel(key);
+    if (!label) return '';
+    return ` <span class="member-badge">${escapeHTML(label)}</span>`;
+}
 
-function renderDonations() { let sum=tempDonations.reduce((a,b)=>a+Number(b.amount||0),0); document.getElementById('cDonationsSum').innerText=`₪${sum}`; document.getElementById('cDonationsList').innerHTML = tempDonations.length===0 ? '<div class="empty-state"><i class="fas fa-hand-holding-heart"></i><div>אין תרומות.</div></div>' : tempDonations.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((d,i) => `<div class="log-item"><div class="log-header"><span style="color:var(--success);"><i class="fas fa-shekel-sign"></i> ${d.amount}</span><span>${d.date}</span></div><div>${d.reason} <button onclick="tempDonations.splice(${i},1);markDirty();renderDonations()" style="float:left;background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button></div></div>`).join(''); }
+function _getMemberOptions(selected) {
+    const father = document.getElementById('cFather')?.value?.trim();
+    const mother = document.getElementById('cMother')?.value?.trim();
+    const opts = [['family', 'כל המשפחה']];
+    if (father) opts.push(['father', father + ' (אבא)']);
+    if (mother) opts.push(['mother', mother + ' (אמא)']);
+    (tempChildren || []).forEach(c => { if (c.name?.trim()) opts.push(['child:' + c.name, c.name]); });
+    return opts.map(([k, l]) => `<option value="${escapeHTML(k)}" ${selected===k?'selected':''}>${escapeHTML(l)}</option>`).join('');
+}
 
-window.addDonation = () => { 
-    const d=document.getElementById('newDonDate').value, a=document.getElementById('newDonAmount').value, r=document.getElementById('newDonReason').value; 
-    if(!d||!a){ showToast('יש למלא תאריך וסכום', 'warning'); return; } markDirty(); 
-    tempDonations.push({date:d,amount:a,reason:r||'כללי'}); 
-    if(Number(a) >= 500) { addTask(`להתקשר להגיד תודה אישית על התרומה (${a} ש"ח)`, d); showToast('נוצרה משימה להכרת הטוב! ' + getRandomCompliment(), 'info'); switchCrmTab('tasks'); }
-    document.getElementById('newDonAmount').value=''; document.getElementById('newDonReason').value=''; renderDonations(); 
+window.refreshMemberDropdowns = function() {
+    ['newLogMember','newTaskMember','newDonMember'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = _getMemberOptions(el.value || 'family');
+    });
+};
+
+// ── Tasks ──────────────────────────────────────────────────
+function renderTasks() {
+    document.getElementById('cTasksList').innerHTML = tempTasks.length===0
+        ? '<div class="empty-state"><i class="fas fa-check-double"></i><div>אין משימות פתוחות.</div></div>'
+        : tempTasks.map((t,i) => `
+            <div class="log-item" style="opacity:${t.done?0.6:1};">
+                <div class="log-header">
+                    <span style="text-decoration:${t.done?'line-through':'none'};">
+                        <input type="checkbox" ${t.done?'checked':''} onchange="tempTasks[${i}].done=this.checked;markDirty();renderTasks()" style="margin-left:8px;">
+                        ${escapeHTML(t.text)}${_memberBadge(t.member)}
+                    </span>
+                    <div>
+                        <span style="color:var(--text-muted);font-size:11px;margin-left:10px;">${t.date||''}</span>
+                        <button onclick="tempTasks.splice(${i},1);markDirty();renderTasks()" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>`).join('');
+}
+window.addTask = (text='', date='') => {
+    const t = text || document.getElementById('newTaskText').value;
+    const d = date || document.getElementById('newTaskDate').value;
+    const member = document.getElementById('newTaskMember')?.value || 'family';
+    if (!t) { showToast('יש להזין תוכן למשימה', 'warning'); return; }
+    markDirty();
+    tempTasks.push({ text:t, date:d, done:false, member });
+    document.getElementById('newTaskText').value = '';
+    renderTasks();
+};
+
+// ── Interaction Logs ───────────────────────────────────────
+function renderLogs() {
+    document.getElementById('cLogsList').innerHTML = tempLogs.length===0
+        ? '<div class="empty-state"><i class="fas fa-comments"></i><div>עוד לא נוצר קשר. זה הזמן!</div></div>'
+        : tempLogs.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((l,i) => `
+            <div class="log-item">
+                <div class="log-header">
+                    <span><i class="fas fa-calendar-alt"></i> ${l.date} — ${escapeHTML(l.type||'')}${_memberBadge(l.member)}</span>
+                    <button onclick="tempLogs.splice(${i},1);markDirty();renderLogs()" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-times"></i></button>
+                </div>
+                <div>${escapeHTML(l.text||l.notes||'')}</div>
+            </div>`).join('');
+}
+window.addInteractionLog = () => {
+    const d   = document.getElementById('newLogDate').value;
+    const t   = document.getElementById('newLogType').value;
+    const txt = document.getElementById('newLogText').value;
+    const member = document.getElementById('newLogMember')?.value || 'family';
+    if (!d || !txt) { showToast('יש למלא תאריך ותיאור', 'warning'); return; }
+    markDirty();
+    tempLogs.push({ date:d, type:t, text:txt, member });
+    document.getElementById('newLogText').value = '';
+    renderLogs();
+};
+
+// ── Donations ──────────────────────────────────────────────
+function renderDonations() {
+    const sum = tempDonations.reduce((a,b) => a + Number(b.amount||0), 0);
+    document.getElementById('cDonationsSum').innerText = `₪${sum.toLocaleString()}`;
+
+    // Per-member breakdown (only if multiple attributed)
+    const byMember = {};
+    tempDonations.forEach(d => {
+        const k = d.member && d.member !== 'family' ? d.member : null;
+        if (k) byMember[k] = (byMember[k]||0) + Number(d.amount||0);
+    });
+    const breakdownEl = document.getElementById('cDonationsBreakdown');
+    if (breakdownEl) {
+        const keys = Object.keys(byMember);
+        breakdownEl.innerHTML = keys.length < 2 ? '' : keys.map(k =>
+            `<span class="member-badge">${escapeHTML(_getMemberLabel(k)||k)}: ₪${byMember[k].toLocaleString()}</span>`
+        ).join(' ');
+    }
+
+    document.getElementById('cDonationsList').innerHTML = tempDonations.length===0
+        ? '<div class="empty-state"><i class="fas fa-hand-holding-heart"></i><div>אין תרומות.</div></div>'
+        : tempDonations.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((d,i) => `
+            <div class="log-item">
+                <div class="log-header">
+                    <span style="color:var(--success);font-weight:600;"><i class="fas fa-shekel-sign"></i> ${Number(d.amount).toLocaleString()}${_memberBadge(d.member)}</span>
+                    <span style="font-size:12px;color:var(--text-muted);">${d.date}</span>
+                </div>
+                <div style="font-size:13px;">${escapeHTML(d.reason||'')}
+                    <button onclick="tempDonations.splice(${i},1);markDirty();renderDonations()" style="float:left;background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>`).join('');
+}
+window.addDonation = () => {
+    const d = document.getElementById('newDonDate').value;
+    const a = document.getElementById('newDonAmount').value;
+    const r = document.getElementById('newDonReason').value;
+    const member = document.getElementById('newDonMember')?.value || 'family';
+    if (!d || !a) { showToast('יש למלא תאריך וסכום', 'warning'); return; }
+    markDirty();
+    tempDonations.push({ date:d, amount:a, reason:r||'כללי', member });
+    if (Number(a) >= 500) { addTask(`להתקשר להגיד תודה אישית על התרומה (${a} ש"ח)`, d); showToast('נוצרה משימה להכרת הטוב! ' + getRandomCompliment(), 'info'); switchCrmTab('tasks'); }
+    document.getElementById('newDonAmount').value = '';
+    document.getElementById('newDonReason').value = '';
+    renderDonations();
+};
+
+// ── Split family card ──────────────────────────────────────
+window.splitFamilyCard = function() {
+    const father = document.getElementById('cFather')?.value?.trim();
+    const mother = document.getElementById('cMother')?.value?.trim();
+    const members = [];
+    if (father) members.push({ key:'father', label:father+' (אבא)', phone:document.getElementById('cFatherPhone')?.value, email:document.getElementById('cFatherEmail')?.value });
+    if (mother) members.push({ key:'mother', label:mother+' (אמא)', phone:document.getElementById('cMotherPhone')?.value, email:document.getElementById('cMotherEmail')?.value });
+    tempChildren.forEach(c => { if (c.name?.trim()) members.push({ key:'child:'+c.name, label:c.name, phone:c.phone||'', email:c.email||'' }); });
+    if (!members.length) { showToast('אין בני משפחה לפיצול', 'warning'); return; }
+
+    document.getElementById('splitMemberList').innerHTML = members.map(m =>
+        `<button class="btn btn-outline split-member-btn" onclick="confirmSplitMember('${escapeHTML(m.key)}')">
+            <i class="fas fa-user"></i> ${escapeHTML(m.label)}
+        </button>`
+    ).join('');
+    document.getElementById('splitFamilyModal').style.display = 'flex';
+};
+
+window.confirmSplitMember = function(memberKey) {
+    document.getElementById('splitFamilyModal').style.display = 'none';
+
+    const father = document.getElementById('cFather')?.value?.trim();
+    const mother = document.getElementById('cMother')?.value?.trim();
+    const allMembers = [];
+    if (father) allMembers.push({ key:'father', label:father, phone:document.getElementById('cFatherPhone')?.value||'', email:document.getElementById('cFatherEmail')?.value||'' });
+    if (mother) allMembers.push({ key:'mother', label:mother, phone:document.getElementById('cMotherPhone')?.value||'', email:document.getElementById('cMotherEmail')?.value||'' });
+    tempChildren.forEach(c => { if (c.name?.trim()) allMembers.push({ key:'child:'+c.name, label:c.name, phone:c.phone||'', email:c.email||'' }); });
+
+    const member = allMembers.find(m => m.key === memberKey);
+    if (!member) return;
+
+    const splitDate  = new Date().toLocaleDateString('he-IL');
+    const origFamily = document.getElementById('cFamilyName')?.value?.trim() || '';
+    const origKey    = `${currentBldg}|${currentAptIdx}`;
+    const origApt    = db[currentBldg]?.apts?.[currentAptIdx];
+
+    // Interactions: member-specific + shared "family" ones (shared history)
+    const newInteractions = [
+        { date: splitDate, type: 'פיצול כרטיס', text: `נפצל מכרטיס משפחת ${origFamily}`, member: 'family' },
+        ...tempLogs.filter(l => l.member === memberKey || !l.member || l.member === 'family')
+    ];
+
+    const newApt = {
+        name: member.label,
+        fatherPhone: member.phone,
+        fatherEmail: member.email,
+        style: origApt?.style || appSettings.styles[0],
+        tags: [...(origApt?.tags||[])],
+        childrenList: [],
+        interactions: newInteractions,
+        donations: tempDonations.filter(d => d.member === memberKey).map(d => ({...d})),
+        tasks: tempTasks.filter(t => t.member === memberKey).map(t => ({...t, done:false})),
+        boards: {}, customData: {}, customFields: {}, milestones: [],
+        splitDate, linkedFrom: origKey,
+        updatedAt: Date.now()
+    };
+
+    if (!db[NO_ADDRESS_KEY]) db[NO_ADDRESS_KEY] = { info:{}, apts:[] };
+    db[NO_ADDRESS_KEY].apts.push(newApt);
+    const newIdx = db[NO_ADDRESS_KEY].apts.length - 1;
+
+    if (origApt) {
+        if (!origApt.splits) origApt.splits = [];
+        origApt.splits.push({ memberKey, memberName:member.label, splitDate, linkedTo:`${NO_ADDRESS_KEY}|${newIdx}` });
+        origApt.updatedAt = Date.now();
+    }
+
+    saveDB(); handleOmniSearch();
+    showToast(`נוצר כרטיס נפרד עבור ${member.label} ✅`, 'success');
 };
 
 window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {

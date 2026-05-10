@@ -870,6 +870,26 @@ body.density-spacious .data-table th {
     white-space: nowrap;
 }
 
+/* ── Member attribution badge ── */
+.member-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: var(--accent-light);
+    color: var(--accent);
+    margin-right: 5px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.split-member-btn {
+    justify-content: flex-start;
+    gap: 8px;
+    font-size: 14px;
+}
+
 /* ── Advanced Filter Builder ── */
 .aud-flt-row {
     display: flex;

@@ -1068,7 +1068,12 @@ function toggleDrivePanel() {
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h2 style="margin:0; color:var(--primary);" id="crmFamilyTitle"><i class="fas fa-id-card"></i> כרטיס משפחה</h2>
-            <button class="btn-icon" onclick="attemptCloseCrmModal()" style="border:none; font-size:18px;"><i class="fas fa-times"></i></button>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-outline" style="width:auto;padding:5px 12px;font-size:12px;" onclick="splitFamilyCard()" title="פצל בן משפחה לכרטיס עצמאי">
+                    <i class="fas fa-code-branch"></i> פצל כרטיס
+                </button>
+                <button class="btn-icon" onclick="attemptCloseCrmModal()" style="border:none; font-size:18px;"><i class="fas fa-times"></i></button>
+            </div>
         </div>
         <div class="crm-tabs">
             <div class="crm-tab active" onclick="switchCrmTab('details')" id="tabBtn-details"><i class="fas fa-user"></i> פרטים</div>
@@ -1105,7 +1110,7 @@ function toggleDrivePanel() {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group">
                     <label>פרטי האב</label>
-                    <input type="text" id="cFather" placeholder="שם פרטי..." oninput="markDirty()">
+                    <input type="text" id="cFather" placeholder="שם פרטי..." oninput="markDirty();refreshMemberDropdowns()">
                     <div style="display:flex; gap:5px; margin-top:5px;">
                         <input type="text" id="cFatherPhone" placeholder="טלפון" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
                         <input type="email" id="cFatherEmail" placeholder="מייל" oninput="markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
@@ -1113,7 +1118,7 @@ function toggleDrivePanel() {
                 </div>
                 <div class="form-group">
                     <label>פרטי האם</label>
-                    <input type="text" id="cMother" placeholder="שם פרטי..." oninput="markDirty()">
+                    <input type="text" id="cMother" placeholder="שם פרטי..." oninput="markDirty();refreshMemberDropdowns()">
                     <div style="display:flex; gap:5px; margin-top:5px;">
                         <input type="text" id="cMotherPhone" placeholder="טלפון" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
                         <input type="email" id="cMotherEmail" placeholder="מייל" oninput="markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
@@ -1171,7 +1176,14 @@ function toggleDrivePanel() {
             <div class="log-list" id="cTasksList"></div>
             <div style="background:var(--bg-body); padding:12px; border-radius:8px; border:1px solid var(--border-light);">
                 <h5 style="margin:0 0 10px 0; color:var(--accent);">משימה חדשה</h5>
-                <div style="display:flex; gap:10px; margin-bottom:10px;"><input type="text" id="newTaskText" class="inline-input" placeholder="מה צריך לעשות?" style="flex:2;"><input type="date" id="newTaskDate" class="inline-input" style="flex:1;"></div>
+                <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+                    <input type="text" id="newTaskText" class="inline-input" placeholder="מה צריך לעשות?" style="flex:2; min-width:160px;">
+                    <input type="date" id="newTaskDate" class="inline-input" style="flex:1;">
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center;">
+                    <label style="font-size:12px; color:var(--text-muted); white-space:nowrap;">עבור מי:</label>
+                    <select id="newTaskMember" class="inline-input" style="flex:1; font-size:13px;"></select>
+                </div>
                 <button class="btn btn-outline" style="font-size:13px; padding:6px;" onclick="addTask()"><i class="fas fa-plus"></i> הוסף משימה</button>
             </div>
         </div>
@@ -1179,17 +1191,31 @@ function toggleDrivePanel() {
             <div class="log-list" id="cLogsList"></div>
             <div style="background:var(--bg-body); padding:12px; border-radius:8px; border:1px solid var(--border-light);">
                 <h5 style="margin:0 0 10px 0; color:var(--accent);">תיעוד חדש</h5>
-                <div style="display:flex; gap:10px; margin-bottom:10px;"><input type="date" id="newLogDate" class="inline-input" style="flex:1;"><select id="newLogType" class="inline-input" style="flex:1;"><option value="ביקור">ביקור</option><option value="שיחה">שיחה</option><option value="הודעה">הודעה</option><option value="אחר">אחר</option></select></div>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="date" id="newLogDate" class="inline-input" style="flex:1;">
+                    <select id="newLogType" class="inline-input" style="flex:1;"><option value="ביקור">ביקור</option><option value="שיחה">שיחה</option><option value="הודעה">הודעה</option><option value="אחר">אחר</option></select>
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
+                    <label style="font-size:12px; color:var(--text-muted); white-space:nowrap;">עבור מי:</label>
+                    <select id="newLogMember" class="inline-input" style="flex:1; font-size:13px;"></select>
+                </div>
                 <textarea id="newLogText" class="inline-input" rows="2" placeholder="מה היה?" style="margin-bottom:10px;"></textarea>
                 <button class="btn btn-outline" style="font-size:13px; padding:6px;" onclick="addInteractionLog()"><i class="fas fa-plus"></i> שמור תיעוד</button>
             </div>
         </div>
         <div id="crm-donations" class="crm-tab-content">
-            <div class="sum-box">סך הכל תרומות: <span id="cDonationsSum">₪0</span></div>
+            <div class="sum-box">סך הכל תרומות: <span id="cDonationsSum">₪0</span> <span id="cDonationsBreakdown" style="font-size:12px; font-weight:400; margin-right:8px;"></span></div>
             <div class="log-list" id="cDonationsList"></div>
             <div style="background:var(--bg-body); padding:12px; border-radius:8px; border:1px solid var(--border-light);">
                 <h5 style="margin:0 0 10px 0; color:var(--success);">תרומה חדשה (מעל 500₪ = משימה אוטומטית!)</h5>
-                <div style="display:flex; gap:10px; margin-bottom:10px;"><input type="date" id="newDonDate" class="inline-input" style="flex:1;"><input type="number" id="newDonAmount" class="inline-input" placeholder="סכום (₪)" style="flex:1;"></div>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="date" id="newDonDate" class="inline-input" style="flex:1;">
+                    <input type="number" id="newDonAmount" class="inline-input" placeholder="סכום (₪)" style="flex:1;">
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
+                    <label style="font-size:12px; color:var(--text-muted); white-space:nowrap;">עבור מי:</label>
+                    <select id="newDonMember" class="inline-input" style="flex:1; font-size:13px;"></select>
+                </div>
                 <input type="text" id="newDonReason" class="inline-input" placeholder="עבור מה?" style="margin-bottom:10px;">
                 <button class="btn btn-success" style="font-size:13px; padding:6px;" onclick="addDonation()"><i class="fas fa-plus"></i> הוסף תרומה</button>
             </div>
@@ -2113,6 +2139,19 @@ function toggleDrivePanel() {
             <span><kbd>Enter</kbd> בחירה</span>
             <span><kbd>Ctrl+K</kbd> פתח/סגור</span>
         </div>
+    </div>
+</div>
+
+<!-- ── Split Family Modal ── -->
+<div id="splitFamilyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9100;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border-radius:18px;padding:24px 28px;max-width:380px;width:92%;box-shadow:0 24px 60px rgba(0,0,0,.3);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <i class="fas fa-code-branch" style="color:var(--accent);font-size:18px;"></i>
+            <h3 style="margin:0;font-size:17px;">פצל כרטיס — עבור מי?</h3>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px;">ייוצר כרטיס עצמאי עם ההיסטוריה המיוחסת לאותו בן משפחה.</p>
+        <div id="splitMemberList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+        <button class="btn btn-outline" style="width:100%;font-size:13px;" onclick="document.getElementById('splitFamilyModal').style.display='none'">ביטול</button>
     </div>
 </div>
 
