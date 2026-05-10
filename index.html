@@ -305,7 +305,46 @@ function toggleDrivePanel() {
         </div>
 
         <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; border-radius:14px; border:1px solid var(--border-light); box-shadow:var(--card-shadow);">
-        <div class="crm-tabs" style="margin:0; padding:8px 12px 0 12px; background:var(--surface); flex-shrink:0; border-radius:14px 14px 0 0; overflow-x:auto;">
+
+        <!-- ── Audience Builder ── -->
+        <div id="audienceBuilder" style="flex-shrink:0; background:var(--surface); border-radius:14px 14px 0 0;">
+            <div id="audHeader" onclick="toggleAudienceBuilder()" style="display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border-light);user-select:none;">
+                <i class="fas fa-users" style="color:var(--accent);font-size:13px;"></i>
+                <span style="font-weight:700;font-size:13px;color:var(--text);">קהל יעד:</span>
+                <span id="audHeaderCount" style="color:var(--accent);font-weight:800;font-size:13px;">לא נבחרו</span>
+                <div id="audHeaderChips" style="display:flex;gap:4px;flex-wrap:wrap;flex:1;min-width:0;overflow:hidden;"></div>
+                <button class="btn btn-outline" style="width:auto;padding:3px 10px;font-size:11px;flex-shrink:0;" onclick="event.stopPropagation();clearAudience()"><i class="fas fa-times"></i> נקה</button>
+                <button class="btn btn-primary" style="width:auto;padding:3px 10px;font-size:11px;flex-shrink:0;" onclick="event.stopPropagation();applyAudienceToChannels()"><i class="fas fa-check"></i> החל על כל הערוצים (<span id="audApplyCount">0</span>)</button>
+                <i id="audChevron" class="fas fa-chevron-down" style="font-size:11px;color:var(--text-muted);transition:transform .3s;flex-shrink:0;"></i>
+            </div>
+            <div id="audBody" style="display:none;padding:12px 16px 14px;border-bottom:1px solid var(--border-solid);">
+                <!-- Smart Segments -->
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+                    <button class="aud-seg-btn active" onclick="applyAudSegment('all',this)">כולם</button>
+                    <button class="aud-seg-btn" onclick="applyAudSegment('no_contact_60',this)"><i class="fas fa-clock"></i> לא נוצר קשר 60+ יום</button>
+                    <button class="aud-seg-btn" onclick="applyAudSegment('no_contact_30',this)"><i class="fas fa-clock"></i> לא נוצר קשר 30+ יום</button>
+                    <button class="aud-seg-btn" onclick="applyAudSegment('has_tasks',this)"><i class="fas fa-tasks"></i> יש משימות פתוחות</button>
+                    <button class="aud-seg-btn" onclick="applyAudSegment('no_phone',this)"><i class="fas fa-phone-slash"></i> חסר טלפון</button>
+                    <button class="aud-seg-btn" onclick="applyAudSegment('no_email',this)"><i class="fas fa-envelope-open"></i> חסר מייל</button>
+                    <button class="aud-seg-btn" onclick="applyAudSegment('red',this)" style="border-color:#ef4444;color:#ef4444;"><i class="fas fa-circle"></i> אדום</button>
+                    <button class="aud-seg-btn" onclick="applyAudSegment('orange',this)" style="border-color:#f59e0b;color:#f59e0b;"><i class="fas fa-circle"></i> כתום</button>
+                </div>
+                <!-- Style pills -->
+                <div id="audStylePills" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;"></div>
+                <!-- Search + select all -->
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <input id="audSearch" type="text" class="inline-input" placeholder="חיפוש לפי שם או בניין..." style="flex:1;padding:6px 10px;font-size:13px;" oninput="filterAudList(this.value)">
+                    <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;">
+                        <input type="checkbox" onchange="toggleAudSelectAll(this.checked)"> בחר הכל
+                    </label>
+                    <span id="audListCount" style="font-size:12px;color:var(--text-muted);white-space:nowrap;"></span>
+                </div>
+                <!-- Family list -->
+                <div id="audFamilyList" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;"></div>
+            </div>
+        </div>
+
+        <div class="crm-tabs" style="margin:0; padding:8px 12px 0 12px; background:var(--surface); flex-shrink:0; overflow-x:auto;">
             <div class="crm-tab active" onclick="switchCommTab('whatsapp')" id="commTabBtn-whatsapp"><i class="fab fa-whatsapp" style="color:#25D366;"></i> וואטסאפ</div>
             <div class="crm-tab" onclick="switchCommTab('email')" id="commTabBtn-email"><i class="fas fa-envelope" style="color:#ea4335;"></i> אימייל</div>
             <div class="crm-tab" onclick="switchCommTab('sms')" id="commTabBtn-sms"><i class="fas fa-sms" style="color:#0ea5e9;"></i> SMS</div>
@@ -321,7 +360,7 @@ function toggleDrivePanel() {
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <span><strong>נמענים:</strong> <span id="waRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span></span>
                         <div style="display:flex;gap:6px;">
-                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientsFromDB('whatsapp')"><i class="fas fa-users"></i> בחר מהרשימה</button>
+                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="openAudienceBuilder()"><i class="fas fa-users"></i> בחר מהרשימה</button>
                             <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientManually('whatsapp')"><i class="fas fa-plus"></i> הוסף ידנית</button>
                         </div>
                     </div>
@@ -344,7 +383,7 @@ function toggleDrivePanel() {
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <span><strong>נמענים:</strong> <span id="emRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span></span>
                         <div style="display:flex;gap:6px;">
-                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientsFromDB('email')"><i class="fas fa-users"></i> בחר מהרשימה</button>
+                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="openAudienceBuilder()"><i class="fas fa-users"></i> בחר מהרשימה</button>
                             <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientManually('email')"><i class="fas fa-plus"></i> הוסף ידנית</button>
                         </div>
                     </div>
@@ -377,7 +416,7 @@ function toggleDrivePanel() {
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                         <span><strong>נמענים:</strong> <span id="smsRecipientCount" style="color:#0ea5e9;font-weight:bold;font-size:16px;">0</span></span>
                         <div style="display:flex;gap:6px;">
-                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addSMSFromDB()"><i class="fas fa-users"></i> בחר מרשימה</button>
+                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="openAudienceBuilder()"><i class="fas fa-users"></i> בחר מהרשימה</button>
                             <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addSMSManually()"><i class="fas fa-plus"></i> הוסף ידנית</button>
                         </div>
                     </div>
@@ -1857,6 +1896,7 @@ function toggleDrivePanel() {
 <script src="tasks.js"></script>
 <script src="events.js"></script>
 <script src="comm.js"></script>
+<script src="audience.js"></script>
 <div id="smartViewsManagerModal" class="modal" style="z-index: 10001;">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">

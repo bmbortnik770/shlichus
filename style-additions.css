@@ -804,3 +804,68 @@ body.density-spacious .data-table th {
 }
 .empty-state-box h4 { margin: 0 0 6px 0; font-size: 17px; font-weight: 700; }
 .empty-state-box p  { font-size: 13px; color: var(--text-hint); margin: 0 0 16px 0; }
+
+/* ── Audience Builder ── */
+.aud-seg-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border-solid);
+    background: var(--bg-body);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+}
+.aud-seg-btn:hover { border-color: var(--accent); color: var(--accent); }
+.aud-seg-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+.aud-style-pill {
+    padding: 3px 9px;
+    font-size: 11px;
+    border-radius: 12px;
+    border: 1px solid var(--border-light);
+    background: var(--bg-body);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+}
+.aud-style-pill:hover { border-color: var(--accent); color: var(--accent); }
+.aud-style-pill.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+.aud-family-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background .12s;
+    font-size: 13px;
+}
+.aud-family-row:hover { background: var(--bg-body); }
+.aud-family-row.selected { background: var(--accent-light); }
+.aud-family-row input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); }
+
+.aud-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.aud-name  { flex: 1; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aud-phone { font-size: 12px; color: var(--text-muted); flex-shrink: 0; direction: ltr; }
+.aud-icons { display: flex; gap: 4px; flex-shrink: 0; }
+.aud-chip  { font-size: 11px; padding: 1px 5px; border-radius: 6px; }
+.aud-chip.has { background: var(--accent-light); color: var(--accent); }
+.aud-chip.no  { background: var(--bg-body); color: var(--text-hint); border: 1px solid var(--border-light); }
+
+.aud-chip-badge {
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    white-space: nowrap;
+}
