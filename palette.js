@@ -147,6 +147,7 @@ function _navigate(dir) {
 function open() {
     const el = document.getElementById('cmdPalette');
     if (!el) return;
+    el.style.display = 'flex';
     el.classList.add('open');
     const inp = document.getElementById('cmdInput');
     if (inp) { inp.value = ''; inp.focus(); }
@@ -154,7 +155,10 @@ function open() {
 }
 
 function close() {
-    document.getElementById('cmdPalette')?.classList.remove('open');
+    const el = document.getElementById('cmdPalette');
+    if (!el) return;
+    el.style.display = 'none';
+    el.classList.remove('open');
 }
 
 // ── Globals ──
