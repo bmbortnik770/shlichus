@@ -2673,7 +2673,7 @@ function renderDonations() {
     document.getElementById('cDonationsList').innerHTML = tempDonations.length===0
         ? '<div class="empty-state"><i class="fas fa-hand-holding-heart"></i><div>אין תרומות.</div></div>'
         : tempDonations.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((d,i) => {
-            const campLabel = typeof _campLabel === 'function' ? _campLabel(d.campaign) : (d.campaign||'');
+            const campLabel = typeof _getCampaignLabel === 'function' ? _getCampaignLabel(d.campaign) : (d.campaign||'');
             return `<div class="log-item">
                 <div class="log-header">
                     <span style="color:var(--success);font-weight:600;"><i class="fas fa-shekel-sign"></i> ${Number(d.amount).toLocaleString()}${_memberBadge(d.member)}</span>
