@@ -70,6 +70,8 @@ if(!appSettings.smartViews) {
 }
 window.activeSmartView = 'v_all';
 window.customSmartSort = '';
+// Init interaction type catalog (scoring.js loaded after app.js — call lazily)
+document.addEventListener('DOMContentLoaded', () => { if (typeof _initInteractionTypes === 'function') _initInteractionTypes(); });
 if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי', target: 30 };
 if(!appSettings.templates) {
     appSettings.templates = [
@@ -1787,6 +1789,7 @@ function updateCoverageStats() {
     const vr=document.getElementById('coverageVerifiedRow');
     if(s.verifiedBldgs>0){vr.style.display='block';document.getElementById('coverageVerifiedCount').innerText=s.verifiedBldgs;}
     else vr.style.display='none';
+    if (typeof renderLifecycleAlerts === 'function') renderLifecycleAlerts();
 }
 
 // ── מפת קומות — render ─────────────────────────────────────────
@@ -2470,6 +2473,9 @@ window.openClientCard = function(idx) {
     tempCustom=JSON.parse(JSON.stringify(a.customData || a.customFields ||{})); renderCustomFields();
     tempBoards=JSON.parse(JSON.stringify(a.boards||{})); renderModalBoards();
     tempMilestones=JSON.parse(JSON.stringify(a.milestones||[])); renderMilestones();
+    if (typeof initLifecycle === 'function') initLifecycle(a);
+    if (typeof _populateLogTypeSelect === 'function') _populateLogTypeSelect();
+    if (typeof updateEngagementDisplay === 'function') updateEngagementDisplay(currentBldg, idx);
     
     const tStr = new Date().toISOString().split('T')[0];
     document.getElementById('newLogDate').value = tStr; 
@@ -2609,25 +2615,34 @@ window.addTask = (text='', date='') => {
 function renderLogs() {
     document.getElementById('cLogsList').innerHTML = tempLogs.length===0
         ? '<div class="empty-state"><i class="fas fa-comments"></i><div>עוד לא נוצר קשר. זה הזמן!</div></div>'
-        : tempLogs.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((l,i) => `
-            <div class="log-item">
+        : tempLogs.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((l,i) => {
+            const tInfo = typeof getITypeInfo === 'function' ? getITypeInfo(l.interactionType || l.type) : null;
+            const typeIcon = tInfo ? `<i class="fas ${tInfo.icon}" style="color:${tInfo.color};margin-left:5px;" title="${escapeHTML(tInfo.label)}"></i>` : '';
+            const dirColors = { outgoing:'#7c3aed', incoming:'#0891b2', milestone:'#f59e0b' };
+            const dirLabels = { outgoing:'אני אצלו', incoming:'הוא אצלי' };
+            const dirBadge  = tInfo && dirLabels[tInfo.direction]
+                ? `<span style="background:${dirColors[tInfo.direction]}22;color:${dirColors[tInfo.direction]};padding:1px 6px;border-radius:8px;font-size:10px;margin-right:4px;">${dirLabels[tInfo.direction]}</span>` : '';
+            return `<div class="log-item">
                 <div class="log-header">
-                    <span><i class="fas fa-calendar-alt"></i> ${l.date} — ${escapeHTML(l.type||'')}${_memberBadge(l.member)}</span>
+                    <span>${typeIcon}${dirBadge}${escapeHTML(tInfo?.label || l.type||'')} — <span style="color:var(--text-muted);font-size:11px;">${l.date}</span>${_memberBadge(l.member)}</span>
                     <button onclick="tempLogs.splice(${i},1);markDirty();renderLogs()" style="background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-times"></i></button>
                 </div>
-                <div>${escapeHTML(l.text||l.notes||'')}</div>
-            </div>`).join('');
+                <div style="font-size:13px;">${escapeHTML(l.text||l.notes||'')}</div>
+            </div>`;
+        }).join('');
 }
 window.addInteractionLog = () => {
-    const d   = document.getElementById('newLogDate').value;
-    const t   = document.getElementById('newLogType').value;
-    const txt = document.getElementById('newLogText').value;
+    const d      = document.getElementById('newLogDate').value;
+    const typeKey= document.getElementById('newLogType').value;
+    const txt    = document.getElementById('newLogText').value;
     const member = document.getElementById('newLogMember')?.value || 'family';
     if (!d || !txt) { showToast('יש למלא תאריך ותיאור', 'warning'); return; }
+    const tInfo  = typeof getITypeInfo === 'function' ? getITypeInfo(typeKey) : null;
     markDirty();
-    tempLogs.push({ date:d, type:t, text:txt, member });
+    tempLogs.push({ date:d, type: tInfo?.label || typeKey, interactionType: typeKey, text:txt, member, direction: tInfo?.direction || 'milestone' });
     document.getElementById('newLogText').value = '';
     renderLogs();
+    if (typeof updateEngagementDisplay === 'function') updateEngagementDisplay(currentBldg, currentAptIdx);
 };
 
 // ── Donations ──────────────────────────────────────────────
@@ -2755,6 +2770,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
     a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customData={...tempCustom}; a.customFields=a.customData; // backward compat
     a.milestones=[...tempMilestones];
+    if (typeof getLifecycleData === 'function') a.lifecycleEvents = getLifecycleData();
     a.updatedAt = Date.now();
     if(a.num) ensureMinimumUnits(currentBldg, a.num);
     isDirty=false; isCreatingNew=false; saveDB(); if(window.haptic) haptic('success'); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");

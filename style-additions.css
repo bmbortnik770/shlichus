@@ -978,3 +978,56 @@ body.density-spacious .data-table th {
 }
 .email-prov-btn:hover { border-color: var(--accent); background: var(--accent-light); }
 .email-prov-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-right: auto; }
+
+/* ── Engagement score badges ── */
+.engagement-badge,
+.last-contact-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.last-contact-badge.lc-none {
+    background: var(--bg-body);
+    color: var(--text-muted);
+}
+
+/* ── Lifecycle event rows ── */
+.lc-event-row {
+    border-radius: 8px;
+    margin-bottom: 8px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+}
+
+/* ── Lifecycle alert panel ── */
+.lc-alert-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 12px;
+    transition: background .12s;
+}
+.lc-alert-item:hover { background: var(--table-hover); }
+.lc-alert-item.lc-alert-urgent {
+    border-right: 3px solid var(--danger);
+    background: rgba(239,68,68,.04);
+}
+
+/* ── Score settings row ── */
+.score-type-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    margin-bottom: 5px;
+}
