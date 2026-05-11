@@ -979,6 +979,10 @@ body.density-spacious .data-table th {
 .email-prov-btn:hover { border-color: var(--accent); background: var(--accent-light); }
 .email-prov-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-right: auto; }
 
+/* ── Direction badge — only takes space when populated ── */
+#logDirectionBadge:empty { display: none; }
+#logDirectionBadge:not(:empty) { margin-bottom: 8px; }
+
 /* ── Engagement score badges ── */
 .engagement-badge,
 .last-contact-badge {

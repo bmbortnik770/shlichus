@@ -87,14 +87,21 @@ window.renderLastContactBadge = function (days) {
 
 // ── Update header badges inside open client card ──────────────
 window.updateEngagementDisplay = function (bldg, idx) {
-    const apt = db?.[bldg]?.apts?.[idx];
+    const apt     = db?.[bldg]?.apts?.[idx];
+    const row     = document.getElementById('familyStatsBadgesRow');
     const scoreEl = document.getElementById('familyScoreBadge');
     const lcEl    = document.getElementById('familyLastContact');
-    if (!apt) { if (scoreEl) scoreEl.innerHTML = ''; if (lcEl) lcEl.innerHTML = ''; return; }
+    if (!apt) {
+        if (row)     row.style.display = 'none';
+        if (scoreEl) scoreEl.innerHTML = '';
+        if (lcEl)    lcEl.innerHTML    = '';
+        return;
+    }
     const score = computeEngagementScore(apt);
     const days  = getLastContactDays(apt);
     if (scoreEl) scoreEl.innerHTML = renderScoreBadge(score);
     if (lcEl)    lcEl.innerHTML    = renderLastContactBadge(days);
+    if (row)     row.style.display = 'flex';
 };
 
 // ── Populate interaction type <select> ────────────────────────

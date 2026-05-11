@@ -3796,7 +3796,7 @@ function refreshMap(filteredRes = null) {
         const _cvs = document.getElementById('styleChart');
         if(_cvs) {
             _cvs.style.display = 'block';
-            chart = new Chart(_cvs, { type:'doughnut', data:{labels:_chartLabels, datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:_chartColors}]}, options:{plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000', font:{size:11}}}}, cutout:'65%', animation:{duration:400}} });
+            chart = new Chart(_cvs, { type:'doughnut', data:{labels:_chartLabels, datasets:[{data:Object.values(stats), borderWidth:0, backgroundColor:_chartColors}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'left', labels:{color:document.body.classList.contains('dark-mode')?'#fff':'#000', font:{size:11}}}}, cutout:'65%', animation:{duration:400}} });
         }
     }
     
