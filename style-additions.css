@@ -1031,3 +1031,42 @@ body.density-spacious .data-table th {
     border-radius: 8px;
     margin-bottom: 5px;
 }
+
+/* ── Pledge rows ── */
+.pledge-row {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+.pledge-bar-wrap {
+    background: var(--bg-body);
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+}
+.pledge-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.5s ease;
+    min-width: 4px;
+}
+.pledge-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* ── LYBUNT flag ── */
+.lybunt-flag {
+    background: rgba(245,158,11,.15);
+    color: #d97706;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+}

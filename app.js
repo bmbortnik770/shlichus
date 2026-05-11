@@ -70,8 +70,10 @@ if(!appSettings.smartViews) {
 }
 window.activeSmartView = 'v_all';
 window.customSmartSort = '';
-// Init interaction type catalog (scoring.js loaded after app.js — call lazily)
-document.addEventListener('DOMContentLoaded', () => { if (typeof _initInteractionTypes === 'function') _initInteractionTypes(); });
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof _initInteractionTypes === 'function') _initInteractionTypes();
+    if (!appSettings.campaigns) appSettings.campaigns = [];
+});
 if(!appSettings.goal) appSettings.goal = { text: 'חיפוש חופשי', target: 30 };
 if(!appSettings.templates) {
     appSettings.templates = [
@@ -2474,6 +2476,7 @@ window.openClientCard = function(idx) {
     tempBoards=JSON.parse(JSON.stringify(a.boards||{})); renderModalBoards();
     tempMilestones=JSON.parse(JSON.stringify(a.milestones||[])); renderMilestones();
     if (typeof initLifecycle === 'function') initLifecycle(a);
+    if (typeof initPledges === 'function') initPledges(a);
     if (typeof _populateLogTypeSelect === 'function') _populateLogTypeSelect();
     if (typeof updateEngagementDisplay === 'function') updateEngagementDisplay(currentBldg, idx);
     
@@ -2576,7 +2579,7 @@ function _getMemberOptions(selected) {
 }
 
 window.refreshMemberDropdowns = function() {
-    ['newLogMember','newTaskMember','newDonMember'].forEach(id => {
+    ['newLogMember','newTaskMember','newDonMember','newPledgeMember','lcMember'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = _getMemberOptions(el.value || 'family');
     });
@@ -2647,10 +2650,13 @@ window.addInteractionLog = () => {
 
 // ── Donations ──────────────────────────────────────────────
 function renderDonations() {
-    const sum = tempDonations.reduce((a,b) => a + Number(b.amount||0), 0);
-    document.getElementById('cDonationsSum').innerText = `₪${sum.toLocaleString()}`;
+    if (typeof _updateDonSumBox === 'function') _updateDonSumBox();
+    else {
+        const sum = tempDonations.reduce((a,b) => a + Number(b.amount||0), 0);
+        document.getElementById('cDonationsSum').innerText = `₪${sum.toLocaleString()}`;
+    }
 
-    // Per-member breakdown (only if multiple attributed)
+    // Per-member breakdown
     const byMember = {};
     tempDonations.forEach(d => {
         const k = d.member && d.member !== 'family' ? d.member : null;
@@ -2666,28 +2672,37 @@ function renderDonations() {
 
     document.getElementById('cDonationsList').innerHTML = tempDonations.length===0
         ? '<div class="empty-state"><i class="fas fa-hand-holding-heart"></i><div>אין תרומות.</div></div>'
-        : tempDonations.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((d,i) => `
-            <div class="log-item">
+        : tempDonations.sort((a,b)=>new Date(b.date)-new Date(a.date)).map((d,i) => {
+            const campLabel = typeof _campLabel === 'function' ? _campLabel(d.campaign) : (d.campaign||'');
+            return `<div class="log-item">
                 <div class="log-header">
                     <span style="color:var(--success);font-weight:600;"><i class="fas fa-shekel-sign"></i> ${Number(d.amount).toLocaleString()}${_memberBadge(d.member)}</span>
-                    <span style="font-size:12px;color:var(--text-muted);">${d.date}</span>
+                    <span style="font-size:11px;color:var(--text-muted);">${d.date}</span>
                 </div>
                 <div style="font-size:13px;">${escapeHTML(d.reason||'')}
+                    ${campLabel ? `<span style="font-size:11px;color:var(--accent);margin-right:6px;"><i class="fas fa-flag"></i> ${escapeHTML(campLabel)}</span>` : ''}
                     <button onclick="tempDonations.splice(${i},1);markDirty();renderDonations()" style="float:left;background:none;border:none;color:var(--danger);cursor:pointer;"><i class="fas fa-trash"></i></button>
                 </div>
-            </div>`).join('');
+            </div>`;
+        }).join('');
 }
 window.addDonation = () => {
-    const d = document.getElementById('newDonDate').value;
-    const a = document.getElementById('newDonAmount').value;
-    const r = document.getElementById('newDonReason').value;
-    const member = document.getElementById('newDonMember')?.value || 'family';
+    const d        = document.getElementById('newDonDate').value;
+    const a        = document.getElementById('newDonAmount').value;
+    const r        = document.getElementById('newDonReason').value;
+    const member   = document.getElementById('newDonMember')?.value || 'family';
+    const campaign = document.getElementById('newDonCampaign')?.value || '';
+    const pledgeId = document.getElementById('newDonPledge')?.value || '';
     if (!d || !a) { showToast('יש למלא תאריך וסכום', 'warning'); return; }
     markDirty();
-    tempDonations.push({ date:d, amount:a, reason:r||'כללי', member });
-    if (Number(a) >= 500) { addTask(`להתקשר להגיד תודה אישית על התרומה (${a} ש"ח)`, d); showToast('נוצרה משימה להכרת הטוב! ' + getRandomCompliment(), 'info'); switchCrmTab('tasks'); }
+    const donation = { date:d, amount:a, reason:r||'כללי', member, campaign };
+    if (pledgeId) donation.pledgeId = pledgeId;
+    tempDonations.push(donation);
+    if (pledgeId && typeof refreshPledgesAfterDonation === 'function') refreshPledgesAfterDonation();
+    if (Number(a) >= 500) { addTask(`להתקשר להגיד תודה אישית על התרומה (${a} ש"ח)`, d); showToast('נוצרה משימה להכרת הטוב! ' + getRandomCompliment(), 'info'); }
     document.getElementById('newDonAmount').value = '';
     document.getElementById('newDonReason').value = '';
+    if (document.getElementById('newDonPledge')) document.getElementById('newDonPledge').value = '';
     renderDonations();
 };
 
@@ -2771,6 +2786,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customData={...tempCustom}; a.customFields=a.customData; // backward compat
     a.milestones=[...tempMilestones];
     if (typeof getLifecycleData === 'function') a.lifecycleEvents = getLifecycleData();
+    if (typeof getPledgesData === 'function') a.pledges = getPledgesData();
     a.updatedAt = Date.now();
     if(a.num) ensureMinimumUnits(currentBldg, a.num);
     isDirty=false; isCreatingNew=false; saveDB(); if(window.haptic) haptic('success'); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
