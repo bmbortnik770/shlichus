@@ -212,6 +212,7 @@ window.renderLifecycleAlerts = function () {
 };
 
 // ── Internals ─────────────────────────────────────────────────
+window._populateLifecycleTypeSelect = function () { _populateLcTypes(); };
 function _populateLcTypes() {
     const sel = document.getElementById('lcType');
     if (!sel) return;

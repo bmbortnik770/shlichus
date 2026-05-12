@@ -2227,31 +2227,53 @@ function updateTerritoryStatsDisplay() {
 
 
 window.switchMainView = function(viewName) {
+    // Old name aliases → new names
+    if (viewName === 'table') viewName = 'community';
+
     currentMainView = viewName;
-    // desktop tabs (null-safe)
+
+    // Update tab active state — handles both old and new tab IDs
     document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
     const dtab = document.getElementById('tab-' + viewName);
     if (dtab) dtab.classList.add('active');
+    // Also activate community tab when showing community
+    if (viewName === 'community') {
+        const cTab = document.getElementById('tab-community');
+        if (cTab) cTab.classList.add('active');
+    }
 
-    // body view class — CSS uses this to show/hide elements per view
-    document.body.classList.remove('view-map','view-table','view-kanban','view-tasks','view-comm','view-events');
+    // body view class
+    document.body.classList.remove(
+        'view-map','view-table','view-kanban','view-tasks','view-comm','view-events',
+        'view-community','view-activity','view-globaldonations'
+    );
     document.body.classList.add('view-' + viewName);
 
-    document.getElementById('map-container').style.display = viewName==='map'?'block':'none';
-    document.getElementById('list-container').style.display = viewName==='table'?'block':'none';
-    document.getElementById('kanban-container').style.display = viewName==='kanban'?'flex':'none';
-    document.getElementById('comm-container').style.display = viewName==='comm'?'flex':'none';
-    document.getElementById('tasks-container').style.display = viewName==='tasks'?'flex':'none';
-    document.getElementById('events-container').style.display = viewName==='events'?'flex':'none';
+    // Container visibility
+    const contMap       = document.getElementById('map-container');
+    const contList      = document.getElementById('list-container');
+    const contKanban    = document.getElementById('kanban-container');
+    const contComm      = document.getElementById('comm-container');
+    const contTasks     = document.getElementById('tasks-container');
+    const contEvents    = document.getElementById('events-container');
+    const contActivity  = document.getElementById('activity-container');
+    const contDonations = document.getElementById('global-donations-container');
 
-    if(viewName==='map') map.resize();
-    if(viewName==='tasks') {
-        document.getElementById('globalTaskDate').value = new Date().toISOString().split('T')[0];
-        renderGlobalTasks();
-    }
-    if(viewName==='events') renderEventsView();
-    handleOmniSearch();
-};;
+    if (contMap)       contMap.style.display       = viewName==='map'            ? 'block' : 'none';
+    if (contList)      contList.style.display      = viewName==='community'       ? 'block' : 'none';
+    if (contComm)      contComm.style.display      = viewName==='comm'            ? 'flex'  : 'none';
+    if (contActivity)  contActivity.style.display  = viewName==='activity'        ? 'flex'  : 'none';
+    if (contDonations) contDonations.style.display = viewName==='globaldonations' ? 'flex'  : 'none';
+    // Sub-view containers — hidden when not in activity (managed by switchActivitySub)
+    if (contKanban) contKanban.style.display = 'none';
+    if (contTasks)  contTasks.style.display  = 'none';
+    if (contEvents) contEvents.style.display = 'none';
+
+    if (viewName==='map') map.resize();
+    if (viewName==='community') handleOmniSearch();
+    if (viewName==='globaldonations' && typeof renderGlobalDonations === 'function') renderGlobalDonations();
+    if (viewName !== 'community') handleOmniSearch();
+};
 
 // ── Haptic ──
 window.haptic = function(type) {

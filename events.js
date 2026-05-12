@@ -8,9 +8,23 @@ let _msInputMode = 'greg'; // 'greg' | 'heb'
 window.switchCrmTab = (tab) => {
     document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content')
         .forEach(e => e.classList.remove('active'));
-    document.getElementById(`tabBtn-${tab}`).classList.add('active');
-    document.getElementById(`crm-${tab}`).classList.add('active');
+    const tabBtn = document.getElementById(`tabBtn-${tab}`);
+    const tabContent = document.getElementById(`crm-${tab}`);
+    if (tabBtn) tabBtn.classList.add('active');
+    if (tabContent) tabContent.classList.add('active');
     if (tab === 'milestones') _initMilestonesTab();
+    if (tab === 'activity' && typeof renderFamilyActivityTab === 'function') {
+        renderFamilyActivityTab();
+    }
+    // If switching to a hidden backward-compat tab, also show the activity tab
+    if (['tasks','logs','lifecycle'].includes(tab)) {
+        // These are hidden tabs — just show activity instead
+        const actBtn = document.getElementById('tabBtn-activity');
+        const actContent = document.getElementById('crm-activity');
+        if (actBtn) actBtn.classList.add('active');
+        if (actContent) actContent.classList.add('active');
+        if (typeof renderFamilyActivityTab === 'function') renderFamilyActivityTab();
+    }
 };
 
 function _initMilestonesTab() {
@@ -697,28 +711,23 @@ window.confirmSplitFamily = async function() {
 // ██  לשונית אירועים ראשית — Events View  ██
 // ════════════════════════════════════════════════════════════
 
-// ── הרחב את switchMainView לתמוך ב-events ──
+// ── הרחב את switchMainView — מנתב events לתת-תצוגה בפעילות ──
 const _origSwitchMainViewEvents = window.switchMainView;
 window.switchMainView = function(viewName) {
-    // הסתר/הצג events-container
-    const evCont = document.getElementById('events-container');
-    if (evCont) evCont.style.display = viewName === 'events' ? 'flex' : 'none';
-
-    // body class
-    document.body.classList.remove('view-events');
-
     if (viewName === 'events') {
-        document.body.classList.add('view-events');
-        currentMainView = 'events';
-        document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
-        const tab = document.getElementById('tab-events');
-        if (tab) tab.classList.add('active');
-        // אתחל ורנדר
-        _initEventsView();
-        renderEventsView();
+        // Route through activity hub
+        _origSwitchMainViewEvents('activity');
+        if (typeof switchActivitySub === 'function') {
+            switchActivitySub('events');
+        } else {
+            // Fallback if activity-hub not loaded yet
+            const evCont = document.getElementById('events-container');
+            if (evCont) evCont.style.display = 'flex';
+            _initEventsView();
+            renderEventsView();
+        }
         return;
     }
-
     _origSwitchMainViewEvents(viewName);
 };
 
