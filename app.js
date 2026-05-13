@@ -2482,7 +2482,8 @@ window.openClientCard = function(idx) {
 
     const sSel = document.getElementById('cStyle'); sSel.innerHTML = '';
     appSettings.styles.forEach(s => sSel.innerHTML += `<option value="${s}" ${a.style===s?'selected':''}>${s}</option>`);
-    if(a.style&&!appSettings.styles.includes(a.style)) sSel.innerHTML+=`<option selected>${a.style}</option>`;
+    if (a.style && !appSettings.styles.includes(a.style)) sSel.innerHTML += `<option selected>${a.style}</option>`;
+    if (!appSettings.styles.includes('מעורב')) sSel.innerHTML += `<option value="מעורב" ${a.style==='מעורב'?'selected':''}>מעורב (הורים שונים)</option>`;
     // Individual parent styles (shown when family style = מעורב)
     const _fsEl = document.getElementById('cFatherStyle'); if (_fsEl) _fsEl.dataset.current = a.fatherStyle || '';
     const _msEl = document.getElementById('cMotherStyle'); if (_msEl) _msEl.dataset.current = a.motherStyle || '';
@@ -2555,7 +2556,7 @@ window.toggleMixedStyle = function () {
     const isMixed  = style === 'מעורב';
     override.style.display = isMixed ? 'block' : 'none';
     if (!isMixed) return;
-    const baseStyles = appSettings.styles.filter(s => s !== 'מעורב');
+    const baseStyles = (appSettings?.styles || []).filter(s => s !== 'מעורב');
     ['cFatherStyle', 'cMotherStyle'].forEach(id => {
         const sel = document.getElementById(id);
         if (!sel) return;
