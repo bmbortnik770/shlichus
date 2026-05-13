@@ -37,6 +37,18 @@ const fieldApp = (function () {
     let missionWaypoints = [];
     let missionCurrentIdx = 0;
     let missionPaused = false;
+    let userPosition = null;
+    let _briefShownForIdx = -1;
+    let _selectedDebriefIdx = -1;
+
+    const QUICK_TEMPLATES = [
+        { emoji: '🤝', label: 'שיחה טובה' },
+        { emoji: '🚪', label: 'לא היו' },
+        { emoji: '📚', label: 'מתעניין' },
+        { emoji: '🙏', label: 'ביקש עזרה' },
+        { emoji: '💰', label: 'תרומה' },
+        { emoji: '📞', label: 'לחזור' },
+    ];
     let taskLayerVisible = false;
     let taskMarkers = [];
     let currentDraftRoute = [];
@@ -2131,9 +2143,18 @@ const fieldApp = (function () {
         if (!navigator.geolocation) return;
         watchId = navigator.geolocation.watchPosition(
             (pos) => {
-                if (!db || !isMissionActive) return;
+                if (!db) return;
                 const user = [pos.coords.longitude, pos.coords.latitude];
-                if (!isDraggingMap && map) { map.easeTo({ center: user, pitch: 75, zoom: 19.5, bearing: pos.coords.heading !== null && !isNaN(pos.coords.heading) ? pos.coords.heading : map.getBearing(), duration: 1000 }); }
+                userPosition = user;
+                if (isMissionActive) {
+                    if (!isDraggingMap && map) { map.easeTo({ center: user, pitch: 75, zoom: 19.5, bearing: pos.coords.heading !== null && !isNaN(pos.coords.heading) ? pos.coords.heading : map.getBearing(), duration: 1000 }); }
+                    updateMissionDistance();
+                    const targetCoords = missionWaypoints[missionCurrentIdx];
+                    if (targetCoords && calculateDistance(user, targetCoords) < GEOFENCE_M && _briefShownForIdx !== missionCurrentIdx) {
+                        _briefShownForIdx = missionCurrentIdx;
+                        showMissionBrief();
+                    }
+                }
                 Object.keys(db).forEach(bldg => {
                     if(bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta' || bldg === NO_ADDRESS_KEY) return;
                     if(!db[bldg].apts || db[bldg].apts.length === 0) return;
@@ -2144,6 +2165,133 @@ const fieldApp = (function () {
             (err) => console.error(err),
             { enableHighAccuracy: true }
         );
+    }
+
+    function updateMissionDistance() {
+        if (!isMissionActive || !userPosition) return;
+        const targetCoords = missionWaypoints[missionCurrentIdx];
+        if (!targetCoords) return;
+        const dist = calculateDistance(userPosition, targetCoords);
+        const distEl = document.getElementById('f-mission-distance');
+        const etaEl = document.getElementById('f-mission-eta');
+        if (distEl) distEl.innerText = dist < 1000 ? `${Math.round(dist)} מ'` : `${(dist / 1000).toFixed(1)} ק"מ`;
+        if (etaEl) {
+            const mins = Math.round(dist / 83); // ~5km/h walking
+            etaEl.innerText = mins < 1 ? 'כמעט כאן' : `~${mins} דק'`;
+        }
+    }
+
+    function showMissionBrief() {
+        if (!isMissionActive) return;
+        const targetCoords = missionWaypoints[missionCurrentIdx];
+        if (!targetCoords) return;
+        let targetBldg = null, minDist = Infinity;
+        Object.keys(db).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            const c = db[bldg].info?.coords; if (!c) return;
+            const d = calculateDistance(targetCoords, c); if (d < minDist) { minDist = d; targetBldg = bldg; }
+        });
+        if (!targetBldg) return;
+        const apts = db[targetBldg].apts || [];
+        const today = new Date();
+        let minDaysSince = Infinity;
+        apts.forEach(apt => {
+            const logs = (apt.interactions || []).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+            if (logs.length > 0) { const d = Math.floor((today - new Date(logs[0].date)) / 86400000); if (d < minDaysSince) minDaysSince = d; }
+        });
+        const upcomingBirthdays = [];
+        apts.forEach(apt => {
+            const chk = (name, bdate) => { if (!bdate) return; try { const bd = new Date(bdate); const ty = new Date(today.getFullYear(), bd.getMonth(), bd.getDate()); const diff = Math.floor((ty - today) / 86400000); if (diff >= 0 && diff <= 30) upcomingBirthdays.push({ name, daysUntil: diff }); } catch(e) {} };
+            chk(apt.father || apt.name, apt.fatherBirthday || apt.birthday);
+            chk(apt.mother, apt.motherBirthday);
+            (apt.children || []).forEach(ch => chk(ch.name, ch.birthday));
+        });
+        let openTaskCount = 0;
+        apts.forEach(apt => { openTaskCount += (apt.tasks || []).filter(t => !t.done).length; });
+        let lastLogText = '';
+        apts.forEach(apt => { (apt.interactions || []).forEach(log => { if (!lastLogText && log.text) lastLogText = log.text; }); });
+        let statsHtml = '';
+        if (minDaysSince !== Infinity) { const col = minDaysSince > 60 ? '#ef4444' : minDaysSince > 30 ? '#f59e0b' : '#10b981'; statsHtml += `<div class="f-brief-stat-item"><span style="color:${col};font-size:22px;font-weight:800;">${minDaysSince}</span><span class="f-brief-stat-label">ימים מקשר</span></div>`; }
+        if (openTaskCount > 0) statsHtml += `<div class="f-brief-stat-item"><span style="color:#3b82f6;font-size:22px;font-weight:800;">${openTaskCount}</span><span class="f-brief-stat-label">משימות פתוחות</span></div>`;
+        if (upcomingBirthdays.length > 0) statsHtml += `<div class="f-brief-stat-item"><span style="font-size:22px;">🎂</span><span class="f-brief-stat-label">${escapeHTML(upcomingBirthdays[0].name)}<br>בעוד ${upcomingBirthdays[0].daysUntil} ימים</span></div>`;
+        let html = `<div class="f-brief-header"><div class="f-brief-title">${escapeHTML(targetBldg)}</div><div class="f-brief-subtitle">${apts.length} משפחות</div></div>`;
+        if (statsHtml) html += `<div class="f-brief-stats">${statsHtml}</div>`;
+        if (lastLogText) html += `<div class="f-brief-last-log"><i class="fas fa-comment-alt" style="color:var(--text-muted);margin-left:6px;"></i><span>${escapeHTML(lastLogText.substring(0, 100))}${lastLogText.length > 100 ? '...' : ''}</span></div>`;
+        document.getElementById('f-mission-brief-body').innerHTML = html;
+        document.getElementById('f-mission-brief').style.display = 'flex';
+        if (navigator.vibrate) navigator.vibrate([30, 20, 60]);
+    }
+
+    function closeBrief() {
+        const el = document.getElementById('f-mission-brief');
+        if (el) el.style.display = 'none';
+    }
+
+    function showDebrief() {
+        closeBrief();
+        const targetCoords = missionWaypoints[missionCurrentIdx];
+        let targetBldg = '';
+        if (targetCoords) {
+            let minDist = Infinity;
+            Object.keys(db).forEach(bldg => {
+                if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+                const c = db[bldg].info?.coords; if (!c) return;
+                const d = calculateDistance(targetCoords, c); if (d < minDist) { minDist = d; targetBldg = bldg; }
+            });
+        }
+        _selectedDebriefIdx = -1;
+        document.getElementById('f-debrief-bldg').innerText = targetBldg || '';
+        document.getElementById('f-debrief-templates').innerHTML = QUICK_TEMPLATES.map((t, i) =>
+            `<button class="f-debrief-btn" onclick="fieldApp.selectDebriefTemplate(${i})">${t.emoji}<br>${t.label}</button>`
+        ).join('');
+        document.getElementById('f-debrief-note').value = '';
+        document.getElementById('f-mission-debrief').style.display = 'flex';
+    }
+
+    function selectDebriefTemplate(idx) {
+        _selectedDebriefIdx = idx;
+        document.querySelectorAll('.f-debrief-btn').forEach((btn, i) => btn.classList.toggle('selected', i === idx));
+    }
+
+    function saveDebrief() {
+        const note = document.getElementById('f-debrief-note')?.value?.trim() || '';
+        const templateLabel = _selectedDebriefIdx >= 0 ? QUICK_TEMPLATES[_selectedDebriefIdx]?.label : '';
+        const text = [templateLabel, note].filter(Boolean).join(' — ');
+        if (text) {
+            const targetCoords = missionWaypoints[missionCurrentIdx];
+            if (targetCoords) {
+                let targetBldg = null, minDist = Infinity;
+                Object.keys(db).forEach(bldg => {
+                    if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+                    const c = db[bldg].info?.coords; if (!c) return;
+                    const d = calculateDistance(targetCoords, c); if (d < minDist) { minDist = d; targetBldg = bldg; }
+                });
+                if (targetBldg) {
+                    (db[targetBldg].apts || []).forEach(apt => {
+                        if (!apt.interactions) apt.interactions = [];
+                        apt.interactions.push({ date: new Date().toISOString(), text, source: 'field' });
+                    });
+                    storageSet(DATA_KEY, db);
+                    const outbox = storageGet(OUTBOX_KEY) || [];
+                    outbox.push({ type: 'visit_log', bldg: targetBldg, text, timestamp: new Date().toISOString() });
+                    storageSet(OUTBOX_KEY, outbox);
+                }
+            }
+            showToast('✅ תיעוד נשמר!');
+        }
+        document.getElementById('f-mission-debrief').style.display = 'none';
+        nextMissionTarget();
+    }
+
+    function skipDebrief() {
+        document.getElementById('f-mission-debrief').style.display = 'none';
+        nextMissionTarget();
+    }
+
+    function openNavToTarget(app) {
+        const wp = missionWaypoints[missionCurrentIdx];
+        if (!wp) { showToast('אין מיקום ליעד'); return; }
+        openExternalNav(wp[0], wp[1], app || 'waze');
     }
 
 
@@ -2221,7 +2369,7 @@ const fieldApp = (function () {
         }
     }
 
-    function nextMissionTarget() { if (missionCurrentIdx < missionWaypoints.length - 1) { missionCurrentIdx++; updateMissionHUD(); const coords = missionWaypoints[missionCurrentIdx]; if (map) map.flyTo({ center: coords, zoom: 18, pitch: 75, duration: 1500 }); if (navigator.vibrate) navigator.vibrate([30, 20, 30]); } else { showMissionSummary(); } }
+    function nextMissionTarget() { _briefShownForIdx = -1; if (missionCurrentIdx < missionWaypoints.length - 1) { missionCurrentIdx++; updateMissionHUD(); const coords = missionWaypoints[missionCurrentIdx]; if (map) map.flyTo({ center: coords, zoom: 18, pitch: 75, duration: 1500 }); if (navigator.vibrate) navigator.vibrate([30, 20, 30]); } else { showMissionSummary(); } }
     function prevMissionTarget() { if (missionCurrentIdx > 0) { missionCurrentIdx--; updateMissionHUD(); const coords = missionWaypoints[missionCurrentIdx]; if (map) map.flyTo({ center: coords, zoom: 18, pitch: 75, duration: 1500 }); } }
     function pauseMission() { missionPaused = !missionPaused; const btn = document.getElementById('f-mission-pause-btn'); if (missionPaused) { btn.innerHTML = '<i class="fas fa-play"></i>'; btn.style.background = 'var(--success)'; showToast("⏸ מבצע מושהה."); } else { btn.innerHTML = '<i class="fas fa-pause"></i>'; btn.style.background = 'var(--warning)'; showToast("▶️ ממשיך במבצע!"); } }
     function refreshMissionRoute() { showToast("🔄 מחשב מסלול מחדש..."); if (navigator.vibrate) navigator.vibrate(30); const remaining = missionWaypoints.slice(missionCurrentIdx); if (navigator.geolocation) { navigator.geolocation.getCurrentPosition( pos => drawMultiStopRoute([pos.coords.longitude, pos.coords.latitude], remaining), () => drawMultiStopRoute(db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928], remaining) ); } }
@@ -3812,6 +3960,7 @@ const fieldApp = (function () {
         openFullImage, openFullFamilyCard, _ffcTab, _ffcRender, closeFFCSheet,
         handleCommTouchStart, handleCommTouchMove, handleCommTouchEnd,
         openEmptyBuildingCard, openFamilyCardMini, _quickDoneTask, skipMissionTarget,
+        showMissionBrief, closeBrief, showDebrief, selectDebriefTemplate, saveDebrief, skipDebrief, openNavToTarget, updateMissionDistance,
         _ffcSaveDetails, _ffcDelete, _ffcAddTag, _ffcRemoveTag,
         _ffcAddChild, _ffcRemoveChild, _ffcUpdateChild,
         _ffcToggleTask, _ffcAddTask, _ffcDeleteTask,

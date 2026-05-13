@@ -301,19 +301,76 @@
                 <div id="f-mission-fam-count" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></div>
             </div>
 
+            <!-- שורת מרחק + ETA + ניווט -->
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+                <span id="f-mission-distance" style="background:rgba(37,99,235,0.1); color:#3b82f6; font-weight:700; font-size:13px; padding:5px 10px; border-radius:20px;">— מ'</span>
+                <span id="f-mission-eta" style="background:rgba(16,185,129,0.1); color:var(--success); font-weight:700; font-size:13px; padding:5px 10px; border-radius:20px;">— דק'</span>
+                <div style="flex:1;"></div>
+                <button onclick="fieldApp.openNavToTarget('waze')" style="padding:6px 12px; background:rgba(106,82,255,0.1); border:1px solid rgba(106,82,255,0.3); border-radius:20px; color:#6a52ff; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit;">
+                    <i class="fas fa-location-arrow"></i> Waze
+                </button>
+                <button onclick="fieldApp.openNavToTarget('google')" style="padding:6px 12px; background:rgba(234,88,12,0.1); border:1px solid rgba(234,88,12,0.3); border-radius:20px; color:#ea580c; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit;">
+                    <i class="fab fa-google"></i> Maps
+                </button>
+            </div>
+
             <!-- כפתורי פעולה: אחורה | דלג | הגעתי -->
             <div style="display:flex; gap:10px;">
                 <button onclick="fieldApp.prevMissionTarget()"
                     style="width:52px; padding:15px 0; background:var(--bg-body); border:1px solid var(--border-light); border-radius:14px; color:var(--text-main); cursor:pointer; font-size:16px; flex-shrink:0;">
                     <i class="fas fa-arrow-right"></i>
                 </button>
-                <button onclick="fieldApp.nextMissionTarget()"
+                <button onclick="fieldApp.showDebrief()"
                     style="flex:1; padding:16px; background:var(--success); border:none; border-radius:14px; color:white; font-weight:800; cursor:pointer; font-family:inherit; font-size:18px; box-shadow:0 4px 15px rgba(16,185,129,0.4);">
                     <i class="fas fa-check"></i> הגעתי!
                 </button>
                 <button onclick="fieldApp.skipMissionTarget()"
                     style="width:52px; padding:15px 0; background:rgba(245,158,11,0.1); border:1px solid var(--warning); border-radius:14px; color:var(--warning); cursor:pointer; font-size:16px; flex-shrink:0;">
                     <i class="fas fa-forward"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- כרטיס בריף אוטומטי (גיאופנס 30מ') -->
+    <div id="f-mission-brief" style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,0.5); align-items:flex-end; justify-content:center;">
+        <div style="background:var(--surface); border-radius:24px 24px 0 0; width:100%; padding:24px 20px calc(24px + var(--safe-b)); box-shadow:0 -8px 30px rgba(0,0,0,0.2); max-height:80vh; overflow-y:auto;">
+            <div style="width:40px; height:4px; background:var(--border-light); border-radius:2px; margin:0 auto 16px;"></div>
+            <div style="text-align:center; margin-bottom:16px;">
+                <div style="font-size:24px; margin-bottom:4px;">📍</div>
+                <div style="font-size:14px; font-weight:800; color:var(--accent);">הגעת ליעד!</div>
+            </div>
+            <div id="f-mission-brief-body"></div>
+            <div style="display:flex; gap:10px; margin-top:16px;">
+                <button onclick="fieldApp.closeBrief()"
+                    style="flex:1; padding:14px; background:var(--bg-body); border:1px solid var(--border-light); border-radius:14px; color:var(--text-muted); font-weight:700; cursor:pointer; font-family:inherit; font-size:15px;">
+                    <i class="fas fa-times"></i> סגור
+                </button>
+                <button onclick="fieldApp.showDebrief()"
+                    style="flex:2; padding:14px; background:var(--success); border:none; border-radius:14px; color:white; font-weight:800; cursor:pointer; font-family:inherit; font-size:16px; box-shadow:0 4px 15px rgba(16,185,129,0.4);">
+                    <i class="fas fa-check"></i> הגעתי!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- דו"ח ביקור מהיר (דיבריף) -->
+    <div id="f-mission-debrief" style="display:none; position:fixed; inset:0; z-index:9100; background:rgba(0,0,0,0.5); align-items:flex-end; justify-content:center;">
+        <div style="background:var(--surface); border-radius:24px 24px 0 0; width:100%; padding:24px 20px calc(24px + var(--safe-b)); box-shadow:0 -8px 30px rgba(0,0,0,0.2); max-height:80vh; overflow-y:auto;">
+            <div style="width:40px; height:4px; background:var(--border-light); border-radius:2px; margin:0 auto 16px;"></div>
+            <div style="font-size:17px; font-weight:800; color:var(--text-main); margin-bottom:4px; text-align:center;">מה היה בביקור?</div>
+            <div id="f-debrief-bldg" style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;"></div>
+            <div id="f-debrief-templates" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:16px;"></div>
+            <textarea id="f-debrief-note" placeholder="הערות נוספות (אופציונלי)..."
+                style="width:100%; padding:12px 14px; border:1px solid var(--border-light); border-radius:12px; background:var(--bg-body); color:var(--text-main); font-family:inherit; font-size:14px; resize:none; height:70px; box-sizing:border-box; margin-bottom:14px; outline:none; direction:rtl;"></textarea>
+            <div style="display:flex; gap:10px;">
+                <button onclick="fieldApp.skipDebrief()"
+                    style="flex:1; padding:14px; background:var(--bg-body); border:1px solid var(--border-light); border-radius:14px; color:var(--text-muted); font-weight:700; cursor:pointer; font-family:inherit; font-size:14px;">
+                    דלג
+                </button>
+                <button onclick="fieldApp.saveDebrief()"
+                    style="flex:2; padding:14px; background:var(--accent); border:none; border-radius:14px; color:white; font-weight:800; cursor:pointer; font-family:inherit; font-size:16px;">
+                    <i class="fas fa-save"></i> שמור וקדם
                 </button>
             </div>
         </div>
