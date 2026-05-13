@@ -295,18 +295,6 @@ function toggleDrivePanel() {
         <div id="list-inner" style="padding: 20px; box-sizing: border-box;"></div>
     </div>
     
-    <div id="kanban-container" style="display:none;">
-        <div class="kanban-hub-header">
-            <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
-                <h2 style="margin:0;"><i class="fas fa-columns"></i> לוחות פרויקטים</h2>
-                <select id="activeKanbanBoard" onchange="renderKanbanView()" class="inline-input" style="width:250px; font-weight:bold;"></select>
-                <span id="kanbanBoardActions" style="display:flex; gap:5px; align-items:center;"></span>
-            </div>
-            <button class="btn btn-primary" style="width:auto; padding:8px 15px;" onclick="createNewBoard()"><i class="fas fa-plus"></i> לוח חדש</button>
-        </div>
-        <div id="kanban-board-scroll"></div>
-    </div>
-
     <div id="comm-container" style="display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; padding:16px 20px 20px 20px; gap:0;">
         <div class="kanban-hub-header" style="flex-shrink:0; padding:0 0 12px 0; margin:0;">
             <h2 style="margin:0; color:var(--primary);"><i class="fas fa-satellite-dish" style="color:var(--accent);"></i> מרכז תקשורת קהילתי</h2>
@@ -514,98 +502,6 @@ function toggleDrivePanel() {
         </div><!-- /comm-tabs-card -->
     </div>
 
-    <div id="tasks-container" style="display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; padding:20px 0 0 0; gap:15px;">
-    <div class="kanban-hub-header">
-        <h2 style="margin:0; color:var(--primary);"><i class="fas fa-check-double" style="color:var(--accent);"></i> מרכז משימות חכם</h2>
-    </div>
-    <div style="flex-grow:1; overflow-y:auto; padding:0 20px 80px 20px;">
-        <div style="background:var(--surface); padding:20px; border-radius:16px; box-shadow:var(--card-shadow); margin-bottom:20px; border:1px solid var(--border-light);">
-            <div style="display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
-                <div style="position:relative; flex:1; min-width:250px;">
-                    <input type="text" id="globalTaskInput" class="inline-input" placeholder="הקלד משימה חדשה... (השתמש ב-@ כדי לתייג משפחה)" style="font-size:16px; padding:14px; border-radius:12px;" autocomplete="off">
-                    <div id="mentionDropdown" style="display:none; position:absolute; top:100%; right:0; background:var(--surface); border:1px solid var(--border-light); border-radius:12px; box-shadow:var(--hover-shadow); z-index:1000; max-height:250px; overflow-y:auto; width:100%; margin-top:8px;"></div>
-                </div>
-                <input type="date" id="globalTaskDate" class="inline-input" style="width:auto; padding:14px; border-radius:12px;">
-                <button class="btn btn-primary" style="width:auto; padding:14px 30px; border-radius:12px; font-size:16px;" onclick="saveGlobalTask()"><i class="fas fa-plus"></i> הוסף משימה</button>
-            </div>
-            <div id="taskTagsContainer" style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; min-height:20px;"></div>
-        </div>
-        <h3 style="margin:0 0 15px 0; color:var(--text-main); font-size:18px;"><i class="fas fa-inbox" style="color:var(--text-muted);"></i> כל המשימות הפתוחות במערכת</h3>
-        <div id="globalTasksList"></div>
-    </div>
-</div>
-
-<!-- ══ לשונית אירועים ══ -->
-<div id="events-container" style="display:none; flex-grow:1; flex-direction:column;
-     background:var(--bg-body); overflow:hidden; padding:0; gap:0;">
-
-    <!-- כותרת -->
-    <div class="kanban-hub-header">
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-            <h2 style="margin:0; color:var(--primary);">
-                <i class="fas fa-calendar-alt" style="color:var(--accent);"></i> אירועי הקהילה
-            </h2>
-            <span id="events-today-heb" style="font-size:13px; color:var(--text-muted);
-                  background:var(--bg-body); padding:4px 12px; border-radius:20px;
-                  border:1px solid var(--border-light);"></span>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <select id="events-window" onchange="renderEventsView()"
-                style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-light);
-                       background:var(--surface); font-family:inherit; font-size:13px; color:var(--text-main);">
-                <option value="7">7 ימים קדימה</option>
-                <option value="14">14 ימים</option>
-                <option value="30" selected>30 ימים</option>
-                <option value="60">60 ימים</option>
-                <option value="90">90 ימים</option>
-            </select>
-            <select id="events-type-filter" onchange="renderEventsView()"
-                style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-light);
-                       background:var(--surface); font-family:inherit; font-size:13px; color:var(--text-main);">
-                <option value="">כל הסוגים</option>
-            </select>
-            <button onclick="renderEventsView()" class="btn btn-outline"
-                style="width:auto; padding:8px 14px; font-size:13px;">
-                <i class="fas fa-sync-alt"></i> רענן
-            </button>
-        </div>
-    </div>
-
-    <!-- טאבים ספירלי / חד פעמי -->
-    <div style="display:flex; gap:6px; padding:12px 20px 0; background:var(--bg-body);">
-        <button id="ev-main-tab-recurring" onclick="switchEventsMainTab('recurring')"
-            style="padding:8px 20px; border-radius:10px; border:none; cursor:pointer;
-                   font-family:inherit; font-size:13px; font-weight:700;
-                   background:var(--accent); color:white;">
-            🔄 ספירלי
-        </button>
-        <button id="ev-main-tab-onetime" onclick="switchEventsMainTab('onetime')"
-            style="padding:8px 20px; border-radius:10px; border:none; cursor:pointer;
-                   font-family:inherit; font-size:13px; font-weight:700;
-                   background:var(--surface); color:var(--text-muted);
-                   border:1px solid var(--border-light);">
-            📌 חד פעמי
-        </button>
-    </div>
-
-    <!-- אזור תוכן -->
-    <div style="flex-grow:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px;">
-
-        <!-- KPI -->
-        <div id="events-kpi-row" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;"></div>
-
-        <!-- ציר זמן -->
-        <div id="events-timeline" style="display:flex; flex-direction:column; gap:8px;"></div>
-
-        <!-- ריק -->
-        <div id="events-empty" style="display:none; text-align:center; padding:60px 20px; color:var(--text-muted);">
-            <i class="fas fa-calendar-alt" style="font-size:40px; opacity:0.2; display:block; margin-bottom:16px;"></i>
-            <div style="font-size:16px; font-weight:600;">אין אירועים בטווח הנבחר</div>
-            <div style="font-size:13px; margin-top:8px;">הוסף אירועים בכרטיסי המשפחות</div>
-        </div>
-    </div>
-</div>
-
 <!-- ══ פעילות — Activity Hub ══ -->
 <div id="activity-container" style="display:none; flex-direction:column; flex-grow:1; overflow:hidden;">
     <!-- Sub-navigation -->
@@ -625,6 +521,81 @@ function toggleDrivePanel() {
     </div>
     <!-- Dashboard area -->
     <div id="activity-dashboard" style="display:flex; flex-direction:column; flex:1; overflow-y:auto; padding:20px; gap:14px;"></div>
+
+    <!-- ══ משימות ══ -->
+    <div id="tasks-container" style="display:none; flex:1; flex-direction:column; background:var(--bg-body); overflow:hidden; padding:20px 0 0 0; gap:15px;">
+        <div class="kanban-hub-header">
+            <h2 style="margin:0; color:var(--primary);"><i class="fas fa-check-double" style="color:var(--accent);"></i> מרכז משימות חכם</h2>
+        </div>
+        <div style="flex-grow:1; overflow-y:auto; padding:0 20px 80px 20px;">
+            <div style="background:var(--surface); padding:20px; border-radius:16px; box-shadow:var(--card-shadow); margin-bottom:20px; border:1px solid var(--border-light);">
+                <div style="display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
+                    <div style="position:relative; flex:1; min-width:250px;">
+                        <input type="text" id="globalTaskInput" class="inline-input" placeholder="הקלד משימה חדשה... (השתמש ב-@ כדי לתייג משפחה)" style="font-size:16px; padding:14px; border-radius:12px;" autocomplete="off">
+                        <div id="mentionDropdown" style="display:none; position:absolute; top:100%; right:0; background:var(--surface); border:1px solid var(--border-light); border-radius:12px; box-shadow:var(--hover-shadow); z-index:1000; max-height:250px; overflow-y:auto; width:100%; margin-top:8px;"></div>
+                    </div>
+                    <input type="date" id="globalTaskDate" class="inline-input" style="width:auto; padding:14px; border-radius:12px;">
+                    <button class="btn btn-primary" style="width:auto; padding:14px 30px; border-radius:12px; font-size:16px;" onclick="saveGlobalTask()"><i class="fas fa-plus"></i> הוסף משימה</button>
+                </div>
+                <div id="taskTagsContainer" style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; min-height:20px;"></div>
+            </div>
+            <h3 style="margin:0 0 15px 0; color:var(--text-main); font-size:18px;"><i class="fas fa-inbox" style="color:var(--text-muted);"></i> כל המשימות הפתוחות במערכת</h3>
+            <div id="globalTasksList"></div>
+        </div>
+    </div>
+
+    <!-- ══ אירועים ══ -->
+    <div id="events-container" style="display:none; flex:1; flex-direction:column; background:var(--bg-body); overflow:hidden; padding:0; gap:0;">
+        <div class="kanban-hub-header">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <h2 style="margin:0; color:var(--primary);">
+                    <i class="fas fa-calendar-alt" style="color:var(--accent);"></i> אירועי הקהילה
+                </h2>
+                <span id="events-today-heb" style="font-size:13px; color:var(--text-muted); background:var(--bg-body); padding:4px 12px; border-radius:20px; border:1px solid var(--border-light);"></span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <select id="events-window" onchange="renderEventsView()" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-light); background:var(--surface); font-family:inherit; font-size:13px; color:var(--text-main);">
+                    <option value="7">7 ימים קדימה</option>
+                    <option value="14">14 ימים</option>
+                    <option value="30" selected>30 ימים</option>
+                    <option value="60">60 ימים</option>
+                    <option value="90">90 ימים</option>
+                </select>
+                <select id="events-type-filter" onchange="renderEventsView()" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-light); background:var(--surface); font-family:inherit; font-size:13px; color:var(--text-main);">
+                    <option value="">כל הסוגים</option>
+                </select>
+                <button onclick="renderEventsView()" class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px;">
+                    <i class="fas fa-sync-alt"></i> רענן
+                </button>
+            </div>
+        </div>
+        <div style="display:flex; gap:6px; padding:12px 20px 0; background:var(--bg-body);">
+            <button id="ev-main-tab-recurring" onclick="switchEventsMainTab('recurring')" style="padding:8px 20px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; font-size:13px; font-weight:700; background:var(--accent); color:white;">🔄 ספירלי</button>
+            <button id="ev-main-tab-onetime" onclick="switchEventsMainTab('onetime')" style="padding:8px 20px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; font-size:13px; font-weight:700; background:var(--surface); color:var(--text-muted); border:1px solid var(--border-light);">📌 חד פעמי</button>
+        </div>
+        <div style="flex-grow:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px;">
+            <div id="events-kpi-row" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;"></div>
+            <div id="events-timeline" style="display:flex; flex-direction:column; gap:8px;"></div>
+            <div id="events-empty" style="display:none; text-align:center; padding:60px 20px; color:var(--text-muted);">
+                <i class="fas fa-calendar-alt" style="font-size:40px; opacity:0.2; display:block; margin-bottom:16px;"></i>
+                <div style="font-size:16px; font-weight:600;">אין אירועים בטווח הנבחר</div>
+                <div style="font-size:13px; margin-top:8px;">הוסף אירועים בכרטיסי המשפחות</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ פרויקטים / קנבן ══ -->
+    <div id="kanban-container" style="display:none; flex:1; flex-direction:column; overflow:hidden;">
+        <div class="kanban-hub-header">
+            <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                <h2 style="margin:0;"><i class="fas fa-columns"></i> לוחות פרויקטים</h2>
+                <select id="activeKanbanBoard" onchange="renderKanbanView()" class="inline-input" style="width:250px; font-weight:bold;"></select>
+                <span id="kanbanBoardActions" style="display:flex; gap:5px; align-items:center;"></span>
+            </div>
+            <button class="btn btn-primary" style="width:auto; padding:8px 15px;" onclick="createNewBoard()"><i class="fas fa-plus"></i> לוח חדש</button>
+        </div>
+        <div id="kanban-board-scroll" style="flex:1; overflow:auto;"></div>
+    </div>
 </div>
 
 <!-- ══ תרומות גלובלי ══ -->

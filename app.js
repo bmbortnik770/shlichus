@@ -2264,10 +2264,6 @@ window.switchMainView = function(viewName) {
     if (contComm)      contComm.style.display      = viewName==='comm'            ? 'flex'  : 'none';
     if (contActivity)  contActivity.style.display  = viewName==='activity'        ? 'flex'  : 'none';
     if (contDonations) contDonations.style.display = viewName==='globaldonations' ? 'flex'  : 'none';
-    // Sub-view containers — hidden when not in activity (managed by switchActivitySub)
-    if (contKanban) contKanban.style.display = 'none';
-    if (contTasks)  contTasks.style.display  = 'none';
-    if (contEvents) contEvents.style.display = 'none';
 
     if (viewName==='map') map.resize();
     if (viewName==='community') handleOmniSearch();
@@ -2503,9 +2499,8 @@ window.openClientCard = function(idx) {
     if (typeof updateEngagementDisplay === 'function') updateEngagementDisplay(currentBldg, idx);
     
     const tStr = new Date().toISOString().split('T')[0];
-    document.getElementById('newLogDate').value = tStr; 
-    document.getElementById('newDonDate').value = tStr; 
-    document.getElementById('newTaskDate').value = tStr;
+    const _setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    _setVal('newLogDate', tStr); _setVal('newDonDate', tStr); _setVal('newTaskDate', tStr);
     
     switchCrmTab('details'); document.getElementById('clientModal').style.display='flex';
 };
@@ -3117,9 +3112,8 @@ window.handleOmniSearch = () => {
         if(dd) dd.style.display='none'; 
     }
     
-    refreshMap(res); 
-    if(currentMainView==='table') renderListView(res);
-    if(currentMainView==='kanban') renderKanbanView(res);
+    refreshMap(res);
+    if(currentMainView==='table' || currentMainView==='community') renderListView(res);
 };
 
 window.jumpToSearchResult = (b,i) => { 

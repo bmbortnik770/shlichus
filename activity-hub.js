@@ -16,7 +16,6 @@ window.switchActivitySub = function (sub) {
     if (btn) btn.classList.add('active');
 
     // Hide all sub-containers
-    const actCont  = document.getElementById('activity-container');
     const dashboard = document.getElementById('activity-dashboard');
     const tasks = document.getElementById('tasks-container');
     const events = document.getElementById('events-container');
@@ -25,16 +24,6 @@ window.switchActivitySub = function (sub) {
     [dashboard, tasks, events, kanban].forEach(el => {
         if (el) el.style.display = 'none';
     });
-
-    // When a sub-view fills its own container, collapse activity-container to sub-nav only
-    if (actCont) {
-        if (sub === 'dashboard') {
-            actCont.style.flexGrow = '1';
-        } else {
-            actCont.style.flexGrow = '0';
-            actCont.style.flexShrink = '0';
-        }
-    }
 
     // Show chosen sub-view
     if (sub === 'dashboard') {
