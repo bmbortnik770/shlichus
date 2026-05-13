@@ -2480,9 +2480,13 @@ window.openClientCard = function(idx) {
     document.getElementById('cFatherEmail').value = a.fatherEmail || '';
     document.getElementById('cMotherEmail').value = a.motherEmail || '';
 
-    const sSel = document.getElementById('cStyle'); sSel.innerHTML = ''; 
-    appSettings.styles.forEach(s => sSel.innerHTML += `<option value="${s}" ${a.style===s?'selected':''}>${s}</option>`); 
+    const sSel = document.getElementById('cStyle'); sSel.innerHTML = '';
+    appSettings.styles.forEach(s => sSel.innerHTML += `<option value="${s}" ${a.style===s?'selected':''}>${s}</option>`);
     if(a.style&&!appSettings.styles.includes(a.style)) sSel.innerHTML+=`<option selected>${a.style}</option>`;
+    // Individual parent styles (shown when family style = מעורב)
+    const _fsEl = document.getElementById('cFatherStyle'); if (_fsEl) _fsEl.dataset.current = a.fatherStyle || '';
+    const _msEl = document.getElementById('cMotherStyle'); if (_msEl) _msEl.dataset.current = a.motherStyle || '';
+    if (typeof toggleMixedStyle === 'function') toggleMixedStyle();
 
     tempTags=[...(a.tags||[])]; renderModalTags();
     tempChildren=JSON.parse(JSON.stringify(a.childrenList||[])); renderModalChildren();
@@ -2543,6 +2547,22 @@ window.addModalBoard = async () => {
 };
 
 function renderModalTags() { document.getElementById('cTagsContainer').innerHTML = appSettings.tags.map(t => `<span class="tag-bubble ${tempTags.includes(t)?'active':''}" onclick="toggleTempTag('${t}')">${t}</span>`).join(''); }
+
+window.toggleMixedStyle = function () {
+    const style    = document.getElementById('cStyle')?.value || '';
+    const override = document.getElementById('parent-style-override');
+    if (!override) return;
+    const isMixed  = style === 'מעורב';
+    override.style.display = isMixed ? 'block' : 'none';
+    if (!isMixed) return;
+    const baseStyles = appSettings.styles.filter(s => s !== 'מעורב');
+    ['cFatherStyle', 'cMotherStyle'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        const cur = sel.dataset.current || sel.value || '';
+        sel.innerHTML = baseStyles.map(s => `<option value="${s}" ${cur===s?'selected':''}>${s}</option>`).join('');
+    });
+};
 window.toggleTempTag = (t) => { markDirty(); if(tempTags.includes(t)) tempTags=tempTags.filter(x=>x!==t); else tempTags.push(t); renderModalTags(); };
 
 window.renderModalChildren = () => {
@@ -2805,6 +2825,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     a.fatherPhone=document.getElementById('cFatherPhone').value; a.motherPhone=document.getElementById('cMotherPhone').value; a.phones = '';
     a.fatherEmail=document.getElementById('cFatherEmail').value; a.motherEmail=document.getElementById('cMotherEmail').value;
     a.style=document.getElementById('cStyle').value; a.notes=document.getElementById('cNotes').value;
+    a.fatherStyle=document.getElementById('cFatherStyle')?.value||''; a.motherStyle=document.getElementById('cMotherStyle')?.value||'';
     a.boards={...tempBoards}; a.childrenList=[...tempChildren]; a.tags=[...tempTags]; a.interactions=[...tempLogs]; a.donations=[...tempDonations]; a.tasks=[...tempTasks]; a.customData={...tempCustom}; a.customFields=a.customData; // backward compat
     a.milestones=[...tempMilestones];
     if (typeof getLifecycleData === 'function') a.lifecycleEvents = getLifecycleData();

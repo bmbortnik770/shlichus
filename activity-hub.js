@@ -17,11 +17,12 @@ window.switchActivitySub = function (sub) {
 
     // Hide all sub-containers
     const dashboard = document.getElementById('activity-dashboard');
-    const tasks = document.getElementById('tasks-container');
-    const events = document.getElementById('events-container');
-    const kanban = document.getElementById('kanban-container');
+    const tasks     = document.getElementById('tasks-container');
+    const events    = document.getElementById('events-container');
+    const kanban    = document.getElementById('kanban-container');
+    const circles   = document.getElementById('circles-container');
 
-    [dashboard, tasks, events, kanban].forEach(el => {
+    [dashboard, tasks, events, kanban, circles].forEach(el => {
         if (el) el.style.display = 'none';
     });
 
@@ -45,6 +46,11 @@ window.switchActivitySub = function (sub) {
         if (kanban) {
             kanban.style.display = 'flex';
             if (typeof renderKanbanView === 'function') renderKanbanView();
+        }
+    } else if (sub === 'circles') {
+        if (circles) {
+            circles.style.display = 'flex';
+            if (typeof renderCirclesHub === 'function') renderCirclesHub();
         }
     }
 };

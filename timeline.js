@@ -198,7 +198,7 @@ function _renderConnectionCircles(container) {
     <div class="conn-circles-wrap">`;
 
     allCircles.forEach(circle => {
-        const isActive = circles.includes(circle.id);
+        const isActive = circles.some(e => _cId(e) === circle.id);
         html += `<button class="conn-circle-chip${isActive ? ' active-circle' : ''}" onclick="_tlToggleCircle('${circle.id}')">
             <span>${safe(circle.emoji || '●')}</span><span>${safe(circle.label)}</span>
         </button>`;
@@ -431,12 +431,15 @@ window._tlToggleTask = function (idx) {
 };
 
 // ── Connection circles ────────────────────────────────────────
+const _cId  = e => typeof e === 'string' ? e : (e.id || '');
+const _cMem = e => typeof e === 'string' ? 'family' : (e.member || 'family');
+
 window._tlToggleCircle = function (circleId) {
     const apt = currentBldg && db?.[currentBldg]?.apts?.[currentAptIdx];
     if (!apt) return;
     if (!apt.connectionCircles) apt.connectionCircles = [];
-    const idx = apt.connectionCircles.indexOf(circleId);
-    if (idx === -1) apt.connectionCircles.push(circleId);
+    const idx = apt.connectionCircles.findIndex(e => _cId(e) === circleId && _cMem(e) === 'family');
+    if (idx === -1) apt.connectionCircles.push({ id: circleId, member: 'family' });
     else apt.connectionCircles.splice(idx, 1);
     markDirty && markDirty();
     _renderConnectionCircles(document.getElementById('fam-act-circles'));
