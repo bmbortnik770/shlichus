@@ -2547,9 +2547,14 @@ window.toggleTempTag = (t) => { markDirty(); if(tempTags.includes(t)) tempTags=t
 
 window.renderModalChildren = () => {
     refreshMemberDropdowns && refreshMemberDropdowns();
-    document.getElementById('childrenWrapper').innerHTML = tempChildren.map((c,i) => `
-        <div style="display:flex; flex-direction:column; gap:5px; padding:8px; background:var(--surface); border:1px solid var(--border-light); border-radius:6px;">
+    document.getElementById('childrenWrapper').innerHTML = tempChildren.map((c,i) => {
+        const gEmoji = c.gender === 'boy' ? '👦' : c.gender === 'girl' ? '👧' : '🧒';
+        const gNext  = c.gender === 'boy' ? 'girl' : c.gender === 'girl' ? '' : 'boy';
+        const gColor = c.gender === 'boy' ? '#3b82f6' : c.gender === 'girl' ? '#ec4899' : '#94a3b8';
+        return `
+        <div style="display:flex; flex-direction:column; gap:5px; padding:8px; background:var(--surface); border:1px solid ${gColor}44; border-radius:6px; border-right:3px solid ${gColor};">
             <div style="display:flex; gap:5px; align-items:center;">
+                <button onclick="tempChildren[${i}].gender='${gNext}';markDirty();renderModalChildren()" title="לחץ לשינוי מין" style="font-size:18px;background:none;border:none;cursor:pointer;padding:0 4px;line-height:1;">${gEmoji}</button>
                 <input type="text" placeholder="שם הילד/ה" value="${c.name||''}" oninput="tempChildren[${i}].name=this.value;markDirty();refreshMemberDropdowns&&refreshMemberDropdowns()" class="inline-input" style="flex:1;">
                 <input type="date" value="${c.dob||''}" onchange="tempChildren[${i}].dob=this.value;markDirty()" class="inline-input" style="flex:1;">
                 <button onclick="toggleChildPhone(${i})" class="btn-icon" title="הוסף פרטי קשר" style="color:var(--accent);border:none;"><i class="fas fa-phone"></i></button>
@@ -2559,11 +2564,11 @@ window.renderModalChildren = () => {
                 <input type="text" placeholder="טלפון של הילד" value="${c.phone||''}" oninput="tempChildren[${i}].phone=this.value; formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
                 <input type="email" placeholder="מייל הילד" value="${c.email||''}" oninput="tempChildren[${i}].email=this.value; markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
             </div>` : ''}
-        </div>
-    `).join(''); 
+        </div>`;
+    }).join('');
 };
 window.toggleChildPhone = (i) => { tempChildren[i].showPhone = !tempChildren[i].showPhone; renderModalChildren(); };
-window.addModalChild = () => { markDirty(); tempChildren.push({name:'',dob:'', phone:'', email:'', showPhone: false}); renderModalChildren(); };
+window.addModalChild = (gender = '') => { markDirty(); tempChildren.push({name:'',dob:'', phone:'', email:'', showPhone: false, gender}); renderModalChildren(); };
 
 function renderCustomFields() {
     const c = document.getElementById('cCustomFieldsContainer'); c.innerHTML = '';

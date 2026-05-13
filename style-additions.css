@@ -1492,3 +1492,103 @@ body.density-spacious .data-table th {
     text-decoration: line-through;
     opacity: .5;
 }
+
+/* ── Parents hero section ── */
+.parents-hero {
+    background: linear-gradient(135deg, rgba(59,130,246,.06) 0%, rgba(236,72,153,.06) 100%);
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+}
+.parents-hero-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.parents-hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.parent-card {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.parent-card-header {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ── Children section ── */
+.children-section {
+    background: var(--bg-body);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+}
+.child-add-btn {
+    flex: 1;
+    font-size: 13px;
+    padding: 7px 10px;
+    border-style: dashed !important;
+    font-weight: 600;
+    transition: all .15s;
+}
+.boy-btn:hover  { background: rgba(59,130,246,.08)  !important; border-color: #3b82f6 !important; color: #3b82f6 !important; }
+.girl-btn:hover { background: rgba(236,72,153,.08) !important; border-color: #ec4899 !important; color: #ec4899 !important; }
+
+/* ── Collapsible family info (activity tab) ── */
+.fam-info-collapsible {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.fam-info-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    list-style: none;
+    user-select: none;
+}
+.fam-info-summary::-webkit-details-marker { display: none; }
+.fam-info-summary span { flex: 1; }
+.fam-info-arrow {
+    font-size: 10px;
+    color: var(--text-hint);
+    transition: transform .2s;
+}
+.fam-info-collapsible[open] .fam-info-arrow { transform: rotate(180deg); }
+.fam-info-body {
+    padding: 12px 14px 14px;
+    border-top: 1px solid var(--border-light);
+}
+
+/* ── Quick-add more prominent when at top ── */
+#fam-act-quick-add .quick-add-section {
+    border-color: var(--accent);
+    box-shadow: 0 2px 12px rgba(37,99,235,.1);
+}
+#fam-act-quick-add .quick-add-type-nav {
+    background: var(--accent-light);
+}

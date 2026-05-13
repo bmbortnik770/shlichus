@@ -1101,7 +1101,9 @@ function toggleDrivePanel() {
         <div id="tabBtn-milestones" style="display:none;" class="crm-tab"></div>
 
         <div id="crm-details" class="crm-tab-content active">
-            <div class="form-group" style="background:var(--table-hover); padding:10px; border-radius:8px; margin-bottom:15px;">
+
+            <!-- ══ כתובת ══ -->
+            <div class="form-group" style="background:var(--table-hover); padding:10px; border-radius:8px; margin-bottom:12px;">
                 <label style="color:var(--primary);"><i class="fas fa-map-marker-alt"></i> כתובת במפה</label>
                 <div style="display:flex; gap:8px;">
                     <input type="text" id="cAddressDisplay" disabled class="inline-input" style="background:transparent; font-weight:bold; color:var(--text-main);">
@@ -1109,12 +1111,49 @@ function toggleDrivePanel() {
                 </div>
             </div>
 
-            <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
+            <!-- ══ שם משפחה + דירה ══ -->
+            <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-bottom:14px;">
                 <div class="form-group"><label>שם משפחה</label><input type="text" id="cFamilyName" placeholder="הקלד כאן..." oninput="markDirty()"></div>
                 <div class="form-group"><label>מס' דירה</label><input type="text" id="cAptNum" placeholder="הקלד..." oninput="markDirty()"></div>
             </div>
-            
-            <div class="form-group" style="background:rgba(59,130,246,0.05); padding:10px; border-radius:8px; border:1px solid rgba(59,130,246,0.2);">
+
+            <!-- ══ הורים — HERO SECTION ══ -->
+            <div class="parents-hero">
+                <div class="parents-hero-title"><i class="fas fa-users"></i> הורים</div>
+                <div class="parents-hero-grid">
+                    <div class="parent-card">
+                        <div class="parent-card-header"><i class="fas fa-male" style="color:#3b82f6;"></i> אב</div>
+                        <input type="text" id="cFather" placeholder="שם פרטי..." oninput="markDirty();refreshMemberDropdowns()" class="inline-input" style="margin-bottom:5px;">
+                        <input type="text" id="cFatherPhone" placeholder="טלפון" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right; margin-bottom:5px;">
+                        <input type="email" id="cFatherEmail" placeholder="מייל" oninput="markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
+                    </div>
+                    <div class="parent-card">
+                        <div class="parent-card-header"><i class="fas fa-female" style="color:#ec4899;"></i> אם</div>
+                        <input type="text" id="cMother" placeholder="שם פרטי..." oninput="markDirty();refreshMemberDropdowns()" class="inline-input" style="margin-bottom:5px;">
+                        <input type="text" id="cMotherPhone" placeholder="טלפון" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right; margin-bottom:5px;">
+                        <input type="email" id="cMotherEmail" placeholder="מייל" oninput="markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ ילדים ══ -->
+            <div class="form-group children-section">
+                <label style="color:var(--accent);"><i class="fas fa-child"></i> ילדים</label>
+                <div id="childrenWrapper" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-outline child-add-btn boy-btn" onclick="addModalChild('boy')">👦 ילד</button>
+                    <button class="btn btn-outline child-add-btn girl-btn" onclick="addModalChild('girl')">👧 ילדה</button>
+                </div>
+            </div>
+
+            <!-- ══ סגנון + תגיות ══ -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px;">
+                <div class="form-group"><label>סגנון</label><select id="cStyle" onchange="markDirty()"></select></div>
+                <div class="form-group"><label><i class="fas fa-tags"></i> תגיות</label><div class="tags-container" id="cTagsContainer"></div></div>
+            </div>
+
+            <!-- ══ פרויקטים ══ -->
+            <div class="form-group" style="background:rgba(59,130,246,0.05); padding:10px; border-radius:8px; border:1px solid rgba(59,130,246,0.2); margin-top:4px;">
                 <label style="color:var(--accent); display:flex; justify-content:space-between; align-items:center;">
                     <span><i class="fas fa-project-diagram"></i> השתתפות בפרויקטים ולוחות</span>
                     <button class="btn-icon" style="padding:2px 6px; font-size:12px; background:white;" onclick="addModalBoard()"><i class="fas fa-plus"></i> צרף ללוח</button>
@@ -1122,38 +1161,11 @@ function toggleDrivePanel() {
                 <div id="cBoardsList" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"></div>
             </div>
 
-            <div class="form-group"><label><i class="fas fa-tags"></i> תגיות</label><div class="tags-container" id="cTagsContainer"></div></div>
-            
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <div class="form-group">
-                    <label>פרטי האב</label>
-                    <input type="text" id="cFather" placeholder="שם פרטי..." oninput="markDirty();refreshMemberDropdowns()">
-                    <div style="display:flex; gap:5px; margin-top:5px;">
-                        <input type="text" id="cFatherPhone" placeholder="טלפון" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
-                        <input type="email" id="cFatherEmail" placeholder="מייל" oninput="markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>פרטי האם</label>
-                    <input type="text" id="cMother" placeholder="שם פרטי..." oninput="markDirty();refreshMemberDropdowns()">
-                    <div style="display:flex; gap:5px; margin-top:5px;">
-                        <input type="text" id="cMotherPhone" placeholder="טלפון" oninput="formatPhone(this); markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
-                        <input type="email" id="cMotherEmail" placeholder="מייל" oninput="markDirty()" class="inline-input" dir="ltr" style="text-align:right;">
-                    </div>
-                </div>
-            </div>
+            <!-- ══ שדות מותאמים אישית ══ -->
+            <div id="cCustomFieldsContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;"></div>
 
-            <div class="form-group" style="background:var(--bg-body); padding:10px; border-radius:8px; border:1px solid var(--border-light);">
-                <label style="color:var(--accent);"><i class="fas fa-child"></i> ילדים</label>
-                <div id="childrenWrapper" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
-                <button class="btn btn-outline" style="font-size:12px; padding:6px; border-style:dashed;" onclick="addModalChild()"><i class="fas fa-plus"></i> הוסף ילד/ה</button>
-            </div>
-            
-            <div style="display:grid; grid-template-columns:1fr; gap:10px;">
-                <div class="form-group"><label>סגנון</label><select id="cStyle" onchange="markDirty()"></select></div>
-            </div>
-            <div id="cCustomFieldsContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
-            <div class="form-group"><label>הערות</label><textarea id="cNotes" rows="2" placeholder="הקלד..." oninput="markDirty()"></textarea></div>
+            <!-- ══ הערות ══ -->
+            <div class="form-group" style="margin-top:12px;"><label>הערות</label><textarea id="cNotes" rows="2" placeholder="הקלד..." oninput="markDirty()"></textarea></div>
 
             <!-- ══ סטטוס משפחה ══ -->
             <div id="family-status-bar" style="margin-top:14px; padding:12px 14px;

@@ -301,19 +301,29 @@ window.renderFamilyActivityTab = function () {
     // Build the layout
     root.innerHTML = `
         <!-- Score row -->
-        <div id="fam-act-score" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
+        <div id="fam-act-score" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
 
-        <!-- Member cards -->
-        <div id="fam-act-members" style="margin-bottom:12px;"></div>
+        <!-- Quick add (TOP, prominent) -->
+        <div id="fam-act-quick-add" style="margin-bottom:14px;"></div>
 
-        <!-- Meta row: circles + goal -->
-        <div class="fam-act-meta-row" style="margin-bottom:14px;">
-            <div id="fam-act-circles" style="background:var(--surface);border:1px solid var(--border-light);border-radius:12px;padding:10px 12px;"></div>
-            <div id="fam-act-goal"></div>
-        </div>
+        <!-- Collapsible family info -->
+        <details id="fam-act-family-info" class="fam-info-collapsible">
+            <summary class="fam-info-summary">
+                <i class="fas fa-users" style="color:var(--accent);"></i>
+                <span>פרטי המשפחה</span>
+                <i class="fas fa-chevron-down fam-info-arrow"></i>
+            </summary>
+            <div class="fam-info-body">
+                <div id="fam-act-members" style="margin-bottom:10px;"></div>
+                <div class="fam-act-meta-row">
+                    <div id="fam-act-circles" style="background:var(--surface);border:1px solid var(--border-light);border-radius:12px;padding:10px 12px;"></div>
+                    <div id="fam-act-goal"></div>
+                </div>
+            </div>
+        </details>
 
         <!-- Timeline filter -->
-        <div class="timeline-filter-bar" id="fam-act-filters">
+        <div class="timeline-filter-bar" id="fam-act-filters" style="margin-top:14px;">
             <button class="tl-filter-btn active" onclick="_tlSetFilter('all')">הכל</button>
             <button class="tl-filter-btn" onclick="_tlSetFilter('log')"><i class="fas fa-history"></i> תיעודים</button>
             <button class="tl-filter-btn" onclick="_tlSetFilter('task')"><i class="fas fa-check"></i> משימות</button>
@@ -323,16 +333,13 @@ window.renderFamilyActivityTab = function () {
 
         <!-- Unified timeline -->
         <div class="unif-timeline" id="fam-act-timeline"></div>
-
-        <!-- Quick add -->
-        <div id="fam-act-quick-add" style="margin-top:14px;"></div>
     `;
 
     // Populate sub-sections
+    _renderQuickAdd(document.getElementById('fam-act-quick-add'));
     _renderMemberCards(document.getElementById('fam-act-members'));
     _renderConnectionCircles(document.getElementById('fam-act-circles'));
     _renderPersonalGoal(document.getElementById('fam-act-goal'));
-    _renderQuickAdd(document.getElementById('fam-act-quick-add'));
 
     // Score badges
     const scoreEl = document.getElementById('fam-act-score');
