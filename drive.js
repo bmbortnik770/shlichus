@@ -769,11 +769,23 @@ function applyOutboxEvent(ev) {
             break;
         }
         case 'edit_family': {
-            // מזג את כל השדות מה-payload, מלבד שדות מערך (tasks, interactions, etc.)
             if (ev.payload) {
-                const protectedKeys = ['tasks','interactions','history','donations','boards','tags','childrenList','customFields'];
+                // שדות מערך שלא ממוזגים מהשטח (מנוהלים בצדדים בנפרד)
+                const skipKeys = ['tasks','interactions','history','donations','boards','tags','customFields'];
                 Object.keys(ev.payload).forEach(k => {
-                    if (!protectedKeys.includes(k)) apt[k] = ev.payload[k];
+                    if (skipKeys.includes(k)) return;
+                    if (k === 'childrenList') {
+                        // מיזוג חכם: ילדים מהשטח גוברים, ילדים שהוספו במשרד נשמרים
+                        const desktopChildren = apt.childrenList || [];
+                        const fieldChildren = ev.payload.childrenList || [];
+                        const merged = [...fieldChildren];
+                        desktopChildren.forEach(dc => {
+                            if (dc.name && !merged.some(fc => fc.name === dc.name)) merged.push(dc);
+                        });
+                        apt.childrenList = merged;
+                    } else {
+                        apt[k] = ev.payload[k];
+                    }
                 });
             }
             break;

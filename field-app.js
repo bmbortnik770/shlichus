@@ -686,50 +686,87 @@ const fieldApp = (function () {
         const phone2 = fam.motherPhone || '';
 
         // --- טאב פרטים (עריכה) ---
+        const _stylesList = ((db.__SETTINGS__ || db['__SETTINGS__'])?.styles || ['חרדי','דתי','מסורתי','חילוני']).filter(s => s !== 'מעורב');
+        const _allStyles = [..._stylesList, 'מעורב'];
+        const _isMixed = fam.style === 'מעורב';
+
         const detailsHtml = `
         <div style="display:flex;flex-direction:column;gap:12px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">שם האב</label>
-                <input id="ffc-father" value="${escapeHTML(fam.father||fam.fatherName||'')}" class="ffc-input" placeholder="שם האב..."></div>
-                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">שם האם</label>
-                <input id="ffc-mother" value="${escapeHTML(fam.mother||fam.motherName||'')}" class="ffc-input" placeholder="שם האם..."></div>
-                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">טלפון אב</label>
-                <input id="ffc-father-phone" value="${escapeHTML(phone1)}" class="ffc-input" placeholder="05X-XXXXXXX" dir="ltr"></div>
-                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">טלפון אם</label>
-                <input id="ffc-mother-phone" value="${escapeHTML(phone2)}" class="ffc-input" placeholder="05X-XXXXXXX" dir="ltr"></div>
-                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">מייל אב</label>
-                <input id="ffc-father-email" value="${escapeHTML(fam.fatherEmail||'')}" class="ffc-input" placeholder="mail@..." dir="ltr"></div>
-                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">מייל אם</label>
-                <input id="ffc-mother-email" value="${escapeHTML(fam.motherEmail||'')}" class="ffc-input" placeholder="mail@..." dir="ltr"></div>
+            <!-- שם משפחה + דירה -->
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+                <div><label style="font-size:11px;color:var(--accent);font-weight:700;display:block;margin-bottom:3px;"><i class="fas fa-star" style="font-size:9px;"></i> שם משפחה</label>
+                <input id="ffc-name" value="${escapeHTML(fam.name||'')}" class="ffc-input" placeholder="שם משפחה..."></div>
+                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">דירה</label>
+                <input id="ffc-num" value="${escapeHTML(fam.num||'')}" class="ffc-input" placeholder="מס'..."></div>
             </div>
-            <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">סגנון</label>
-            <input id="ffc-style" value="${escapeHTML(fam.style||'')}" class="ffc-input" placeholder="חרדי / דתי / מסורתי..."></div>
-            <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">הערות</label>
-            <textarea id="ffc-notes" class="ffc-input" rows="3" placeholder="הערות פנימיות...">${escapeHTML(fam.notes||'')}</textarea></div>
-            <div>
-                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;">תגיות</label>
-                <div id="ffc-tags-display" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-                    ${(fam.tags||[]).map((t,i) => `<span style="background:var(--accent);color:white;padding:4px 10px;border-radius:15px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;">${escapeHTML(t)}<i class="fas fa-times" style="cursor:pointer;font-size:10px;" onclick="fieldApp._ffcRemoveTag('${bldgEnc}',${aptIdx},${i})"></i></span>`).join('')}
-                </div>
-                <div style="display:flex;gap:8px;">
-                    <input id="ffc-tag-input" class="ffc-input" placeholder="הוסף תגית..." style="flex:1;">
-                    <button onclick="fieldApp._ffcAddTag('${bldgEnc}',${aptIdx})" style="padding:10px 16px;background:var(--accent);color:white;border:none;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-plus"></i></button>
+            <!-- הורים -->
+            <div style="background:rgba(59,130,246,0.04);border:1px solid rgba(59,130,246,0.15);border-radius:12px;padding:12px;">
+                <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;"><i class="fas fa-users"></i> הורים</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div style="display:flex;flex-direction:column;gap:5px;">
+                        <div style="font-size:11px;font-weight:600;color:#3b82f6;"><i class="fas fa-male"></i> אב</div>
+                        <input id="ffc-father" value="${escapeHTML(fam.father||fam.fatherName||'')}" class="ffc-input" placeholder="שם פרטי...">
+                        <input id="ffc-father-phone" value="${escapeHTML(phone1)}" class="ffc-input" placeholder="טלפון" dir="ltr">
+                        <input id="ffc-father-email" value="${escapeHTML(fam.fatherEmail||'')}" class="ffc-input" placeholder="מייל" dir="ltr">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:5px;">
+                        <div style="font-size:11px;font-weight:600;color:#ec4899;"><i class="fas fa-female"></i> אם</div>
+                        <input id="ffc-mother" value="${escapeHTML(fam.mother||fam.motherName||'')}" class="ffc-input" placeholder="שם פרטי...">
+                        <input id="ffc-mother-phone" value="${escapeHTML(phone2)}" class="ffc-input" placeholder="טלפון" dir="ltr">
+                        <input id="ffc-mother-email" value="${escapeHTML(fam.motherEmail||'')}" class="ffc-input" placeholder="מייל" dir="ltr">
+                    </div>
                 </div>
             </div>
+            <!-- סגנון + תגיות -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;">
+                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">סגנון</label>
+                <select id="ffc-style" class="ffc-input" onchange="fieldApp._ffcToggleMixedStyle()">
+                    ${_allStyles.map(s => `<option value="${s}"${fam.style===s?' selected':''}>${s}</option>`).join('')}
+                    ${fam.style && !_allStyles.includes(fam.style) ? `<option value="${escapeHTML(fam.style)}" selected>${escapeHTML(fam.style)}</option>` : ''}
+                </select></div>
+                <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">תגיות</label>
+                <div id="ffc-tags-display" style="display:flex;gap:4px;flex-wrap:wrap;min-height:32px;align-items:center;">
+                    ${(fam.tags||[]).map((t,i) => `<span style="background:var(--accent);color:white;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;">${escapeHTML(t)}<i class="fas fa-times" style="cursor:pointer;font-size:9px;" onclick="fieldApp._ffcRemoveTag('${bldgEnc}',${aptIdx},${i})"></i></span>`).join('')}
+                </div></div>
+            </div>
+            <!-- סגנון מעורב — נגלה כשסגנון = מעורב -->
+            <div id="ffc-mixed-styles" style="display:${_isMixed?'grid':'none'};grid-template-columns:1fr 1fr;gap:8px;padding:10px;background:rgba(245,158,11,0.05);border:1px dashed rgba(245,158,11,0.4);border-radius:10px;">
+                <div><label style="font-size:11px;color:#3b82f6;font-weight:700;display:block;margin-bottom:3px;"><i class="fas fa-male"></i> סגנון אב</label>
+                <select id="ffc-father-style" class="ffc-input" style="font-size:12px;">
+                    ${_stylesList.map(s => `<option value="${s}"${fam.fatherStyle===s?' selected':''}>${s}</option>`).join('')}
+                </select></div>
+                <div><label style="font-size:11px;color:#ec4899;font-weight:700;display:block;margin-bottom:3px;"><i class="fas fa-female"></i> סגנון אם</label>
+                <select id="ffc-mother-style" class="ffc-input" style="font-size:12px;">
+                    ${_stylesList.map(s => `<option value="${s}"${fam.motherStyle===s?' selected':''}>${s}</option>`).join('')}
+                </select></div>
+            </div>
+            <!-- הוספת תגית -->
+            <div style="display:flex;gap:8px;">
+                <input id="ffc-tag-input" class="ffc-input" placeholder="הוסף תגית..." style="flex:1;">
+                <button onclick="fieldApp._ffcAddTag('${bldgEnc}',${aptIdx})" style="padding:10px 16px;background:var(--accent);color:white;border:none;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-plus"></i></button>
+            </div>
+            <!-- ילדים -->
             <div>
-                <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:6px;"><i class="fas fa-child"></i> ילדים</label>
+                <label style="font-size:11px;color:var(--text-muted);font-weight:700;display:block;margin-bottom:6px;"><i class="fas fa-child"></i> ילדים</label>
                 <div id="ffc-children-list">
-                    ${(fam.childrenList||[]).map((c,i) => `
-                    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
-                        <input value="${escapeHTML(c.name||'')}" class="ffc-input" style="flex:2;" placeholder="שם" oninput="fieldApp._ffcUpdateChild('${bldgEnc}',${aptIdx},${i},'name',this.value)">
-                        <input type="date" value="${escapeHTML(c.dob||'')}" class="ffc-input" style="flex:2;" oninput="fieldApp._ffcUpdateChild('${bldgEnc}',${aptIdx},${i},'dob',this.value)">
-                        <button onclick="fieldApp._ffcRemoveChild('${bldgEnc}',${aptIdx},${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;"><i class="fas fa-times"></i></button>
-                    </div>`).join('')}
+                    ${(fam.childrenList||[]).map((c,i) => {
+                        const gEmoji = c.gender==='boy'?'👦':c.gender==='girl'?'👧':'🧒';
+                        return `<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;padding:8px;background:var(--bg-body);border-radius:10px;border:1px solid var(--border-light);">
+                            <button onclick="fieldApp._ffcToggleChildGender('${bldgEnc}',${aptIdx},${i})" style="font-size:20px;background:none;border:none;cursor:pointer;padding:0;line-height:1;flex-shrink:0;" title="לחץ לשינוי מין">${gEmoji}</button>
+                            <input value="${escapeHTML(c.name||'')}" class="ffc-input" style="flex:2;min-width:0;" placeholder="שם" oninput="fieldApp._ffcUpdateChild('${bldgEnc}',${aptIdx},${i},'name',this.value)">
+                            <input type="date" value="${escapeHTML(c.dob||'')}" class="ffc-input" style="flex:1;min-width:0;" onchange="fieldApp._ffcUpdateChild('${bldgEnc}',${aptIdx},${i},'dob',this.value)">
+                            <button onclick="fieldApp._ffcRemoveChild('${bldgEnc}',${aptIdx},${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;flex-shrink:0;"><i class="fas fa-times"></i></button>
+                        </div>`;
+                    }).join('')}
                 </div>
                 <button onclick="fieldApp._ffcAddChild('${bldgEnc}',${aptIdx})" style="width:100%;padding:9px;background:var(--bg-body);border:1px dashed var(--border-light);border-radius:10px;color:var(--text-muted);cursor:pointer;font-family:inherit;">
                     <i class="fas fa-plus"></i> הוסף ילד/ה
                 </button>
             </div>
+            <!-- הערות -->
+            <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">הערות</label>
+            <textarea id="ffc-notes" class="ffc-input" rows="3" placeholder="הערות פנימיות...">${escapeHTML(fam.notes||'')}</textarea></div>
+            <!-- כפתורים -->
             <button onclick="fieldApp._ffcSaveDetails('${bldgEnc}',${aptIdx})" style="width:100%;padding:14px;background:var(--accent);color:white;border:none;border-radius:12px;font-weight:bold;font-size:16px;cursor:pointer;font-family:inherit;">
                 <i class="fas fa-save"></i> שמור פרטים
             </button>
@@ -861,6 +898,11 @@ const fieldApp = (function () {
     function _ffcSaveDetails(bldgEnc, aptIdx) {
         const bldg = decodeURIComponent(bldgEnc);
         const fam = db[bldg].apts[aptIdx];
+        const originalName = fam.name; // שמור שם מקורי לחיפוש ב-outbox
+        const nameEl = document.getElementById('ffc-name');
+        if (nameEl) { fam.name = nameEl.value.trim() || fam.name; }
+        const numEl = document.getElementById('ffc-num');
+        if (numEl) fam.num = numEl.value.trim();
         fam.father = document.getElementById('ffc-father').value.trim();
         fam.fatherName = fam.father;
         fam.mother = document.getElementById('ffc-mother').value.trim();
@@ -869,12 +911,16 @@ const fieldApp = (function () {
         fam.motherPhone = document.getElementById('ffc-mother-phone').value.trim();
         fam.fatherEmail = document.getElementById('ffc-father-email').value.trim();
         fam.motherEmail = document.getElementById('ffc-mother-email').value.trim();
-        fam.style = document.getElementById('ffc-style').value.trim();
+        fam.style = document.getElementById('ffc-style').value;
+        if (fam.style === 'מעורב') {
+            fam.fatherStyle = document.getElementById('ffc-father-style')?.value || '';
+            fam.motherStyle = document.getElementById('ffc-mother-style')?.value || '';
+        }
         fam.notes = document.getElementById('ffc-notes').value.trim();
         fam.updatedAt = Date.now();
         storageSet(DATA_KEY, db);
         const outbox = storageGet(OUTBOX_KEY) || [];
-        outbox.push({ type: 'edit_family', bldg, aptName: fam.name, timestamp: new Date().toISOString(), payload: fam });
+        outbox.push({ type: 'edit_family', bldg, aptName: originalName, timestamp: new Date().toISOString(), payload: fam });
         storageSet(OUTBOX_KEY, outbox);
         pushOutboxToDrive().catch(e => console.warn('[Outbox] push error:', e));
         showToast('✅ הפרטים נשמרו!');
@@ -920,9 +966,24 @@ const fieldApp = (function () {
         const bldg = decodeURIComponent(bldgEnc);
         const fam = db[bldg].apts[aptIdx];
         if (!fam.childrenList) fam.childrenList = [];
-        fam.childrenList.push({ name: '', dob: '' });
+        fam.childrenList.push({ name: '', dob: '', gender: '' });
         storageSet(DATA_KEY, db);
         _ffcRender(bldgEnc, aptIdx, 'details');
+    }
+
+    function _ffcToggleChildGender(bldgEnc, aptIdx, childIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const child = db[bldg].apts[aptIdx].childrenList?.[childIdx];
+        if (!child) return;
+        child.gender = child.gender === 'boy' ? 'girl' : child.gender === 'girl' ? '' : 'boy';
+        storageSet(DATA_KEY, db);
+        _ffcRender(bldgEnc, aptIdx, 'details');
+    }
+
+    function _ffcToggleMixedStyle() {
+        const sel = document.getElementById('ffc-style');
+        const div = document.getElementById('ffc-mixed-styles');
+        if (sel && div) div.style.display = sel.value === 'מעורב' ? 'grid' : 'none';
     }
 
     function _ffcRemoveChild(bldgEnc, aptIdx, childIdx) {
@@ -4064,7 +4125,7 @@ const fieldApp = (function () {
         openEmptyBuildingCard, openFamilyCardMini, _quickDoneTask, skipMissionTarget,
         showMissionBrief, closeBrief, showDebrief, selectDebriefTemplate, saveDebrief, skipDebrief, openNavToTarget, updateMissionDistance,
         _ffcSaveDetails, _ffcDelete, _ffcAddTag, _ffcRemoveTag,
-        _ffcAddChild, _ffcRemoveChild, _ffcUpdateChild,
+        _ffcAddChild, _ffcRemoveChild, _ffcUpdateChild, _ffcToggleChildGender, _ffcToggleMixedStyle,
         _ffcToggleTask, _ffcAddTask, _ffcDeleteTask,
         _ffcAddLog, _ffcDeleteLog,
         _ffcAddDonation, _ffcDeleteDonation,
