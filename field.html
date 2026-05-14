@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <link rel="stylesheet" href="field-style.css?v=27">
+    <link rel="stylesheet" href="field-style.css?v=28">
 </head>
 <body>
     <div id="f-splash" class="f-splash">
@@ -52,7 +52,73 @@
         </div>
     </div>
 
-    <div id="view-map" class="view-container active" style="padding-top:0;">
+    <!-- ===== HOME DASHBOARD ===== -->
+    <div id="view-home" class="view-container active" style="padding-top:0; overflow-y:auto; padding-bottom:calc(var(--bottom-nav-h) + var(--safe-b) + 20px);">
+
+        <!-- Hero gradient -->
+        <div class="home-hero">
+            <div id="home-greeting" class="home-hero-title">שלום, שליח 👋</div>
+            <div id="home-date" class="home-hero-sub"></div>
+        </div>
+
+        <div style="padding:0 16px;">
+
+            <!-- 4 כפתורי פעולה ראשיים -->
+            <div class="home-actions-grid">
+                <button class="home-action-btn home-clr-green" onclick="fieldApp.openStreetEncounterForm()">
+                    <span class="home-action-icon">🤝</span>
+                    <span class="home-action-label">מפגש חדש</span>
+                    <span class="home-action-sub">הוסף נפש ומשימה</span>
+                </button>
+                <button class="home-action-btn home-clr-blue" onclick="fieldApp.openQuickTaskForm()">
+                    <span class="home-action-icon">✅</span>
+                    <span class="home-action-label">משימה חדשה</span>
+                    <span class="home-action-sub">שייך למשפחה</span>
+                </button>
+                <button class="home-action-btn home-clr-orange" onclick="fieldApp.openActivityPicker()">
+                    <span class="home-action-icon">📝</span>
+                    <span class="home-action-label">תעד פעילות</span>
+                    <span class="home-action-sub">ביקור, שיחה...</span>
+                </button>
+                <button class="home-action-btn home-clr-purple" onclick="fieldApp.openEvents()">
+                    <span class="home-action-icon">🎯</span>
+                    <span class="home-action-label">אירועים</span>
+                    <span class="home-action-sub">נרשמים ונוכחות</span>
+                </button>
+            </div>
+
+            <!-- כפתורים משניים: קהילה + מסלולים -->
+            <div style="display:flex; gap:10px; margin-bottom:20px;">
+                <button onclick="fieldApp.switchView('community', document.getElementById('nav-community'))"
+                    style="flex:1;padding:13px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-family:inherit;font-size:14px;font-weight:700;color:var(--text-main);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <i class="fas fa-users" style="color:var(--success);"></i> קהילה
+                </button>
+                <button onclick="fieldApp.switchView('map', document.getElementById('nav-map'))"
+                    style="flex:1;padding:13px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-family:inherit;font-size:14px;font-weight:700;color:var(--text-main);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <i class="fas fa-route" style="color:var(--accent);"></i> מסלולים
+                </button>
+            </div>
+
+            <!-- משימות היום -->
+            <div style="margin-bottom:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <span style="font-size:16px;font-weight:800;">📌 משימות היום</span>
+                    <button onclick="fieldApp.switchView('tasks', document.getElementById('nav-tasks'))"
+                        style="font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;font-weight:700;font-family:inherit;">הכל ←</button>
+                </div>
+                <div id="home-tasks-preview"></div>
+            </div>
+
+            <!-- אחרונים -->
+            <div>
+                <div style="font-size:16px;font-weight:800;margin-bottom:10px;">🕐 אחרונים</div>
+                <div id="home-recent-families"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="view-map" class="view-container" style="padding-top:0;">
         <div id="f-map" style="width: 100%; height: 100%; position: absolute;"></div>
         <div class="theme-anchor" onclick="fieldApp.toggleDarkMode()" id="f-theme-btn"><i class="fas fa-moon"></i></div>
         <div class="map-anchors">
@@ -431,18 +497,21 @@
     </div>
 
     <nav class="f-bottom-nav" id="f-bottom-nav-bar">
-        <div class="nav-item active" onclick="fieldApp.switchView('map', this)">
-            <i class="fas fa-map-marked-alt"></i><span>מפה</span>
+        <div class="nav-item active" id="nav-home" onclick="fieldApp.switchView('home', this)">
+            <i class="fas fa-home"></i><span>בית</span>
         </div>
-        <div class="nav-item" onclick="fieldApp.switchView('tasks', this)">
-            <i class="fas fa-clipboard-list"></i><span>משימות</span>
+        <div class="nav-item" id="nav-map" onclick="fieldApp.switchView('map', this)">
+            <i class="fas fa-map-marked-alt"></i><span>מפה</span>
         </div>
         <div class="nav-item super-fab-container" id="f-fab-wrapper" style="display:none;">
             <button class="super-fab state-crm" id="super-fab-btn" onclick="fieldApp.toggleSpeedDial()">
                 <span class="fab-icon" id="fab-icon"><i class="fas fa-plus"></i></span>
             </button>
         </div>
-        <div class="nav-item" onclick="fieldApp.switchView('community', this)">
+        <div class="nav-item" id="nav-tasks" onclick="fieldApp.switchView('tasks', this)">
+            <i class="fas fa-clipboard-list"></i><span>משימות</span>
+        </div>
+        <div class="nav-item" id="nav-community" onclick="fieldApp.switchView('community', this)">
             <i class="fas fa-address-book"></i><span>קהילה</span>
         </div>
     </nav>

@@ -483,6 +483,9 @@ function getEventDisplayInfo(ev) {
         case 'add_general_task':    return { icon:'fa-thumbtack', color:'var(--warning)', desc:`משימה כללית חדשה` };
         case 'building_visit_log':  return { icon:'fa-building', color:'var(--success)', desc:`ביקור בבניין — ${ev.bldg ? escapeHTML(ev.bldg) : ''}` };
         case 'tag_add':             return { icon:'fa-tag',     color:'var(--warning)', desc:`תג נוסף: "${ev.tag || ''}" — ${nameLabel}` };
+        case 'event_create':        return { icon:'fa-calendar-plus', color:'var(--accent)', desc:`אירוע חדש: "${ev.payload?.name || ''}"` };
+        case 'event_add_registrant':return { icon:'fa-user-plus', color:'var(--accent)', desc:`נרשם לאירוע: ${ev.payload?.regName || ''}` };
+        case 'event_attendance':    return { icon:'fa-check-circle', color:'var(--success)', desc:`נוכחות באירוע: ${ev.payload?.regName || ''}` };
         default:               return { icon:'fa-sync',    color:'var(--text-muted)', desc:`עדכון — ${nameLabel}` };
     }
 }
@@ -652,6 +655,43 @@ async function _patchDriveFileProcessed(fileId) {
  */
 function applyOutboxEvent(ev) {
     if (!ev || !ev.type) return false;
+
+    // ── event_create / event_add_registrant / event_attendance ──
+    if (ev.type === 'event_create') {
+        if (!db.meta) db.meta = {};
+        if (!db.meta.events) db.meta.events = [];
+        if (ev.payload) {
+            const newEv = { ...ev.payload, registrants: [], attendance: [] };
+            if (!newEv.id) newEv.id = ev.timestamp || Date.now().toString();
+            db.meta.events.push(newEv);
+        }
+        return true;
+    }
+    if (ev.type === 'event_add_registrant') {
+        if (!db.meta?.events) return false;
+        const evObj = db.meta.events.find(e => e.id === ev.eventId) || db.meta.events[ev.eventIdx];
+        if (!evObj) return false;
+        if (!evObj.registrants) evObj.registrants = [];
+        const reg = ev.payload;
+        if (reg && !evObj.registrants.some(r => r.name === reg.regName)) {
+            evObj.registrants.push({ name: reg.regName, phone: reg.regPhone || '', famRef: reg.famRef || null });
+        }
+        return true;
+    }
+    if (ev.type === 'event_attendance') {
+        if (!db.meta?.events) return false;
+        const evObj = db.meta.events.find(e => e.id === ev.eventId) || db.meta.events[ev.eventIdx];
+        if (!evObj) return false;
+        if (!evObj.attendance) evObj.attendance = [];
+        const regName = ev.payload?.regName;
+        if (!regName) return false;
+        if (ev.payload?.present) {
+            if (!evObj.attendance.includes(regName)) evObj.attendance.push(regName);
+        } else {
+            evObj.attendance = evObj.attendance.filter(n => n !== regName);
+        }
+        return true;
+    }
 
     // ── add_general_task: משימה כללית (לא שייכת למשפחה ספציפית) ──
     if (ev.type === 'add_general_task') {

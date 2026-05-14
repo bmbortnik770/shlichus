@@ -1542,13 +1542,557 @@ const fieldApp = (function () {
         document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
         document.getElementById('view-' + viewId).classList.add('active');
         closeOverlays();
+        if (viewId === 'home' && db) renderHomeView();
         if (viewId === 'map' && map) setTimeout(() => map.resize(), 100);
         if (viewId === 'tasks' && db) { initTaskDateFilter(); renderTasks(); }
     }
 
+    // ==========================================
+    // HOME DASHBOARD
+    // ==========================================
+    function renderHomeView() {
+        if (!db) return;
+        _renderHomeTasks();
+        _renderHomeRecent();
+        // תאריך בכותרת
+        const dateEl = document.getElementById('home-date');
+        if (dateEl) {
+            const d = new Date();
+            const days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+            dateEl.textContent = `יום ${days[d.getDay()]}, ${d.toLocaleDateString('he-IL')}`;
+        }
+    }
+
+    function _renderHomeTasks() {
+        const el = document.getElementById('home-tasks-preview');
+        if (!el) return;
+        const today = new Date().toLocaleDateString('he-IL');
+        const todayISO = new Date().toISOString().split('T')[0];
+        const tasks = [];
+        (db?.meta?.generalTasks || []).forEach((t, i) => { if (!t.done) tasks.push({ t, isGeneral: true, idx: i }); });
+        Object.keys(db || {}).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg]?.apts || []).forEach((apt, aptIdx) => {
+                (apt.tasks || []).forEach((t, tIdx) => {
+                    if (t.done) return;
+                    const tISO = _taskToISO(t.date);
+                    if (tISO === todayISO || !tISO) tasks.push({ t, bldg, aptIdx, tIdx, famName: apt.name });
+                });
+            });
+        });
+        if (!tasks.length) {
+            el.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px;background:var(--surface);border-radius:14px;border:1px dashed var(--border-light);">אין משימות להיום 🎉</div>`;
+            return;
+        }
+        el.innerHTML = tasks.slice(0, 4).map(({ t, isGeneral, idx, bldg, aptIdx, tIdx, famName }) => {
+            const enc = bldg ? encodeURIComponent(bldg) : '';
+            return `<div class="home-task-card" onclick="${isGeneral ? '' : `fieldApp.openFullFamilyCard('${enc}',${aptIdx})`}">
+                <button class="home-task-done-btn" onclick="event.stopPropagation(); fieldApp._homeCompleteTask(${isGeneral ? `'general',${idx}` : `'family','${enc}',${aptIdx},${tIdx}`})" title="סמן כבוצע">
+                    <i class="fas fa-check" style="color:var(--border-light);"></i>
+                </button>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:14px;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(t.text)}</div>
+                    <div style="font-size:11px;color:var(--text-muted);">${famName ? 'משפחת ' + escapeHTML(famName) : 'כללי'}${t.date ? ' · ' + escapeHTML(t.date) : ''}</div>
+                </div>
+                ${bldg ? `<i class="fas fa-chevron-left" style="color:var(--text-muted);font-size:12px;"></i>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    function _taskToISO(dateStr) {
+        if (!dateStr) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+        const sep = dateStr.includes('.') ? '.' : '/';
+        const p = dateStr.split(sep);
+        if (p.length === 3) return `${p[2].padStart(4,'0')}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        return null;
+    }
+
+    function _homeCompleteTask(type, ...args) {
+        if (type === 'general') {
+            const idx = args[0];
+            if (db.meta?.generalTasks?.[idx]) {
+                db.meta.generalTasks[idx].done = true;
+                storageSet(DATA_KEY, db);
+                const outbox = storageGet(OUTBOX_KEY) || [];
+                outbox.push({ type: 'task_done', aptName: null, bldg: null, payload: { taskText: db.meta.generalTasks[idx].text }, timestamp: new Date().toISOString() });
+                storageSet(OUTBOX_KEY, outbox);
+            }
+        } else {
+            const bldg = decodeURIComponent(args[0]), aptIdx = args[1], tIdx = args[2];
+            const apt = db[bldg]?.apts?.[aptIdx];
+            if (apt?.tasks?.[tIdx]) {
+                apt.tasks[tIdx].done = true;
+                storageSet(DATA_KEY, db);
+                const outbox = storageGet(OUTBOX_KEY) || [];
+                outbox.push({ type: 'task_done', bldg, aptIdx, taskIdx: tIdx, aptName: apt.name, payload: { taskText: apt.tasks[tIdx].text }, timestamp: new Date().toISOString() });
+                storageSet(OUTBOX_KEY, outbox);
+                pushOutboxToDrive().catch(()=>{});
+            }
+        }
+        renderTasks();
+        _renderHomeTasks();
+        if (navigator.vibrate) navigator.vibrate(30);
+        showToast('✅ משימה בוצעה!');
+    }
+
+    function _renderHomeRecent() {
+        const el = document.getElementById('home-recent-families');
+        if (!el) return;
+        const recents = [];
+        Object.keys(db || {}).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg]?.apts || []).forEach((apt, aptIdx) => {
+                const lastInt = (apt.interactions || []).slice(-1)[0];
+                const ts = apt.updatedAt || (lastInt?._ts ? new Date(lastInt._ts).getTime() : 0);
+                if (ts) recents.push({ bldg, aptIdx, apt, ts });
+            });
+        });
+        recents.sort((a, b) => b.ts - a.ts);
+        if (!recents.length) { el.innerHTML = `<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px;">הוסף משפחות לראות אותן כאן</div>`; return; }
+        el.innerHTML = recents.slice(0, 5).map(({ bldg, aptIdx, apt }) => {
+            const enc = encodeURIComponent(bldg);
+            const initials = (apt.name || '?').charAt(0);
+            const phone = apt.fatherPhone || apt.motherPhone || apt.phone || '';
+            const waLink = phone ? `https://wa.me/${phone.replace(/\D/g,'').replace(/^0/,'972')}` : '';
+            const lastInt = (apt.interactions || []).slice(-1)[0];
+            const lastText = lastInt ? `${lastInt.type || ''} · ${lastInt.date || ''}` : 'אין תיעוד';
+            return `<div class="home-recent-card">
+                <div class="home-recent-avatar">${escapeHTML(initials)}</div>
+                <div style="flex:1;min-width:0;" onclick="fieldApp.openFullFamilyCard('${enc}',${aptIdx})">
+                    <div style="font-weight:700;font-size:14px;color:var(--text-main);">משפחת ${escapeHTML(apt.name||'ללא שם')}</div>
+                    <div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(lastText)}</div>
+                </div>
+                <div class="home-recent-actions">
+                    <button class="home-recent-action-btn" onclick="event.stopPropagation(); fieldApp._homeQuickTask('${enc}',${aptIdx})" title="משימה מהירה" style="color:var(--warning);">
+                        <i class="fas fa-tasks"></i>
+                    </button>
+                    ${phone ? `<button class="home-recent-action-btn" onclick="event.stopPropagation(); fieldApp.callFamilyNumber('${phone}')" title="חייג" style="color:var(--success);"><i class="fas fa-phone"></i></button>` : ''}
+                    ${waLink ? `<button class="home-recent-action-btn" onclick="event.stopPropagation(); window.open('${waLink}','_blank')" title="וואטסאפ" style="color:#25d366;"><i class="fab fa-whatsapp"></i></button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function _homeQuickTask(bldgEnc, aptIdx) {
+        _qtSelectedFamily = { bldg: decodeURIComponent(bldgEnc), aptIdx };
+        openQuickTaskForm();
+    }
+
+    // ==========================================
+    // STREET ENCOUNTER
+    // ==========================================
+    let _encVoiceRec = null;
+
+    function openStreetEncounterForm() {
+        const chips = ['בדיקת מזוזות','מבצע תפילין','הזמנה לשבת','ספרים/מידע','ביקור בית','לחזור'];
+        const html = `
+        <div style="text-align:center;margin-bottom:18px;">
+            <div style="font-size:32px;margin-bottom:6px;">🤝</div>
+            <div style="font-size:19px;font-weight:800;color:var(--text-main);">מפגש חדש</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">מלא מה שיש — אפשר להשלים אחר כך</div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:12px;align-items:stretch;">
+            <input id="enc-name" type="text" placeholder="שם משפחה *" autofocus
+                style="flex:1;font-size:17px;font-weight:700;padding:13px 16px;border-radius:14px;border:2px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;outline:none;transition:border-color 0.2s;box-sizing:border-box;"
+                onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-light)'">
+            <button class="btn-mic" id="enc-mic" onclick="fieldApp._encVoice()" style="flex-shrink:0;"><i class="fas fa-microphone"></i></button>
+        </div>
+
+        <input id="enc-phone" type="tel" placeholder="📱 טלפון"
+            style="width:100%;font-size:16px;padding:13px 16px;border-radius:14px;border:2px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;margin-bottom:12px;outline:none;transition:border-color 0.2s;box-sizing:border-box;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-light)'">
+
+        <div style="position:relative;margin-bottom:16px;">
+            <input id="enc-address" type="text" placeholder="🏠 כתובת (אופציונלי)" autocomplete="off"
+                oninput="fieldApp.searchAddressInput(this.value)"
+                style="width:100%;font-size:16px;padding:13px 16px;border-radius:14px;border:2px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;outline:none;transition:border-color 0.2s;box-sizing:border-box;"
+                onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-light)'">
+            <div id="address-suggestions" style="position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--accent);border-radius:12px;z-index:9999;display:none;max-height:150px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.2);"></div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">📋 משימה מיידית</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+                ${chips.map(c => `<button onclick="fieldApp._encChip(this,'${escapeHTML(c)}')" class="enc-chip">${escapeHTML(c)}</button>`).join('')}
+            </div>
+            <input id="enc-task" type="text" placeholder="או הקלד משימה אחרת..."
+                style="width:100%;font-size:15px;padding:12px 16px;border-radius:12px;border:1.5px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;outline:none;box-sizing:border-box;transition:border-color 0.2s;"
+                onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-light)'">
+        </div>
+
+        <button onclick="fieldApp.saveStreetEncounter()"
+            style="width:100%;padding:16px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:16px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 6px 20px rgba(16,185,129,0.4);">
+            💾 שמור מפגש
+        </button>`;
+
+        openSheet(html, 'auto');
+        setTimeout(() => document.getElementById('enc-name')?.focus(), 200);
+    }
+
+    function _encVoice() {
+        const input = document.getElementById('enc-name');
+        const btn = document.getElementById('enc-mic');
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) { showToast('הקלטה לא נתמכת'); return; }
+        if (_encVoiceRec) { try { _encVoiceRec.stop(); } catch(e){} _encVoiceRec = null; if(btn) btn.classList.remove('listening'); return; }
+        _encVoiceRec = new SR();
+        _encVoiceRec.lang = 'he-IL';
+        _encVoiceRec.onstart = () => { if(btn) btn.classList.add('listening'); };
+        _encVoiceRec.onresult = (e) => { if(input) input.value = e.results[0][0].transcript; };
+        _encVoiceRec.onend = () => { _encVoiceRec = null; if(btn) btn.classList.remove('listening'); };
+        _encVoiceRec.onerror = () => { _encVoiceRec = null; if(btn) btn.classList.remove('listening'); };
+        try { _encVoiceRec.start(); } catch(e){}
+    }
+
+    function _encChip(el, text) {
+        document.querySelectorAll('.enc-chip').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        const input = document.getElementById('enc-task');
+        if (input) { input.value = text; }
+    }
+
+    function saveStreetEncounter() {
+        const name = document.getElementById('enc-name')?.value?.trim();
+        if (!name) { showToast('⚠️ חסר שם משפחה'); document.getElementById('enc-name')?.focus(); return; }
+        const phone = document.getElementById('enc-phone')?.value?.trim() || '';
+        const task  = document.getElementById('enc-task')?.value?.trim() || '';
+        const addrInput = document.getElementById('enc-address');
+        const address = addrInput?.value?.trim() || '';
+
+        // מצא / צור בניין
+        const bldgKey = address || NO_ADDRESS_KEY;
+        if (!db[bldgKey]) db[bldgKey] = { info: { code:'', rep:'', notes:'', coords: selectedCoords || null }, apts: [] };
+        const fam = { name, phone: phone, fatherPhone: phone, updatedAt: Date.now() };
+        if (task) { fam.tasks = [{ text: task, date: new Date().toLocaleDateString('he-IL'), done: false }]; }
+        db[bldgKey].apts.push(fam);
+        storageSet(DATA_KEY, db);
+
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'new_family', bldg: bldgKey, timestamp: new Date().toISOString(), payload: { ...fam, coords: selectedCoords } });
+        if (task) outbox.push({ type: 'add_family_task', bldg: bldgKey, aptName: name, timestamp: new Date().toISOString(), payload: { taskText: task, taskDate: fam.tasks[0].date } });
+        storageSet(OUTBOX_KEY, outbox);
+        pushOutboxToDrive().catch(()=>{});
+        selectedCoords = null;
+
+        closeOverlays();
+        renderCommunity();
+        renderMarkers();
+        renderTasks();
+        renderHomeView();
+        if (navigator.vibrate) navigator.vibrate([20,30,20]);
+        showToast(`✅ ${escapeHTML(name)} נשמר${task ? ' עם משימה' : ''}!`);
+    }
+
+    // ==========================================
+    // ACTIVITY PICKER (from home screen)
+    // ==========================================
+    function openActivityPicker() {
+        if (!db) return;
+        const actTypes = db?.__SETTINGS__?.activityTypes || _DEFAULT_ACT;
+        const html = `
+        <div style="text-align:center;margin-bottom:16px;">
+            <div style="font-size:18px;font-weight:800;">תעד פעילות</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">בחר סוג — ואז בחר משפחה</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            ${actTypes.map(t => {
+                const icon  = _ACT_ICONS[t]  || 'fas fa-check';
+                const color = _ACT_COLORS[t] || 'var(--accent)';
+                return `<button onclick="fieldApp.openQuickActivityLog('${encodeURIComponent(t)}')"
+                    style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--bg-body);border:1.5px solid ${color}30;border-radius:14px;cursor:pointer;font-family:inherit;font-size:15px;font-weight:700;color:var(--text-main);text-align:right;transition:background 0.15s;"
+                    onmousedown="this.style.background='var(--surface)'" onmouseup="this.style.background='var(--bg-body)'">
+                    <span style="width:38px;height:38px;border-radius:50%;background:${color}18;border:1px solid ${color}40;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="${icon}" style="color:${color};font-size:15px;"></i>
+                    </span>
+                    ${escapeHTML(t)}
+                </button>`;
+            }).join('')}
+        </div>`;
+        openSheet(html, 'auto');
+    }
+
+    // ==========================================
+    // EVENTS SYSTEM
+    // ==========================================
+    const EVENT_TYPES = { 'שיעור':'📚', 'קידוש':'🍷', 'אירוע':'🎯', 'סיום':'🎓', 'שבת':'✡️', 'אחר':'📅' };
+
+    function openEvents() {
+        if (!db) return;
+        const events = db?.meta?.events || [];
+        const html = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-right:36px;">
+            <h3 style="margin:0;font-size:20px;"><i class="fas fa-calendar-alt" style="color:var(--accent);margin-left:8px;"></i>אירועים</h3>
+            <button onclick="fieldApp.openCreateEventForm()"
+                style="background:var(--accent);color:white;border:none;border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit;font-size:14px;">
+                <i class="fas fa-plus"></i> אירוע חדש
+            </button>
+        </div>
+        ${events.length === 0
+            ? `<div style="text-align:center;padding:40px 20px;">
+                <div style="font-size:48px;margin-bottom:12px;">📅</div>
+                <div style="font-size:16px;font-weight:700;color:var(--text-main);margin-bottom:6px;">אין אירועים עדיין</div>
+                <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">צור שיעור, קידוש, אירוע...</div>
+                <button onclick="fieldApp.openCreateEventForm()"
+                    style="background:var(--accent);color:white;border:none;border-radius:14px;padding:14px 28px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">
+                    צור אירוע ראשון
+                </button>
+               </div>`
+            : events.map((ev, i) => {
+                const emoji = EVENT_TYPES[ev.type] || '📅';
+                const regCount = (ev.registrants || []).length;
+                const attCount = (ev.attendance || []).length;
+                return `<div class="event-card" onclick="fieldApp.openEventDetail(${i})">
+                    <div class="event-icon-box">${emoji}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:800;font-size:15px;color:var(--text-main);">${escapeHTML(ev.name)}</div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">
+                            ${ev.date ? escapeHTML(ev.date) + (ev.time ? ' · ' + escapeHTML(ev.time) : '') : ''}
+                            ${ev.location ? ' · ' + escapeHTML(ev.location) : ''}
+                        </div>
+                        <div style="font-size:11px;color:var(--accent);margin-top:2px;font-weight:700;">
+                            ${regCount} נרשמים${attCount > 0 ? ' · ' + attCount + ' נכחו' : ''}
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-left" style="color:var(--text-muted);font-size:13px;"></i>
+                </div>`;
+              }).join('')
+        }`;
+        openSheet(html, 'auto');
+    }
+
+    function openCreateEventForm() {
+        const today = new Date().toISOString().split('T')[0];
+        const typeOptions = Object.keys(EVENT_TYPES).map(t => `<option value="${t}">${EVENT_TYPES[t]} ${t}</option>`).join('');
+        const html = `
+        <button class="sheet-close-btn" onclick="fieldApp.openEvents()"><i class="fas fa-arrow-right"></i></button>
+        <h3 style="margin:0 0 20px 0;font-size:19px;padding-right:36px;"><i class="fas fa-plus-circle" style="color:var(--accent);margin-left:8px;"></i>אירוע חדש</h3>
+
+        <input id="evt-name" type="text" placeholder="שם האירוע *" autofocus
+            style="width:100%;font-size:17px;font-weight:700;padding:14px 16px;border-radius:14px;border:2px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;margin-bottom:12px;outline:none;transition:border-color 0.2s;box-sizing:border-box;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-light)'">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <input id="evt-date" type="date" value="${today}"
+                style="width:100%;padding:13px;border-radius:14px;border:2px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;font-size:15px;outline:none;box-sizing:border-box;">
+            <input id="evt-time" type="time"
+                style="width:100%;padding:13px;border-radius:14px;border:2px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;font-size:15px;outline:none;box-sizing:border-box;">
+        </div>
+
+        <select id="evt-type"
+            style="width:100%;padding:13px 16px;border-radius:14px;border:2px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;font-size:15px;margin-bottom:12px;outline:none;box-sizing:border-box;">
+            ${typeOptions}
+        </select>
+
+        <input id="evt-location" type="text" placeholder="📍 מיקום (אופציונלי)"
+            style="width:100%;padding:13px 16px;border-radius:14px;border:2px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;font-size:15px;margin-bottom:20px;outline:none;transition:border-color 0.2s;box-sizing:border-box;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border-light)'">
+
+        <button onclick="fieldApp.saveEvent()"
+            style="width:100%;padding:16px;background:var(--accent);color:white;border:none;border-radius:16px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(37,99,235,0.35);">
+            <i class="fas fa-check"></i> צור אירוע
+        </button>`;
+        openSheet(html, 'auto');
+        setTimeout(() => document.getElementById('evt-name')?.focus(), 150);
+    }
+
+    function saveEvent() {
+        const name = document.getElementById('evt-name')?.value?.trim();
+        if (!name) { showToast('⚠️ חסר שם לאירוע'); return; }
+        const ev = {
+            id: 'evt_' + Date.now(),
+            name,
+            date: document.getElementById('evt-date')?.value || '',
+            time: document.getElementById('evt-time')?.value || '',
+            type: document.getElementById('evt-type')?.value || 'אחר',
+            location: document.getElementById('evt-location')?.value?.trim() || '',
+            registrants: [],
+            attendance: [],
+            createdAt: new Date().toISOString()
+        };
+        if (!db.meta) db.meta = {};
+        if (!db.meta.events) db.meta.events = [];
+        db.meta.events.push(ev);
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'event_create', timestamp: new Date().toISOString(), payload: ev });
+        storageSet(OUTBOX_KEY, outbox);
+        pushOutboxToDrive().catch(()=>{});
+        showToast(`✅ ${escapeHTML(name)} נוצר!`);
+        openEventDetail(db.meta.events.length - 1);
+    }
+
+    function openEventDetail(evIdx) {
+        const ev = db?.meta?.events?.[evIdx];
+        if (!ev) return;
+        const emoji = EVENT_TYPES[ev.type] || '📅';
+        const regs = ev.registrants || [];
+        const att  = ev.attendance || [];
+        const attSet = new Set(att);
+
+        const html = `
+        <button class="sheet-close-btn" onclick="fieldApp.openEvents()"><i class="fas fa-arrow-right"></i></button>
+        <div style="padding-right:36px;margin-bottom:16px;">
+            <div style="font-size:22px;margin-bottom:4px;">${emoji} <span style="font-weight:800;font-size:19px;">${escapeHTML(ev.name)}</span></div>
+            ${ev.date ? `<div style="font-size:13px;color:var(--text-muted);">${escapeHTML(ev.date)}${ev.time ? ' · ' + escapeHTML(ev.time) : ''}${ev.location ? ' · ' + escapeHTML(ev.location) : ''}</div>` : ''}
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:16px;">
+            <div style="flex:1;background:rgba(37,99,235,0.08);border-radius:12px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:800;color:var(--accent);">${regs.length}</div>
+                <div style="font-size:11px;color:var(--text-muted);">נרשמים</div>
+            </div>
+            <div style="flex:1;background:rgba(16,185,129,0.08);border-radius:12px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:800;color:var(--success);">${attSet.size}</div>
+                <div style="font-size:11px;color:var(--text-muted);">נכחו</div>
+            </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:800;">רשימת נרשמים</div>
+            <button onclick="fieldApp.openAddEventRegistrant(${evIdx})"
+                style="background:var(--accent);color:white;border:none;border-radius:10px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;">
+                <i class="fas fa-user-plus"></i> הוסף
+            </button>
+        </div>
+
+        ${regs.length === 0
+            ? `<div style="text-align:center;padding:24px;color:var(--text-muted);background:var(--bg-body);border-radius:14px;border:1px dashed var(--border-light);">
+                <i class="fas fa-user-plus fa-2x" style="opacity:0.2;display:block;margin-bottom:10px;"></i>
+                הוסף נרשמים לאירוע
+               </div>`
+            : regs.map((r, rIdx) => {
+                const isAtt = attSet.has(rIdx);
+                return `<div class="event-registrant-row ${isAtt ? 'attended' : ''}">
+                    <button class="attendance-check ${isAtt ? 'checked' : ''}"
+                        onclick="fieldApp.toggleEventAttendance(${evIdx},${rIdx})">
+                        ${isAtt ? '<i class="fas fa-check"></i>' : ''}
+                    </button>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;font-size:14px;">${escapeHTML(r.name || 'ללא שם')}</div>
+                        ${r.phone ? `<div style="font-size:11px;color:var(--text-muted);">${escapeHTML(r.phone)}</div>` : ''}
+                    </div>
+                    ${r.phone ? `<button onclick="fieldApp.callFamilyNumber('${r.phone}')" style="background:none;border:none;color:var(--success);cursor:pointer;font-size:16px;padding:4px;"><i class="fas fa-phone"></i></button>` : ''}
+                </div>`;
+              }).join('')
+        }`;
+        openSheet(html, 'auto');
+    }
+
+    function openAddEventRegistrant(evIdx) {
+        const html = `
+        <button class="sheet-close-btn" onclick="fieldApp.openEventDetail(${evIdx})"><i class="fas fa-arrow-right"></i></button>
+        <h3 style="margin:0 0 14px 0;font-size:18px;padding-right:36px;"><i class="fas fa-user-plus" style="color:var(--accent);margin-left:8px;"></i>הוסף נרשם</h3>
+
+        <div style="position:relative;margin-bottom:10px;">
+            <i class="fas fa-search" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"></i>
+            <input id="evt-reg-search" class="f-input" placeholder="חפש מהקהילה..."
+                style="padding-right:40px;" oninput="fieldApp._evtRegSearch(${evIdx},this.value)" autocomplete="off">
+        </div>
+        <div id="evt-reg-list">${_evtRegBuildList(evIdx,'')}</div>
+
+        <div style="margin-top:12px;border-top:1px solid var(--border-light);padding-top:12px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">אדם חדש (לא מהקהילה)</div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <input id="evt-new-name" type="text" placeholder="שם"
+                    style="flex:2;padding:11px 13px;border-radius:12px;border:1.5px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;font-size:14px;outline:none;">
+                <input id="evt-new-phone" type="tel" placeholder="טלפון"
+                    style="flex:2;padding:11px 13px;border-radius:12px;border:1.5px solid var(--border-light);background:var(--bg-body);color:var(--text-main);font-family:inherit;font-size:14px;outline:none;">
+            </div>
+            <button onclick="fieldApp._evtSaveNewReg(${evIdx})"
+                style="width:100%;padding:12px;background:var(--success);color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:inherit;font-size:14px;">
+                <i class="fas fa-plus"></i> הוסף לאירוע
+            </button>
+        </div>`;
+        openSheet(html, 'auto');
+    }
+
+    function _evtRegBuildList(evIdx, query) {
+        const q = query.trim().toLowerCase();
+        const ev = db?.meta?.events?.[evIdx];
+        const existing = new Set((ev?.registrants || []).map(r => r.name));
+        const rows = [];
+        Object.keys(db || {}).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg]?.apts || []).forEach((apt, aptIdx) => {
+                if (existing.has(apt.name)) return;
+                const txt = `${apt.name||''} ${apt.father||''} ${apt.mother||''} ${bldg}`.toLowerCase();
+                if (q && !txt.includes(q)) return;
+                const dist = (userPosition && db[bldg]?.info?.coords)
+                    ? calculateDistance(userPosition, db[bldg].info.coords) : Infinity;
+                rows.push({ bldg, aptIdx, apt, dist });
+            });
+        });
+        rows.sort((a, b) => a.dist - b.dist);
+        if (!rows.length) return `<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">${q ? 'לא נמצא' : 'כל הקהילה כבר נרשמה'}</div>`;
+        return rows.slice(0, 12).map(r => {
+            const be = encodeURIComponent(r.bldg);
+            const phone = r.apt.fatherPhone || r.apt.motherPhone || r.apt.phone || '';
+            return `<div onclick="fieldApp._evtRegFromCommunity(${evIdx},'${be}',${r.aptIdx})"
+                style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg-body);border:1px solid var(--border-light);border-radius:11px;margin-bottom:6px;cursor:pointer;transition:background 0.1s;"
+                onmousedown="this.style.background='var(--surface)'" onmouseup="this.style.background='var(--bg-body)'">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:13px;">משפחת ${escapeHTML(r.apt.name||'ללא שם')}</div>
+                    ${phone ? `<div style="font-size:11px;color:var(--text-muted);">${escapeHTML(phone)}</div>` : ''}
+                </div>
+                <i class="fas fa-user-plus" style="color:var(--accent);font-size:13px;"></i>
+            </div>`;
+        }).join('');
+    }
+
+    function _evtRegSearch(evIdx, query) {
+        const el = document.getElementById('evt-reg-list');
+        if (el) el.innerHTML = _evtRegBuildList(evIdx, query);
+    }
+
+    function _evtRegFromCommunity(evIdx, bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const apt = db[bldg]?.apts?.[aptIdx];
+        if (!apt) return;
+        const phone = apt.fatherPhone || apt.motherPhone || apt.phone || '';
+        _evtAddRegistrant(evIdx, apt.name || '', phone, { bldg, aptIdx });
+    }
+
+    function _evtSaveNewReg(evIdx) {
+        const name  = document.getElementById('evt-new-name')?.value?.trim();
+        const phone = document.getElementById('evt-new-phone')?.value?.trim() || '';
+        if (!name) { showToast('⚠️ חסר שם'); return; }
+        _evtAddRegistrant(evIdx, name, phone, null);
+    }
+
+    function _evtAddRegistrant(evIdx, name, phone, famRef) {
+        const ev = db?.meta?.events?.[evIdx];
+        if (!ev) return;
+        if (!ev.registrants) ev.registrants = [];
+        ev.registrants.push({ name, phone, famRef });
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'event_add_registrant', eventId: ev.id, payload: { name, phone, famRef }, timestamp: new Date().toISOString() });
+        storageSet(OUTBOX_KEY, outbox);
+        pushOutboxToDrive().catch(()=>{});
+        showToast(`✅ ${escapeHTML(name)} נוסף לאירוע`);
+        openEventDetail(evIdx);
+    }
+
+    function toggleEventAttendance(evIdx, regIdx) {
+        const ev = db?.meta?.events?.[evIdx];
+        if (!ev) return;
+        if (!ev.attendance) ev.attendance = [];
+        const idx = ev.attendance.indexOf(regIdx);
+        if (idx >= 0) ev.attendance.splice(idx, 1);
+        else ev.attendance.push(regIdx);
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'event_attendance', eventId: ev.id, regIdx, attended: idx < 0, timestamp: new Date().toISOString() });
+        storageSet(OUTBOX_KEY, outbox);
+        if (navigator.vibrate) navigator.vibrate(20);
+        openEventDetail(evIdx);
+    }
+
     function openRouteMenu() {
         closeOverlays();
-        switchView('map', document.querySelector('.nav-item'));
+        switchView('map', document.getElementById('nav-map'));
         const routeSheetEl = document.getElementById('f-route-sheet');
         openSheet(routeSheetEl.innerHTML, 'auto');
     }
@@ -1749,7 +2293,7 @@ const fieldApp = (function () {
             if (!db[bldg].apts[aptIdx].tasks) db[bldg].apts[aptIdx].tasks = [];
             db[bldg].apts[aptIdx].tasks.push(newTask); outbox.push({ type: 'add_family_task', bldg, aptName: famName, timestamp: new Date().toISOString(), payload: { taskText: text, taskDate: todayStr } });
         }
-        storageSet(DATA_KEY, db); storageSet(OUTBOX_KEY, outbox); closeOverlays(); renderTasks(); switchView('tasks', document.querySelectorAll('.nav-item')[1]); showToast("✅ משימה חדשה תועדה!");
+        storageSet(DATA_KEY, db); storageSet(OUTBOX_KEY, outbox); closeOverlays(); renderTasks(); switchView('tasks', document.getElementById('nav-tasks')); showToast("✅ משימה חדשה תועדה!");
     }
 
     function saveQuickTask() {
@@ -3705,7 +4249,7 @@ const fieldApp = (function () {
     }
 
     function activateMapPickMode() {
-        switchView('map', document.querySelector('.nav-item'));
+        switchView('map', document.getElementById('nav-map'));
         showToast('לחץ לחיצה ארוכה על בניין להוספה למסלול', 3000);
         isRouteBuilderMode = true;
         updateAppUIState('ROUTE_BUILDER');
@@ -3925,7 +4469,7 @@ const fieldApp = (function () {
                             title: task.text, sub: 'משפחת ' + (apt.name||'') + ' · ' + bldg,
                             typeLabel: 'משימה',
                             action: () => {
-                                switchView('tasks', document.querySelectorAll('.nav-item')[1]);
+                                switchView('tasks', document.getElementById('nav-tasks'));
                                 const taskInput = document.getElementById('f-task-search');
                                 if (taskInput) { taskInput.value = task.text; renderTasks(); }
                                 globalSearchClear();
@@ -3944,7 +4488,7 @@ const fieldApp = (function () {
                     title: task.text, sub: 'משימה כללית',
                     typeLabel: 'משימה',
                     action: () => {
-                        switchView('tasks', document.querySelectorAll('.nav-item')[1]);
+                        switchView('tasks', document.getElementById('nav-tasks'));
                         globalSearchClear();
                     }
                 });
@@ -3978,7 +4522,7 @@ const fieldApp = (function () {
                         action: () => {
                             if (map) {
                                 map.flyTo({ center: coords, zoom: 18, pitch: 60, duration: 1200 });
-                                switchView('map', document.querySelector('.nav-item'));
+                                switchView('map', document.getElementById('nav-map'));
                                 // פתח כרטיס בניין (ריק אם לא קיים)
                                 setTimeout(() => {
                                     // חפש אם יש בניין קרוב במסד
@@ -4445,7 +4989,13 @@ const fieldApp = (function () {
         deleteCurrentTask, addEditTag, removeEditTag, toggleChipTag, onTagAtInput, onTagAtKey, selectDropdownTag,
         toggleVoiceSearch,
         // *** FAB bottom sheet + תיעוד פעילות מהיר ***
-        openQuickActivityLog, _qalSearch, _qalSelectFamily, _qalSave, _fabTodayRoute
+        openQuickActivityLog, _qalSearch, _qalSelectFamily, _qalSave, _fabTodayRoute,
+        // *** מסך בית + מפגש רחוב + אירועים ***
+        renderHomeView, _homeCompleteTask, _homeQuickTask,
+        openStreetEncounterForm, _encVoice, _encChip, saveStreetEncounter,
+        openActivityPicker,
+        openEvents, openCreateEventForm, saveEvent, openEventDetail,
+        openAddEventRegistrant, _evtRegSearch, _evtRegFromCommunity, _evtSaveNewReg, toggleEventAttendance
     };
 })();
 
