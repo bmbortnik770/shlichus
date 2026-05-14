@@ -1087,6 +1087,60 @@ body, html {
     z-index: calc(var(--z-top-bar) - 1) !important;
 }
 
+/* ==========================================
+   FAB Bottom Sheet — סקציות וכפתורים
+   ========================================== */
+.fab-sheet-section-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.fab-sheet-btn {
+    background: var(--bg-body);
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
+    padding: 12px 8px;
+    text-align: center;
+    cursor: pointer;
+    font-family: 'Assistant', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    transition: background 0.15s;
+}
+.fab-sheet-btn:active { background: var(--surface); }
+.fab-sheet-btn-office {
+    border-color: rgba(245,158,11,0.4);
+    background: rgba(245,158,11,0.06);
+}
+.fab-act-chip {
+    background: var(--bg-body);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-family: 'Assistant', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+.fab-act-chip:active { background: var(--surface); }
+
 /* שורת חיפוש משימות מעל הסינכרון */
 #view-tasks .f-top-bar {
     z-index: var(--z-top-bar) !important;

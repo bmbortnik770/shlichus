@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <link rel="stylesheet" href="field-style.css?v=26"> 
+    <link rel="stylesheet" href="field-style.css?v=27">
 </head>
 <body>
     <div id="f-splash" class="f-splash">
@@ -447,23 +447,6 @@
         </div>
     </nav>
 
-    <!-- Speed Dial — 3 כפתורים שצצים מה-FAB -->
-    <div id="speed-dial-overlay" style="display:none; position:fixed; inset:0; z-index:calc(var(--z-fab) - 1);" onclick="fieldApp.toggleSpeedDial()"></div>
-    <div id="speed-dial" class="speed-dial">
-        <div class="speed-dial-item" id="sd-family" onclick="fieldApp.toggleSpeedDial(); fieldApp.openFamilyForm()">
-            <span class="speed-dial-label">משפחה חדשה</span>
-            <button class="speed-dial-btn" style="background:var(--success);"><i class="fas fa-user-plus"></i></button>
-        </div>
-        <div class="speed-dial-item" id="sd-task" onclick="fieldApp.toggleSpeedDial(); fieldApp.openQuickTaskForm()">
-            <span class="speed-dial-label">משימה חדשה</span>
-            <button class="speed-dial-btn" style="background:var(--warning);"><i class="fas fa-tasks"></i></button>
-        </div>
-        <div class="speed-dial-item" id="sd-mission" onclick="fieldApp.toggleSpeedDial(); fieldApp.openMissionPlanner()">
-            <span class="speed-dial-label">מבצעים</span>
-            <button class="speed-dial-btn" style="background:var(--accent);"><i class="fas fa-route"></i></button>
-        </div>
-    </div>
-
     <!-- מתכנן מבצעים (Mission Planner) -->
     <div id="mission-planner-sheet" class="f-sheet" style="max-height:92vh;">
         <div class="f-sheet-handle"></div>
@@ -625,6 +608,6 @@
 
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="field-app.js?v=30"></script>
+    <script src="field-app.js?v=31"></script>
 </body>
 </html>

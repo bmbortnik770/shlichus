@@ -193,8 +193,7 @@ const fieldApp = (function () {
                 document.getElementById('f-fab-wrapper').style.display = 'flex';
                 if(map) { renderMarkers(); renderTasks(); renderCommunity(); }
                 checkForOfficeRoute();
-                // סריקת אנשי קשר אוטומטית (אחרי 3 שניות כדי שהאפליקציה תתייצב)
-                setTimeout(() => scanContacts(false), 3000);
+                // סריקת אנשי קשר: ידנית בלבד (לא אוטומטית)
             } catch(e) { setSyncStatus('error'); continueOffline(); }
         } catch (e) { setSyncStatus('offline'); continueOffline(); }
     }
@@ -3233,16 +3232,204 @@ const fieldApp = (function () {
     // ==========================================
     // Speed Dial FAB
     // ==========================================
-    let _speedDialOpen = false;
+    let _currentQalType = '';
+
+    const _ACT_ICONS  = { 'ביקור':'fas fa-walking','שיחה':'fas fa-phone','וואטסאפ':'fab fa-whatsapp','אין מענה':'fas fa-phone-slash','מייל':'fas fa-envelope','פגישה':'fas fa-handshake','שיחת וידאו':'fas fa-video' };
+    const _ACT_COLORS = { 'ביקור':'#10b981','שיחה':'#3b82f6','וואטסאפ':'#25d366','אין מענה':'#f59e0b','מייל':'#8b5cf6','פגישה':'#ec4899','שיחת וידאו':'#06b6d4' };
+    const _DEFAULT_ACT = ['ביקור','שיחה','וואטסאפ','אין מענה','מייל'];
 
     function toggleSpeedDial() {
-        _speedDialOpen = !_speedDialOpen;
-        const dial = document.getElementById('speed-dial');
-        const overlay = document.getElementById('speed-dial-overlay');
-        const fabBtn = document.getElementById('super-fab-btn');
-        if (dial) dial.classList.toggle('open', _speedDialOpen);
-        if (overlay) overlay.style.display = _speedDialOpen ? 'block' : 'none';
-        if (fabBtn) fabBtn.classList.toggle('dial-open', _speedDialOpen);
+        const actTypes = db?.__SETTINGS__?.activityTypes || _DEFAULT_ACT;
+        const savedRoutes = storageGet(SAVED_ROUTES_KEY) || [];
+        const hasOffice = !!(db?.meta?.assignedRoute?.length);
+
+        const routeToday = hasOffice
+            ? `<button class="fab-sheet-btn fab-sheet-btn-office" onclick="fieldApp.closeOverlays(); fieldApp._fabTodayRoute()">
+                <i class="fas fa-star" style="color:var(--warning);font-size:18px;display:block;margin-bottom:4px;"></i>
+                <span>מהמשרד</span>
+                <span style="font-size:10px;color:var(--warning);font-weight:700;">${db.meta.assignedRoute.length} עצירות</span>
+               </button>`
+            : `<button class="fab-sheet-btn" onclick="fieldApp.closeOverlays(); fieldApp._fabTodayRoute()">
+                <i class="fas fa-check-double" style="color:var(--warning);font-size:18px;display:block;margin-bottom:4px;"></i>
+                <span>לפי משימות</span>
+               </button>`;
+
+        const html = `
+        <div style="display:flex;flex-direction:column;gap:16px;">
+
+            <div>
+                <div class="fab-sheet-section-title"><i class="fas fa-plus-circle"></i> הוספה</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <button class="fab-sheet-btn" onclick="fieldApp.closeOverlays(); fieldApp.openQuickFamilyForm()">
+                        <i class="fas fa-user-plus" style="color:var(--success);font-size:18px;display:block;margin-bottom:4px;"></i>
+                        <span>משפחה חדשה</span>
+                    </button>
+                    <button class="fab-sheet-btn" onclick="fieldApp.closeOverlays(); fieldApp.openQuickTaskForm()">
+                        <i class="fas fa-tasks" style="color:var(--warning);font-size:18px;display:block;margin-bottom:4px;"></i>
+                        <span>משימה חדשה</span>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <div class="fab-sheet-section-title"><i class="fas fa-pen-alt"></i> תיעוד פעילות</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    ${actTypes.map(t => {
+                        const icon = _ACT_ICONS[t] || 'fas fa-check';
+                        const col  = _ACT_COLORS[t] || 'var(--accent)';
+                        return `<button onclick="fieldApp.openQuickActivityLog('${encodeURIComponent(t)}')"
+                            class="fab-act-chip" style="border-color:${col}20;">
+                            <i class="${icon}" style="color:${col};"></i>${escapeHTML(t)}
+                        </button>`;
+                    }).join('')}
+                </div>
+            </div>
+
+            <div>
+                <div class="fab-sheet-section-title"><i class="fas fa-route"></i> מסלולים</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                    ${routeToday}
+                    <button class="fab-sheet-btn" onclick="fieldApp.closeOverlays(); fieldApp.openSavedRoutesSheet()">
+                        <i class="fas fa-bookmark" style="color:var(--accent);font-size:18px;display:block;margin-bottom:4px;"></i>
+                        <span>שמורים${savedRoutes.length > 0 ? ` (${savedRoutes.length})` : ''}</span>
+                    </button>
+                    <button class="fab-sheet-btn" onclick="fieldApp.closeOverlays(); fieldApp.openMissionPlanner()">
+                        <i class="fas fa-map-marked-alt" style="color:var(--success);font-size:18px;display:block;margin-bottom:4px;"></i>
+                        <span>מסלול חדש</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>`;
+
+        openSheet(html, 'auto');
+    }
+
+    function _fabTodayRoute() {
+        if (db?.meta?.assignedRoute?.length) buildRoute('office');
+        else buildRoute('tasks');
+    }
+
+    // ── תיעוד פעילות מהיר: בחירת משפחה ──────────────────────────
+    function openQuickActivityLog(typeEnc) {
+        _currentQalType = decodeURIComponent(typeEnc);
+        const icon  = _ACT_ICONS[_currentQalType]  || 'fas fa-check';
+        const color = _ACT_COLORS[_currentQalType] || 'var(--accent)';
+
+        const html = `
+        <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                <span style="background:${color}18;border:1px solid ${color}40;color:${color};padding:5px 14px;border-radius:20px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;">
+                    <i class="${icon}"></i>${escapeHTML(_currentQalType)}
+                </span>
+                <span style="font-size:15px;font-weight:700;color:var(--text-main);">— לאיזו משפחה?</span>
+            </div>
+            <div style="position:relative;margin-bottom:10px;">
+                <i class="fas fa-search" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:14px;pointer-events:none;"></i>
+                <input id="qal-search" class="ffc-input" placeholder="חיפוש לפי שם, טלפון, כתובת..."
+                    style="padding-right:36px;" oninput="fieldApp._qalSearch(this.value)" autocomplete="off">
+            </div>
+            <div id="qal-families" style="display:flex;flex-direction:column;gap:6px;max-height:45vh;overflow-y:auto;">
+                ${_qalBuildList('')}
+            </div>
+        </div>`;
+
+        openSheet(html, 'auto');
+        setTimeout(() => document.getElementById('qal-search')?.focus(), 150);
+    }
+
+    function _qalBuildList(query) {
+        const q = query.trim().toLowerCase();
+        const rows = [];
+        Object.keys(db || {}).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            const bldgCoords = db[bldg].info?.coords;
+            (db[bldg].apts || []).forEach((apt, idx) => {
+                const txt = `${apt.name||''} ${apt.father||''} ${apt.mother||''} ${bldg}`.toLowerCase();
+                if (q && !txt.includes(q)) return;
+                const dist = (userPosition && bldgCoords && !isNaN(bldgCoords[0]))
+                    ? calculateDistance(userPosition, bldgCoords) : Infinity;
+                rows.push({ bldg, idx, apt, dist });
+            });
+        });
+        rows.sort((a, b) => a.dist - b.dist);
+        if (!rows.length) return `<div style="text-align:center;padding:20px;color:var(--text-muted);">לא נמצאו משפחות</div>`;
+        return rows.slice(0, 20).map(r => {
+            const lastLog = (r.apt.interactions || []).slice(-1)[0];
+            const lastText = lastLog ? `${lastLog.type||''} · ${lastLog.date||''}` : 'אין תיעוד';
+            const distBadge = r.dist < Infinity
+                ? `<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${r.dist < 1000 ? Math.round(r.dist)+"מ'" : (r.dist/1000).toFixed(1)+"ק\"מ"}</span>`
+                : '';
+            return `<div onclick="fieldApp._qalSelectFamily('${encodeURIComponent(r.bldg)}',${r.idx})"
+                style="background:var(--bg-body);border:1px solid var(--border-light);border-radius:12px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:background 0.1s;"
+                onmousedown="this.style.background='var(--surface)'" onmouseup="this.style.background='var(--bg-body)'">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:14px;color:var(--text-main);">משפחת ${escapeHTML(r.apt.name||'ללא שם')}</div>
+                    <div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg)} · ${escapeHTML(lastText)}</div>
+                </div>
+                ${distBadge}
+                <i class="fas fa-chevron-left" style="color:var(--text-muted);font-size:12px;"></i>
+            </div>`;
+        }).join('');
+    }
+
+    function _qalSearch(query) {
+        const container = document.getElementById('qal-families');
+        if (container) container.innerHTML = _qalBuildList(query);
+    }
+
+    function _qalSelectFamily(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const apt  = db[bldg].apts[aptIdx];
+        const icon  = _ACT_ICONS[_currentQalType]  || 'fas fa-check';
+        const color = _ACT_COLORS[_currentQalType] || 'var(--accent)';
+
+        const html = `
+        <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+                <span style="background:${color}18;border:1px solid ${color}40;color:${color};padding:4px 12px;border-radius:16px;font-size:13px;font-weight:700;">
+                    <i class="${icon}"></i> ${escapeHTML(_currentQalType)}
+                </span>
+                <i class="fas fa-arrow-left" style="color:var(--text-muted);font-size:12px;"></i>
+                <span style="font-size:15px;font-weight:800;color:var(--text-main);">משפחת ${escapeHTML(apt.name||'?')}</span>
+            </div>
+            <div style="background:var(--bg-body);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--text-muted);">
+                <i class="fas fa-map-marker-alt" style="margin-left:5px;color:var(--accent);"></i>${escapeHTML(bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : bldg)}
+                ${apt.num ? ` · דירה ${escapeHTML(apt.num)}` : ''}
+            </div>
+            <textarea id="qal-note" class="ffc-input" rows="3" placeholder="הערות (אופציונלי)..." style="margin-bottom:14px;"></textarea>
+            <div style="display:flex;gap:8px;">
+                <button onclick="fieldApp.openQuickActivityLog('${encodeURIComponent(_currentQalType)}')"
+                    style="flex:1;padding:13px;background:var(--bg-body);border:1px solid var(--border-light);border-radius:12px;color:var(--text-muted);font-weight:700;cursor:pointer;font-family:inherit;">
+                    <i class="fas fa-arrow-right"></i> חזור
+                </button>
+                <button onclick="fieldApp._qalSave('${bldgEnc}',${aptIdx})"
+                    style="flex:2;padding:14px;background:${color};border:none;border-radius:12px;color:white;font-weight:800;font-size:16px;cursor:pointer;font-family:inherit;">
+                    <i class="fas fa-save"></i> שמור
+                </button>
+            </div>
+        </div>`;
+
+        openSheet(html, 'auto');
+        setTimeout(() => document.getElementById('qal-note')?.focus(), 150);
+    }
+
+    function _qalSave(bldgEnc, aptIdx) {
+        const bldg = decodeURIComponent(bldgEnc);
+        const apt  = db[bldg].apts[aptIdx];
+        const note = document.getElementById('qal-note')?.value?.trim() || '';
+        const ts   = new Date().toISOString();
+        const dateHe = new Date(ts).toLocaleDateString('he-IL');
+        if (!apt.interactions) apt.interactions = [];
+        apt.interactions.push({ date: dateHe, type: _currentQalType, notes: note, source: 'field', _ts: ts });
+        apt.updatedAt = Date.now();
+        storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'visit_log', bldg, aptName: apt.name, timestamp: ts, payload: { note, result: _currentQalType } });
+        storageSet(OUTBOX_KEY, outbox);
+        pushOutboxToDrive().catch(e => console.warn('[QAL] push error:', e));
+        closeOverlays();
+        showToast(`✅ ${_currentQalType} — משפחת ${escapeHTML(apt.name||'')} — נשמר!`);
     }
 
     // ==========================================
@@ -4132,7 +4319,9 @@ const fieldApp = (function () {
         // *** מסך משימות מתקדם ***
         toggleViewAllTasks, toggleCompletedTasks, setTaskFilter, openTaskEdit, saveEditedTask,
         deleteCurrentTask, addEditTag, removeEditTag, toggleChipTag, onTagAtInput, onTagAtKey, selectDropdownTag,
-        toggleVoiceSearch
+        toggleVoiceSearch,
+        // *** FAB bottom sheet + תיעוד פעילות מהיר ***
+        openQuickActivityLog, _qalSearch, _qalSelectFamily, _qalSave, _fabTodayRoute
     };
 })();
 
