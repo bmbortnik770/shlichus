@@ -959,6 +959,7 @@ const fieldApp = (function () {
         document.getElementById('f-sheet').style.height = '';
         renderCommunity();
         renderMarkers();
+        renderHomeView();
         showToast('🗑️ המשפחה נמחקה');
     }
 
@@ -1512,6 +1513,9 @@ const fieldApp = (function () {
         const actionOverlay = document.getElementById('action-sheet-overlay');
         if (actionSheet) actionSheet.classList.remove('active');
         if (actionOverlay) actionOverlay.classList.remove('active');
+        // סגור snap-sheet של FFC
+        const snapSheet = document.getElementById('ffc-snap-sheet');
+        if (snapSheet) snapSheet.classList.remove('active');
         document.getElementById('f-scrim').style.display = 'none';
         if(db) document.getElementById('f-fab-wrapper').style.display = 'flex';
         if (activeBuildingFeatureId && map) { map.setFeatureState({source: 'composite', sourceLayer: 'building', id: activeBuildingFeatureId}, { active: false }); activeBuildingFeatureId = null; }
@@ -1789,6 +1793,11 @@ const fieldApp = (function () {
         }
     }
 
+    function _qrbHasValidCoords(bldg) {
+        const c = db[bldg]?.info?.coords;
+        return Array.isArray(c) && c.length === 2 && typeof c[0] === 'number' && typeof c[1] === 'number' && c[0] !== 0 && c[1] !== 0;
+    }
+
     function _qrbBuildList() {
         const listEl = document.getElementById('qrb-list');
         if (!listEl || !db) return;
@@ -1814,14 +1823,17 @@ const fieldApp = (function () {
         }
         listEl.innerHTML = items.map(({ bldg, dist, openTasks, famCount }) => {
             const enc = encodeURIComponent(bldg);
+            const hasCoords = _qrbHasValidCoords(bldg);
             const sel = _qrbSelected.has(bldg);
             const distTxt = dist !== null ? (dist < 1000 ? `${Math.round(dist)}מ'` : `${(dist/1000).toFixed(1)}ק"מ`) : '';
             const taskBadge = openTasks > 0 ? `<span style="background:rgba(245,158,11,0.12);color:var(--warning);border-radius:10px;padding:2px 7px;font-size:11px;font-weight:700;">✓${openTasks}</span>` : '';
-            return `<div class="qrb-item${sel ? ' sel' : ''}" onclick="fieldApp._qrbToggle('${enc}')">
+            const noCoordBadge = !hasCoords ? `<span style="background:rgba(239,68,68,0.1);color:var(--danger,#ef4444);border-radius:10px;padding:2px 7px;font-size:11px;">📍 לא ממוקם</span>` : '';
+            const clickAttr = hasCoords ? `onclick="fieldApp._qrbToggle('${enc}')"` : '';
+            return `<div class="qrb-item${sel ? ' sel' : ''}${!hasCoords ? ' disabled' : ''}" ${clickAttr} style="${!hasCoords ? 'opacity:0.45;cursor:default;' : ''}">
                 <div class="qrb-chk">${sel ? '<i class="fas fa-check"></i>' : ''}</div>
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:700;font-size:14px;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(bldg)}</div>
-                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px;display:flex;gap:6px;align-items:center;">${famCount} משפחות ${taskBadge}</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px;display:flex;gap:6px;align-items:center;">${famCount} משפחות ${taskBadge} ${noCoordBadge}</div>
                 </div>
                 ${distTxt ? `<span class="qrb-dist">${distTxt}</span>` : ''}
             </div>`;
@@ -1849,8 +1861,9 @@ const fieldApp = (function () {
         const items = [];
         Object.keys(db || {}).forEach(bldg => {
             if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
-            const coords = db[bldg]?.info?.coords;
-            const dist = (userPosition && coords)
+            if (!_qrbHasValidCoords(bldg)) return;
+            const coords = db[bldg].info.coords;
+            const dist = userPosition
                 ? calculateDistance(coords, [userPosition.longitude, userPosition.latitude])
                 : Infinity;
             items.push({ bldg, dist });
@@ -1877,11 +1890,16 @@ const fieldApp = (function () {
             ? [userPosition.longitude, userPosition.latitude]
             : (db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928]);
         const waypoints = [];
+        let noCoordCount = 0;
         Array.from(_qrbSelected).forEach(bldg => {
-            const coords = db[bldg]?.info?.coords;
-            if (coords) waypoints.push(coords);
+            if (_qrbHasValidCoords(bldg)) {
+                waypoints.push(db[bldg].info.coords);
+            } else {
+                noCoordCount++;
+            }
         });
-        if (!waypoints.length) { showToast('לא נמצאו כתובות לבניינים הנבחרים'); return; }
+        if (!waypoints.length) { showToast('הבניינים הנבחרים אינם ממוקמים על המפה — סמן אותם תחילה'); return; }
+        if (noCoordCount > 0) showToast(`${noCoordCount} בניינים ללא מיקום לא נכללו במסלול`);
         waypoints.sort((a, b) => calculateDistance(startCoords, a) - calculateDistance(startCoords, b));
         pendingRouteWaypoints = waypoints;
         switchView('map', document.getElementById('nav-map'));
