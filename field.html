@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <link rel="stylesheet" href="field-style.css?v=28">
+    <link rel="stylesheet" href="field-style.css?v=29">
 </head>
 <body>
     <div id="f-splash" class="f-splash">
@@ -53,65 +53,75 @@
     </div>
 
     <!-- ===== HOME DASHBOARD ===== -->
-    <div id="view-home" class="view-container active" style="padding-top:0; overflow-y:auto; padding-bottom:calc(var(--bottom-nav-h) + var(--safe-b) + 20px);">
+    <div id="view-home" class="view-container active" style="padding-top:0; overflow-y:auto; padding-bottom:calc(var(--bottom-nav-h) + var(--safe-b) + 24px);">
 
-        <!-- Hero gradient -->
+        <!-- Hero + Stats -->
         <div class="home-hero">
-            <div id="home-greeting" class="home-hero-title">שלום, שליח 👋</div>
-            <div id="home-date" class="home-hero-sub"></div>
+            <div class="home-hero-top">
+                <div>
+                    <div id="home-greeting" class="home-hero-title">שלום, שליח 👋</div>
+                    <div id="home-date" class="home-hero-sub"></div>
+                </div>
+            </div>
+            <div class="home-stats-row">
+                <div class="home-stat-chip" id="home-stat-visits">🚶 — ביקורים</div>
+                <div class="home-stat-chip" id="home-stat-tasks">📌 — משימות</div>
+                <div class="home-stat-chip" id="home-stat-fams">👥 — משפחות</div>
+                <div class="home-stat-chip" id="home-stat-sync">🔄 בטעינה</div>
+            </div>
         </div>
 
         <div style="padding:0 16px;">
 
-            <!-- 4 כפתורי פעולה ראשיים -->
-            <div class="home-actions-grid">
-                <button class="home-action-btn home-clr-green" onclick="fieldApp.openStreetEncounterForm()">
-                    <span class="home-action-icon">🤝</span>
-                    <span class="home-action-label">מפגש חדש</span>
-                    <span class="home-action-sub">הוסף נפש ומשימה</span>
+            <!-- Primary CTA: יוצא לשטח -->
+            <button class="home-cta-btn" onclick="fieldApp.openQuickRouteBuilder()">
+                <span style="font-size:26px;line-height:1;flex-shrink:0;">🚀</span>
+                <div style="flex:1;text-align:right;">
+                    <div>יוצא לשטח</div>
+                    <div class="home-cta-sub">בנה מסלול ביקורים מהיר</div>
+                </div>
+                <i class="fas fa-chevron-left" style="font-size:16px;opacity:0.7;flex-shrink:0;"></i>
+            </button>
+
+            <!-- 4 Secondary Actions -->
+            <div class="home-secondary-row">
+                <button class="home-sec-btn" style="background:rgba(16,185,129,0.1);color:var(--success);" onclick="fieldApp.openStreetEncounterForm()">
+                    <span class="home-sec-icon">🤝</span><span>מפגש</span>
                 </button>
-                <button class="home-action-btn home-clr-blue" onclick="fieldApp.openQuickTaskForm()">
-                    <span class="home-action-icon">✅</span>
-                    <span class="home-action-label">משימה חדשה</span>
-                    <span class="home-action-sub">שייך למשפחה</span>
+                <button class="home-sec-btn" style="background:rgba(139,92,246,0.1);color:#7c3aed;" onclick="fieldApp.openEvents()">
+                    <span class="home-sec-icon">🎯</span><span>אירועים</span>
                 </button>
-                <button class="home-action-btn home-clr-orange" onclick="fieldApp.openActivityPicker()">
-                    <span class="home-action-icon">📝</span>
-                    <span class="home-action-label">תעד פעילות</span>
-                    <span class="home-action-sub">ביקור, שיחה...</span>
+                <button class="home-sec-btn" style="background:rgba(245,158,11,0.1);color:var(--warning);" onclick="fieldApp.openQuickTaskForm()">
+                    <span class="home-sec-icon">✅</span><span>משימה</span>
                 </button>
-                <button class="home-action-btn home-clr-purple" onclick="fieldApp.openEvents()">
-                    <span class="home-action-icon">🎯</span>
-                    <span class="home-action-label">אירועים</span>
-                    <span class="home-action-sub">נרשמים ונוכחות</span>
+                <button class="home-sec-btn" style="background:rgba(37,99,235,0.1);color:var(--accent);" onclick="fieldApp.switchView('community', document.getElementById('nav-community'))">
+                    <span class="home-sec-icon">👥</span><span>קהילה</span>
                 </button>
             </div>
 
-            <!-- כפתורים משניים: קהילה + מסלולים -->
-            <div style="display:flex; gap:10px; margin-bottom:20px;">
-                <button onclick="fieldApp.switchView('community', document.getElementById('nav-community'))"
-                    style="flex:1;padding:13px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-family:inherit;font-size:14px;font-weight:700;color:var(--text-main);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-                    <i class="fas fa-users" style="color:var(--success);"></i> קהילה
-                </button>
-                <button onclick="fieldApp.switchView('map', document.getElementById('nav-map'))"
-                    style="flex:1;padding:13px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-family:inherit;font-size:14px;font-weight:700;color:var(--text-main);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-                    <i class="fas fa-route" style="color:var(--accent);"></i> מסלולים
-                </button>
-            </div>
-
-            <!-- משימות היום -->
+            <!-- Saved Routes -->
             <div style="margin-bottom:20px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                    <span style="font-size:16px;font-weight:800;">📌 משימות היום</span>
-                    <button onclick="fieldApp.switchView('tasks', document.getElementById('nav-tasks'))"
-                        style="font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;font-weight:700;font-family:inherit;">הכל ←</button>
+                <div class="home-section-hdr">
+                    <span class="home-section-ttl">🗺️ מסלולים שמורים</span>
+                    <button class="home-section-lnk" onclick="fieldApp.closeOverlays();fieldApp.openSavedRoutesSheet()">כל המסלולים ←</button>
+                </div>
+                <div id="home-routes-preview"></div>
+            </div>
+
+            <!-- Today Tasks -->
+            <div style="margin-bottom:20px;">
+                <div class="home-section-hdr">
+                    <span class="home-section-ttl">📌 משימות היום</span>
+                    <button class="home-section-lnk" onclick="fieldApp.switchView('tasks', document.getElementById('nav-tasks'))">הכל ←</button>
                 </div>
                 <div id="home-tasks-preview"></div>
             </div>
 
-            <!-- אחרונים -->
-            <div>
-                <div style="font-size:16px;font-weight:800;margin-bottom:10px;">🕐 אחרונים</div>
+            <!-- Recent Families -->
+            <div style="margin-bottom:20px;">
+                <div class="home-section-hdr">
+                    <span class="home-section-ttl">🕐 ביקרת לאחרונה</span>
+                </div>
                 <div id="home-recent-families"></div>
             </div>
 
@@ -677,6 +687,6 @@
 
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="field-app.js?v=33"></script>
+    <script src="field-app.js?v=34"></script>
 </body>
 </html>

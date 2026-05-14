@@ -1552,15 +1552,75 @@ const fieldApp = (function () {
     // ==========================================
     function renderHomeView() {
         if (!db) return;
-        _renderHomeTasks();
-        _renderHomeRecent();
-        // תאריך בכותרת
+
+        // תאריך
         const dateEl = document.getElementById('home-date');
         if (dateEl) {
             const d = new Date();
             const days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
             dateEl.textContent = `יום ${days[d.getDay()]}, ${d.toLocaleDateString('he-IL')}`;
         }
+
+        // סטטיסטיקות
+        const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+        let visitsWeek = 0, tasksOpen = 0, totalFams = 0;
+        const todayISO = new Date().toISOString().split('T')[0];
+        Object.keys(db).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            (db[bldg]?.apts || []).forEach(apt => {
+                totalFams++;
+                (apt.interactions || []).forEach(i => { if (i._ts && i._ts > weekAgo) visitsWeek++; });
+                (apt.tasks || []).forEach(t => {
+                    if (!t.done) { const iso = _taskToISO(t.date); if (!iso || iso === todayISO) tasksOpen++; }
+                });
+            });
+        });
+        (db?.meta?.generalTasks || []).forEach(t => { if (!t.done) tasksOpen++; });
+
+        const setChip = (id, txt, bg) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = txt;
+            if (bg) el.style.background = bg;
+        };
+        setChip('home-stat-visits', `🚶 ${visitsWeek} ביקורים`);
+        setChip('home-stat-tasks',  `📌 ${tasksOpen} משימות`);
+        setChip('home-stat-fams',   `👥 ${totalFams} משפחות`);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        setChip('home-stat-sync',
+            outbox.length ? `⏳ ${outbox.length} ממתינים` : '✅ מסונכרן',
+            outbox.length ? 'rgba(245,158,11,0.35)' : 'rgba(16,185,129,0.35)'
+        );
+
+        _renderHomeRoutes();
+        _renderHomeTasks();
+        _renderHomeRecent();
+    }
+
+    function _renderHomeRoutes() {
+        const el = document.getElementById('home-routes-preview');
+        if (!el) return;
+        const routes = loadSavedRoutes();
+        if (!routes.length) {
+            el.innerHTML = `<div style="text-align:center;padding:14px 16px;color:var(--text-muted);font-size:13px;background:var(--surface);border-radius:14px;border:1px dashed var(--border-light);">
+                אין מסלולים שמורים — לחץ <strong>יוצא לשטח</strong> כדי לבנות
+            </div>`;
+            return;
+        }
+        el.innerHTML = routes.slice().reverse().slice(0, 3).map(r => {
+            const stops = r.waypoints?.length || 0;
+            const date  = r.created ? new Date(r.created).toLocaleDateString('he-IL') : '';
+            return `<div class="home-route-card">
+                <div class="home-route-icon">🗺️</div>
+                <div style="flex:1;min-width:0;cursor:pointer;" onclick="fieldApp.buildRouteFromSaved(${r.id})">
+                    <div style="font-weight:700;font-size:14px;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.name || 'מסלול')}</div>
+                    <div style="font-size:11px;color:var(--text-muted);">${stops} עצירות${date ? ' · ' + date : ''}</div>
+                </div>
+                <button class="home-route-go" onclick="event.stopPropagation();fieldApp.buildRouteFromSaved(${r.id})" title="צא עכשיו">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>`;
+        }).join('');
     }
 
     function _renderHomeTasks() {
@@ -1677,6 +1737,158 @@ const fieldApp = (function () {
     function _homeQuickTask(bldgEnc, aptIdx) {
         _qtSelectedFamily = { bldg: decodeURIComponent(bldgEnc), aptIdx };
         openQuickTaskForm();
+    }
+
+    // ==========================================
+    // QUICK ROUTE BUILDER
+    // ==========================================
+    let _qrbSelected = new Set();
+
+    function openQuickRouteBuilder() {
+        _qrbSelected = new Set();
+        const html = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+                <div style="font-size:19px;font-weight:800;color:var(--text-main);">🚀 יוצא לשטח</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">בחר בניינים — נצא בסדר אופטימלי</div>
+            </div>
+            <button onclick="event.stopPropagation();fieldApp._qrbSelectNearest(10)"
+                style="background:rgba(37,99,235,0.1);color:var(--accent);border:1px solid rgba(37,99,235,0.2);border-radius:20px;padding:7px 14px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;">
+                ⚡ 10 קרובות
+            </button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;">
+            <button onclick="fieldApp.buildRoute('tasks');fieldApp.closeOverlays()"
+                style="flex-shrink:0;padding:8px 16px;background:rgba(245,158,11,0.1);color:var(--warning);border:1px solid rgba(245,158,11,0.3);border-radius:20px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">
+                ✅ לפי משימות
+            </button>
+            <button onclick="fieldApp.buildRoute('community');fieldApp.closeOverlays()"
+                style="flex-shrink:0;padding:8px 16px;background:rgba(16,185,129,0.1);color:var(--success);border:1px solid rgba(16,185,129,0.2);border-radius:20px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">
+                👥 קרובות מקהילה
+            </button>
+            <button onclick="fieldApp.closeOverlays();fieldApp.openSavedRoutesSheet()"
+                style="flex-shrink:0;padding:8px 16px;background:rgba(37,99,235,0.1);color:var(--accent);border:1px solid rgba(37,99,235,0.2);border-radius:20px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">
+                📁 שמורים
+            </button>
+        </div>
+        <div id="qrb-list" style="max-height:42vh;overflow-y:auto;"></div>
+        <div style="padding-top:12px;margin-top:12px;border-top:1px solid var(--border-light);">
+            <button id="qrb-go-btn" onclick="fieldApp._qrbGoNow()"
+                style="width:100%;padding:16px;background:linear-gradient(135deg,var(--success),#059669);color:white;border:none;border-radius:16px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 20px rgba(16,185,129,0.4);opacity:0.4;transition:opacity 0.2s;">
+                <i class="fas fa-play"></i> <span id="qrb-go-label">בחר בניינים לצאת</span>
+            </button>
+        </div>`;
+        openSheet(html, 'tall');
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => { userPosition = pos.coords; _qrbBuildList(); },
+                () => _qrbBuildList()
+            );
+        } else {
+            _qrbBuildList();
+        }
+    }
+
+    function _qrbBuildList() {
+        const listEl = document.getElementById('qrb-list');
+        if (!listEl || !db) return;
+        const items = [];
+        Object.keys(db).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            const coords = db[bldg]?.info?.coords;
+            const dist = (userPosition && coords)
+                ? calculateDistance(coords, [userPosition.longitude, userPosition.latitude])
+                : null;
+            const openTasks = (db[bldg]?.apts || []).reduce((s, apt) => s + (apt.tasks || []).filter(t => !t.done).length, 0);
+            items.push({ bldg, dist, openTasks, famCount: (db[bldg]?.apts || []).length });
+        });
+        items.sort((a, b) => {
+            if (a.dist !== null && b.dist !== null) return a.dist - b.dist;
+            if (a.dist !== null) return -1;
+            if (b.dist !== null) return 1;
+            return (a.bldg || '').localeCompare(b.bldg || '', 'he');
+        });
+        if (!items.length) {
+            listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);">אין בניינים — הוסף משפחות תחילה</div>`;
+            return;
+        }
+        listEl.innerHTML = items.map(({ bldg, dist, openTasks, famCount }) => {
+            const enc = encodeURIComponent(bldg);
+            const sel = _qrbSelected.has(bldg);
+            const distTxt = dist !== null ? (dist < 1000 ? `${Math.round(dist)}מ'` : `${(dist/1000).toFixed(1)}ק"מ`) : '';
+            const taskBadge = openTasks > 0 ? `<span style="background:rgba(245,158,11,0.12);color:var(--warning);border-radius:10px;padding:2px 7px;font-size:11px;font-weight:700;">✓${openTasks}</span>` : '';
+            return `<div class="qrb-item${sel ? ' sel' : ''}" onclick="fieldApp._qrbToggle('${enc}')">
+                <div class="qrb-chk">${sel ? '<i class="fas fa-check"></i>' : ''}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:14px;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(bldg)}</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px;display:flex;gap:6px;align-items:center;">${famCount} משפחות ${taskBadge}</div>
+                </div>
+                ${distTxt ? `<span class="qrb-dist">${distTxt}</span>` : ''}
+            </div>`;
+        }).join('');
+        _qrbRefreshBtn();
+    }
+
+    function _qrbToggle(bldgEnc) {
+        const bldg = decodeURIComponent(bldgEnc);
+        if (_qrbSelected.has(bldg)) _qrbSelected.delete(bldg);
+        else _qrbSelected.add(bldg);
+        document.querySelectorAll('.qrb-item').forEach(el => {
+            const m = (el.getAttribute('onclick') || '').match(/_qrbToggle\('(.+?)'\)/);
+            if (!m) return;
+            const b = decodeURIComponent(m[1]);
+            const sel = _qrbSelected.has(b);
+            el.classList.toggle('sel', sel);
+            const chk = el.querySelector('.qrb-chk');
+            if (chk) chk.innerHTML = sel ? '<i class="fas fa-check"></i>' : '';
+        });
+        _qrbRefreshBtn();
+    }
+
+    function _qrbSelectNearest(n) {
+        const items = [];
+        Object.keys(db || {}).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            const coords = db[bldg]?.info?.coords;
+            const dist = (userPosition && coords)
+                ? calculateDistance(coords, [userPosition.longitude, userPosition.latitude])
+                : Infinity;
+            items.push({ bldg, dist });
+        });
+        items.sort((a, b) => a.dist - b.dist);
+        _qrbSelected = new Set(items.slice(0, n).map(i => i.bldg));
+        _qrbBuildList();
+    }
+
+    function _qrbRefreshBtn() {
+        const btn = document.getElementById('qrb-go-btn');
+        const lbl = document.getElementById('qrb-go-label');
+        if (!btn || !lbl) return;
+        const n = _qrbSelected.size;
+        btn.style.opacity = n > 0 ? '1' : '0.4';
+        lbl.textContent = n > 0 ? `צא עכשיו — ${n} עצירות` : 'בחר בניינים לצאת';
+    }
+
+    function _qrbGoNow() {
+        if (!_qrbSelected.size) return;
+        closeOverlays();
+        showToast('🗺️ בונה מסלול...');
+        const startCoords = userPosition
+            ? [userPosition.longitude, userPosition.latitude]
+            : (db?.__SETTINGS__?.homeLocation?.coords || [34.8878, 31.9928]);
+        const waypoints = [];
+        Array.from(_qrbSelected).forEach(bldg => {
+            const coords = db[bldg]?.info?.coords;
+            if (coords) waypoints.push(coords);
+        });
+        if (!waypoints.length) { showToast('לא נמצאו כתובות לבניינים הנבחרים'); return; }
+        waypoints.sort((a, b) => calculateDistance(startCoords, a) - calculateDistance(startCoords, b));
+        pendingRouteWaypoints = waypoints;
+        switchView('map', document.getElementById('nav-map'));
+        setTimeout(() => {
+            drawMultiStopRoute(startCoords, waypoints);
+            document.getElementById('f-route-dialog').style.display = 'flex';
+        }, 350);
     }
 
     // ==========================================
@@ -4991,7 +5203,8 @@ const fieldApp = (function () {
         // *** FAB bottom sheet + תיעוד פעילות מהיר ***
         openQuickActivityLog, _qalSearch, _qalSelectFamily, _qalSave, _fabTodayRoute,
         // *** מסך בית + מפגש רחוב + אירועים ***
-        renderHomeView, _homeCompleteTask, _homeQuickTask,
+        renderHomeView, _homeCompleteTask, _homeQuickTask, _renderHomeRoutes,
+        openQuickRouteBuilder, _qrbToggle, _qrbSelectNearest, _qrbGoNow,
         openStreetEncounterForm, _encVoice, _encChip, saveStreetEncounter,
         openActivityPicker,
         openEvents, openCreateEventForm, saveEvent, openEventDetail,
