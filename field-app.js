@@ -9,6 +9,7 @@ const OUTBOX_KEY  = 'field_outbox';
 const SYNC_TIME_KEY = 'field_last_sync';
 const NO_ADDRESS_KEY = "__NO_ADDRESS__";
 const SAVED_ROUTES_KEY = 'field_saved_routes';
+const SHADOW_KEY = 'field_shadow_events'; // [{fileId, events:[...]}] — changes pushed but not yet merged by desktop
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
 mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.3.0/mapbox-gl-rtl-text.js', null, true);
@@ -184,10 +185,13 @@ const fieldApp = (function () {
             if (!searchData.files || searchData.files.length === 0) { showToast("⚠️ לא נמצא קובץ נתונים"); setSyncStatus('error'); continueOffline(); return; }
             const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${searchData.files[0].id}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const textData = await dlRes.text();
-            try { 
-                db = JSON.parse(textData); if(!db.meta) db.meta = {}; storageSet(DATA_KEY, db); setSyncStatus('success'); 
+            try {
+                db = JSON.parse(textData); if(!db.meta) db.meta = {};
+                // הפעל שינויים ממתינים (שנדחפו לדרייב אבל המשרד טרם מיזג)
+                _applyShadowEvents();
+                storageSet(DATA_KEY, db); setSyncStatus('success');
                 document.getElementById('f-fab-wrapper').style.display = 'flex';
-                if(map) { renderMarkers(); renderTasks(); renderCommunity(); } 
+                if(map) { renderMarkers(); renderTasks(); renderCommunity(); }
                 checkForOfficeRoute();
                 // סריקת אנשי קשר אוטומטית (אחרי 3 שניות כדי שהאפליקציה תתייצב)
                 setTimeout(() => scanContacts(false), 3000);
@@ -195,7 +199,7 @@ const fieldApp = (function () {
         } catch (e) { setSyncStatus('offline'); continueOffline(); }
     }
 
-    // ── בדיקת קבצי outbox שסומנו כ-processed ומחיקתם ──
+    // ── בדיקת קבצי outbox שטופלו על ידי המשרד ומחיקת הצל המקומי ──
     async function cleanProcessedOutboxFiles() {
         if (!accessToken) return;
         const savedFileIds = storageGet('outbox_file_ids') || [];
@@ -204,20 +208,26 @@ const fieldApp = (function () {
         const toDelete = [];
         for (const entry of savedFileIds) {
             try {
-                const res = await fetch(
+                // קודם בדוק metadata בלבד (זול) — trashed/חסר
+                const metaRes = await fetch(
+                    `https://www.googleapis.com/drive/v3/files/${entry.fileId}?fields=id,trashed`,
+                    { headers: { Authorization: `Bearer ${accessToken}` } }
+                );
+                if (!metaRes.ok) { toDelete.push(entry.fileId); continue; } // 404 = נמחק
+                const meta = await metaRes.json();
+                if (meta.trashed) { toDelete.push(entry.fileId); continue; } // הועבר לאשפה
+
+                // קובץ עדיין קיים — הורד תוכן לבדיקת _processed
+                const contentRes = await fetch(
                     `https://www.googleapis.com/drive/v3/files/${entry.fileId}?alt=media`,
                     { headers: { Authorization: `Bearer ${accessToken}` } }
                 );
-                if (!res.ok) { toDelete.push(entry.fileId); continue; } // כבר נמחק
-                const content = await res.json();
+                if (!contentRes.ok) { toDelete.push(entry.fileId); continue; }
+                const content = await contentRes.json();
                 if (content._processed) {
-                    // המשרד סימן כעובד — מחק
-                    await fetch(`https://www.googleapis.com/drive/v3/files/${entry.fileId}`, {
-                        method: 'DELETE',
-                        headers: { Authorization: `Bearer ${accessToken}` }
-                    });
+                    // המשרד סימן כ"עובד" (טיפול חלקי) — אין צורך לשמור בצל
                     toDelete.push(entry.fileId);
-                    console.log(`[Outbox] קובץ ${entry.filename} עובד ונמחק`);
+                    console.log(`[Outbox] קובץ ${entry.filename} סומן processed`);
                 }
             } catch(e) { console.warn('[Outbox] clean error:', e); }
         }
@@ -225,12 +235,97 @@ const fieldApp = (function () {
         if (toDelete.length > 0) {
             const remaining = savedFileIds.filter(e => !toDelete.includes(e.fileId));
             storageSet('outbox_file_ids', remaining);
+
+            // נקה shadow events לקבצים שטופלו
+            const shadow = storageGet(SHADOW_KEY) || [];
+            const cleanedShadow = shadow.filter(e => !toDelete.includes(e.fileId));
+            storageSet(SHADOW_KEY, cleanedShadow);
+            console.log(`[Shadow] נוקו ${shadow.length - cleanedShadow.length} ערכים`);
+        }
+    }
+
+    // ── הפעל shadow events על db שנטען זה עתה מהשרת ──
+    // מבטיח שהשליח רואה את שינוייו שטרם מוזגו על ידי המשרד
+    function _applyShadowEvents() {
+        if (!db) return;
+        const shadow = storageGet(SHADOW_KEY) || [];
+        if (shadow.length === 0) return;
+        let count = 0;
+        shadow.forEach(entry => {
+            (entry.events || []).forEach(ev => { try { if (_applyOneShadowEvent(ev)) count++; } catch(e) {} });
+        });
+        if (count > 0) console.log(`[Shadow] הוחלו ${count} אירועים על db`);
+    }
+
+    function _applyOneShadowEvent(ev) {
+        if (!ev || !ev.type) return false;
+        const bldgData = ev.bldg ? db[ev.bldg] : null;
+        const ts = ev.timestamp || new Date().toISOString();
+        const dateHe = new Date(ts).toLocaleDateString('he-IL');
+
+        const _findApt = () => ev.aptName
+            ? bldgData?.apts?.find(a => a.name === ev.aptName)
+            : (typeof ev.aptIdx === 'number' ? bldgData?.apts?.[ev.aptIdx] : null);
+
+        const _dupInteraction = (apt, note) =>
+            (apt.interactions || []).some(i => (i.notes === note || i.text === note) && i.source === 'field' && Math.abs(new Date(i._ts || i.date) - new Date(ts)) < 120000);
+
+        switch (ev.type) {
+            case 'building_visit_log': {
+                if (!bldgData?.apts) return false;
+                const note = ev.payload?.note || ev.text || '';
+                (bldgData.apts).forEach(apt => {
+                    if (!apt.interactions) apt.interactions = [];
+                    if (!_dupInteraction(apt, note)) apt.interactions.push({ date: dateHe, type: 'ביקור', notes: note, source: 'field', _ts: ts });
+                });
+                return true;
+            }
+            case 'visit_log': {
+                const apt = _findApt(); if (!apt) return false;
+                if (!apt.interactions) apt.interactions = [];
+                const note = ev.payload?.note || ev.text || '';
+                if (!_dupInteraction(apt, note)) apt.interactions.push({ date: dateHe, type: ev.payload?.result || 'ביקור', notes: note, source: 'field', _ts: ts });
+                return true;
+            }
+            case 'add_family_task': {
+                const apt = _findApt(); if (!apt) return false;
+                if (!apt.tasks) apt.tasks = [];
+                const text = ev.payload?.taskText || '';
+                if (text && !apt.tasks.some(t => t.text === text)) apt.tasks.push({ text, date: ev.payload?.taskDate || '', done: false });
+                return true;
+            }
+            case 'task_done': {
+                const apt = _findApt(); if (!apt) return false;
+                const task = (apt.tasks || []).find(t => t.text === ev.payload?.taskText && !t.done);
+                if (task) { task.done = true; task.doneAt = ts; }
+                return true;
+            }
+            case 'edit_family': {
+                const apt = _findApt(); if (!apt || !ev.payload) return false;
+                const skip = ['tasks','interactions','history','donations','boards','tags','childrenList','customFields'];
+                Object.keys(ev.payload).forEach(k => { if (!skip.includes(k)) apt[k] = ev.payload[k]; });
+                return true;
+            }
+            case 'new_family':
+            case 'add_full_family': {
+                if (!ev.bldg || !ev.payload) return false;
+                if (!db[ev.bldg]) db[ev.bldg] = { info: { code:'', coords: ev.payload?.coords || null }, apts: [] };
+                if (!db[ev.bldg].apts.some(a => a.name === ev.payload.name)) db[ev.bldg].apts.push({ ...ev.payload });
+                return true;
+            }
+            case 'delete_family': {
+                if (!bldgData?.apts) return false;
+                const idx = ev.aptName ? bldgData.apts.findIndex(a => a.name === ev.aptName) : (typeof ev.aptIdx === 'number' ? ev.aptIdx : -1);
+                if (idx >= 0) bldgData.apts.splice(idx, 1);
+                return true;
+            }
+            default: return false;
         }
     }
 
     function continueOffline() {
         isOfflineMode = true; db = storageGet(DATA_KEY); setSyncStatus('offline');
-        if (db) { document.getElementById('f-login').style.display = 'none'; document.getElementById('f-fab-wrapper').style.display = 'flex'; bootMap(); startLocationTracking(); checkForOfficeRoute(); }
+        if (db) { _applyShadowEvents(); document.getElementById('f-login').style.display = 'none'; document.getElementById('f-fab-wrapper').style.display = 'flex'; bootMap(); startLocationTracking(); checkForOfficeRoute(); }
         else { showToast("❌ חובה חיבור רשת לאיפוס ראשוני"); showAuthScreen(); }
     }
 
@@ -290,6 +385,11 @@ const fieldApp = (function () {
                 // שמור רק 20 אחרונים
                 if (savedFileIds.length > 20) savedFileIds.splice(0, savedFileIds.length - 20);
                 storageSet('outbox_file_ids', savedFileIds);
+                // שמור shadow — שינויים אלה ישמשו לתצוגה עד שהמשרד ימזג
+                const shadow = storageGet(SHADOW_KEY) || [];
+                shadow.push({ fileId: created.id, events: outbox });
+                if (shadow.length > 20) shadow.splice(0, shadow.length - 20);
+                storageSet(SHADOW_KEY, shadow);
                 // נקה את ה-outbox רק אחרי שהשמירה הצליחה
                 storageSet(OUTBOX_KEY, []);
                 console.log(`[Outbox] שולח ${outbox.length} אירועים לדרייב → ${filename}`);
@@ -2267,13 +2367,15 @@ const fieldApp = (function () {
                     const d = calculateDistance(targetCoords, c); if (d < minDist) { minDist = d; targetBldg = bldg; }
                 });
                 if (targetBldg) {
+                    const ts = new Date().toISOString();
+                    const dateHe = new Date(ts).toLocaleDateString('he-IL');
                     (db[targetBldg].apts || []).forEach(apt => {
                         if (!apt.interactions) apt.interactions = [];
-                        apt.interactions.push({ date: new Date().toISOString(), text, source: 'field' });
+                        apt.interactions.push({ date: dateHe, type: 'ביקור', notes: text, source: 'field', _ts: ts });
                     });
                     storageSet(DATA_KEY, db);
                     const outbox = storageGet(OUTBOX_KEY) || [];
-                    outbox.push({ type: 'visit_log', bldg: targetBldg, text, timestamp: new Date().toISOString() });
+                    outbox.push({ type: 'building_visit_log', bldg: targetBldg, text, timestamp: ts, payload: { note: text, result: templateLabel } });
                     storageSet(OUTBOX_KEY, outbox);
                 }
             }

@@ -333,7 +333,8 @@ let _fieldUpdatesSessionHandled = false; // מניעת הצגה חוזרת בא�
 
 async function mergeOutboxUpdates() {
     if (!accessToken) return;
-    if (_fieldUpdatesSessionHandled) return;
+    // מאפשר טריגר ידני לעקוף את דגל הסשן
+    if (_fieldUpdatesSessionHandled && !window._fieldUpdatesManualTrigger) return;
     try {
         const q = encodeURIComponent("name contains 'mobile_update_' and trashed = false");
         const listRes = await fetch(
@@ -479,16 +480,19 @@ function getEventDisplayInfo(ev) {
         case 'contact_update': return { icon:'fa-address-book', color:'var(--success)', desc:`איש קשר עודכן — ${nameLabel}` };
         case 'new_family':
         case 'add_full_family':return { icon:'fa-user-plus', color:'var(--success)', desc:`משפחה חדשה — ${nameLabel}` };
-        case 'add_general_task': return { icon:'fa-thumbtack', color:'var(--warning)', desc:`משימה כללית חדשה` };
+        case 'add_general_task':    return { icon:'fa-thumbtack', color:'var(--warning)', desc:`משימה כללית חדשה` };
+        case 'building_visit_log':  return { icon:'fa-building', color:'var(--success)', desc:`ביקור בבניין — ${ev.bldg ? escapeHTML(ev.bldg) : ''}` };
         default:               return { icon:'fa-sync',    color:'var(--text-muted)', desc:`עדכון — ${nameLabel}` };
     }
 }
 
 function getEventDetails(ev) {
     let lines = [];
-    if (ev.type === 'visit_log' && ev.payload) {
-        if (ev.payload.note) lines.push(`📝 ${escapeHTML(ev.payload.note)}`);
-        if (ev.payload.result) lines.push(`תוצאה: ${escapeHTML(ev.payload.result)}`);
+    if ((ev.type === 'visit_log' || ev.type === 'building_visit_log') && (ev.payload || ev.text)) {
+        const note = ev.payload?.note || ev.text || '';
+        const result = ev.payload?.result || '';
+        if (note) lines.push(`📝 ${escapeHTML(note)}`);
+        if (result) lines.push(`תוצאה: ${escapeHTML(result)}`);
     }
     if (ev.type === 'edit_family' && ev.payload) {
         const fields = ['father','mother','fatherPhone','motherPhone','style','notes'];
@@ -550,17 +554,18 @@ window.applySelectedFieldUpdates = async function() {
         }
     });
 
-    // מחק מ-Drive קבצים שכל ה-events שלהם עובדו (נבחרו או היו כבר מעובדים)
-    const fullyAppliedFiles = pendingFieldUpdateFiles.filter(f => {
-        const fileEvents = allEvents.filter(ev => ev._fileId === f.fileId);
-        return fileEvents.every((ev, localIdx) => {
-            const globalIdx = allEvents.indexOf(ev);
-            return selectedIndices.has(globalIdx);
-        });
-    });
-
-    for (const file of fullyAppliedFiles) {
-        await trashDriveFile(file.fileId);
+    // מחק / סמן קבצים לפי מידת הטיפול
+    for (const file of pendingFieldUpdateFiles) {
+        const fileEvents = allEvents.filter(ev => ev._fileId === file.fileId);
+        const selectedCount = fileEvents.filter(ev => selectedIndices.has(allEvents.indexOf(ev))).length;
+        if (selectedCount === 0) continue; // לא נבחר כלום — אל תגע
+        if (selectedCount === fileEvents.length) {
+            // טיפול מלא — מחק
+            await trashDriveFile(file.fileId);
+        } else {
+            // טיפול חלקי — סמן _processed כדי שהאפליקציה תדע לנקות shadow
+            await _patchDriveFileProcessed(file.fileId);
+        }
     }
 
     // נקה appliedEventIds ישנים (מעל 30 יום) כדי לא לתפוח
@@ -606,13 +611,28 @@ window.dismissFieldUpdates = async function() {
 
 async function trashDriveFile(fileId) {
     try {
-        // drive.file scope allows trashing files the app created
         await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
             method: 'PATCH',
             headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ trashed: true })
         });
     } catch(e) { console.error('trashDriveFile error:', e); }
+}
+
+// סמן קובץ outbox כ-_processed (טיפול חלקי) — האפליקציה תנקה shadow בסנכרון הבא
+async function _patchDriveFileProcessed(fileId) {
+    try {
+        const getRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!getRes.ok) return;
+        const content = await getRes.json();
+        content._processed = true;
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(content)
+        });
+        console.log('[Drive] קובץ outbox סומן _processed:', fileId);
+    } catch(e) { console.warn('_patchDriveFileProcessed error:', e); }
 }
 
 /**
@@ -640,6 +660,23 @@ function applyOutboxEvent(ev) {
             text: ev.payload?.text || '',
             date: ev.payload?.date || '',
             done: false
+        });
+        return true;
+    }
+
+    // ── building_visit_log: ביקור ברמת בניין (דיבריף מאפליקציית השטח) ──
+    if (ev.type === 'building_visit_log') {
+        if (!ev.bldg) return false;
+        const bldgData = db[ev.bldg];
+        if (!bldgData?.apts) return false;
+        const ts = ev.timestamp || new Date().toISOString();
+        const dateHe = new Date(ts).toLocaleDateString('he-IL');
+        const note = ev.payload?.note || ev.text || '';
+        const result = ev.payload?.result || '';
+        bldgData.apts.forEach(apt => {
+            if (!apt.interactions) apt.interactions = [];
+            apt.interactions.push({ date: dateHe, type: 'ביקור', notes: escapeHTML(note), result, source: 'field' });
+            apt.updatedAt = Date.now();
         });
         return true;
     }
