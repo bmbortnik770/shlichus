@@ -22,6 +22,7 @@ const fieldApp = (function () {
     let accessToken = null, isOfflineMode = false, currentTarget = null;
     let watchId = null, fabIsOpen = false, isDark = false, tokenClient = null;
     let isMissionActive = false, pressTimer = null, isDraggingMap = false;
+    let isSyncing = false;
     let recognition = null, isRecording = false;
     let pendingAutoTaskContext = null, editingFamilyContext = null; 
     let selectedCoords = null; 
@@ -347,6 +348,7 @@ const fieldApp = (function () {
         if (!accessToken) return;
         const outbox = storageGet(OUTBOX_KEY) || [];
         if (outbox.length === 0) return;
+        if (outbox.length > 100) showToast(`⚠️ ${outbox.length} עדכונים ממתינים — בדוק חיבור לרשת`);
 
         setSyncStatus('syncing');
         const ts = Date.now();
@@ -402,11 +404,17 @@ const fieldApp = (function () {
     }
     async function forceSync(event) {
         if (event) event.stopPropagation();
+        if (isSyncing) { showToast('סנכרון כבר רץ...'); return; }
         if (!navigator.onLine) { showToast("אין חיבור רשת"); setSyncStatus('offline'); return; }
         if (!accessToken) { login(); return; }
+        isSyncing = true;
         setSyncStatus('syncing');
-        await pushOutboxToDrive();
-        await loadDataFromDrive();
+        try {
+            await pushOutboxToDrive();
+            await loadDataFromDrive();
+        } finally {
+            isSyncing = false;
+        }
     }
 
     // ==========================================
@@ -918,8 +926,19 @@ const fieldApp = (function () {
         fam.notes = document.getElementById('ffc-notes').value.trim();
         fam.updatedAt = Date.now();
         storageSet(DATA_KEY, db);
+        // שלח רק את השדות שנערכו בטופס זה — לא snapshot מלא
+        const _editPayload = {
+            name: fam.name, num: fam.num,
+            father: fam.father, fatherName: fam.fatherName,
+            mother: fam.mother, motherName: fam.motherName,
+            fatherPhone: fam.fatherPhone, motherPhone: fam.motherPhone,
+            fatherEmail: fam.fatherEmail, motherEmail: fam.motherEmail,
+            style: fam.style, notes: fam.notes,
+            childrenList: fam.childrenList || [],
+        };
+        if (fam.style === 'מעורב') { _editPayload.fatherStyle = fam.fatherStyle; _editPayload.motherStyle = fam.motherStyle; }
         const outbox = storageGet(OUTBOX_KEY) || [];
-        outbox.push({ type: 'edit_family', bldg, aptName: originalName, timestamp: new Date().toISOString(), payload: fam });
+        outbox.push({ type: 'edit_family', bldg, aptName: originalName, timestamp: new Date().toISOString(), payload: _editPayload });
         storageSet(OUTBOX_KEY, outbox);
         pushOutboxToDrive().catch(e => console.warn('[Outbox] push error:', e));
         showToast('✅ הפרטים נשמרו!');
@@ -949,7 +968,13 @@ const fieldApp = (function () {
         if (!val) return;
         const fam = db[bldg].apts[aptIdx];
         if (!fam.tags) fam.tags = [];
-        if (!fam.tags.includes(val)) fam.tags.push(val);
+        if (!fam.tags.includes(val)) {
+            fam.tags.push(val);
+            const outbox = storageGet(OUTBOX_KEY) || [];
+            outbox.push({ type: 'tag_add', bldg, aptName: fam.name, tag: val, timestamp: new Date().toISOString() });
+            storageSet(OUTBOX_KEY, outbox);
+            pushOutboxToDrive().catch(e => console.warn('[Outbox] tag_add error:', e));
+        }
         storageSet(DATA_KEY, db);
         _ffcRender(bldgEnc, aptIdx, 'details');
     }
@@ -1001,11 +1026,15 @@ const fieldApp = (function () {
 
     function _ffcToggleTask(bldgEnc, aptIdx, taskIdx, done) {
         const bldg = decodeURIComponent(bldgEnc);
-        db[bldg].apts[aptIdx].tasks[taskIdx].done = done;
+        const apt = db[bldg].apts[aptIdx];
+        if (!apt?.tasks?.[taskIdx]) return;
+        apt.tasks[taskIdx].done = done;
         storageSet(DATA_KEY, db);
         const outbox = storageGet(OUTBOX_KEY) || [];
-        outbox.push({ type: done ? 'task_done' : 'task_undone', bldg, aptIdx, taskIdx, timestamp: new Date().toISOString() });
+        outbox.push({ type: done ? 'task_done' : 'task_undone', bldg, aptIdx, taskIdx, aptName: apt.name, payload: { taskText: apt.tasks[taskIdx].text }, timestamp: new Date().toISOString() });
         storageSet(OUTBOX_KEY, outbox);
+        pushOutboxToDrive().catch(e => console.warn('[Outbox] task toggle error:', e));
+        renderTasks();
         _ffcRender(bldgEnc, aptIdx, 'tasks');
     }
 
@@ -2437,6 +2466,7 @@ const fieldApp = (function () {
                     const outbox = storageGet(OUTBOX_KEY) || [];
                     outbox.push({ type: 'building_visit_log', bldg: targetBldg, text, timestamp: ts, payload: { note: text, result: templateLabel } });
                     storageSet(OUTBOX_KEY, outbox);
+                    pushOutboxToDrive().catch(e => console.warn('[Outbox] debrief push error:', e));
                 }
             }
             showToast('✅ תיעוד נשמר!');

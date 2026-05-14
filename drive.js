@@ -482,6 +482,7 @@ function getEventDisplayInfo(ev) {
         case 'add_full_family':return { icon:'fa-user-plus', color:'var(--success)', desc:`משפחה חדשה — ${nameLabel}` };
         case 'add_general_task':    return { icon:'fa-thumbtack', color:'var(--warning)', desc:`משימה כללית חדשה` };
         case 'building_visit_log':  return { icon:'fa-building', color:'var(--success)', desc:`ביקור בבניין — ${ev.bldg ? escapeHTML(ev.bldg) : ''}` };
+        case 'tag_add':             return { icon:'fa-tag',     color:'var(--warning)', desc:`תג נוסף: "${ev.tag || ''}" — ${nameLabel}` };
         default:               return { icon:'fa-sync',    color:'var(--text-muted)', desc:`עדכון — ${nameLabel}` };
     }
 }
@@ -639,7 +640,7 @@ async function _patchDriveFileProcessed(fileId) {
  * מחיל event בודד מאפליקציית השטח על ה-db.
  * סכמת event:
  * {
- *   type: 'task_done' | 'task_undone' | 'visit_log' | 'call_log' | 'stage_change' | 'quick_status' | 'edit_family' | 'delete_family' | 'add_family_task' | 'contact_update' | 'new_family',
+ *   type: 'task_done' | 'task_undone' | 'visit_log' | 'call_log' | 'stage_change' | 'quick_status' | 'edit_family' | 'delete_family' | 'add_family_task' | 'contact_update' | 'new_family' | 'tag_add' | 'building_visit_log',
  *   bldg: <מפתח הבניין>,
  *   aptName: <שם המשפחה>,
  *   aptNum: <מספר דירה> (אופציונלי),
@@ -724,12 +725,15 @@ function applyOutboxEvent(ev) {
 
     switch (ev.type) {
         case 'task_done': {
-            const task = (apt.tasks || []).find(t => t.text === ev.payload?.taskText && !t.done);
+            // נסה לפי אינדקס קודם, אז לפי טקסט
+            let task = typeof ev.taskIdx === 'number' ? (apt.tasks || [])[ev.taskIdx] : null;
+            if (!task) task = (apt.tasks || []).find(t => t.text === ev.payload?.taskText && !t.done);
             if (task) { task.done = true; task.doneAt = ts; }
             break;
         }
         case 'task_undone': {
-            const task = typeof ev.taskIdx === 'number' ? (apt.tasks || [])[ev.taskIdx] : null;
+            let task = typeof ev.taskIdx === 'number' ? (apt.tasks || [])[ev.taskIdx] : null;
+            if (!task) task = (apt.tasks || []).find(t => t.text === ev.payload?.taskText && t.done);
             if (task) { task.done = false; delete task.doneAt; }
             break;
         }
@@ -788,6 +792,11 @@ function applyOutboxEvent(ev) {
                     }
                 });
             }
+            break;
+        }
+        case 'tag_add': {
+            if (!apt.tags) apt.tags = [];
+            if (ev.tag && !apt.tags.includes(ev.tag)) apt.tags.push(ev.tag);
             break;
         }
         case 'contact_update': {
