@@ -2890,26 +2890,50 @@ const fieldApp = (function () {
     // מיקרו-טופס הוספת משימה מהירה
     // ==========================================
     let _taskVoiceRec = null;
+    let _qtSelectedFamily = null; // { bldg, aptIdx }
 
     function openQuickTaskForm() {
         closeOverlays();
-
+        _qtSelectedFamily = null;
         const todayVal = new Date().toISOString().split('T')[0];
 
         const html = `
             <button class="sheet-close-btn" onclick="fieldApp.closeOverlays()"><i class="fas fa-times"></i></button>
-            <div class="quick-form-header" style="padding-right:36px; margin-bottom:14px;">
-                <h3 style="margin:0; font-size:19px;"><i class="fas fa-tasks" style="color:var(--warning); margin-left:8px;"></i>משימה חדשה</h3>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-right:36px;">
+                <h3 style="margin:0;font-size:19px;"><i class="fas fa-tasks" style="color:var(--warning);margin-left:8px;"></i>משימה חדשה</h3>
             </div>
             <div class="quick-form-body">
                 <div class="smart-chips-container" id="q-task-smart-chips"></div>
-                <div class="f-input-wrapper" style="margin-bottom:10px;">
-                    <input type="text" id="q-task-title" class="f-input" placeholder="מה צריך לעשות?" style="padding-right:14px;">
+
+                <!-- כותרת + מיקרופון -->
+                <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px;">
+                    <div class="f-input-wrapper" style="flex:1;margin-bottom:0;">
+                        <input type="text" id="q-task-title" class="f-input" placeholder="מה צריך לעשות?" style="padding-right:14px;">
+                    </div>
+                    <button id="btn-task-mic" class="btn-mic" onclick="fieldApp.startTaskVoiceDictation()" title="הקלטה קולית" style="flex-shrink:0;">
+                        <i class="fas fa-microphone"></i>
+                    </button>
                 </div>
+
+                <!-- תאריך -->
                 <div class="f-input-wrapper" style="margin-bottom:14px;">
                     <i class="fas fa-calendar-alt"></i>
                     <input type="date" id="q-task-date" class="f-input" value="${todayVal}">
                 </div>
+
+                <!-- שיוך למשפחה -->
+                <div style="margin-bottom:14px;">
+                    <div class="fab-sheet-section-title" style="margin-bottom:8px;"><i class="fas fa-users"></i> שייך למשפחה</div>
+                    <div style="position:relative;margin-bottom:8px;">
+                        <i class="fas fa-search" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:14px;pointer-events:none;z-index:1;"></i>
+                        <input id="qt-fam-search" class="f-input" placeholder="חיפוש לפי שם, כתובת..."
+                            style="padding-right:36px;" oninput="fieldApp._qtFamSearch(this.value)" autocomplete="off">
+                    </div>
+                    <div id="qt-fam-list" style="display:flex;flex-direction:column;gap:5px;max-height:30vh;overflow-y:auto;">
+                        ${_qtBuildFamList('')}
+                    </div>
+                </div>
+
                 <button class="btn-save-quick" onclick="fieldApp.saveQuickTask()">
                     שמור משימה <i class="fas fa-check"></i>
                 </button>
@@ -2921,6 +2945,67 @@ const fieldApp = (function () {
             renderSmartChips();
             document.getElementById('q-task-title')?.focus();
         }, 300);
+    }
+
+    function _qtBuildFamList(query) {
+        const q = query.trim().toLowerCase();
+        const rows = [];
+        Object.keys(db || {}).forEach(bldg => {
+            if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+            const bldgCoords = db[bldg]?.info?.coords;
+            (db[bldg]?.apts || []).forEach((apt, idx) => {
+                const txt = `${apt.name||''} ${apt.father||''} ${apt.mother||''} ${bldg}`.toLowerCase();
+                if (q && !txt.includes(q)) return;
+                const dist = (userPosition && bldgCoords && !isNaN(bldgCoords[0]))
+                    ? calculateDistance(userPosition, bldgCoords) : Infinity;
+                rows.push({ bldg, idx, apt, dist });
+            });
+        });
+        rows.sort((a, b) => a.dist - b.dist);
+
+        const noAssign = `<div id="qt-fam-none" onclick="fieldApp._qtSelectFam(null)"
+            style="background:var(--bg-body);border:1px solid var(--border-light);border-radius:10px;padding:9px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-muted);font-weight:600;transition:background 0.1s;">
+            <i class="fas fa-ban" style="color:var(--danger);opacity:0.5;"></i> ללא שיוך למשפחה
+        </div>`;
+
+        if (!rows.length) return noAssign + `<div style="text-align:center;padding:10px;color:var(--text-muted);font-size:13px;">לא נמצאו משפחות</div>`;
+
+        return noAssign + rows.slice(0, 15).map(r => {
+            const be = encodeURIComponent(r.bldg);
+            const distBadge = r.dist < Infinity
+                ? `<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${r.dist < 1000 ? Math.round(r.dist)+"מ'" : (r.dist/1000).toFixed(1)+"ק\"מ"}</span>`
+                : '';
+            return `<div id="qt-fam-${be}-${r.idx}" onclick="fieldApp._qtSelectFam('${be}',${r.idx})"
+                style="background:var(--bg-body);border:1px solid var(--border-light);border-radius:10px;padding:9px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background 0.1s;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:13px;color:var(--text-main);">משפחת ${escapeHTML(r.apt.name||'ללא שם')}</div>
+                    <div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg)}</div>
+                </div>
+                ${distBadge}
+            </div>`;
+        }).join('');
+    }
+
+    function _qtFamSearch(query) {
+        const container = document.getElementById('qt-fam-list');
+        if (container) container.innerHTML = _qtBuildFamList(query);
+    }
+
+    function _qtSelectFam(bldgEnc, aptIdx) {
+        // נקה סלקציה קודמת
+        document.querySelectorAll('#qt-fam-list > div').forEach(el => {
+            el.style.background = 'var(--bg-body)';
+            el.style.borderColor = 'var(--border-light)';
+        });
+        if (!bldgEnc) {
+            _qtSelectedFamily = null;
+            const el = document.getElementById('qt-fam-none');
+            if (el) { el.style.background = 'rgba(239,68,68,0.06)'; el.style.borderColor = 'rgba(239,68,68,0.3)'; }
+            return;
+        }
+        _qtSelectedFamily = { bldg: decodeURIComponent(bldgEnc), aptIdx };
+        const el = document.getElementById(`qt-fam-${bldgEnc}-${aptIdx}`);
+        if (el) { el.style.background = 'rgba(37,99,235,0.08)'; el.style.borderColor = 'var(--accent)'; }
     }
 
     function closeQuickTaskForm() {
@@ -3027,8 +3112,8 @@ const fieldApp = (function () {
     }
 
     function saveQuickTask() {
-        const title = document.getElementById('q-task-title').value.trim();
-        const date  = document.getElementById('q-task-date').value;
+        const title = document.getElementById('q-task-title')?.value?.trim();
+        const date  = document.getElementById('q-task-date')?.value;
 
         if (!title) { showToast('⚠️ יש להזין תיאור למשימה'); return; }
 
@@ -3036,21 +3121,29 @@ const fieldApp = (function () {
             ? new Date(date).toLocaleDateString('he-IL')
             : new Date().toLocaleDateString('he-IL');
 
-        const newTask = { text: title, date: dateFormatted, done: false };
-
-        // שמור כמשימה כללית במסד
-        if (!db.meta) db.meta = {};
-        if (!db.meta.generalTasks) db.meta.generalTasks = [];
-        db.meta.generalTasks.push(newTask);
-
         const outbox = storageGet(OUTBOX_KEY) || [];
-        outbox.push({ type: 'add_general_task', timestamp: new Date().toISOString(), payload: { text: title, date: dateFormatted } });
+
+        if (_qtSelectedFamily) {
+            const { bldg, aptIdx } = _qtSelectedFamily;
+            const apt = db[bldg]?.apts?.[aptIdx];
+            if (!apt) { showToast('שגיאה: משפחה לא נמצאה'); return; }
+            if (!apt.tasks) apt.tasks = [];
+            apt.tasks.push({ text: title, date: dateFormatted, done: false });
+            outbox.push({ type: 'add_family_task', bldg, aptName: apt.name, timestamp: new Date().toISOString(), payload: { taskText: title, taskDate: dateFormatted } });
+            showToast(`✅ משימה שויכה למשפחת ${escapeHTML(apt.name||'')} — ${title}`);
+        } else {
+            if (!db.meta) db.meta = {};
+            if (!db.meta.generalTasks) db.meta.generalTasks = [];
+            db.meta.generalTasks.push({ text: title, date: dateFormatted, done: false });
+            outbox.push({ type: 'add_general_task', timestamp: new Date().toISOString(), payload: { text: title, date: dateFormatted } });
+            showToast(`✅ משימה כללית נשמרה: ${title}`);
+        }
+
         storageSet(DATA_KEY, db);
         storageSet(OUTBOX_KEY, outbox);
-
+        pushOutboxToDrive().catch(e => console.warn('[QT] push error:', e));
         closeQuickTaskForm();
         renderTasks();
-        showToast(`✅ משימה נשמרה: ${title}`);
         if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
     }
 
@@ -4306,6 +4399,7 @@ const fieldApp = (function () {
         toggleRouteSheet, addStopToRoute, removeStopFromRoute, renderRouteSheet, startActiveRoute, stopActiveRoute, renderActiveStop, openWaze, markStopDone,
         openQuickFamilyForm, closeQuickFamilyForm, expandToFullFamilyForm, saveQuickFamily,
         openQuickTaskForm, closeQuickTaskForm, expandToFullTaskForm, renderSmartChips, _selectChip, startTaskVoiceDictation, saveQuickTask,
+        _qtBuildFamList, _qtFamSearch, _qtSelectFam,
         // *** פונקציות חדשות חשופות ***
         openFullImage, openFullFamilyCard, _ffcTab, _ffcRender, closeFFCSheet,
         handleCommTouchStart, handleCommTouchMove, handleCommTouchEnd,
