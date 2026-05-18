@@ -73,13 +73,21 @@ function _entryHtml(e) {
     if (e.type === 'log') {
         const info = typeof getITypeInfo === 'function' ? getITypeInfo(e.data.interactionType || e.data.type) : { icon: 'fa-history', color: '#3b82f6' };
         const memberBadge = e.data.member ? `<span style="font-size:10px;background:var(--accent-light);color:var(--accent);padding:1px 5px;border-radius:8px;">${safe(e.data.member)}</span>` : '';
+        const thread = e.data.thread;
+        const threadBtn = (thread && thread.length > 0)
+            ? `<button class="unif-thread-btn" onclick="event.stopPropagation();_tlShowThread(${e.idx})" title="הצג שרשור">
+                <i class="fab fa-whatsapp"></i> ${thread.length} הודעות
+               </button>`
+            : '';
+        const notesText = e.data.notes || e.data.text || '';
         return `<div class="unif-entry" data-type="log" data-idx="${e.idx}">
             <div class="unif-entry-icon" style="background:${info.color}18;">
                 <i class="fas ${info.icon}" style="color:${info.color};"></i>
             </div>
             <div class="unif-entry-body">
-                <div class="unif-entry-title">${safe(info.label)} ${memberBadge}</div>
-                ${e.data.text ? `<div class="unif-entry-sub">${safe(e.data.text)}</div>` : ''}
+                <div class="unif-entry-title">${safe(info.label || e.data.type)} ${memberBadge}</div>
+                ${notesText ? `<div class="unif-entry-sub">${safe(notesText.slice(0, 80))}${notesText.length > 80 ? '…' : ''}</div>` : ''}
+                ${threadBtn}
             </div>
             <div class="unif-entry-date">${_fmtDate(e.date)}</div>
             <div class="unif-entry-actions">
@@ -500,6 +508,70 @@ window.addLifecycleEvent = function () {
     _origAddLifecycle && _origAddLifecycle.apply(this, arguments);
     const isActive = document.getElementById('crm-activity')?.classList.contains('active');
     if (isActive) renderFamilyActivityTab();
+};
+
+// ── WhatsApp thread popup ─────────────────────────────────────
+window._tlShowThread = function (idx) {
+    const log = (typeof tempLogs !== 'undefined') ? tempLogs[idx] : null;
+    if (!log || !log.thread || !log.thread.length) return;
+
+    const safe = s => (typeof escapeHTML === 'function' ? escapeHTML(s || '') : (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+
+    const msgs = log.thread.map(m => {
+        const isContact = m.from !== 'me';
+        const time = m.ts ? (() => { try { return new Date(m.ts).toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' }); } catch(e) { return ''; } })() : '';
+        return `<div class="wa-thread-msg ${isContact ? 'wa-msg-in' : 'wa-msg-out'}">
+            <div class="wa-msg-bubble">${safe(m.text)}</div>
+            ${time ? `<div class="wa-msg-time">${time}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const date = log.date ? (() => { try { return new Date(log.date).toLocaleDateString('he-IL', { weekday:'long', day:'numeric', month:'long' }); } catch(e) { return log.date; } })() : '';
+
+    // Remove existing popup
+    document.getElementById('wa-thread-modal')?.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'wa-thread-modal';
+    modal.innerHTML = `
+        <div class="wa-thread-overlay" onclick="document.getElementById('wa-thread-modal').remove()"></div>
+        <div class="wa-thread-panel" dir="rtl">
+            <div class="wa-thread-header">
+                <i class="fab fa-whatsapp" style="color:#25d366;font-size:18px;"></i>
+                <div style="flex:1;">
+                    <div style="font-weight:700;font-size:14px;">${safe(log.type || 'וואטסאפ')}</div>
+                    ${date ? `<div style="font-size:11px;opacity:.6;">${date}</div>` : ''}
+                </div>
+                <button onclick="document.getElementById('wa-thread-modal').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:inherit;padding:4px;">✕</button>
+            </div>
+            <div class="wa-thread-body">${msgs}</div>
+            ${log.notes ? `<div class="wa-thread-summary"><i class="fas fa-robot" style="color:var(--accent);margin-left:4px;"></i> <strong>סיכום AI:</strong> ${safe(log.notes)}</div>` : ''}
+        </div>`;
+
+    // Inject CSS once
+    if (!document.getElementById('wa-thread-style')) {
+        const style = document.createElement('style');
+        style.id = 'wa-thread-style';
+        style.textContent = `
+        .unif-thread-btn{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:2px 8px;border-radius:12px;background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.3);font-size:11px;font-weight:600;cursor:pointer;transition:background .15s;}
+        .unif-thread-btn:hover{background:rgba(37,211,102,.22);}
+        #wa-thread-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:flex-end;justify-content:center;}
+        .wa-thread-overlay{position:absolute;inset:0;background:rgba(0,0,0,.45);}
+        .wa-thread-panel{position:relative;width:100%;max-width:480px;max-height:75vh;background:var(--surface,#fff);border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 32px rgba(0,0,0,.18);}
+        .wa-thread-header{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border-light,#e5e7eb);flex-shrink:0;}
+        .wa-thread-body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:6px;background:#e5ddd5;}
+        .wa-msg-in{align-self:flex-start;max-width:80%;}
+        .wa-msg-out{align-self:flex-end;max-width:80%;}
+        .wa-msg-bubble{padding:7px 10px;border-radius:10px;font-size:13px;line-height:1.4;word-break:break-word;}
+        .wa-msg-in .wa-msg-bubble{background:#fff;border-radius:0 10px 10px 10px;}
+        .wa-msg-out .wa-msg-bubble{background:#d9fdd3;border-radius:10px 0 10px 10px;}
+        .wa-msg-time{font-size:10px;color:#8696a0;text-align:left;margin-top:2px;padding:0 4px;}
+        .wa-thread-summary{padding:10px 14px;background:var(--accent-light,rgba(0,200,150,.08));border-top:1px solid var(--border-light,#e5e7eb);font-size:12px;color:var(--text-main,#222);flex-shrink:0;}
+        `;
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(modal);
 };
 
 })();
