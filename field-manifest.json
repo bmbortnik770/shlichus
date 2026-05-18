@@ -1,24 +1,39 @@
 {
+  "id": "/shlichus/field.html",
   "name": "שליחות CRM - שטח",
   "short_name": "שליחות",
   "description": "מערכת ניהול לשליחי חב\"ד בשטח",
   "start_url": "/shlichus/field.html",
   "display": "standalone",
-  "background_color": "#f8fafc",
+  "background_color": "#1a2744",
   "theme_color": "#1a2744",
   "orientation": "portrait",
   "scope": "/shlichus/",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/shlichus/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/shlichus/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/shlichus/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/shlichus/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
