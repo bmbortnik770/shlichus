@@ -1,14 +1,14 @@
 // *** עדכן את המספר הזה בכל פעם שמעלים גרסה חדשה ***
-const CACHE_VERSION = 'v34';
+const CACHE_VERSION = 'v35';
 const CACHE_NAME = 'field-app-cache-' + CACHE_VERSION;
 
 const ASSETS_TO_CACHE = [
   '/shlichus/field.html',
   '/shlichus/field-manifest.json',
-  '/shlichus/assets/index-B8c7wQYb.js',
+  '/shlichus/assets/index-CbOQQQyy.js',
   '/shlichus/assets/vendor-C8w-UNLI.js',
   '/shlichus/assets/mapbox-D1pTBA1i.js',
-  '/shlichus/assets/index-Cd550mWI.css',
+  '/shlichus/assets/index-BEz5C5g0.css',
   '/shlichus/770.jpg',
   '/shlichus/icon-192.png',
   '/shlichus/icon-512.png',
