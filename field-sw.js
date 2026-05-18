@@ -1,13 +1,17 @@
 // *** עדכן את המספר הזה בכל פעם שמעלים גרסה חדשה ***
-const CACHE_VERSION = 'v29';
+const CACHE_VERSION = 'v30';
 const CACHE_NAME = 'field-app-cache-' + CACHE_VERSION;
 
 const ASSETS_TO_CACHE = [
-  './field.html',
-  './field-style.css',
-  './field-app.js',
-  './field-manifest.json',
-  './favicon.ico'
+  '/shlichus/field.html',
+  '/shlichus/field-manifest.json',
+  '/shlichus/assets/index-DlXss5-1.js',
+  '/shlichus/assets/vendor-C8w-UNLI.js',
+  '/shlichus/assets/mapbox-D1pTBA1i.js',
+  '/shlichus/assets/index-BgLOdPlZ.css',
+  '/shlichus/770.jpg',
+  '/shlichus/icon-192.png',
+  '/shlichus/icon-512.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -59,7 +63,7 @@ self.addEventListener('fetch', (event) => {
         });
       });
     }).catch(() => {
-      if (event.request.mode === 'navigate') return caches.match('./field.html');
+      if (event.request.mode === 'navigate') return caches.match('/shlichus/field.html');
     })
   );
 });
