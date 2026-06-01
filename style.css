@@ -1278,3 +1278,63 @@ body.dark-mode .dfab-label { background: var(--surface-2); color: var(--text-mai
     transition: background 0.1s;
 }
 .conv-doc-card-header:hover { background: var(--table-hover); }
+
+/* ══ POI Suggestion Cards ══ */
+.poi-sug-card {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: box-shadow .15s;
+}
+.poi-sug-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.poi-sug-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px 6px;
+}
+.poi-sug-icon { font-size: 20px; flex-shrink: 0; line-height: 1; margin-top: 1px; }
+.poi-sug-title { flex: 1; min-width: 0; }
+.poi-sug-name { font-weight: 700; font-size: 13px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.poi-sug-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; margin-top: 3px; }
+.poi-gmaps-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border-light);
+    color: var(--text-muted); text-decoration: none; flex-shrink: 0;
+    transition: background .12s, color .12s;
+}
+.poi-gmaps-btn:hover { background: #4285f4; color: white; border-color: #4285f4; }
+.poi-sug-details { padding: 0 12px 6px; display: flex; flex-direction: column; gap: 3px; }
+.poi-sug-detail { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+.poi-sug-detail i { width: 12px; text-align: center; flex-shrink: 0; color: var(--text-hint); }
+.poi-sug-match {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
+    background: var(--bg-body);
+    border-top: 1px solid var(--border-light);
+}
+.poi-sug-actions {
+    display: flex; gap: 6px; padding: 8px 10px;
+    background: var(--bg-body);
+    border-top: 1px solid var(--border-light);
+}
+.poi-btn-approve {
+    flex: 1; padding: 7px 10px; border: none; border-radius: 8px;
+    background: #10b981; color: white; font-size: 12px; font-weight: 700;
+    cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: background .12s;
+}
+.poi-btn-approve:hover { background: #059669; }
+.poi-btn-reassign {
+    padding: 7px 10px; border: 1px solid var(--border-light); border-radius: 8px;
+    background: transparent; color: var(--text-muted); font-size: 12px;
+    cursor: pointer; font-family: inherit; transition: background .12s, color .12s;
+}
+.poi-btn-reassign:hover { background: #6366f1; color: white; border-color: #6366f1; }
+.poi-btn-skip {
+    padding: 7px 10px; border: 1px solid var(--border-light); border-radius: 8px;
+    background: transparent; color: var(--text-muted); font-size: 12px;
+    cursor: pointer; font-family: inherit; transition: background .12s, color .12s;
+}
+.poi-btn-skip:hover { background: #ef4444; color: white; border-color: #ef4444; }

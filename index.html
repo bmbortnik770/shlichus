@@ -976,6 +976,26 @@ function toggleDrivePanel() {
 
             <!-- ── לשונית סיווג ── -->
             <div id="tmPanel-classify" style="display:none;">
+                <!-- זיהוי אוטומטי מ-OSM -->
+                <div style="margin-bottom:14px;">
+                    <button onclick="window.tmScanPOIs()" id="tmScanPOIsBtn" class="btn btn-success" style="width:100%; padding:10px; font-size:13px; font-weight:700;">
+                        <i class="fas fa-magic"></i> זיהוי אוטומטי מ-OpenStreetMap
+                    </button>
+                    <div id="tmPOIScanStatus" style="font-size:11px; color:var(--text-muted); text-align:center; margin-top:6px; display:none;"></div>
+                </div>
+
+                <!-- הצעות POI -->
+                <div id="tmPOISuggestionsWrap" style="display:none; margin-bottom:14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <div style="font-weight:700; font-size:12px; color:var(--text-main);">
+                            <i class="fas fa-lightbulb" style="color:#f59e0b;"></i>
+                            הצעות זיהוי (<span id="tmPOIPendingCount">0</span>)
+                        </div>
+                        <button onclick="window.tmSkipAllPOIs()" style="font-size:11px; color:var(--text-muted); background:none; border:none; cursor:pointer; font-family:inherit;">דלג על הכל</button>
+                    </div>
+                    <div id="tmPOISuggestionsList" style="display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto;"></div>
+                </div>
+
                 <!-- סיכום קטגוריות -->
                 <div id="tmClassifySummary" style="margin-bottom:14px;"></div>
 

@@ -1085,6 +1085,21 @@ function tmHandleClassifyClick(e) {
     if (!features.length) return;
     const f = features[0];
     const key = tmBuildingKey(f);
+
+    // מצב שיוך מחדש של POI — בחירת בניין עבור הצעה ממתינה
+    if (_tmReassignPoiIdx !== null) {
+        const poi = _tmPOISuggestions[_tmReassignPoiIdx];
+        if (poi) {
+            poi.matchedBldgKey = key;
+            _tmApplyPOIToBuilding(poi, key);
+            poi.status = 'approved';
+        }
+        _tmReassignPoiIdx = null;
+        window.tmCancelReassign();
+        tmRenderPOISuggestions();
+        tmRenderClassifySummary();
+        return;
+    }
     const center = tmBuildingCenter(f);
     const currentEntry = tmBuildingClassify[key];
     const currentCat = currentEntry?.catId || 'residential';
@@ -1208,6 +1223,248 @@ function tmRenderClassifySummary() {
         `).join('')}
     </div>`;
 }
+
+// ══════════════════════════════════════════════════════════════════
+// OSM POI AUTO-DETECTION — זיהוי מקומות ציבוריים אוטומטי
+// ══════════════════════════════════════════════════════════════════
+
+let _tmPOISuggestions = [];
+let _tmReassignPoiIdx = null;
+
+const _POI_EMOJI = { synagogue:'🕍', education:'📚', medical:'🏥', business:'🏪', offices:'🏢' };
+
+function _osmToCatId(tags) {
+    const a = tags.amenity || '';
+    if (a === 'place_of_worship') return 'synagogue';
+    if (['school','university','college','kindergarten'].includes(a)) return 'education';
+    if (['clinic','hospital','pharmacy','doctors','dentist'].includes(a)) return 'medical';
+    if (tags.shop) return 'business';
+    if (tags.office) return 'offices';
+    if (['bank','restaurant','cafe','fast_food','bar'].includes(a)) return 'business';
+    return 'business';
+}
+
+function _osmGetName(tags) {
+    return tags['name:he'] || tags.name || tags['name:en'] || '';
+}
+
+function _osmGetAddress(tags) {
+    return [tags['addr:street'] || '', tags['addr:housenumber'] || ''].filter(Boolean).join(' ');
+}
+
+function _tmFindNearestBuilding(lng, lat, maxM) {
+    if (!tmMap) return null;
+    maxM = maxM || 80;
+    const features = tmMap.queryRenderedFeatures({ layers: ['tm-buildings-highlight'] });
+    const polygon = tmPoints.length >= 3 ? [...tmPoints, tmPoints[0]] : null;
+    let best = null, bestD = Infinity;
+    const seen = new Set();
+    features.forEach(f => {
+        const key = tmBuildingKey(f);
+        if (seen.has(key)) return;
+        seen.add(key);
+        const center = tmBuildingCenter(f);
+        if (!center) return;
+        if (polygon && !pointInPolygon(center, polygon) && !tmManualBuildings[key]?.added) return;
+        const d = haversineM([lng, lat], center);
+        if (d < maxM && d < bestD) { bestD = d; best = { key, center }; }
+    });
+    return best;
+}
+
+function _tmApplyPOIToBuilding(poi, bldgKey) {
+    const pending = window._tmPendingGeometry?.[bldgKey];
+    tmBuildingClassify[bldgKey] = {
+        catId: poi.catId,
+        name: poi.name,
+        phone: poi.phone,
+        website: poi.website,
+        hours: poi.hours,
+        address: poi.address,
+        gmapsUrl: poi.gmapsUrl,
+        geometry: pending?.geometry || null,
+        center: [poi.lng, poi.lat],
+        source: 'osm',
+        osmId: poi.osmId
+    };
+    showToast(`"${poi.name}" שויך ✓`, 'success');
+}
+
+window.tmScanPOIs = async function() {
+    if (tmPoints.length < 3) { showToast('יש לצייר תיחום קודם', 'warning'); return; }
+    const btn = document.getElementById('tmScanPOIsBtn');
+    const statusEl = document.getElementById('tmPOIScanStatus');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> סורק מ-OpenStreetMap...'; }
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.innerText = 'שולף נתוני מקומות...'; }
+
+    const lngs = tmPoints.map(p => p[0]), lats = tmPoints.map(p => p[1]);
+    const bbox = `${(Math.min(...lats)-0.001).toFixed(6)},${(Math.min(...lngs)-0.001).toFixed(6)},${(Math.max(...lats)+0.001).toFixed(6)},${(Math.max(...lngs)+0.001).toFixed(6)}`;
+    const polygon = [...tmPoints, tmPoints[0]];
+
+    const query = `[out:json][timeout:25];(
+node["amenity"~"place_of_worship|school|university|college|kindergarten|clinic|hospital|pharmacy|doctors|dentist|bank|restaurant|cafe|fast_food"](${bbox});
+node["shop"](${bbox});
+node["office"](${bbox});
+way["amenity"~"place_of_worship|school|university|college|kindergarten|clinic|hospital|pharmacy|doctors|dentist|bank"](${bbox});
+way["shop"](${bbox});
+way["office"](${bbox});
+);out tags center;`;
+
+    try {
+        const resp = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(query) });
+        if (!resp.ok) throw new Error('Overpass ' + resp.status);
+        const data = await resp.json();
+
+        const pois = [];
+        for (const el of data.elements) {
+            const tags = el.tags || {};
+            const name = _osmGetName(tags);
+            if (!name) continue;
+            let lat, lng;
+            if (el.type === 'node') { lat = el.lat; lng = el.lon; }
+            else if (el.center) { lat = el.center.lat; lng = el.center.lon; }
+            else continue;
+            if (!pointInPolygon([lng, lat], polygon)) continue;
+            const catId = _osmToCatId(tags);
+            const cat = tmCategories.find(c => c.id === catId) || { name: 'אחר', color: '#6366f1' };
+            const address = _osmGetAddress(tags);
+            const safeName = encodeURIComponent(name + (address ? ' ' + address : ''));
+            pois.push({
+                osmId: el.id, osmType: el.type,
+                name, catId, catName: cat.name, catColor: cat.color,
+                phone: tags.phone || tags['contact:phone'] || tags['contact:mobile'] || '',
+                website: tags.website || tags['contact:website'] || '',
+                hours: tags.opening_hours || '',
+                address,
+                lat, lng,
+                gmapsUrl: `https://maps.google.com/?q=${safeName}&ll=${lat},${lng}&z=18`,
+                matchedBldgKey: null,
+                status: 'pending'
+            });
+        }
+
+        if (!pois.length) {
+            if (statusEl) { statusEl.innerText = 'לא נמצאו מקומות ציבוריים בתיחום'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic"></i> זיהוי אוטומטי מ-OpenStreetMap'; }
+            return;
+        }
+
+        // התאמה אוטומטית לבניין הקרוב
+        pois.forEach(poi => {
+            const match = _tmFindNearestBuilding(poi.lng, poi.lat);
+            if (match) poi.matchedBldgKey = match.key;
+        });
+
+        _tmPOISuggestions = pois;
+        if (statusEl) { statusEl.innerText = `נמצאו ${pois.length} מקומות`; setTimeout(() => { if (statusEl) statusEl.style.display = 'none'; }, 3000); }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-redo"></i> סרוק שוב'; }
+        tmRenderPOISuggestions();
+
+    } catch(e) {
+        console.warn('POI scan failed:', e);
+        showToast('שגיאה בסריקת מקומות — נסה שוב', 'danger');
+        if (statusEl) { statusEl.innerText = 'שגיאה — נסה שוב'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic"></i> זיהוי אוטומטי מ-OpenStreetMap'; }
+    }
+};
+
+function tmRenderPOISuggestions() {
+    const wrap = document.getElementById('tmPOISuggestionsWrap');
+    const list = document.getElementById('tmPOISuggestionsList');
+    const countEl = document.getElementById('tmPOIPendingCount');
+    if (!wrap || !list) return;
+
+    const pending = _tmPOISuggestions.filter(p => p.status === 'pending');
+    if (countEl) countEl.innerText = pending.length;
+
+    if (!pending.length) {
+        wrap.style.display = 'none';
+        if (_tmPOISuggestions.length > 0) showToast('כל ההצעות טופלו ✓', 'success');
+        return;
+    }
+    wrap.style.display = 'block';
+
+    list.innerHTML = pending.map(poi => {
+        const idx = _tmPOISuggestions.indexOf(poi);
+        const emoji = _POI_EMOJI[poi.catId] || '📍';
+        const hasMatch = !!poi.matchedBldgKey;
+        const safeWebsite = /^https?:\/\//.test(poi.website) ? poi.website : '';
+        return `
+        <div class="poi-sug-card" id="poiCard-${idx}">
+            <div class="poi-sug-header">
+                <span class="poi-sug-icon">${emoji}</span>
+                <div class="poi-sug-title">
+                    <div class="poi-sug-name">${escapeHTML(poi.name)}</div>
+                    <span class="poi-sug-badge" style="background:${poi.catColor}22;color:${poi.catColor};">${escapeHTML(poi.catName)}</span>
+                </div>
+                <a href="${poi.gmapsUrl}" target="_blank" rel="noopener" class="poi-gmaps-btn" title="פתח בגוגל מפות">
+                    <i class="fas fa-external-link-alt"></i>
+                </a>
+            </div>
+            <div class="poi-sug-details">
+                ${poi.address ? `<div class="poi-sug-detail"><i class="fas fa-map-marker-alt"></i>${escapeHTML(poi.address)}</div>` : ''}
+                ${poi.phone   ? `<div class="poi-sug-detail"><i class="fas fa-phone"></i>${escapeHTML(poi.phone)}</div>` : ''}
+                ${safeWebsite ? `<div class="poi-sug-detail"><i class="fas fa-globe"></i><a href="${safeWebsite}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(safeWebsite.replace(/^https?:\/\//,'').slice(0,32))}</a></div>` : ''}
+                ${poi.hours   ? `<div class="poi-sug-detail"><i class="fas fa-clock"></i>${escapeHTML(poi.hours.slice(0,50))}</div>` : ''}
+            </div>
+            <div class="poi-sug-match">
+                <i class="fas fa-${hasMatch ? 'link' : 'question-circle'}" style="color:${hasMatch ? '#10b981' : '#f59e0b'};font-size:11px;"></i>
+                <span style="font-size:11px;color:var(--text-muted);">${hasMatch ? 'בניין זוהה אוטומטית' : 'לא זוהה בניין — בחר ידנית'}</span>
+            </div>
+            <div class="poi-sug-actions">
+                <button onclick="window.tmApprovePOI(${idx})" class="poi-btn-approve">
+                    <i class="fas fa-check"></i> ${hasMatch ? 'אשר' : 'בחר בניין'}
+                </button>
+                <button onclick="window.tmReassignPOI(${idx})" class="poi-btn-reassign" title="שייך לבניין אחר">
+                    <i class="fas fa-arrows-alt"></i>
+                </button>
+                <button onclick="window.tmSkipPOI(${idx})" class="poi-btn-skip" title="דלג">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+window.tmApprovePOI = function(idx) {
+    const poi = _tmPOISuggestions[idx];
+    if (!poi) return;
+    if (!poi.matchedBldgKey) { window.tmReassignPOI(idx); return; }
+    _tmApplyPOIToBuilding(poi, poi.matchedBldgKey);
+    poi.status = 'approved';
+    tmRenderPOISuggestions();
+    tmRenderClassifySummary();
+};
+
+window.tmSkipPOI = function(idx) {
+    const poi = _tmPOISuggestions[idx];
+    if (poi) poi.status = 'skipped';
+    tmRenderPOISuggestions();
+};
+
+window.tmSkipAllPOIs = function() {
+    _tmPOISuggestions.forEach(p => { if (p.status === 'pending') p.status = 'skipped'; });
+    tmRenderPOISuggestions();
+};
+
+window.tmReassignPOI = function(idx) {
+    _tmReassignPoiIdx = idx;
+    const poi = _tmPOISuggestions[idx];
+    const hint = document.getElementById('tmClassifyHint');
+    if (hint) {
+        hint.innerHTML = `<i class="fas fa-crosshairs"></i> לחץ על הבניין של "${escapeHTML(poi?.name || '')}" &nbsp;<button onclick="window.tmCancelReassign()" style="background:none;border:1px solid white;border-radius:6px;color:white;padding:2px 8px;cursor:pointer;font-size:11px;font-family:inherit;">ביטול</button>`;
+        hint.style.display = 'block';
+    }
+};
+
+window.tmCancelReassign = function() {
+    _tmReassignPoiIdx = null;
+    const hint = document.getElementById('tmClassifyHint');
+    if (hint) {
+        hint.innerHTML = '<i class="fas fa-tag"></i> לחץ על מבנה לסיווגו';
+        hint.style.display = tmCurrentTab === 'classify' ? 'block' : 'none';
+    }
+};
 
 // ── Territory rendering on main map ──
 function renderTerritoryOnMap() {
