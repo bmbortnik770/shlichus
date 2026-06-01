@@ -3,14 +3,21 @@
 // נטען אחרון — מרחיב את כל פונקציות ה-comm שב-app.js
 // ══════════════════════════════════════════════════════════════
 
-// ── עטוף את switchCommTab — הוסף SMS / Phone / Logs ──
-const _origSwitchCommTab = window.switchCommTab;
-window.switchCommTab = function(tabName) {
-    _origSwitchCommTab(tabName);
-    if (tabName === 'sms')   { _initSMSTab(); renderSMSRecipients(); }
-    if (tabName === 'phone') renderCallList();
-    if (tabName === 'logs')  renderCommLogs();
+// ── switchCommMode wraps the new mode nav ──
+const _origSwitchCommMode = window.switchCommMode;
+window.switchCommMode = function(mode) {
+    if (_origSwitchCommMode) _origSwitchCommMode(mode);
+    if (mode === 'compose') { _initSMSTab(); renderCommSenders && renderCommSenders(); renderSMSRecipients(); }
+    if (mode === 'calls')   renderCallList();
+    if (mode === 'logs')    renderCommLogs();
+    if (mode === 'docs')    renderAllConvDocs && renderAllConvDocs();
     updateCommStats();
+};
+// Backward-compat alias
+window.switchCommTab = function(tabName) {
+    const map = { phone: 'calls', whatsapp: 'compose', email: 'compose', sms: 'compose' };
+    switchCommMode(map[tabName] || tabName);
+    if (tabName === 'sms') { switchCommChannel && switchCommChannel('sms'); }
 };
 
 // ── עטוף את executeQueueAction — תעד אוטומטי ──
@@ -52,7 +59,7 @@ window.autoLogSentMessage = function(channel, recipients, text, result = '') {
         logged++;
     });
 
-    if (logged > 0) { saveDB(); handleOmniSearch(); }
+    if (logged > 0) { saveDB(); handleOmniSearch(); refreshMap && refreshMap(); }
     return logged;
 };
 
@@ -229,7 +236,7 @@ window.saveQuickCallLog = function() {
         result
     });
     apt.updatedAt = Date.now();
-    saveDB(); handleOmniSearch(); renderCallList(); updateCommStats();
+    saveDB(); handleOmniSearch(); refreshMap && refreshMap(); renderCallList(); updateCommStats();
     document.getElementById('quickCallModal').style.display = 'none';
     showToast('השיחה תועדה! ' + getRandomCompliment(), 'success');
 };
@@ -313,7 +320,7 @@ window.addSMSManually = async function() {
 window.removeSMSR = function(i) { _smsR.splice(i, 1); renderSMSRecipients(); };
 
 window.sendCommSMS = async function() {
-    const text = document.getElementById('smsMessageText')?.value?.trim();
+    const text = (document.getElementById('commMessageText') || document.getElementById('smsMessageText'))?.value?.trim();
     if (!text) return showToast('יש להזין תוכן', 'warning');
     const valid = _smsR.filter(r => r.phone);
     if (!valid.length) return showToast('אין נמענים עם מספר טלפון', 'error');
@@ -335,7 +342,7 @@ window.sendCommSMS = async function() {
             if (cp.startsWith('0')) cp = '+972' + cp.substring(1);
             window.location.href = `sms:${cp}?body=${encodeURIComponent(pText)}`;
             autoLogSentMessage('sms', [r], text);
-            _smsR = []; renderSMSRecipients(); updateCommStats();
+            _smsR = []; window._updateCommRecipCount && _updateCommRecipCount(); updateCommStats();
         } else {
             _showSMSQueue(valid, text);
         }
@@ -368,7 +375,8 @@ async function _sendViaTwilio(recipients, text, svc) {
     autoLogSentMessage('sms', recipients.filter(r => r.key), text);
     setSyncStatus('ok', 'מסונכרן');
     showToast(`✅ ${sent} SMS נשלחו${failed ? `, ${failed} נכשלו` : ''}`, sent > 0 ? 'success' : 'error');
-    _smsR = []; renderSMSRecipients(); updateCommStats();
+    _smsR = []; window._updateCommRecipCount && _updateCommRecipCount(); updateCommStats();
+    if (sent > 0) window._offerStatusUpdate && _offerStatusUpdate(sent);
 }
 
 // ── SMS Queue Helper (desktop) ──

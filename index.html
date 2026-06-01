@@ -330,208 +330,239 @@ function toggleDrivePanel() {
     <div id="comm-container" style="display:none; flex-grow:1; flex-direction:column; background:var(--bg-body); overflow:hidden; padding:16px 20px 20px 20px; gap:0;">
         <div class="kanban-hub-header" style="flex-shrink:0; padding:0 0 12px 0; margin:0;">
             <h2 style="margin:0; color:var(--primary);"><i class="fas fa-satellite-dish" style="color:var(--accent);"></i> מרכז תקשורת קהילתי</h2>
-            <div style="display:flex; gap:10px;">
-                <span class="tag-badge" style="font-size:14px; padding:6px 10px;"><i class="fas fa-paper-plane"></i> <span id="commMonthlyCount">0 הודעות נשלחו החודש</span></span>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span class="tag-badge" style="font-size:13px; padding:5px 10px;"><i class="fas fa-paper-plane"></i> <span id="commMonthlyCount">0 הודעות נשלחו החודש</span></span>
+                <button class="btn btn-outline" style="width:auto;padding:5px 12px;font-size:12px;" onclick="openCommServices()"><i class="fas fa-cog"></i> שירותים</button>
             </div>
         </div>
 
-        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; border-radius:14px; border:1px solid var(--border-light); box-shadow:var(--card-shadow);">
+        <div class="comm-card">
 
-        <!-- ── Audience Builder ── -->
-        <div id="audienceBuilder" style="flex-shrink:0; background:var(--surface); border-radius:14px 14px 0 0;">
-            <div id="audHeader" onclick="toggleAudienceBuilder()" style="display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border-light);user-select:none;">
-                <i class="fas fa-users" style="color:var(--accent);font-size:13px;"></i>
-                <span style="font-weight:700;font-size:13px;color:var(--text);">קהל יעד:</span>
-                <span id="audHeaderCount" style="color:var(--accent);font-weight:800;font-size:13px;">לא נבחרו</span>
-                <div id="audHeaderChips" style="display:flex;gap:4px;flex-wrap:wrap;flex:1;min-width:0;overflow:hidden;"></div>
-                <button class="btn btn-outline" style="width:auto;padding:3px 10px;font-size:11px;flex-shrink:0;" onclick="event.stopPropagation();clearAudience()"><i class="fas fa-times"></i> נקה</button>
-                <button class="btn btn-primary" style="width:auto;padding:3px 10px;font-size:11px;flex-shrink:0;" onclick="event.stopPropagation();applyAudienceToChannels()"><i class="fas fa-check"></i> החל על כל הערוצים (<span id="audApplyCount">0</span>)</button>
-                <i id="audChevron" class="fas fa-chevron-down" style="font-size:11px;color:var(--text-muted);transition:transform .3s;flex-shrink:0;"></i>
+            <!-- ── Mode nav ── -->
+            <div class="comm-mode-nav">
+                <button class="comm-mode-btn active" data-mode="compose" onclick="switchCommMode('compose')"><i class="fas fa-paper-plane"></i> כתיבה ושליחה</button>
+                <button class="comm-mode-btn" data-mode="calls" onclick="switchCommMode('calls')"><i class="fas fa-phone"></i> חיוג</button>
+                <button class="comm-mode-btn" data-mode="logs" onclick="switchCommMode('logs')"><i class="fas fa-history"></i> היסטוריה</button>
+                <button class="comm-mode-btn" data-mode="templates" onclick="switchCommMode('templates')"><i class="fas fa-file-alt"></i> תבניות</button>
+                <button class="comm-mode-btn" data-mode="docs" onclick="switchCommMode('docs')"><i class="fas fa-folder-open"></i> תיעודים</button>
             </div>
-            <div id="audBody" style="display:none;padding:12px 16px 14px;border-bottom:1px solid var(--border-solid);">
-                <!-- Smart Segments -->
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-                    <button class="aud-seg-btn active" onclick="applyAudSegment('all',this)">כולם</button>
-                    <button class="aud-seg-btn" onclick="applyAudSegment('no_contact_60',this)"><i class="fas fa-clock"></i> לא נוצר קשר 60+ יום</button>
-                    <button class="aud-seg-btn" onclick="applyAudSegment('no_contact_30',this)"><i class="fas fa-clock"></i> לא נוצר קשר 30+ יום</button>
-                    <button class="aud-seg-btn" onclick="applyAudSegment('has_tasks',this)"><i class="fas fa-tasks"></i> יש משימות פתוחות</button>
-                    <button class="aud-seg-btn" onclick="applyAudSegment('no_phone',this)"><i class="fas fa-phone-slash"></i> חסר טלפון</button>
-                    <button class="aud-seg-btn" onclick="applyAudSegment('no_email',this)"><i class="fas fa-envelope-open"></i> חסר מייל</button>
-                    <button class="aud-seg-btn" onclick="applyAudSegment('red',this)" style="border-color:#ef4444;color:#ef4444;"><i class="fas fa-circle"></i> אדום</button>
-                    <button class="aud-seg-btn" onclick="applyAudSegment('orange',this)" style="border-color:#f59e0b;color:#f59e0b;"><i class="fas fa-circle"></i> כתום</button>
-                </div>
-                <!-- Style pills -->
-                <div id="audStylePills" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;"></div>
-                <!-- Advanced filter builder -->
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-                    <button id="audAdvToggleBtn" class="aud-seg-btn" onclick="toggleAdvFilters()" style="font-size:11px;">
-                        <i class="fas fa-sliders-h"></i> סינון מתקדם
-                        <span class="aud-adv-badge" style="display:none;background:var(--accent);color:#fff;border-radius:8px;padding:0 5px;font-size:10px;margin-right:4px;"></span>
-                    </button>
-                    <button class="aud-seg-btn" onclick="clearAdvFilters()" style="font-size:11px;color:var(--text-hint);" title="נקה כל התנאים">
-                        <i class="fas fa-times"></i> נקה תנאים
-                    </button>
-                </div>
-                <div id="audAdvBody" style="display:none;background:var(--bg-body);border:1px solid var(--border-light);border-radius:9px;padding:10px 12px 8px;margin-bottom:10px;">
-                    <div id="audAdvRows"></div>
-                    <button class="aud-seg-btn" onclick="addAdvFilter()" style="margin-top:8px;font-size:12px;">
-                        <i class="fas fa-plus"></i> הוסף תנאי
-                    </button>
-                </div>
-                <!-- Search + select all -->
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                    <input id="audSearch" type="text" class="inline-input" placeholder="חיפוש לפי שם או בניין..." style="flex:1;padding:6px 10px;font-size:13px;" oninput="filterAudList(this.value)">
-                    <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;">
-                        <input type="checkbox" onchange="toggleAudSelectAll(this.checked)"> בחר הכל
-                    </label>
-                    <span id="audListCount" style="font-size:12px;color:var(--text-muted);white-space:nowrap;"></span>
-                </div>
-                <!-- Family list -->
-                <div id="audFamilyList" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;"></div>
-            </div>
-        </div>
 
-        <div class="crm-tabs" style="margin:0; padding:8px 12px 0 12px; background:var(--surface); flex-shrink:0; overflow-x:auto;">
-            <div class="crm-tab active" onclick="switchCommTab('whatsapp')" id="commTabBtn-whatsapp"><i class="fab fa-whatsapp" style="color:#25D366;"></i> וואטסאפ</div>
-            <div class="crm-tab" onclick="switchCommTab('email')" id="commTabBtn-email"><i class="fas fa-envelope" style="color:#ea4335;"></i> אימייל</div>
-            <div class="crm-tab" onclick="switchCommTab('sms')" id="commTabBtn-sms"><i class="fas fa-sms" style="color:#0ea5e9;"></i> SMS</div>
-            <div class="crm-tab" onclick="switchCommTab('phone')" id="commTabBtn-phone"><i class="fas fa-phone" style="color:var(--success);"></i> רשימות חיוג</div>
-            <div class="crm-tab" onclick="switchCommTab('templates')" id="commTabBtn-templates"><i class="fas fa-file-alt"></i> תבניות הודעה</div>
-            <div class="crm-tab" onclick="switchCommTab('logs')" id="commTabBtn-logs"><i class="fas fa-history"></i> היסטוריה</div>
-        </div>
+            <!-- ── COMPOSE MODE ── -->
+            <div id="comm-mode-compose" class="comm-mode-content active">
 
-        <div id="comm-content-area" style="flex:1; min-height:0; padding:20px; overflow-y:auto; background:var(--surface); border-radius:0 0 14px 14px;">
-            <div id="comm-whatsapp" class="comm-tab-content active">
-                <h3 style="margin-top:0; color:#25D366;"><i class="fab fa-whatsapp"></i> שליחת הודעות וואטסאפ</h3>
-                <div style="background:var(--bg-body); padding:12px; border-radius:8px; margin-bottom:10px; border:1px solid var(--border-light);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <span><strong>נמענים:</strong> <span id="waRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span></span>
+                <!-- Audience panel (right side in RTL) -->
+                <div id="audienceBuilder" class="comm-audience-panel">
+                    <div class="comm-panel-title">
+                        <i class="fas fa-users"></i> קהל יעד
+                        <span id="audHeaderCount" style="color:var(--accent); font-weight:800; margin-right:6px;">לא נבחרו</span>
+                    </div>
+                    <div class="aud-segs-wrap">
+                        <button class="aud-seg-btn active" onclick="applyAudSegment('all',this)">כולם</button>
+                        <button class="aud-seg-btn" onclick="applyAudSegment('no_contact_60',this)"><i class="fas fa-clock"></i> 60+ יום</button>
+                        <button class="aud-seg-btn" onclick="applyAudSegment('no_contact_30',this)"><i class="fas fa-clock"></i> 30+ יום</button>
+                        <button class="aud-seg-btn" onclick="applyAudSegment('has_tasks',this)"><i class="fas fa-tasks"></i> יש משימות</button>
+                        <button class="aud-seg-btn" onclick="applyAudSegment('no_phone',this)"><i class="fas fa-phone-slash"></i> חסר טלפון</button>
+                        <button class="aud-seg-btn" onclick="applyAudSegment('no_email',this)"><i class="fas fa-envelope-open"></i> חסר מייל</button>
+                        <button class="aud-seg-btn" style="border-color:#ef4444;color:#ef4444;" onclick="applyAudSegment('red',this)"><i class="fas fa-circle" style="font-size:8px;"></i> אדום</button>
+                        <button class="aud-seg-btn" style="border-color:#f59e0b;color:#f59e0b;" onclick="applyAudSegment('orange',this)"><i class="fas fa-circle" style="font-size:8px;"></i> כתום</button>
+                        <span id="audSavedSegsWrap"></span>
+                    </div>
+                    <div id="audStylePills" style="display:flex;flex-wrap:wrap;gap:5px;padding:0 12px 8px;min-height:4px;"></div>
+                    <div style="padding:0 12px 8px; display:flex; gap:6px; align-items:center;">
+                        <button id="audAdvToggleBtn" class="aud-seg-btn" onclick="toggleAdvFilters()" style="font-size:11px;">
+                            <i class="fas fa-sliders-h"></i> סינון מתקדם
+                            <span class="aud-adv-badge" style="display:none;background:var(--accent);color:#fff;border-radius:8px;padding:0 5px;font-size:10px;margin-right:4px;"></span>
+                        </button>
+                        <button class="aud-seg-btn" onclick="clearAdvFilters()" style="font-size:11px;color:var(--text-hint);" title="נקה תנאים"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div id="audAdvBody" style="display:none;background:var(--bg-body);border-top:1px solid var(--border-light);border-bottom:1px solid var(--border-light);padding:10px 12px 8px;margin-bottom:4px;">
+                        <div id="audAdvRows"></div>
+                        <button class="aud-seg-btn" onclick="addAdvFilter()" style="margin-top:8px;font-size:12px;"><i class="fas fa-plus"></i> הוסף תנאי</button>
+                    </div>
+                    <div class="aud-search-row">
+                        <input id="audSearch" type="text" class="inline-input" placeholder="חיפוש..." style="flex:1;padding:6px 10px;font-size:12px;" oninput="filterAudList(this.value)">
+                        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;white-space:nowrap;">
+                            <input type="checkbox" id="audSelectAllCb" onchange="toggleAudSelectAll(this.checked)"> הכל
+                        </label>
+                        <span id="audListCount" style="font-size:11px;color:var(--text-muted);white-space:nowrap;"></span>
+                    </div>
+                    <div id="audFamilyList" class="comm-family-list"></div>
+                    <div class="comm-aud-footer">
                         <div style="display:flex;gap:6px;">
-                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="openAudienceBuilder()"><i class="fas fa-users"></i> בחר מהרשימה</button>
-                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientManually('whatsapp')"><i class="fas fa-plus"></i> הוסף ידנית</button>
+                            <button class="aud-seg-btn" style="font-size:11px;" onclick="saveAudSegment()"><i class="fas fa-bookmark"></i> שמור סגמנט</button>
+                            <button class="aud-seg-btn" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="clearAudience()"><i class="fas fa-times"></i> נקה</button>
                         </div>
                     </div>
-                    <div id="waRecipientsList" style="max-height:140px;overflow-y:auto;"></div>
+                    <!-- Hidden compat -->
+                    <div id="audBody" style="display:none;"></div>
+                    <i id="audChevron" style="display:none;"></i>
+                    <span id="audHeaderChips" style="display:none;"></span>
+                    <span id="audApplyCount" style="display:none;">0</span>
                 </div>
-                <div class="form-group">
-                    <label>בחר תבנית הודעה:</label>
-                    <select id="waTemplateSelect" onchange="previewWaTemplate()"><option value="">-- בחר תבנית או הקלד חופשי --</option></select>
-                </div>
-                <div class="form-group">
-                    <label>תוכן ההודעה:</label>
-                    <textarea id="waMessageText" rows="4" placeholder="הקלד את ההודעה כאן... (השתמש ב-[שם] לשילוב אוטומטי של שם המשפחה)" class="inline-input" style="width:100%;"></textarea>
-                </div>
-                <button class="btn btn-success" onclick="sendCommWhatsApp()"><i class="fab fa-whatsapp"></i> פתח וואטסאפ לנמענים</button>
-            </div>
 
-            <div id="comm-email" class="comm-tab-content">
-                <h3 style="margin-top:0; color:#ea4335;"><i class="fas fa-envelope"></i> מערך דיוור במייל</h3>
-                <div style="background:var(--bg-body); padding:12px; border-radius:8px; margin-bottom:10px; border:1px solid var(--border-light);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <span><strong>נמענים:</strong> <span id="emRecipientCount" style="color:var(--accent); font-weight:bold; font-size:16px;">0</span></span>
-                        <div style="display:flex;gap:6px;">
-                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="openAudienceBuilder()"><i class="fas fa-users"></i> בחר מהרשימה</button>
-                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addRecipientManually('email')"><i class="fas fa-plus"></i> הוסף ידנית</button>
-                        </div>
+                <!-- Compose panel (left side in RTL) -->
+                <div class="comm-compose-panel">
+                    <div class="comm-channel-bar">
+                        <button class="comm-ch-btn active" data-ch="whatsapp" onclick="switchCommChannel('whatsapp')">
+                            <i class="fab fa-whatsapp"></i> וואטסאפ
+                        </button>
+                        <button class="comm-ch-btn" data-ch="email" onclick="switchCommChannel('email')">
+                            <i class="fas fa-envelope"></i> מייל
+                        </button>
+                        <button class="comm-ch-btn" data-ch="sms" onclick="switchCommChannel('sms')">
+                            <i class="fas fa-sms"></i> SMS
+                        </button>
                     </div>
-                    <div id="emRecipientsList" style="max-height:140px;overflow-y:auto;"></div>
-                </div>
-                <div class="form-group">
-                    <label>נושא המייל:</label>
-                    <input type="text" id="emSubject" class="inline-input" style="width:100%;" placeholder="הקלד נושא למייל...">
-                </div>
-                <div class="form-group">
-                    <label>בחר תבנית:</label>
-                    <select id="emTemplateSelect" onchange="previewEmTemplate()"><option value="">-- בחר תבנית או הקלד חופשי --</option></select>
-                </div>
-                <div class="form-group">
-                    <label>תוכן המייל:</label>
-                    <textarea id="emMessageText" rows="5" placeholder="הקלד את תוכן המייל..." class="inline-input" style="width:100%;"></textarea>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                    <button class="btn btn-primary" onclick="sendCommEmail()" style="background:#ea4335; border-color:#ea4335;"><i class="fas fa-paper-plane"></i> שלח מייל</button>
-                    <button class="btn btn-outline" style="width:auto;padding:6px 12px;font-size:12px;" onclick="resetEmailProvider()"><i class="fas fa-exchange-alt"></i> שנה ספק מייל</button>
-                </div>
-            </div>
-
-            <div id="comm-sms" class="comm-tab-content">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-                    <h3 style="margin:0;color:#0ea5e9;"><i class="fas fa-sms"></i> שליחת SMS</h3>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <span id="smsProviderBadge" style="font-size:12px;background:var(--bg-body);padding:4px 10px;border-radius:8px;border:1px solid var(--border-light);font-weight:600;">📱 SMS מקומי (sms:)</span>
-                        <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="openCommServices()"><i class="fas fa-cog"></i> שירותים</button>
+                    <div class="comm-recipients-row">
+                        <span class="comm-recip-label">נמענים:</span>
+                        <span id="commRecipCount" class="comm-recip-count">0</span>
+                        <div id="commRecipChips" class="comm-recip-chips"></div>
+                        <span id="commMissingWarn" class="comm-missing-warn" style="display:none;"></span>
+                        <button class="comm-add-manual-btn" onclick="addManualCommRecipient()" title="הוסף ידנית"><i class="fas fa-user-plus"></i></button>
                     </div>
-                </div>
-                <div style="background:var(--bg-body);padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid var(--border-light);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <span><strong>נמענים:</strong> <span id="smsRecipientCount" style="color:#0ea5e9;font-weight:bold;font-size:16px;">0</span></span>
-                        <div style="display:flex;gap:6px;">
-                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="openAudienceBuilder()"><i class="fas fa-users"></i> בחר מהרשימה</button>
-                            <button class="btn btn-outline" style="width:auto;padding:4px 10px;font-size:12px;" onclick="addSMSManually()"><i class="fas fa-plus"></i> הוסף ידנית</button>
-                        </div>
+                    <div id="commSubjectRow" style="display:none;">
+                        <input type="text" id="emSubject" class="inline-input" style="width:100%;" placeholder="נושא המייל...">
                     </div>
-                    <div id="smsRecipientsList" style="max-height:140px;overflow-y:auto;"></div>
-                </div>
-                <div class="form-group">
-                    <label>בחר תבנית:</label>
-                    <select id="smsTemplateSelect" onchange="previewSMSTemplate()" style="width:100%;"><option value="">-- בחר תבנית --</option></select>
-                </div>
-                <div class="form-group">
-                    <label>תוכן ה-SMS:</label>
-                    <textarea id="smsMessageText" rows="4" placeholder="הקלד הודעת SMS... (השתמש ב-[שם] לשילוב שם המשפחה)" class="inline-input" style="width:100%;"></textarea>
-                </div>
-                <button class="btn btn-primary" style="background:#0ea5e9;border-color:#0ea5e9;" onclick="sendCommSMS()"><i class="fas fa-paper-plane"></i> שלח SMS לנמענים</button>
-            </div>
-
-            <div id="comm-phone" class="comm-tab-content">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-                    <h3 style="margin:0;color:var(--success);"><i class="fas fa-phone"></i> מרכז חיוג — <span id="callListCount">0</span> משפחות</h3>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <select onchange="setCallSort(this.value)" class="inline-input" style="padding:5px 8px;font-size:12px;width:auto;">
-                            <option value="urgency">מיון: דחיפות</option>
-                            <option value="name">מיון: שם</option>
-                            <option value="last_contact">קשר אחרון</option>
+                    <div class="comm-template-row">
+                        <i class="fas fa-file-alt" style="color:var(--text-muted);font-size:13px;flex-shrink:0;"></i>
+                        <select id="commTemplateSelect" class="inline-input" style="flex:1;" onchange="applyCommTemplate()">
+                            <option value="">-- בחר תבנית --</option>
                         </select>
-                        <input type="text" placeholder="חיפוש..." oninput="setCallSearch(this.value)" class="inline-input" style="padding:5px 10px;font-size:12px;width:130px;">
                     </div>
+                    <textarea id="commMessageText" class="comm-editor inline-input"
+                        placeholder="הקלד הודעה... ([שם] = שם משפחה אוטומטי)"
+                        oninput="onCommTextInput(this)"></textarea>
+                    <div id="smsCharCounter" style="display:none; font-size:11px; color:var(--text-muted); text-align:left; margin-top:-8px;">
+                        <span id="smsCharNum">0</span>/160
+                        <span id="smsMultiPart" style="display:none; color:var(--warning); margin-right:6px;"></span>
+                    </div>
+                    <div class="comm-send-row">
+                        <button id="commSendBtn" class="btn btn-success comm-send-btn" onclick="sendCommMessage()">
+                            <i class="fas fa-paper-plane"></i> שלח
+                        </button>
+                        <button class="btn btn-outline" style="width:auto;padding:8px 14px;font-size:13px;" onclick="showCommPreview()" title="תצוגה מקדימה">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <div id="commSendStatus" style="font-size:12px;color:var(--text-muted);flex:1;"></div>
+                        <span id="smsProviderBadge" style="display:none;font-size:11px;background:var(--bg-body);padding:3px 8px;border-radius:8px;border:1px solid var(--border-light);">📱 SMS</span>
+                        <button id="smsSvcBtn" style="display:none;width:auto;padding:4px 8px;" class="btn btn-outline btn-sm" onclick="openCommServices()"><i class="fas fa-cog"></i></button>
+                    </div>
+                    <!-- Hidden legacy IDs (backward compat) -->
+                    <span id="waRecipientCount" style="display:none;">0</span>
+                    <span id="emRecipientCount" style="display:none;">0</span>
+                    <span id="smsRecipientCount" style="display:none;">0</span>
+                    <div id="waRecipientsList" style="display:none;"></div>
+                    <div id="emRecipientsList" style="display:none;"></div>
+                    <div id="smsRecipientsList" style="display:none;"></div>
+                    <select id="waTemplateSelect" style="display:none;"></select>
+                    <select id="emTemplateSelect" style="display:none;"></select>
+                    <select id="smsTemplateSelect" style="display:none;"></select>
+                    <textarea id="waMessageText" style="display:none;"></textarea>
+                    <textarea id="emMessageText" style="display:none;"></textarea>
+                    <textarea id="smsMessageText" style="display:none;"></textarea>
                 </div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-                    <button class="call-filter-btn active" data-f="all" onclick="setCallFilter('all')">הכל</button>
-                    <button class="call-filter-btn" data-f="need_contact" onclick="setCallFilter('need_contact')"><i class="fas fa-exclamation-circle" style="color:var(--danger);"></i> ניהל קשר</button>
-                    <button class="call-filter-btn" data-f="has_tasks" onclick="setCallFilter('has_tasks')"><i class="fas fa-tasks" style="color:var(--warning);"></i> יש משימות</button>
-                    <button class="call-filter-btn" data-f="no_phone" onclick="setCallFilter('no_phone')"><i class="fas fa-phone-slash"></i> ללא טלפון</button>
-                </div>
-                <div id="callListContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
             </div>
 
-            <div id="comm-templates" class="comm-tab-content">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h3 style="margin:0;"><i class="fas fa-file-alt" style="color:var(--accent);"></i> ניהול תבניות הודעה</h3>
-                    <button class="btn btn-primary" style="width:auto; padding:6px 15px;" onclick="createNewTemplate()"><i class="fas fa-plus"></i> תבנית חדשה</button>
+            <!-- ── CALLS MODE ── -->
+            <div id="comm-mode-calls" class="comm-mode-content">
+                <div class="comm-fullwidth-inner">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                        <h3 style="margin:0;color:var(--success);"><i class="fas fa-phone"></i> מרכז חיוג — <span id="callListCount">0</span> משפחות</h3>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                            <select onchange="setCallSort(this.value)" class="inline-input" style="padding:5px 8px;font-size:12px;width:auto;">
+                                <option value="urgency">מיון: דחיפות</option>
+                                <option value="name">מיון: שם</option>
+                                <option value="last_contact">קשר אחרון</option>
+                            </select>
+                            <input type="text" placeholder="חיפוש..." oninput="setCallSearch(this.value)" class="inline-input" style="padding:5px 10px;font-size:12px;width:130px;">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+                        <button class="call-filter-btn active" data-f="all" onclick="setCallFilter('all')">הכל</button>
+                        <button class="call-filter-btn" data-f="need_contact" onclick="setCallFilter('need_contact')"><i class="fas fa-exclamation-circle" style="color:var(--danger);"></i> נדרש קשר</button>
+                        <button class="call-filter-btn" data-f="has_tasks" onclick="setCallFilter('has_tasks')"><i class="fas fa-tasks" style="color:var(--warning);"></i> יש משימות</button>
+                        <button class="call-filter-btn" data-f="no_phone" onclick="setCallFilter('no_phone')"><i class="fas fa-phone-slash"></i> ללא טלפון</button>
+                    </div>
+                    <div id="callListContainer" style="display:flex;flex-direction:column;gap:6px;overflow-y:auto;flex:1;padding-bottom:20px;"></div>
                 </div>
-                <div style="background:var(--bg-body); padding:10px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px; font-size:13px; color:var(--text-muted);">
-                    <i class="fas fa-lightbulb" style="color:var(--warning);"></i> <strong>טיפ:</strong> השתמש במילה <strong>[שם]</strong> בתוך התבנית כדי שהמערכת תשתול אוטומטית את שם המשפחה בשליחה המונית.
-                </div>
-                <div id="templatesListContainer"></div>
             </div>
 
-            <div id="comm-logs" class="comm-tab-content">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-                    <h3 style="margin:0;"><i class="fas fa-history" style="color:var(--accent);"></i> היסטוריית תקשורת — <span id="logsCount">0</span> רשומות</h3>
-                    <input type="text" placeholder="חיפוש..." oninput="setLogsSearch(this.value)" class="inline-input" style="padding:5px 10px;font-size:12px;width:140px;">
+            <!-- ── LOGS MODE ── -->
+            <div id="comm-mode-logs" class="comm-mode-content">
+                <div class="comm-fullwidth-inner">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                        <h3 style="margin:0;"><i class="fas fa-history" style="color:var(--accent);"></i> היסטוריית תקשורת — <span id="logsCount">0</span> רשומות</h3>
+                        <input type="text" placeholder="חיפוש..." oninput="setLogsSearch(this.value)" class="inline-input" style="padding:5px 10px;font-size:12px;width:140px;">
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+                        <button class="log-filter-btn active" data-f="" onclick="setLogsFilter('')">הכל</button>
+                        <button class="log-filter-btn" data-f="whatsapp" onclick="setLogsFilter('whatsapp')"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp</button>
+                        <button class="log-filter-btn" data-f="email" onclick="setLogsFilter('email')"><i class="fas fa-envelope" style="color:#ea4335;"></i> מייל</button>
+                        <button class="log-filter-btn" data-f="sms" onclick="setLogsFilter('sms')"><i class="fas fa-sms" style="color:#0ea5e9;"></i> SMS</button>
+                        <button class="log-filter-btn" data-f="phone" onclick="setLogsFilter('phone')"><i class="fas fa-phone" style="color:var(--success);"></i> שיחה</button>
+                        <button class="log-filter-btn" data-f="visit" onclick="setLogsFilter('visit')"><i class="fas fa-walking" style="color:var(--accent);"></i> ביקור</button>
+                    </div>
+                    <div id="commLogsTimeline" style="display:flex;flex-direction:column;gap:6px;overflow-y:auto;flex:1;padding-bottom:20px;"></div>
                 </div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-                    <button class="log-filter-btn active" data-f="" onclick="setLogsFilter('')">הכל</button>
-                    <button class="log-filter-btn" data-f="whatsapp" onclick="setLogsFilter('whatsapp')"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp</button>
-                    <button class="log-filter-btn" data-f="email" onclick="setLogsFilter('email')"><i class="fas fa-envelope" style="color:#ea4335;"></i> מייל</button>
-                    <button class="log-filter-btn" data-f="sms" onclick="setLogsFilter('sms')"><i class="fas fa-sms" style="color:#0ea5e9;"></i> SMS</button>
-                    <button class="log-filter-btn" data-f="phone" onclick="setLogsFilter('phone')"><i class="fas fa-phone" style="color:var(--success);"></i> שיחה</button>
-                    <button class="log-filter-btn" data-f="visit" onclick="setLogsFilter('visit')"><i class="fas fa-walking" style="color:var(--accent);"></i> ביקור</button>
+            </div>
+
+            <!-- ── TEMPLATES MODE ── -->
+            <div id="comm-mode-templates" class="comm-mode-content">
+                <div class="comm-fullwidth-inner">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="margin:0;"><i class="fas fa-file-alt" style="color:var(--accent);"></i> ניהול תבניות הודעה</h3>
+                        <button class="btn btn-primary" style="width:auto; padding:6px 15px;" onclick="createNewTemplate()"><i class="fas fa-plus"></i> תבנית חדשה</button>
+                    </div>
+                    <div style="background:var(--bg-body); padding:10px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:15px; font-size:13px; color:var(--text-muted);">
+                        <i class="fas fa-lightbulb" style="color:var(--warning);"></i> <strong>טיפ:</strong> השתמש במילה <strong>[שם]</strong> כדי שהמערכת תשתול אוטומטית את שם המשפחה בשליחה.
+                    </div>
+                    <div id="templatesListContainer" style="overflow-y:auto;flex:1;padding-bottom:20px;"></div>
                 </div>
-                <div id="commLogsTimeline" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+
+            <!-- ── DOCS MODE ── -->
+            <div id="comm-mode-docs" class="comm-mode-content">
+                <div class="comm-fullwidth-inner">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                        <h3 style="margin:0;"><i class="fas fa-folder-open" style="color:var(--accent);"></i> תיעוד שיחות — <span id="docsCount">0</span> מסמכים</h3>
+                        <input type="text" placeholder="חיפוש..." oninput="setDocsSearch(this.value)" class="inline-input" style="padding:5px 10px;font-size:12px;width:150px;">
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+                        <button class="log-filter-btn active" data-df="" onclick="setDocsChannelFilter('')">הכל</button>
+                        <button class="log-filter-btn" data-df="phone" onclick="setDocsChannelFilter('phone')"><i class="fas fa-phone" style="color:var(--success);"></i> שיחות</button>
+                        <button class="log-filter-btn" data-df="whatsapp" onclick="setDocsChannelFilter('whatsapp')"><i class="fab fa-whatsapp" style="color:#25D366;"></i> WhatsApp</button>
+                        <button class="log-filter-btn" data-df="email" onclick="setDocsChannelFilter('email')"><i class="fas fa-envelope" style="color:#ea4335;"></i> מייל</button>
+                        <button class="log-filter-btn" data-df="visit" onclick="setDocsChannelFilter('visit')"><i class="fas fa-walking" style="color:var(--accent);"></i> ביקור</button>
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+                        <button class="log-filter-btn active" data-dt="" onclick="setDocsTypeFilter('')">כל הסוגים</button>
+                        <button class="log-filter-btn" data-dt="summary" onclick="setDocsTypeFilter('summary')">📝 סיכום</button>
+                        <button class="log-filter-btn" data-dt="thread" onclick="setDocsTypeFilter('thread')">💬 שרשור</button>
+                        <button class="log-filter-btn" data-dt="transcript" onclick="setDocsTypeFilter('transcript')">🎙️ תמליל</button>
+                        <button class="log-filter-btn" data-dt="recording_link" onclick="setDocsTypeFilter('recording_link')">🎧 הקלטה</button>
+                    </div>
+                    <div id="allDocsTimeline" style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1;padding-bottom:20px;"></div>
+                </div>
+            </div>
+
+        </div><!-- /comm-card -->
+
+        <!-- Preview modal -->
+        <div id="commPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;">
+            <div style="background:var(--surface-solid);border-radius:16px;padding:24px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:var(--modal-shadow);direction:rtl;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 style="margin:0;font-size:16px;"><i class="fas fa-eye" style="color:var(--accent);"></i> תצוגה מקדימה</h3>
+                    <button class="btn-icon" onclick="document.getElementById('commPreviewModal').style.display='none'"><i class="fas fa-times"></i></button>
+                </div>
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">3 דוגמאות ראשונות עם החלפת [שם] אוטומטית:</p>
+                <div id="commPreviewContent" style="display:flex;flex-direction:column;gap:10px;"></div>
+                <div style="display:flex;gap:10px;margin-top:20px;">
+                    <button class="btn btn-success" style="width:auto;padding:8px 20px;" onclick="document.getElementById('commPreviewModal').style.display='none'; sendCommMessage()"><i class="fas fa-paper-plane"></i> אשר ושלח</button>
+                    <button class="btn btn-outline" style="width:auto;padding:8px 16px;" onclick="document.getElementById('commPreviewModal').style.display='none'">ביטול</button>
+                </div>
             </div>
         </div>
-        </div><!-- /comm-tabs-card -->
+
     </div>
 
 <!-- ══ פעילות — Activity Hub ══ -->
@@ -1131,6 +1162,7 @@ function toggleDrivePanel() {
             <div class="crm-tab active" onclick="switchCrmTab('details')" id="tabBtn-details"><i class="fas fa-user"></i> פרטים</div>
             <div class="crm-tab" onclick="switchCrmTab('activity')" id="tabBtn-activity"><i class="fas fa-bolt"></i> פעילות</div>
             <div class="crm-tab" onclick="switchCrmTab('donations')" id="tabBtn-donations"><i class="fas fa-hand-holding-heart"></i> תרומות</div>
+            <div class="crm-tab" onclick="switchCrmTab('docs')" id="tabBtn-docs"><i class="fas fa-folder-open"></i> תיעוד</div>
         </div>
         <!-- Hidden backward-compat tab buttons (referenced by JS functions) -->
         <div id="tabBtn-tasks" style="display:none;" class="crm-tab"></div>
@@ -1445,6 +1477,64 @@ function toggleDrivePanel() {
             </div>
         </div>
         <!-- ══ סוף לשונית אירועים ══ -->
+
+        <!-- ══ לשונית תיעוד תקשורת ══ -->
+        <div id="crm-docs" class="crm-tab-content">
+            <div id="convDocsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+            <button class="btn btn-outline" style="width:100%;font-size:13px;margin-bottom:10px;" onclick="openAddConvDoc()">
+                <i class="fas fa-plus"></i> הוסף תיעוד
+            </button>
+            <div id="addConvDocForm" style="display:none;background:var(--bg-body);border:1px solid var(--border-light);border-radius:12px;padding:14px;">
+                <h5 style="margin:0 0 12px 0;color:var(--accent);font-size:14px;"><i class="fas fa-plus-circle"></i> תיעוד חדש</h5>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:12px;">תאריך</label>
+                        <input type="date" id="newDocDate" class="inline-input">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:12px;">ערוץ</label>
+                        <select id="newDocChannel" class="inline-input" style="font-size:12px;">
+                            <option value="phone">📞 שיחת טלפון</option>
+                            <option value="whatsapp">💬 WhatsApp</option>
+                            <option value="email">✉️ מייל</option>
+                            <option value="visit">🚶 ביקור</option>
+                            <option value="general">📄 כללי</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:12px;">סוג תיעוד</label>
+                        <select id="newDocType" class="inline-input" style="font-size:12px;" onchange="toggleDocRecordingUrl()">
+                            <option value="summary">📝 סיכום</option>
+                            <option value="thread">💬 שרשור מלא</option>
+                            <option value="transcript">🎙️ תמליל</option>
+                            <option value="recording_link">🎧 קישור הקלטה</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:12px;">כותרת</label>
+                        <input type="text" id="newDocTitle" class="inline-input" placeholder="נושא השיחה...">
+                    </div>
+                </div>
+                <div id="newDocRecordingRow" style="display:none;margin-bottom:8px;">
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:12px;">קישור להקלטה (URL)</label>
+                        <input type="url" id="newDocRecordingUrl" class="inline-input" placeholder="https://..." dir="ltr">
+                    </div>
+                </div>
+                <div class="form-group" style="margin:0 0 10px 0;">
+                    <label style="font-size:12px;">תוכן / סיכום / שרשור</label>
+                    <textarea id="newDocBody" class="inline-input" rows="5" placeholder="הדבק כאן סיכום, שרשור שיחה, תמליל, סיכום בינה מלאכותית..."></textarea>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-success" style="flex:1;font-size:13px;padding:8px;" onclick="saveConvDoc()">
+                        <i class="fas fa-save"></i> שמור תיעוד
+                    </button>
+                    <button class="btn btn-outline" style="width:auto;padding:8px 14px;font-size:13px;" onclick="cancelAddConvDoc()">ביטול</button>
+                </div>
+            </div>
+        </div>
 
         <div style="margin-top:20px; display:flex; gap:10px;">
             <button id="saveClientBtn" class="btn btn-primary" onclick="saveClientWithAuthCheck()"><i class="fas fa-save"></i> שמור פרטים</button>
@@ -1945,6 +2035,49 @@ function toggleDrivePanel() {
                 <div style="margin-top:12px;" id="campaignSettingsContainer"></div>
                 <button onclick="addCampaign()" class="btn btn-outline" style="width:100%;margin-top:8px;font-size:13px;"><i class="fas fa-plus"></i> קמפיין חדש</button>
                 <button onclick="openDonorReport()" class="btn btn-primary" style="width:100%;margin-top:6px;font-size:13px;"><i class="fas fa-chart-bar"></i> דוחות תרומות (LYBUNT)</button>
+            </div>
+        </details>
+
+        <!-- ── ניקוד וסימון ── -->
+        <details id="scoringDetails" style="background:var(--bg-body); padding:0; border-radius:12px; border:1px solid var(--border-light); margin-bottom:15px;">
+            <summary style="font-weight:700; cursor:pointer; color:var(--text-main); list-style:none; display:flex; align-items:center; gap:10px; padding:15px; border-radius:12px;">
+                <div style="width:32px;height:32px;background:linear-gradient(135deg,#10b981,#f59e0b);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-star" style="color:white;font-size:14px;"></i>
+                </div>
+                <span style="flex:1;">ניקוד וסימון אוטומטי</span>
+                <i class="fas fa-chevron-down" style="font-size:12px; color:var(--text-muted);"></i>
+            </summary>
+            <div style="padding:0 15px 15px 15px; border-top:1px solid var(--border-light);">
+                <p style="font-size:12px; color:var(--text-muted); margin:12px 0 14px;">
+                    כל פעולה שנרשמת מוסיפה נקודות. הצבע מחושב <strong>מיידית</strong> לפי הציון הכולל.
+                </p>
+
+                <!-- Color thresholds -->
+                <div style="background:var(--surface);border-radius:10px;padding:12px;margin-bottom:14px;border:1px solid var(--border-light);">
+                    <div style="font-weight:700;font-size:13px;margin-bottom:10px;"><i class="fas fa-palette" style="color:var(--accent);"></i> סף צבעים לפי ניקוד</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+                            <span class="status-dot" style="background:#10b981;flex-shrink:0;"></span> ירוק ≥
+                            <input type="number" id="scoreThreshGreen" class="inline-input" style="width:70px;padding:4px 8px;" min="1" max="500" value="60">
+                            <span style="font-size:11px;color:var(--text-muted);">נקודות</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+                            <span class="status-dot" style="background:#f59e0b;flex-shrink:0;"></span> כתום ≥
+                            <input type="number" id="scoreThreshOrange" class="inline-input" style="width:70px;padding:4px 8px;" min="1" max="499" value="25">
+                            <span style="font-size:11px;color:var(--text-muted);">נקודות</span>
+                        </label>
+                    </div>
+                    <p style="font-size:11px;color:var(--text-muted);margin:8px 0 0;">מתחת לכתום = <span style="color:#ef4444;font-weight:600;">אדום</span>. ללא קשר בכלל = <span style="color:#94a3b8;font-weight:600;">אפור</span>.</p>
+                </div>
+
+                <!-- Channel scoring rules -->
+                <div style="font-weight:700;font-size:13px;margin-bottom:8px;"><i class="fas fa-list-alt" style="color:var(--accent);"></i> נקודות לפי סוג קשר</div>
+                <div id="scoringRulesTable" style="display:flex;flex-direction:column;gap:6px;">
+                    <!-- Rendered by JS -->
+                </div>
+                <p style="font-size:11px;color:var(--text-muted);margin:10px 0 0;">
+                    <i class="fas fa-info-circle"></i> "תוקף" = כמה ימים אחורה לחפש. נקודות פגות תוקף לא נספרות.
+                </p>
             </div>
         </details>
 

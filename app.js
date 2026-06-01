@@ -46,6 +46,20 @@ let appSettings = JSON.parse(localStorage.getItem('crm_prefs')) || {
 };
 
 if(!appSettings.styleColors) appSettings.styleColors = {};
+
+// ── Default scoring rules ──────────────────────────────────
+if(!appSettings.scoringRules) {
+    appSettings.scoringRules = {
+        thresholds: { green: 60, orange: 25 },
+        channels: [
+            { key: 'visit',    label: 'ביקור בית',      points: 50, ttlDays: 90 },
+            { key: 'phone',    label: 'שיחת טלפון',     points: 30, ttlDays: 60 },
+            { key: 'whatsapp', label: 'WhatsApp',        points: 20, ttlDays: 30 },
+            { key: 'sms',      label: 'SMS',             points: 20, ttlDays: 30 },
+            { key: 'email',    label: 'מייל',            points: 10, ttlDays: 30 },
+        ]
+    };
+}
 if(!appSettings.tagColors) appSettings.tagColors = {};
 // נקה כפילויות שנשמרו בעבר
 appSettings.styles = [...new Set(appSettings.styles)];
@@ -995,7 +1009,9 @@ function tmCountBuildings() {
     const polygon = [...tmPoints, tmPoints[0]];
     const lngs = tmPoints.map(p=>p[0]), lats = tmPoints.map(p=>p[1]);
     tmMap.fitBounds([[Math.min(...lngs), Math.min(...lats)],[Math.max(...lngs), Math.max(...lats)]], { padding:40, duration:500 });
-    setTimeout(() => {
+
+    const doCount = () => {
+        if (!tmMap) return;
         const features = tmMap.queryRenderedFeatures({ layers: ['tm-buildings-highlight'] });
         const seen = new Set();
         let count = 0;
@@ -1015,7 +1031,14 @@ function tmCountBuildings() {
         if (countEl) countEl.innerText = count;
         if (!appSettings.territory) appSettings.territory = {};
         appSettings.territory.buildingCount = count;
-    }, 700);
+    };
+
+    // Wait for map to finish rendering tiles before querying features
+    if (tmMap.isStyleLoaded() && tmMap.areTilesLoaded()) {
+        doCount();
+    } else {
+        tmMap.once('idle', doCount);
+    }
 }
 
 // ── מפתח ייחודי למבנה ──
@@ -1685,6 +1708,10 @@ function ensureMinimumUnits(bldgKey, aptNum) {
 
 // ── סריקה ראשית ─────────────────────────────────────────────────
 async function startTerritoryUnitsScan() {
+    // FROZEN — disabled temporarily to prevent overwriting existing building markers
+    showToast('סריקת דירות מושהית זמנית', 'info');
+    return;
+
     const btn=document.getElementById('btnScanUnits');
     const statusEl=document.getElementById('unitsScanStatus');
     const summaryEl=document.getElementById('unitsScanSummary');
@@ -2330,12 +2357,11 @@ window.closeDesktopFab = function() {
 };
 
 window.switchCommTab = function(tabName) {
-    document.querySelectorAll('#comm-container .crm-tab, #comm-container .comm-tab-content').forEach(e => e.classList.remove('active'));
-    document.getElementById('commTabBtn-' + tabName).classList.add('active');
-    document.getElementById('comm-' + tabName).classList.add('active');
-    
-    if (tabName === 'templates') renderTemplates();
-    if (tabName === 'whatsapp' || tabName === 'email') renderCommSenders(tabName);
+    const map = { phone: 'calls', whatsapp: 'compose', email: 'compose', sms: 'compose' };
+    switchCommMode(map[tabName] || tabName);
+    if (tabName === 'sms') switchCommChannel('sms');
+    else if (tabName === 'email') switchCommChannel('email');
+    else if (tabName === 'whatsapp') switchCommChannel('whatsapp');
 };
 
 window.toggleMapStyle = () => { const s = map.getStyle().name.includes('Satellite'); map.setStyle(s ? 'mapbox://styles/mapbox/streets-v12' : 'mapbox://styles/mapbox/satellite-streets-v12'); showToast(s ? 'מפת רחובות' : 'מפת לוויין', 'info'); };
@@ -2536,10 +2562,11 @@ window.openClientCard = function(idx) {
     switchCrmTab('details'); document.getElementById('clientModal').style.display='flex';
 };
 
-window.switchCrmTab = (tab) => { 
-    document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content').forEach(e=>e.classList.remove('active')); 
-    document.getElementById(`tabBtn-${tab}`).classList.add('active'); 
-    document.getElementById(`crm-${tab}`).classList.add('active'); 
+window.switchCrmTab = (tab) => {
+    document.querySelectorAll('#clientModal .crm-tab, #clientModal .crm-tab-content').forEach(e=>e.classList.remove('active'));
+    document.getElementById(`tabBtn-${tab}`).classList.add('active');
+    document.getElementById(`crm-${tab}`).classList.add('active');
+    if (tab === 'docs') renderConvDocs(currentBldg, currentAptIdx);
 };
 
 window.renderModalBoards = () => {
@@ -2862,6 +2889,7 @@ window.saveClientWithAuthCheck = () => ensureAuthAndExecute(() => {
     isDirty=false; isCreatingNew=false; saveDB(); if(window.haptic) haptic('success'); document.getElementById('clientModal').style.display='none'; showToast("עודכן בהצלחה! " + getRandomCompliment(), "success");
     handleOmniSearch();
     updateCoverageStats();
+    refreshMap && refreshMap();
     if(currentMainView==='map' && currentBldg!==NO_ADDRESS_KEY) openBuildingModal();
 });
 
@@ -3245,7 +3273,35 @@ document.addEventListener('click', (e) => {
     } 
 });
 
-function getStatusColor(a) { const logs=a.interactions||[]; if(logs.length===0) return '#94a3b8'; const last=[...logs].sort((x,y)=>new Date(y.date)-new Date(x.date))[0].date; const diff=(new Date()-new Date(last))/86400000; return diff<=30?'#10b981':(diff<=90?'#f59e0b':'#ef4444'); }
+function getAptScore(a) {
+    const logs = a.interactions || [];
+    if (!logs.length) return -1; // -1 = no contact ever
+    const rules = appSettings.scoringRules?.channels || [];
+    const _typeToKey = { 'WhatsApp':'whatsapp','מייל':'email','SMS':'sms','שיחה':'phone','ביקור':'visit' };
+    const now = Date.now();
+    let score = 0;
+    logs.forEach(log => {
+        const ch = log.channel || _typeToKey[log.type] || '';
+        const rule = rules.find(r => r.key === ch);
+        if (!rule) return;
+        const logMs = new Date(log.date).getTime();
+        if (!logMs) return;
+        const ageDays = (now - logMs) / 86400000;
+        if (ageDays <= rule.ttlDays) score += rule.points;
+    });
+    return score;
+}
+
+window.getAptScore = getAptScore;
+
+function getStatusColor(a) {
+    const score = getAptScore(a);
+    if (score < 0) return '#94a3b8'; // אפור — אין קשר
+    const thresh = appSettings.scoringRules?.thresholds || { green: 60, orange: 25 };
+    if (score >= thresh.green)  return '#10b981';
+    if (score >= thresh.orange) return '#f59e0b';
+    return '#ef4444';
+}
 window.flyToBuildingFromTable = (bEnc) => { const b=decodeURIComponent(bEnc); if(b===NO_ADDRESS_KEY||!db[b].info.coords) {showToast('ללא מיקום מפה','error');return;} switchMainView('map'); map.flyTo({center:db[b].info.coords,zoom:19,pitch:60}); setTimeout(()=>{currentBldg=b;openBuildingModal();},1200); };
 
 window.toggleAllBulk = (cb) => { const cbs=document.querySelectorAll('.bulk-cb'); cbs.forEach(c=>c.checked=cb.checked); updateBulkBar(); };
@@ -3923,6 +3979,9 @@ window.openSettings=()=>{
     }).join('') + `<div style="display:flex;gap:8px;margin-top:8px;"><input type="text" id="newStyleInput" class="inline-input" placeholder="שם סגנון חדש..."><button class="btn btn-success" style="width:auto;" onclick="addNewStyle()">הוסף</button></div>`;
     document.getElementById('settingsModal').style.display='flex';
 
+    // ── Scoring rules UI ──
+    _renderScoringSettingsUI();
+
     // ── Initialize shlichut area section ──
     if(appSettings.missionName) {
         const mn = document.getElementById('settingsMissionName');
@@ -4022,6 +4081,34 @@ window.addNewStyle = () => {
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); saveDB(); populateFilterDropdowns(); openSettings(); refreshMap();
 };
 
+function _renderScoringSettingsUI() {
+    const g = document.getElementById('scoreThreshGreen');
+    const o = document.getElementById('scoreThreshOrange');
+    const t = appSettings.scoringRules?.thresholds || { green: 60, orange: 25 };
+    if (g) g.value = t.green;
+    if (o) o.value = t.orange;
+
+    const table = document.getElementById('scoringRulesTable');
+    if (!table) return;
+    const channels = appSettings.scoringRules?.channels || [];
+    const chColors = { visit:'#8b5cf6', phone:'#10b981', whatsapp:'#25D366', sms:'#0ea5e9', email:'#ea4335' };
+
+    table.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:6px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-muted);">
+            <span>סוג קשר</span><span style="text-align:center;">נקודות</span><span style="text-align:center;">תוקף (ימים)</span>
+        </div>` +
+    channels.map(ch => `
+        <div class="scoring-row" data-key="${ch.key}" style="display:grid;grid-template-columns:1fr 80px 80px;gap:6px;align-items:center;padding:6px 8px;background:var(--surface);border-radius:8px;border:1px solid var(--border-light);">
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;">
+                <span style="width:10px;height:10px;border-radius:50%;background:${chColors[ch.key]||'var(--accent)'};flex-shrink:0;display:inline-block;"></span>
+                ${escapeHTML(ch.label)}
+            </div>
+            <input type="number" class="inline-input score-pts" value="${ch.points}" min="0" max="999" style="padding:4px 6px;text-align:center;font-weight:700;color:var(--accent);">
+            <input type="number" class="inline-input score-ttl" value="${ch.ttlDays}" min="1" max="365" style="padding:4px 6px;text-align:center;">
+        </div>`
+    ).join('');
+}
+
 window.saveSettingsAndClose = () => {
     appSettings.defaultView = document.getElementById('setDefaultView').value;
 
@@ -4056,6 +4143,24 @@ window.saveSettingsAndClose = () => {
         };
     }
 
+    // Scoring rules
+    const gEl = document.getElementById('scoreThreshGreen');
+    const oEl = document.getElementById('scoreThreshOrange');
+    if (gEl && oEl) {
+        if (!appSettings.scoringRules) appSettings.scoringRules = { thresholds: {}, channels: [] };
+        appSettings.scoringRules.thresholds.green  = parseInt(gEl.value)  || 60;
+        appSettings.scoringRules.thresholds.orange = parseInt(oEl.value) || 25;
+        document.querySelectorAll('.scoring-row').forEach(row => {
+            const key = row.dataset.key;
+            const ch = appSettings.scoringRules.channels.find(c => c.key === key);
+            if (!ch) return;
+            const pts = row.querySelector('.score-pts');
+            const ttl = row.querySelector('.score-ttl');
+            if (pts) ch.points  = parseInt(pts.value)  || ch.points;
+            if (ttl) ch.ttlDays = parseInt(ttl.value) || ch.ttlDays;
+        });
+    }
+
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
     saveDB();
     populateFilterDropdowns();
@@ -4064,6 +4169,7 @@ window.saveSettingsAndClose = () => {
     renderTerritoryOnMap();
     updateCoverageStats();
     refreshMap();
+    handleOmniSearch();
     showToast('הגדרות נשמרו', 'success');
 };
 
@@ -4078,18 +4184,17 @@ window.setDefaultLocation = () => {
 // --- פונקציות תקשורת: וואטסאפ ומייל ---
 
 window.sendCommWhatsApp = async () => {
-    const text = document.getElementById('waMessageText').value;
+    const text = (document.getElementById('commMessageText') || document.getElementById('waMessageText'))?.value || '';
     if(!text) return showToast('יש להזין תוכן להודעה', 'warning');
     if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
-    
+
     const validRecipients = commRecipients.filter(r => r.phone);
     if(validRecipients.length === 0) return showToast('לא נמצאו טלפונים — הוסף מספר טלפון לאיש הקשר', 'error');
 
     if(validRecipients.length > 1 || text.includes('[שם]')) {
         startCommQueue('whatsapp', '', text, validRecipients);
         commRecipients = [];
-        renderRecipientsList('whatsapp');
-        document.getElementById('waRecipientCount').innerText = 0;
+        _updateCommRecipCount();
     } else {
         const r = validRecipients[0];
         let cp = String(r.phone).replace(/\D/g,'');
@@ -4108,15 +4213,14 @@ window.sendCommWhatsApp = async () => {
             showToast('פותח וואטסאפ...', 'success');
             if(window.autoLogSentMessage) autoLogSentMessage('whatsapp', commRecipients.filter(r=>r.key), text);
             commRecipients = [];
-            renderRecipientsList('whatsapp');
-            document.getElementById('waRecipientCount').innerText = 0;
+            _updateCommRecipCount();
         }
     }
 };
 
 window.sendCommEmail = async () => {
-    const subjInput = document.getElementById('emSubject').value || 'הודעה מהקהילה';
-    const textInput = document.getElementById('emMessageText').value;
+    const subjInput = document.getElementById('emSubject')?.value || 'הודעה מהקהילה';
+    const textInput = (document.getElementById('commMessageText') || document.getElementById('emMessageText'))?.value || '';
     
     if(!textInput) return showToast('יש להזין תוכן למייל', 'warning');
     if(commRecipients.length === 0) return showToast('יש להוסיף נמענים קודם!', 'error');
@@ -4134,8 +4238,7 @@ window.sendCommEmail = async () => {
         if(proceed === '1') {
             startCommQueue('email', subjInput, textInput, validRecipients);
             commRecipients = [];
-            renderRecipientsList('email');
-            document.getElementById('emRecipientCount').innerText = 0;
+            _updateCommRecipCount();
             return;
         }
     }
@@ -4155,8 +4258,7 @@ window.sendCommEmail = async () => {
     _doSendEmail(prov, finalSubj, finalText, emails);
     if(window.autoLogSentMessage) autoLogSentMessage('email', logRecipients, textInput);
     commRecipients = [];
-    renderRecipientsList('email');
-    document.getElementById('emRecipientCount').innerText = 0;
+    _updateCommRecipCount();
 };
 
 // שולח מייל בודד דרך Gmail API (ללא פתיחת חלון)
@@ -4331,6 +4433,9 @@ function showToast(msg, type='info') {
     setTimeout(() => { t.style.animation='fadeOut 0.3s ease-in forwards'; setTimeout(()=>t.remove(), 300); }, 3500);
 }
 
+// --- תקשורת ---
+let _currentCommChannel = 'whatsapp';
+
 // --- תבניות ---
 let commRecipients = [];
 // Bridge scope gap: audience.js writes window.commRecipients, but app.js functions
@@ -4403,55 +4508,41 @@ window.renderCommSenders = (type) => {
     if(bulkSelection.length > 0) {
         commRecipients = [];
         bulkSelection.forEach(v => {
-            let [b,i] = v.split('|'); let a = db[b].apts[i];
-            commRecipients.push({ name: a.name||'ללא שם', phone: getAllPhones(a)[0]||'', email: getAllEmails(a)[0]||'', key: v });
+            let [b,i] = v.split('|'); let a = db[b]?.apts?.[parseInt(i)];
+            if(a) {
+                const r = { name: a.name||'ללא שם', phone: getAllPhones(a)[0]||'', email: getAllEmails(a)[0]||'', key: v };
+                commRecipients.push(r);
+                // Reflect in sharedAudience so audience panel shows selections
+                if (window.sharedAudience && !window.sharedAudience.some(s => s.key === v))
+                    window.sharedAudience.push(r);
+            }
         });
         bulkSelection = [];
+        // Re-render audience panel so checkboxes reflect new selection
+        if (typeof openAudienceBuilder === 'function') openAudienceBuilder();
     }
-    const sel = document.getElementById(type === 'whatsapp' ? 'waTemplateSelect' : 'emTemplateSelect');
-    if(sel) {
-        sel.innerHTML = '<option value="">-- בחר תבנית או הקלד חופשי --</option>' +
-            (appSettings.templates || []).map((t, i) => `<option value="${i}">${t.title}</option>`).join('');
-    }
-    renderRecipientsList(type);
+    _loadCommTemplates && _loadCommTemplates();
+    _updateCommRecipCount();
 };
 
 window.renderRecipientsList = (type) => {
-    const containerId = type === 'whatsapp' ? 'waRecipientsList' : 'emRecipientsList';
-    const countId = type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount';
-    const container = document.getElementById(containerId);
-    const countEl = document.getElementById(countId);
-    if(countEl) countEl.innerText = commRecipients.length;
-    if(!container) return;
-    if(commRecipients.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">אין נמענים. הוסף ידנית או סמן משפחות ברשימה/מפה.</div>`;
-        return;
-    }
-    const field = type === 'whatsapp' ? 'phone' : 'email';
-    container.innerHTML = commRecipients.map((r,i) => `
-        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-body);border:1px solid var(--border-light);border-radius:6px;margin-bottom:4px;">
-            <span style="flex:1;font-weight:600;font-size:13px;">${r.name}</span>
-            <span style="font-size:12px;color:var(--text-muted);direction:ltr;">${r[field]||'<span style="color:var(--danger);">חסר</span>'}</span>
-            <button class="btn-icon" style="color:var(--danger);padding:2px 6px;" onclick="removeRecipient(${i},'${type}')"><i class="fas fa-times"></i></button>
-        </div>`).join('');
+    _updateCommRecipCount();
 };
 
 window.removeRecipient = (idx, type) => {
     commRecipients.splice(idx, 1);
-    renderRecipientsList(type);
-    const countEl = document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount');
-    if(countEl) countEl.innerText = commRecipients.length;
+    _updateCommRecipCount();
 };
 
 window.addRecipientManually = async (type) => {
+    const ch = type || _currentCommChannel;
     const name = await showCustomDialog({ title: 'הוסף נמען', message: 'שם המשפחה:', showInput: true, showCancel: true });
     if(!name) return;
-    const contact = await showCustomDialog({ title: 'הוסף נמען', message: type === 'whatsapp' ? 'מספר טלפון:' : 'כתובת מייל:', showInput: true, showCancel: true });
+    const fieldLabel = ch === 'email' ? 'כתובת מייל:' : 'מספר טלפון:';
+    const contact = await showCustomDialog({ title: 'הוסף נמען', message: fieldLabel, showInput: true, showCancel: true });
     if(!contact) return;
-    commRecipients.push({ name, phone: type === 'whatsapp' ? contact : '', email: type === 'email' ? contact : '', key: '' });
-    renderRecipientsList(type);
-    const countEl = document.getElementById(type === 'whatsapp' ? 'waRecipientCount' : 'emRecipientCount');
-    if(countEl) countEl.innerText = commRecipients.length;
+    commRecipients.push({ name: name.trim(), phone: ch === 'email' ? '' : contact.trim(), email: ch === 'email' ? contact.trim() : '', key: '' });
+    _updateCommRecipCount();
 };
 
 window.addRecipientsFromDB = (type) => {
@@ -4498,13 +4589,472 @@ window.closeRecipientPicker = (type) => {
 };
 
 window.previewWaTemplate = () => {
-    const idx = document.getElementById('waTemplateSelect').value;
-    if(idx !== '') document.getElementById('waMessageText').value = (appSettings.templates[idx]||{}).text || '';
+    const idx = document.getElementById('waTemplateSelect')?.value;
+    if(idx !== '') {
+        const t = (appSettings.templates[idx]||{}).text || '';
+        const ta = document.getElementById('commMessageText') || document.getElementById('waMessageText');
+        if(ta) ta.value = t;
+    }
 };
 
 window.previewEmTemplate = () => {
-    const idx = document.getElementById('emTemplateSelect').value;
-    if(idx !== '') document.getElementById('emMessageText').value = (appSettings.templates[idx]||{}).text || '';
+    const idx = document.getElementById('emTemplateSelect')?.value;
+    if(idx !== '') {
+        const t = (appSettings.templates[idx]||{}).text || '';
+        const ta = document.getElementById('commMessageText') || document.getElementById('emMessageText');
+        if(ta) ta.value = t;
+    }
+};
+
+// ══════════════════════════════════════════════════════════════
+// COMM HUB — New unified functions
+// ══════════════════════════════════════════════════════════════
+
+window.switchCommMode = function(mode) {
+    document.querySelectorAll('.comm-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    document.querySelectorAll('.comm-mode-content').forEach(el => el.classList.remove('active'));
+    const target = document.getElementById('comm-mode-' + mode);
+    if (target) target.classList.add('active');
+    if (mode === 'calls')     renderCallList && renderCallList();
+    if (mode === 'logs')      renderCommLogs && renderCommLogs();
+    if (mode === 'templates') renderTemplates && renderTemplates();
+    if (mode === 'docs')      renderAllConvDocs && renderAllConvDocs();
+    if (mode === 'compose')   _restoreCommDraft();
+    updateCommStats && updateCommStats();
+};
+
+window.switchCommChannel = function(ch) {
+    _currentCommChannel = ch;
+    document.querySelectorAll('.comm-ch-btn').forEach(b => b.classList.toggle('active', b.dataset.ch === ch));
+    const subjectRow = document.getElementById('commSubjectRow');
+    if (subjectRow) subjectRow.style.display = ch === 'email' ? 'block' : 'none';
+    const smsBar = document.getElementById('smsCharCounter');
+    if (smsBar) smsBar.style.display = ch === 'sms' ? 'block' : 'none';
+    const smsBadge = document.getElementById('smsProviderBadge');
+    const smsSvcBtn = document.getElementById('smsSvcBtn');
+    if (smsBadge) smsBadge.style.display = ch === 'sms' ? 'inline' : 'none';
+    if (smsSvcBtn) smsSvcBtn.style.display = ch === 'sms' ? 'inline-flex' : 'none';
+    _updateCommRecipCount();
+    _loadCommTemplates();
+};
+
+window._updateCommRecipCount = function() {
+    const ch = _currentCommChannel;
+    let total = 0, missing = 0;
+    const src = ch === 'sms' ? (window._smsR || []) : (window.commRecipients || []);
+    const field = ch === 'email' ? 'email' : 'phone';
+
+    if (ch === 'sms') {
+        total = src.filter(r => r.phone).length;
+        missing = src.filter(r => !r.phone).length;
+    } else if (ch === 'email') {
+        total = src.filter(r => r.email).length;
+        missing = src.filter(r => !r.email).length;
+    } else {
+        total = src.filter(r => r.phone).length;
+        missing = src.filter(r => !r.phone).length;
+    }
+
+    const countEl = document.getElementById('commRecipCount');
+    if (countEl) countEl.textContent = total;
+
+    const warn = document.getElementById('commMissingWarn');
+    if (warn) {
+        if (missing > 0 && src.length > 0) {
+            const fieldLabel = ch === 'email' ? 'מייל' : 'טלפון';
+            warn.textContent = `⚠️ ${missing} חסרי ${fieldLabel}`;
+            warn.style.display = 'inline';
+        } else {
+            warn.style.display = 'none';
+        }
+    }
+
+    const chips = document.getElementById('commRecipChips');
+    if (chips) {
+        const shown = src.slice(0, 5);
+        chips.innerHTML = shown.map(r => `<span class="comm-recip-chip">${escapeHTML(r.name)}</span>`).join('')
+            + (src.length > 5 ? `<span class="comm-recip-chip">+${src.length - 5}</span>` : '');
+    }
+
+    // Send button color by channel
+    const btn = document.getElementById('commSendBtn');
+    if (btn) {
+        const colors = { whatsapp: '#25D366', email: '#ea4335', sms: '#0ea5e9' };
+        btn.style.background = colors[ch] || '';
+        btn.style.borderColor = colors[ch] || '';
+    }
+};
+
+window._loadCommTemplates = function() {
+    const sel = document.getElementById('commTemplateSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- בחר תבנית --</option>' +
+        (appSettings.templates || []).map((t, i) =>
+            `<option value="${i}">${escapeHTML(t.title)}</option>`
+        ).join('');
+};
+
+window.applyCommTemplate = function() {
+    const sel = document.getElementById('commTemplateSelect');
+    const ta  = document.getElementById('commMessageText');
+    if (!sel || !ta) return;
+    const idx = parseInt(sel.value);
+    if (!isNaN(idx) && appSettings.templates?.[idx]) {
+        ta.value = appSettings.templates[idx].text;
+        onCommTextInput(ta);
+    }
+};
+
+window.onCommTextInput = function(ta) {
+    // SMS char counter
+    const counter = document.getElementById('smsCharCounter');
+    const num     = document.getElementById('smsCharNum');
+    const multi   = document.getElementById('smsMultiPart');
+    if (counter && _currentCommChannel === 'sms') {
+        const len = ta.value.length;
+        if (num) num.textContent = len;
+        if (num) num.style.color = len > 160 ? 'var(--danger)' : 'var(--text-muted)';
+        if (multi) {
+            if (len > 160) {
+                const parts = Math.ceil(len / 153);
+                multi.textContent = `${parts} חלקים`;
+                multi.style.display = 'inline';
+            } else {
+                multi.style.display = 'none';
+            }
+        }
+        counter.style.display = 'block';
+    }
+    // Draft auto-save
+    try {
+        localStorage.setItem('comm_draft', JSON.stringify({
+            ch: _currentCommChannel,
+            text: ta.value,
+            subject: document.getElementById('emSubject')?.value || ''
+        }));
+    } catch(e) {}
+};
+
+window._restoreCommDraft = function() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('comm_draft') || 'null');
+        if (!saved) return;
+        if (saved.ch) switchCommChannel(saved.ch);
+        const ta = document.getElementById('commMessageText');
+        if (ta && saved.text) ta.value = saved.text;
+        const subj = document.getElementById('emSubject');
+        if (subj && saved.subject) subj.value = saved.subject;
+    } catch(e) {}
+};
+
+window.sendCommMessage = function() {
+    const text = document.getElementById('commMessageText')?.value?.trim();
+    if (!text) return showToast('יש להזין תוכן', 'warning');
+    // Sync hidden legacy textareas so old send functions still work
+    const smsTA = document.getElementById('smsMessageText');
+    if (smsTA) smsTA.value = text;
+    if (_currentCommChannel === 'whatsapp') sendCommWhatsApp();
+    else if (_currentCommChannel === 'email') sendCommEmail();
+    else if (_currentCommChannel === 'sms')   sendCommSMS();
+};
+
+window.showCommPreview = function() {
+    const text = document.getElementById('commMessageText')?.value?.trim();
+    if (!text) return showToast('יש להזין תוכן תחילה', 'warning');
+    const ch = _currentCommChannel;
+    const src = ch === 'sms' ? (window._smsR || []) : (window.commRecipients || []);
+    if (!src.length) return showToast('אין נמענים לתצוגה מקדימה', 'warning');
+
+    const samples = src.slice(0, 3);
+    const chLabel = { whatsapp: 'WhatsApp', email: 'מייל', sms: 'SMS' }[ch] || ch;
+    const chColor = { whatsapp: '#25D366', email: '#ea4335', sms: '#0ea5e9' }[ch] || 'var(--accent)';
+
+    const content = document.getElementById('commPreviewContent');
+    if (!content) return;
+    content.innerHTML = samples.map(r => {
+        const msg = text.replace(/\[\s*שם\s*\]/g, r.name || 'משפחה יקרה');
+        return `<div style="background:var(--bg-body);border-radius:10px;padding:12px;border:1px solid var(--border-light);">
+            <div style="font-size:11px;font-weight:700;color:${chColor};margin-bottom:6px;">
+                <i class="fas fa-user"></i> ${escapeHTML(r.name)} — ${chLabel}
+            </div>
+            <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${escapeHTML(msg)}</div>
+        </div>`;
+    }).join('');
+
+    if (src.length > 3) {
+        content.innerHTML += `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:8px;">
+            ועוד ${src.length - 3} נמענים...
+        </div>`;
+    }
+
+    document.getElementById('commPreviewModal').style.display = 'flex';
+};
+
+window.addManualCommRecipient = async function() {
+    const ch = _currentCommChannel;
+    const name = await showCustomDialog({ title: 'הוסף נמען', message: 'שם המשפחה:', showInput: true, showCancel: true });
+    if (!name) return;
+    const fieldLabel = ch === 'email' ? 'כתובת מייל:' : 'מספר טלפון:';
+    const contact = await showCustomDialog({ title: 'הוסף נמען', message: fieldLabel, showInput: true, showCancel: true });
+    if (!contact) return;
+    if (ch === 'sms') {
+        if (!window._smsR) window._smsR = [];
+        window._smsR.push({ name: name.trim(), phone: contact.trim(), key: null });
+    } else {
+        commRecipients.push({
+            name: name.trim(),
+            phone: ch === 'whatsapp' ? contact.trim() : '',
+            email: ch === 'email'    ? contact.trim() : '',
+            key: ''
+        });
+    }
+    _updateCommRecipCount();
+};
+
+// ══════════════════════════════════════════════════════════════
+// CONV DOCS — תיעוד שיחות (documentation hub)
+// ══════════════════════════════════════════════════════════════
+
+const _docTypeLabels = { summary: 'סיכום', thread: 'שרשור', transcript: 'תמליל', recording_link: 'הקלטה' };
+const _docTypeBadgeColors = { summary: '#6366f1', thread: '#25D366', transcript: '#f59e0b', recording_link: '#0ea5e9' };
+const _docChanIcons = {
+    phone:   { icon: 'fa-phone fas',    color: 'var(--success)', label: 'שיחה' },
+    whatsapp:{ icon: 'fa-whatsapp fab', color: '#25D366',        label: 'WhatsApp' },
+    email:   { icon: 'fa-envelope fas', color: '#ea4335',        label: 'מייל' },
+    visit:   { icon: 'fa-walking fas',  color: 'var(--accent)', label: 'ביקור' },
+    general: { icon: 'fa-file fas',     color: 'var(--text-muted)', label: 'כללי' }
+};
+
+let _docsChannelFilter = '';
+let _docsTypeFilter = '';
+let _docsSearch = '';
+
+window.setDocsChannelFilter = function(f) {
+    _docsChannelFilter = f;
+    document.querySelectorAll('[data-df]').forEach(b => b.classList.toggle('active', b.dataset.df === f));
+    renderAllConvDocs();
+};
+window.setDocsTypeFilter = function(f) {
+    _docsTypeFilter = f;
+    document.querySelectorAll('[data-dt]').forEach(b => b.classList.toggle('active', b.dataset.dt === f));
+    renderAllConvDocs();
+};
+window.setDocsSearch = function(v) { _docsSearch = v; renderAllConvDocs(); };
+
+window.renderAllConvDocs = function() {
+    const c = document.getElementById('allDocsTimeline');
+    if (!c) return;
+
+    let entries = [];
+    Object.keys(db).forEach(bldg => {
+        if (bldg === '__BOARDS__' || bldg === '__SETTINGS__' || bldg === 'meta') return;
+        (db[bldg]?.apts || []).forEach((apt, idx) => {
+            (apt.convDocs || []).forEach(doc => entries.push({ bldg, idx, apt, doc }));
+        });
+    });
+
+    entries.sort((a, b) => (b.doc.createdAt || 0) - (a.doc.createdAt || 0));
+
+    if (_docsChannelFilter) entries = entries.filter(e => e.doc.channel === _docsChannelFilter);
+    if (_docsTypeFilter)    entries = entries.filter(e => e.doc.docType  === _docsTypeFilter);
+    if (_docsSearch) {
+        const q = _docsSearch.toLowerCase();
+        entries = entries.filter(e =>
+            (e.apt.name||'').toLowerCase().includes(q) ||
+            (e.doc.title||'').toLowerCase().includes(q) ||
+            (e.doc.body||'').toLowerCase().includes(q)
+        );
+    }
+
+    const counter = document.getElementById('docsCount');
+    if (counter) counter.textContent = entries.length;
+
+    if (entries.length === 0) {
+        c.innerHTML = `<div class="empty-state" style="padding:40px 0;">
+            <i class="fas fa-folder-open" style="font-size:36px;opacity:.3;"></i>
+            <h4>אין תיעודים עדיין</h4>
+            <p style="color:var(--text-muted);">פתח כרטיס משפחה → לשונית "תיעוד" → הוסף תיעוד</p>
+        </div>`;
+        return;
+    }
+
+    c.innerHTML = entries.map(({ bldg, idx, apt, doc }) => {
+        const ci = _docChanIcons[doc.channel] || _docChanIcons.general;
+        const typeLabel = _docTypeLabels[doc.docType] || doc.docType || '';
+        const typeBadgeColor = _docTypeBadgeColors[doc.docType] || 'var(--accent)';
+        const safeFamily = escapeHTML(apt.name || 'ללא שם');
+        const safeTitle  = escapeHTML(doc.title || '');
+        const safePreview= escapeHTML((doc.body || '').substring(0, 130));
+        const safeDate   = escapeHTML(doc.date || '');
+        const recLink = doc.recordingUrl
+            ? `<a href="${escapeHTML(doc.recordingUrl)}" target="_blank" onclick="event.stopPropagation();" class="doc-rec-link"><i class="fas fa-headphones"></i> האזן להקלטה</a>`
+            : '';
+
+        return `<div class="conv-doc-entry" onclick="currentBldg='${escapeHTML(bldg)}'; openClientCard(${idx}); setTimeout(()=>switchCrmTab('docs'),350)">
+            <div class="conv-doc-icon" style="background:${ci.color}22;color:${ci.color};"><i class="${ci.icon}"></i></div>
+            <div class="conv-doc-body">
+                <div class="conv-doc-header">
+                    <span class="conv-doc-name">${safeFamily}</span>
+                    <span class="conv-doc-type-badge" style="background:${typeBadgeColor}22;color:${typeBadgeColor};">${typeLabel}</span>
+                    <span class="conv-doc-date">${safeDate}</span>
+                </div>
+                ${safeTitle ? `<div class="conv-doc-title">${safeTitle}</div>` : ''}
+                ${safePreview ? `<div class="conv-doc-preview">${safePreview}${(doc.body||'').length > 130 ? '...' : ''}</div>` : ''}
+                ${recLink}
+            </div>
+        </div>`;
+    }).join('');
+};
+
+// ── Per-family docs (client card tab) ─────────────────────
+
+window.renderConvDocs = function(bldg, idx) {
+    const c = document.getElementById('convDocsList');
+    if (!c || !bldg) return;
+    const apt = db[bldg]?.apts?.[idx];
+    if (!apt) return;
+    const docs = apt.convDocs || [];
+
+    if (docs.length === 0) {
+        c.innerHTML = `<div class="empty-state" style="padding:24px 0;"><i class="fas fa-folder-open" style="font-size:28px;opacity:.3;"></i>
+            <div style="margin-top:8px;font-size:13px;color:var(--text-muted);">אין תיעודים עבור משפחה זו</div></div>`;
+        return;
+    }
+
+    const sorted = [...docs].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    c.innerHTML = sorted.map((doc, i) => {
+        const ci = _docChanIcons[doc.channel] || _docChanIcons.general;
+        const typeLabel = _docTypeLabels[doc.docType] || doc.docType || '';
+        const typeBadgeColor = _docTypeBadgeColors[doc.docType] || 'var(--accent)';
+        const safeTitle   = escapeHTML(doc.title || '');
+        const safeDate    = escapeHTML(doc.date || '');
+        const bodyPreview = escapeHTML((doc.body || '').substring(0, 150));
+        const bodyFull    = escapeHTML(doc.body || '');
+        const docIdx = docs.indexOf(doc);
+        const recLink = doc.recordingUrl
+            ? `<a href="${escapeHTML(doc.recordingUrl)}" target="_blank" onclick="event.stopPropagation();" class="doc-rec-link"><i class="fas fa-headphones"></i> האזן</a>`
+            : '';
+
+        return `<div class="conv-doc-card" id="convDocCard-${docIdx}">
+            <div class="conv-doc-card-header" onclick="toggleDocExpand(${docIdx})">
+                <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                    <span style="width:28px;height:28px;border-radius:50%;background:${ci.color}22;color:${ci.color};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;"><i class="${ci.icon}"></i></span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                            ${safeTitle ? `<span style="font-weight:700;font-size:13px;">${safeTitle}</span>` : ''}
+                            <span style="font-size:11px;padding:1px 6px;border-radius:8px;background:${typeBadgeColor}22;color:${typeBadgeColor};">${typeLabel}</span>
+                            <span style="font-size:11px;color:var(--text-muted);">${safeDate}</span>
+                        </div>
+                        ${bodyPreview ? `<div class="conv-doc-preview" id="convDocPreview-${docIdx}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${bodyPreview}${(doc.body||'').length > 150 ? '...' : ''}</div>` : ''}
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+                    ${recLink}
+                    <button class="btn-icon" style="color:var(--danger);padding:2px 6px;font-size:12px;" onclick="event.stopPropagation();deleteConvDoc('${escapeHTML(bldg)}',${idx},${docIdx})" title="מחק"><i class="fas fa-trash"></i></button>
+                    <i class="fas fa-chevron-down" id="convDocChevron-${docIdx}" style="font-size:11px;color:var(--text-muted);transition:transform 0.2s;"></i>
+                </div>
+            </div>
+            <div id="convDocFull-${docIdx}" style="display:none;padding:10px 12px;border-top:1px solid var(--border-light);font-size:13px;line-height:1.7;white-space:pre-wrap;">${bodyFull}</div>
+        </div>`;
+    }).join('');
+};
+
+window.toggleDocExpand = function(docIdx) {
+    const full    = document.getElementById(`convDocFull-${docIdx}`);
+    const preview = document.getElementById(`convDocPreview-${docIdx}`);
+    const chevron = document.getElementById(`convDocChevron-${docIdx}`);
+    if (!full) return;
+    const open = full.style.display !== 'none';
+    full.style.display    = open ? 'none' : 'block';
+    if (preview) preview.style.display = open ? '' : 'none';
+    if (chevron) chevron.style.transform = open ? '' : 'rotate(180deg)';
+};
+
+window.openAddConvDoc = function() {
+    const form = document.getElementById('addConvDocForm');
+    if (!form) return;
+    const dateEl = document.getElementById('newDocDate');
+    if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+    document.getElementById('newDocTitle').value = '';
+    document.getElementById('newDocBody').value = '';
+    const recUrl = document.getElementById('newDocRecordingUrl');
+    if (recUrl) recUrl.value = '';
+    document.getElementById('newDocChannel').value = 'phone';
+    document.getElementById('newDocType').value = 'summary';
+    toggleDocRecordingUrl();
+    form.style.display = 'block';
+    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+
+window.cancelAddConvDoc = function() {
+    const form = document.getElementById('addConvDocForm');
+    if (form) form.style.display = 'none';
+};
+
+window.toggleDocRecordingUrl = function() {
+    const typeEl = document.getElementById('newDocType');
+    const row    = document.getElementById('newDocRecordingRow');
+    if (!typeEl || !row) return;
+    row.style.display = typeEl.value === 'recording_link' ? 'block' : 'none';
+};
+
+window.saveConvDoc = function() {
+    const date    = document.getElementById('newDocDate')?.value || '';
+    const channel = document.getElementById('newDocChannel')?.value || 'general';
+    const docType = document.getElementById('newDocType')?.value || 'summary';
+    const title   = document.getElementById('newDocTitle')?.value?.trim() || '';
+    const body    = document.getElementById('newDocBody')?.value?.trim() || '';
+    const recUrl  = document.getElementById('newDocRecordingUrl')?.value?.trim() || '';
+
+    if (docType !== 'recording_link' && !body) { showToast('יש להזין תוכן', 'warning'); return; }
+    if (docType === 'recording_link' && !recUrl && !body) { showToast('יש להזין קישור להקלטה', 'warning'); return; }
+
+    const apt = db[currentBldg]?.apts?.[currentAptIdx];
+    if (!apt) return;
+    if (!apt.convDocs) apt.convDocs = [];
+
+    apt.convDocs.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        date, channel, docType, title, body,
+        recordingUrl: recUrl,
+        createdAt: Date.now()
+    });
+    apt.updatedAt = Date.now();
+    saveDB();
+    cancelAddConvDoc();
+    renderConvDocs(currentBldg, currentAptIdx);
+    showToast('התיעוד נשמר ✅', 'success');
+};
+
+window.deleteConvDoc = async function(bldg, idx, docIdx) {
+    const ok = await showCustomDialog({ title: 'מחיקת תיעוד', message: 'האם למחוק תיעוד זה?', showCancel: true });
+    if (!ok) return;
+    const apt = db[bldg]?.apts?.[idx];
+    if (!apt?.convDocs) return;
+    apt.convDocs.splice(docIdx, 1);
+    apt.updatedAt = Date.now();
+    saveDB();
+    renderConvDocs(bldg, idx);
+    showToast('התיעוד נמחק', 'info');
+};
+
+window._offerStatusUpdate = async function(count) {
+    if (!count) return;
+    const yes = await showCustomDialog({
+        title: 'עדכון סטטוס',
+        message: `לסמן את ${count} המשפחות ששלחת להן כ"ירוק"?`,
+        showCancel: true
+    });
+    if (!yes) return;
+    let updated = 0;
+    const src = _currentCommChannel === 'sms' ? (window._smsR || []) : (window.commRecipients || []);
+    src.forEach(r => {
+        if (!r.key) return;
+        const [bldg, idxStr] = r.key.split('|');
+        const apt = db[bldg]?.apts?.[parseInt(idxStr)];
+        if (apt) { apt.status = 'green'; apt.updatedAt = Date.now(); updated++; }
+    });
+    if (updated > 0) { saveDB(); handleOmniSearch(); showToast(`${updated} משפחות סומנו ירוק ✅`, 'success'); }
 };
 
 // --- גיבוי וייבוא JSON ---

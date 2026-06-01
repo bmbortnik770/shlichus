@@ -8,15 +8,11 @@ let _audExpanded     = false;
 let _audSegment      = 'all';
 let _audStyleFilter  = '';
 
-// ── Toggle open/close ─────────────────────────────────────
+// ── Toggle (now a no-op — panel is always visible) ────────
 window.toggleAudienceBuilder = function () {
-    _audExpanded = !_audExpanded;
-    const body = document.getElementById('audBody');
-    const chev = document.getElementById('audChevron');
-    if (!body) return;
-    body.style.display = _audExpanded ? 'block' : 'none';
-    if (chev) chev.style.transform = _audExpanded ? 'rotate(180deg)' : '';
-    if (_audExpanded) { _buildStylePills(); _renderList(''); }
+    _audExpanded = true;
+    _buildStylePills();
+    _renderList('');
 };
 
 // ── Smart Segments ─────────────────────────────────────────
@@ -143,6 +139,7 @@ window.toggleAudItem = function (cb) {
     }
     cb.closest('.aud-family-row').classList.toggle('selected', cb.checked);
     _refreshCounts();
+    _syncAudienceToChannels();
 };
 
 // ── Select all visible ─────────────────────────────────────
@@ -162,6 +159,7 @@ window.toggleAudSelectAll = function (checked) {
         }
     });
     _renderList(document.getElementById('audSearch')?.value || '');
+    _syncAudienceToChannels();
 };
 
 window.filterAudList = function (q) { _renderList(q); };
@@ -187,51 +185,37 @@ window.toggleAudStylePill = function (btn, s) {
     _renderList(document.getElementById('audSearch')?.value || '');
 };
 
-// ── Apply to all channels ──────────────────────────────────
-window.applyAudienceToChannels = function () {
-    if (!sharedAudience.length) return showToast('בחר משפחות קודם', 'warning');
-
-    // WhatsApp + Email (commRecipients)
-    window.commRecipients = sharedAudience.map(r => ({ ...r }));
-    if (typeof renderRecipientsList === 'function') {
-        renderRecipientsList('whatsapp');
-        renderRecipientsList('email');
+// ── Sync to channels (called automatically on every selection change) ──
+function _syncAudienceToChannels() {
+    if (!sharedAudience.length) {
+        window.commRecipients = [];
+        window._smsR = [];
+    } else {
+        window.commRecipients = sharedAudience.map(r => ({ ...r }));
+        window._smsR = sharedAudience
+            .filter(r => r.phone)
+            .map(r => ({ name: r.name, phone: r.phone, key: r.key }));
     }
-    const waCnt = document.getElementById('waRecipientCount');
-    const emCnt = document.getElementById('emRecipientCount');
-    if (waCnt) waCnt.innerText = commRecipients.filter(r => r.phone).length;
-    if (emCnt) emCnt.innerText = commRecipients.filter(r => r.email).length;
-
-    // SMS (_smsR via renderSMSRecipients)
-    if (typeof renderSMSRecipients === 'function') {
-        window.bulkSelection = sharedAudience.map(r => r.key);
-        renderSMSRecipients();
-        window.bulkSelection = [];
-    }
-
-    _refreshHeaderChips();
+    window._updateCommRecipCount && _updateCommRecipCount();
     updateCommStats && updateCommStats();
-    if (_audExpanded) toggleAudienceBuilder();
-    showToast(`${sharedAudience.length} משפחות נטענו לכל הערוצים ✅`, 'success');
+}
+
+// ── Public alias (kept for any external callers) ──────────
+window.applyAudienceToChannels = function () {
+    _syncAudienceToChannels();
+    if (sharedAudience.length) showToast(`${sharedAudience.length} משפחות נטענו ✅`, 'success');
 };
 
 // ── Clear ──────────────────────────────────────────────────
 window.clearAudience = function () {
     sharedAudience = [];
     window.commRecipients = [];
-    if (typeof renderRecipientsList === 'function') {
-        renderRecipientsList('whatsapp');
-        renderRecipientsList('email');
-    }
-    ['waRecipientCount', 'emRecipientCount'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.innerText = '0';
-    });
     window._smsR = [];
-    if (typeof renderSMSRecipients === 'function') renderSMSRecipients();
+    const cb = document.getElementById('audSelectAllCb');
+    if (cb) cb.checked = false;
     _refreshCounts();
-    _refreshHeaderChips();
-    if (_audExpanded) _renderList('');
+    _renderList('');
+    window._updateCommRecipCount && _updateCommRecipCount();
     showToast('הקהל נוקה', 'info');
 };
 
@@ -257,9 +241,11 @@ function _refreshHeaderChips () {
     }
 }
 
-// Open the builder directly from channel "choose from list" buttons
+// Open the builder — panel is always visible in new design
 window.openAudienceBuilder = function () {
-    if (!_audExpanded) toggleAudienceBuilder();
+    _audExpanded = true;
+    _buildStylePills();
+    _renderList('');
     document.getElementById('audienceBuilder')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
 
@@ -540,4 +526,79 @@ window.toggleAdvFilters = function() {
     const body = document.getElementById('audAdvBody');
     if (body) body.style.display = _advOpen ? 'block' : 'none';
     if (_advOpen) _renderAdvFilters();
+};
+
+// ══════════════════════════════════════════════════════════════
+// Named Segments — save & load
+// ══════════════════════════════════════════════════════════════
+
+window.saveAudSegment = async function() {
+    if (!sharedAudience.length) return showToast('בחר משפחות קודם', 'warning');
+    const name = await showCustomDialog({ title: 'שמור סגמנט', message: 'שם הסגמנט:', showInput: true, showCancel: true });
+    if (!name || !name.trim()) return;
+    if (!appSettings.savedSegments) appSettings.savedSegments = [];
+    appSettings.savedSegments.push({
+        name: name.trim(),
+        keys: sharedAudience.map(r => r.key)
+    });
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    _renderSavedSegments();
+    showToast(`סגמנט "${name.trim()}" נשמר ✅`, 'success');
+};
+
+function _renderSavedSegments() {
+    const wrap = document.getElementById('audSavedSegsWrap');
+    if (!wrap) return;
+    const segs = appSettings.savedSegments || [];
+    wrap.innerHTML = segs.map((s, i) =>
+        `<button class="aud-seg-btn" onclick="loadAudSegment(${i})" style="font-size:11px;" title="לחץ לטעינה / לחץ ימני למחיקה" oncontextmenu="deleteAudSegment(event,${i})">
+            <i class="fas fa-bookmark" style="font-size:9px;"></i> ${escapeHTML(s.name)}
+        </button>`
+    ).join('');
+}
+
+window.loadAudSegment = function(i) {
+    const seg = (appSettings.savedSegments || [])[i];
+    if (!seg) return;
+    sharedAudience = [];
+    (seg.keys || []).forEach(key => {
+        if (!key) return;
+        const [bldg, idxStr] = key.split('|');
+        const apt = db[bldg]?.apts?.[parseInt(idxStr)];
+        if (!apt) return;
+        sharedAudience.push({
+            name: apt.name || 'ללא שם',
+            phone: getAllPhones(apt)[0] || '',
+            email: getAllEmails(apt)[0] || '',
+            key
+        });
+    });
+    _refreshCounts();
+    _renderList('');
+    _syncAudienceToChannels();
+    showToast(`סגמנט "${seg.name}" נטען — ${sharedAudience.length} משפחות ✅`, 'success');
+};
+
+window.deleteAudSegment = function(e, i) {
+    e.preventDefault();
+    if (!appSettings.savedSegments) return;
+    const seg = appSettings.savedSegments[i];
+    if (!seg) return;
+    appSettings.savedSegments.splice(i, 1);
+    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    _renderSavedSegments();
+    showToast(`סגמנט "${seg.name}" נמחק`, 'info');
+};
+
+// Auto-init: render saved segments and initial list when entering comm view
+const _origSwitchMainView = window.switchMainView;
+window.switchMainView = function(view) {
+    if (_origSwitchMainView) _origSwitchMainView(view);
+    if (view === 'comm') {
+        _audExpanded = true;
+        _buildStylePills();
+        _renderList('');
+        _renderSavedSegments();
+        window._loadCommTemplates && _loadCommTemplates();
+    }
 };

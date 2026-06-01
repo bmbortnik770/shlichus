@@ -104,10 +104,11 @@ body {
     direction: rtl;
 }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-solid); border-radius: 10px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-body); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border-solid); border-radius: 4px; min-height: 40px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-hint); }
+* { scrollbar-width: thin; scrollbar-color: var(--border-solid) var(--bg-body); }
 
 /* ─── Splash ────────────────────────────────────────────────── */
 /* ─── Splash ─────────────────────────────────────────────────── */
@@ -1000,3 +1001,280 @@ body.dark-mode .dfab-label { background: var(--surface-2); color: var(--text-mai
     border-color: transparent; box-shadow: var(--glow-blue);
 }
 .smart-view-item.active i { color: white; }
+
+/* ══════════════════════════════════════════════════════════════
+   COMM HUB — New layout
+   ══════════════════════════════════════════════════════════════ */
+
+/* Card wrapper */
+.comm-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--card-shadow);
+    background: var(--surface);
+}
+
+/* ── Mode nav ── */
+.comm-mode-nav {
+    display: flex;
+    background: var(--surface);
+    border-radius: 14px 14px 0 0;
+    border-bottom: 1px solid var(--border-light);
+    padding: 0 16px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 0;
+}
+.comm-mode-nav::-webkit-scrollbar { display: none; }
+.comm-mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+    font-family: inherit;
+    margin-bottom: -1px;
+}
+.comm-mode-btn:hover:not(.active) { color: var(--text-main); }
+.comm-mode-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Mode content panels ── */
+.comm-mode-content { flex: 1; display: none; min-height: 0; overflow: hidden; }
+.comm-mode-content.active { display: flex; }
+#comm-mode-compose { flex-direction: row; }
+#comm-mode-calls, #comm-mode-logs, #comm-mode-templates { flex-direction: column; }
+
+/* Full-width inner wrapper for non-compose modes */
+.comm-fullwidth-inner {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow: hidden;
+}
+
+/* ── Audience panel (right side in RTL) ── */
+.comm-audience-panel {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border-light);
+    background: var(--bg-body);
+    overflow: hidden;
+}
+.comm-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 14px;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-main);
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0;
+    background: var(--surface);
+}
+.aud-segs-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 10px 12px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--surface);
+}
+.aud-search-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border-light);
+}
+.comm-family-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.comm-aud-footer {
+    padding: 8px 12px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    background: var(--surface);
+    border-top: 1px solid var(--border-light);
+    flex-shrink: 0;
+    gap: 6px;
+}
+
+/* ── Compose panel (left side in RTL) ── */
+.comm-compose-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 20px;
+    gap: 12px;
+    overflow-y: auto;
+    background: var(--surface);
+}
+
+/* Channel bar */
+.comm-channel-bar {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.comm-ch-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 22px;
+    border: 2px solid var(--border-light);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+}
+.comm-ch-btn:hover { border-color: var(--border-solid); color: var(--text-main); }
+.comm-ch-btn.active[data-ch="whatsapp"] { border-color: #25D366; color: #25D366; background: #25D36618; }
+.comm-ch-btn.active[data-ch="email"]    { border-color: #ea4335; color: #ea4335; background: #ea433518; }
+.comm-ch-btn.active[data-ch="sms"]      { border-color: #0ea5e9; color: #0ea5e9; background: #0ea5e918; }
+
+/* Recipients row */
+.comm-recipients-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: var(--bg-body);
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    flex-shrink: 0;
+}
+.comm-recip-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.comm-recip-count { font-size: 22px; font-weight: 800; color: var(--accent); min-width: 28px; line-height: 1; }
+.comm-recip-chips { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.comm-recip-chip {
+    font-size: 11px; padding: 2px 8px;
+    background: var(--accent-light); color: var(--accent);
+    border-radius: 10px; font-weight: 600;
+}
+.comm-missing-warn {
+    font-size: 11px; color: var(--warning);
+    background: var(--warning-light);
+    border-radius: 8px; padding: 2px 8px;
+    white-space: nowrap;
+}
+.comm-add-manual-btn {
+    padding: 4px 8px; border-radius: 8px;
+    border: 1px solid var(--border-light);
+    background: transparent; cursor: pointer;
+    color: var(--text-muted); font-size: 13px;
+    transition: all .15s;
+}
+.comm-add-manual-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Template row */
+.comm-template-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Message editor */
+.comm-editor {
+    flex: 1;
+    min-height: 120px;
+    resize: vertical;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+/* Send row */
+.comm-send-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.comm-send-btn { width: auto !important; padding: 10px 28px; font-size: 15px; font-weight: 700; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    #comm-mode-compose { flex-direction: column; }
+    .comm-audience-panel {
+        width: 100%; max-height: 260px;
+        border-left: none; border-bottom: 1px solid var(--border-light);
+    }
+    .comm-family-list { max-height: 120px; }
+}
+
+/* ── Conv Docs — global timeline (comm hub docs mode) ── */
+.conv-doc-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.1s;
+}
+.conv-doc-entry:hover { box-shadow: var(--hover-shadow); transform: translateX(-2px); }
+.conv-doc-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 14px;
+}
+.conv-doc-body { flex: 1; min-width: 0; }
+.conv-doc-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.conv-doc-name { font-weight: 700; font-size: 14px; color: var(--text-main); }
+.conv-doc-type-badge { font-size: 11px; padding: 2px 7px; border-radius: 8px; font-weight: 600; }
+.conv-doc-date { font-size: 11px; color: var(--text-muted); margin-right: auto; }
+.conv-doc-title { font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 3px; }
+.conv-doc-preview { font-size: 12px; color: var(--text-muted); line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-rec-link { font-size: 11px; color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; }
+.doc-rec-link:hover { text-decoration: underline; }
+
+/* ── Conv Doc Card (per-family) ── */
+.conv-doc-card {
+    background: var(--bg-body);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.conv-doc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.conv-doc-card-header:hover { background: var(--table-hover); }
