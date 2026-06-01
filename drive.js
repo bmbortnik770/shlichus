@@ -9,9 +9,16 @@
     if (authOverlay) authOverlay.style.display = 'none';
     syncWithDrive();
 }
-window.logout = async function() { 
+window.logout = async function() {
     const proceed = await showCustomDialog({ title: 'התנתקות', message: 'האם אתה בטוח שברצונך להתנתק מהחשבון?', showCancel: true });
-    if(proceed) { localStorage.removeItem('gdrive_session'); location.reload(); } 
+    if (proceed) {
+        localStorage.removeItem('gdrive_session');
+        localStorage.removeItem('crm_logged_in');
+        if (window.tokenClient && accessToken) {
+            try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch(e) {}
+        }
+        location.reload();
+    }
 };
 
 window.continueWithoutLogin = function() {
@@ -40,13 +47,13 @@ async function ensureAuthAndExecute(cb) {
     const session = JSON.parse(localStorage.getItem('gdrive_session') || 'null');
     const isValid = session && session.token && session.expiresAt > (Date.now() + 60000);
     if (isValid) {
-        // Token still good — just run
         cb();
+    } else if (window.tokenClient) {
+        showToast('מחדש חיבור לענן...', 'info');
+        window._pendingAuthCallback = cb;
+        window.tokenClient.requestAccessToken({ prompt: '' });
     } else {
-        // Token expired/missing — save pending action and redirect to Google
-        showToast('מחדש חיבור לענן...', 'warning');
-        try { localStorage.setItem('community_data_final', JSON.stringify(db)); } catch(e) {}
-        // Redirect to Google auth — on return, syncWithDrive will restore data
+        showToast('יש להתחבר מחדש', 'warning');
         window.handleGoogleLogin();
     }
 }
@@ -189,27 +196,23 @@ function mergeDB(local, remote) {
     return result;
 }
 
-// ── Auto-refresh token before it expires ──
+// ── Auto-refresh token silently using GIS tokenClient ──
 function scheduleTokenRefresh() {
     const session = JSON.parse(localStorage.getItem('gdrive_session') || 'null');
     if (!session) return;
     const msUntilExpiry = session.expiresAt - Date.now();
-    // Warn user 3 minutes before expiry so they can save work
-    const warnIn = Math.max(msUntilExpiry - 180000, 10000);
+    if (msUntilExpiry <= 0) return;
+    // Silent refresh 5 minutes before expiry (minimum 30 seconds from now)
+    const refreshIn = Math.max(msUntilExpiry - 300000, 30000);
     setTimeout(() => {
         if (!accessToken) return;
-        setSyncStatus('error', 'עוד מעט יפוג — שמור!');
-        showToast('חיבור Google יפוג בעוד 3 דקות — שמור עבודה ורענן את העמוד', 'warning');
-    }, warnIn);
-    // Hard expiry — clear token and show re-auth
-    const expireIn = Math.max(msUntilExpiry, 10000);
-    setTimeout(() => {
-        localStorage.removeItem('gdrive_session');
-        accessToken = null;
-        setSyncStatus('error', 'פג תוקף');
-        const row = document.querySelector('.gdrive-sync-row');
-        if (row) row.innerHTML = '<button class="btn btn-primary" style="width:100%;font-size:14px;" onclick="handleGoogleLogin()"><i class="fab fa-google" style="margin-left:6px;"></i>התחבר מחדש לענן</button>';
-    }, expireIn);
+        if (window.tokenClient) {
+            window.tokenClient.requestAccessToken({ prompt: '' });
+        } else {
+            setSyncStatus('error', 'פג תוקף');
+            showToast('חיבור Google פג — לחץ "סנכרן" לחידוש', 'warning');
+        }
+    }, refreshIn);
 }
 
 async function syncWithDrive(forcePull = false) {
@@ -218,22 +221,18 @@ async function syncWithDrive(forcePull = false) {
         const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='community_data_final.json'&spaces=drive`, { headers: { Authorization: `Bearer ${accessToken}` } });
         if (!res.ok) {
             if (res.status === 401 || res.status === 403) {
-                // Token expired or revoked — stop all retries, clear session, show re-auth
                 localStorage.removeItem('gdrive_session');
                 accessToken = null;
-                setSyncStatus('error', 'פג תוקף — יש להתחבר מחדש');
-                // Make sure splash is hidden
-                const splash = document.getElementById('splash-screen');
-                if (splash) { splash.style.opacity = '0'; setTimeout(() => { splash.style.display = 'none'; }, 600); }
-                // Show re-auth button in sidebar (non-blocking)
-                showToast('חיבור Google פג — לחץ "התחבר מחדש" בתפריט', 'warning');
-                setSyncStatus('error', 'לחץ התחבר מחדש');
-                // Update sync button in sidebar to a prominent re-auth button
-                const syncRow = document.querySelector('.gdrive-sync-row');
-                if (syncRow) {
-                    syncRow.innerHTML = '<button class="btn btn-primary" style="width:100%;font-size:14px;" onclick="handleGoogleLogin()"><i class="fab fa-google" style="margin-left:6px;"></i>התחבר מחדש לענן</button>';
+                if (window.tokenClient) {
+                    // Silent token refresh — no redirect or user interaction needed
+                    setSyncStatus('wait', 'מחדש חיבור...');
+                    window._pendingAuthCallback = () => syncWithDrive(forcePull);
+                    window.tokenClient.requestAccessToken({ prompt: '' });
+                } else {
+                    setSyncStatus('error', 'פג תוקף — יש להתחבר מחדש');
+                    showToast('חיבור Google פג — לחץ "סנכרן" לחידוש', 'warning');
                 }
-                return; // STOP — do not throw, do not retry
+                return;
             }
             throw new Error('Drive API error: ' + res.status);
         }
@@ -411,14 +410,51 @@ async function mergeOutboxUpdates() {
 
         window._fieldUpdatesManualTrigger = false;
         const totalEvents = pendingFieldUpdateFiles.reduce((s, f) => s + f.events.length, 0);
-        showFieldUpdatesDialog(pendingFieldUpdateFiles, totalEvents);
+        await _autoApplyFieldUpdates(pendingFieldUpdateFiles, totalEvents);
 
     } catch (e) {
         console.error('mergeOutboxUpdates error:', e);
     }
 }
 
-// ── הצגת חלון עדכונים מהשטח ──
+// ── יישום אוטומטי של עדכוני שטח ––
+async function _autoApplyFieldUpdates(updateFiles, totalEvents) {
+    if (!appSettings.appliedEventIds) appSettings.appliedEventIds = {};
+    let applied = 0;
+    const usedFileIds = new Set();
+
+    for (const file of updateFiles) {
+        for (const ev of file.events) {
+            if (applyOutboxEvent(ev)) {
+                applied++;
+                usedFileIds.add(file.fileId);
+                const evId = ev.id || `${ev.type}_${ev.bldg}_${ev.aptName}_${ev.timestamp}`;
+                appSettings.appliedEventIds[evId] = Date.now();
+            }
+        }
+        if (usedFileIds.has(file.fileId)) await trashDriveFile(file.fileId);
+    }
+
+    // נקה appliedEventIds ישנים (מעל 30 יום)
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    for (const id of Object.keys(appSettings.appliedEventIds)) {
+        if (appSettings.appliedEventIds[id] < cutoff) delete appSettings.appliedEventIds[id];
+    }
+
+    if (applied > 0) {
+        db.meta.lastModified = Date.now();
+        await pushToDrive();
+        saveLocal();
+        if (typeof refreshMap === 'function') refreshMap();
+        if (typeof handleOmniSearch === 'function') handleOmniSearch();
+        showToast(`✅ ${applied} עדכוני שטח יושמו אוטומטית`, 'success');
+    }
+
+    _fieldUpdatesSessionHandled = true;
+    pendingFieldUpdateFiles = [];
+}
+
+// ── הצגת חלון עדכונים מהשטח (נשמר לשימוש ידני בלבד) ──
 function showFieldUpdatesDialog(updateFiles, totalEvents) {
     // בנה רשימה מאוחדת של כל האירועים
     const allEvents = [];
@@ -486,6 +522,9 @@ function getEventDisplayInfo(ev) {
         case 'event_create':        return { icon:'fa-calendar-plus', color:'var(--accent)', desc:`אירוע חדש: "${ev.payload?.name || ''}"` };
         case 'event_add_registrant':return { icon:'fa-user-plus', color:'var(--accent)', desc:`נרשם לאירוע: ${ev.payload?.regName || ''}` };
         case 'event_attendance':    return { icon:'fa-check-circle', color:'var(--success)', desc:`נוכחות באירוע: ${ev.payload?.regName || ''}` };
+        case 'add_donation':        return { icon:'fa-shekel-sign', color:'var(--success)', desc:`תרומה ₪${ev.payload?.amount || ''} — ${nameLabel}` };
+        case 'delete_log':          return { icon:'fa-trash-alt', color:'var(--danger)', desc:`לוג נמחק — ${nameLabel}` };
+        case 'delete_task':         return { icon:'fa-trash-alt', color:'var(--danger)', desc:`משימה נמחקה: "${ev.payload?.text || ''}" — ${nameLabel}` };
         default:               return { icon:'fa-sync',    color:'var(--text-muted)', desc:`עדכון — ${nameLabel}` };
     }
 }
@@ -839,6 +878,38 @@ function applyOutboxEvent(ev) {
             if (ev.tag && !apt.tags.includes(ev.tag)) apt.tags.push(ev.tag);
             break;
         }
+        case 'add_donation': {
+            if (!apt.donations) apt.donations = [];
+            if (ev.payload) apt.donations.push({ ...ev.payload });
+            break;
+        }
+        case 'delete_log': {
+            const logs = apt.interactions || apt.history;
+            if (!logs) break;
+            // Try content match first (indexes may differ between desktop/field)
+            const removedLog = ev.payload;
+            let logRemoveIdx = -1;
+            if (removedLog) {
+                logRemoveIdx = logs.findIndex(l =>
+                    l.date === removedLog.date &&
+                    (l.text === removedLog.text || l.notes === removedLog.text || l.text === removedLog.notes)
+                );
+            }
+            if (logRemoveIdx === -1 && typeof ev.logIdx === 'number') logRemoveIdx = ev.logIdx;
+            if (logRemoveIdx >= 0 && logRemoveIdx < logs.length) logs.splice(logRemoveIdx, 1);
+            break;
+        }
+        case 'delete_task': {
+            if (!apt.tasks) break;
+            const removedTask = ev.payload;
+            let taskRemoveIdx = -1;
+            if (removedTask?.text) {
+                taskRemoveIdx = apt.tasks.findIndex(t => t.text === removedTask.text && !t.done === !removedTask.done);
+            }
+            if (taskRemoveIdx === -1 && typeof ev.taskIdx === 'number') taskRemoveIdx = ev.taskIdx;
+            if (taskRemoveIdx >= 0 && taskRemoveIdx < apt.tasks.length) apt.tasks.splice(taskRemoveIdx, 1);
+            break;
+        }
         case 'contact_update': {
             // עדכון שדה ספציפי (טלפון/מייל) עם שיוך
             const { field, value, attribution } = ev;
@@ -867,14 +938,18 @@ function applyOutboxEvent(ev) {
     return true;
 }
 
-// ── Wrapper for manual sync button — re-auths if token expired ──
+// ── Wrapper for manual sync button — silent token refresh if expired ──
 window.manualSync = async function() {
     const session = JSON.parse(localStorage.getItem('gdrive_session') || 'null');
     const tokenValid = session && session.token && session.expiresAt > Date.now();
     if (!tokenValid || !accessToken) {
-        // Token expired — redirect to Google login (no popup)
         showToast('מחדש חיבור...', 'info');
-        window.handleGoogleLogin();
+        if (window.tokenClient) {
+            window._pendingAuthCallback = () => syncWithDrive();
+            window.tokenClient.requestAccessToken({ prompt: '' });
+        } else {
+            window.handleGoogleLogin();
+        }
         return;
     }
     await syncWithDrive();
@@ -945,11 +1020,9 @@ async function pushToDrive() {
 
 function setSyncStatus(st, txt) { document.getElementById('sync-text').innerText=txt; const ic=document.getElementById('sync-icon'), co=document.getElementById('sync-status'); if(st==='wait'){ic.className='fas fa-spinner fa-spin';co.style.color='var(--warning)';} if(st==='ok'){ic.className='fas fa-cloud-check';co.style.color='var(--success)';} if(st==='error'){ic.className='fas fa-exclamation-triangle';co.style.color='var(--danger)';} }
 
-function saveDB() { 
-    // בדיקת בטיחות: לא שומרים לדרייב אם אין נתונים אמיתיים
-    const realKeys = Object.keys(db).filter(k => k !== '__BOARDS__' && k !== '__SETTINGS__' && k !== NO_ADDRESS_KEY && k !== 'meta');
-    const hasRealData = realKeys.length > 0 || (db[NO_ADDRESS_KEY] && db[NO_ADDRESS_KEY].apts && db[NO_ADDRESS_KEY].apts.length > 0);
-    if(!hasRealData) { console.warn('saveDB: מניעת שמירה של DB ריק'); return; }
+function saveDB() {
+    // Safety: don't save uninitialized db (prevents overwriting Drive data on fresh load)
+    if (!db || !db.meta) { console.warn('saveDB: db not initialized, skipping'); return; }
 
     db.meta.lastModified = Date.now();
     db['__SETTINGS__'] = appSettings;
@@ -969,3 +1042,15 @@ function autoSave() {
         saveLocal(); // רק לוקאלי — לא דרייב
     }, 2000);
 }
+
+// ── בדיקה תקופתית לעדכוני שטח (כל 5 דקות) ──
+// מאפס את דגל הסשן לפני כל polling כך שקבצים חדשים מהשטח ייקלטו.
+// appliedEventIds מונע יישום כפול של אירועים שכבר עובדו.
+(function _startFieldUpdatePolling() {
+    setInterval(() => {
+        if (accessToken && document.visibilityState !== 'hidden') {
+            _fieldUpdatesSessionHandled = false;
+            mergeOutboxUpdates();
+        }
+    }, 5 * 60 * 1000);
+})();

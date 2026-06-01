@@ -161,9 +161,12 @@ function _updateHebPreview() {
     }
 
     // fallback — הפעם הבאה
-    const next = HebrewDate.nextOccurrence(monthName, day);
-    const greg = next.gregDate.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric' });
-    el.textContent = `${hebDay} ${monthHe} — בפעם הבאה: ${greg} (עוד ${next.daysUntil} ימים)`;
+    try {
+        const next = HebrewDate.nextOccurrence(monthName, day);
+        if (!next || !next.gregDate) { el.textContent = `${hebDay} ${monthHe}`; return; }
+        const greg = next.gregDate.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric' });
+        el.textContent = `${hebDay} ${monthHe} — בפעם הבאה: ${greg} (עוד ${next.daysUntil} ימים)`;
+    } catch(e) { el.textContent = `${hebDay} ${monthHe}`; }
 }
 
 // ── שינוי מצב קלט: לועזי / עברי ──
@@ -189,6 +192,7 @@ window.onMsGregDateChange = function() {
     const previewText = document.getElementById('ms-greg-preview-text');
     if (!val) { preview.style.display = 'none'; return; }
     const hDate = HebrewDate.fromGregorian(new Date(val + 'T12:00:00'));
+    if (!hDate) { preview.style.display = 'none'; return; }
     previewText.textContent = `${hDate.display} (${hDate.short})`;
     preview.style.display = 'block';
 };
@@ -222,6 +226,7 @@ window.addMilestone = function() {
         const gregVal = document.getElementById('ms-new-greg-date').value;
         if (!gregVal) { showToast('יש לבחור תאריך', 'warning'); return; }
         const hDate = HebrewDate.fromGregorian(new Date(gregVal + 'T12:00:00'));
+        if (!hDate) { showToast('לא ניתן להמיר תאריך זה', 'error'); return; }
         monthName   = hDate.monthName;
         day         = hDate.day;
         gregDateStr = gregVal;
@@ -511,14 +516,17 @@ window.onDeceasedDateChange = function() {
     if (!val || !window.HebrewDate) { preview.style.display = 'none'; offer.style.display = 'none'; return; }
 
     const hDate = HebrewDate.fromGregorian(new Date(val + 'T12:00:00'));
+    if (!hDate) { preview.style.display = 'none'; offer.style.display = 'none'; return; }
     text.textContent = hDate.display;
     preview.style.display = 'block';
 
     // הצג הצעת יארצייט
     offer.style.display = 'block';
-    const next = HebrewDate.nextOccurrence(hDate.monthName, hDate.day);
-    const nextGreg = next.gregDate.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric' });
-    yzPreview.textContent = `יארצייט: ${hDate.short} — בפעם הבאה: ${nextGreg}`;
+    try {
+        const next = HebrewDate.nextOccurrence(hDate.monthName, hDate.day);
+        const nextGreg = next?.gregDate?.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric' }) || '';
+        yzPreview.textContent = nextGreg ? `יארצייט: ${hDate.short} — בפעם הבאה: ${nextGreg}` : `יארצייט: ${hDate.short}`;
+    } catch(e) { yzPreview.textContent = `יארצייט: ${hDate.short}`; }
 };
 
 window.onDeceasedWhoChange = function() {
@@ -540,6 +548,8 @@ window.confirmDeceased = function() {
     // הוסף יארצייט אוטומטי
     if (addYahrzeit && date && window.HebrewDate) {
         const hDate = HebrewDate.fromGregorian(new Date(date + 'T12:00:00'));
+        if (!hDate) { showToast('תאריך לא תקין — יארצייט לא נשמר', 'warning'); }
+        else {
         const whoLabel = who === 'father' ? 'האב' : who === 'mother' ? 'האם' : 'ע"ה';
         if (!a.milestones) a.milestones = [];
         a.milestones.push({
@@ -554,6 +564,7 @@ window.confirmDeceased = function() {
         });
         // עדכן גם tempMilestones אם הכרטיס עדיין פתוח
         tempMilestones = [...(a.milestones)];
+        } // end if (hDate)
     }
 
     a.updatedAt = Date.now();

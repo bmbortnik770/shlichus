@@ -52,7 +52,9 @@ window.computeEngagementScore = function (apt) {
         const key = i.interactionType || _guessKey(i.type);
         const pts = (w[key] !== undefined) ? w[key] : (w.other || 5);
         const days = (now - new Date(i.date).getTime()) / 86400000;
-        score += pts * Math.pow(0.5, days / decay);
+        const safeDays = isNaN(days) || days < 0 ? 0 : days;
+        const safeDecay = decay > 0 ? decay : 30;
+        score += pts * Math.pow(0.5, Math.min(safeDays / safeDecay, 1000));
     });
     return Math.min(100, Math.round(score));
 };
@@ -189,7 +191,7 @@ function _typeRow(t, i) {
 window.saveScoreSettings = function () {
     const el = document.getElementById('scoreDecayInput');
     if (el) appSettings.scoreDecayDays = parseInt(el.value) || 90;
-    localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
+    try { localStorage.setItem('crm_prefs', JSON.stringify(appSettings)); } catch(e) { console.warn('saveScoreSettings: localStorage quota', e); }
     if (typeof saveDB === 'function') saveDB();
     if (typeof showToast === 'function') showToast('הגדרות ניקוד נשמרו ✅', 'success');
     _populateLogTypeSelect();

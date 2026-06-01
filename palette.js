@@ -119,7 +119,7 @@ function _bindItems() {
         item.addEventListener('click', () => {
             if (item.dataset.type === 'family') {
                 const f = _familyData[parseInt(item.dataset.fi)];
-                if (f) { currentBldg = f.bldg; openClientCard(f.idx); }
+                if (f && db[f.bldg]) { currentBldg = f.bldg; openClientCard(f.idx); }
             } else {
                 _dispatch(item.dataset.key);
             }

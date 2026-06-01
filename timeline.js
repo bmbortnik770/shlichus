@@ -526,7 +526,7 @@ window._tlShowThread = function (idx) {
         </div>`;
     }).join('');
 
-    const date = log.date ? (() => { try { return new Date(log.date).toLocaleDateString('he-IL', { weekday:'long', day:'numeric', month:'long' }); } catch(e) { return log.date; } })() : '';
+    const date = log.date ? (() => { try { const d = new Date(log.date); if (isNaN(d)) return safe(log.date); return d.toLocaleDateString('he-IL', { weekday:'long', day:'numeric', month:'long' }); } catch(e) { return safe(log.date); } })() : '';
 
     // Remove existing popup
     document.getElementById('wa-thread-modal')?.remove();

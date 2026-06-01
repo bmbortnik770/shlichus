@@ -140,10 +140,15 @@ const fieldApp = (function () {
         window.addEventListener('online', forceSync);
         isDark = localStorage.getItem('field_theme') === 'dark';
         if(isDark) { document.body.classList.add('dark-mode'); document.getElementById('f-theme-btn').innerHTML = '<i class="fas fa-sun"></i>'; }
-        if (!document.getElementById('f-toast-container')) { 
-            const tc = document.createElement('div'); tc.id = 'f-toast-container'; 
-            tc.style.cssText = 'position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:10px; width:90%; pointer-events:none;'; 
-            document.body.appendChild(tc); 
+        if (!document.getElementById('f-toast-container')) {
+            const tc = document.createElement('div'); tc.id = 'f-toast-container';
+            tc.style.cssText = 'position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:10px; width:90%; pointer-events:none;';
+            document.body.appendChild(tc);
+        }
+        if (!document.getElementById('f-outbox-badge')) {
+            const ob = document.createElement('div'); ob.id = 'f-outbox-badge';
+            ob.style.cssText = 'display:none; position:fixed; top:16px; left:16px; z-index:9998; background:#ef4444; color:white; border-radius:50%; width:22px; height:22px; align-items:center; justify-content:center; font-size:11px; font-weight:700; box-shadow:0 2px 8px rgba(239,68,68,0.5);';
+            document.body.appendChild(ob);
         }
         initSpeech();
         if (typeof google !== 'undefined') { 
@@ -171,7 +176,35 @@ const fieldApp = (function () {
         if (resp.error) { showAuthScreen(); setSyncStatus('error'); return; }
         accessToken = resp.access_token; localStorage.setItem('field_has_logged_in', 'true');
         document.getElementById('f-login').style.display = 'none'; document.getElementById('f-splash').style.display = 'flex';
+        _startPeriodicTokenRefresh();
         await pushOutboxToDrive(); await loadDataFromDrive(); bootMap(); startLocationTracking();
+    }
+
+    function _startPeriodicTokenRefresh() {
+        // Refresh token every 45 minutes to prevent mid-session expiry
+        setInterval(() => {
+            if (tokenClient && !isOfflineMode && navigator.onLine) {
+                tokenClient.requestAccessToken({ prompt: '' });
+            }
+        }, 45 * 60 * 1000);
+    }
+
+    function _applyOutboxToView() {
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        if (outbox.length === 0) return;
+        let count = 0;
+        outbox.forEach(ev => { try { if (_applyOneShadowEvent(ev)) count++; } catch(e) {} });
+        if (count > 0) {
+            console.log(`[OutboxView] ${count} pending events applied to view`);
+            _updateOutboxBadge(outbox.length);
+        }
+    }
+
+    function _updateOutboxBadge(count) {
+        const badge = document.getElementById('f-outbox-badge');
+        if (!badge) return;
+        badge.style.display = count > 0 ? 'flex' : 'none';
+        badge.innerText = count;
     }
 
     async function loadDataFromDrive() {
@@ -188,9 +221,11 @@ const fieldApp = (function () {
             const textData = await dlRes.text();
             try {
                 db = JSON.parse(textData); if(!db.meta) db.meta = {};
-                // הפעל שינויים ממתינים (שנדחפו לדרייב אבל המשרד טרם מיזג)
+                // Apply events already pushed to Drive (shadow) and pending outbox (for visual consistency)
                 _applyShadowEvents();
-                storageSet(DATA_KEY, db); setSyncStatus('success');
+                storageSet(DATA_KEY, db);
+                _applyOutboxToView(); // Show pending unsent changes — does not save to DATA_KEY
+                setSyncStatus('success');
                 document.getElementById('f-fab-wrapper').style.display = 'flex';
                 if(map) { renderMarkers(); renderTasks(); renderCommunity(); }
                 checkForOfficeRoute();
@@ -325,8 +360,13 @@ const fieldApp = (function () {
 
     function continueOffline() {
         isOfflineMode = true; db = storageGet(DATA_KEY); setSyncStatus('offline');
-        if (db) { _applyShadowEvents(); document.getElementById('f-login').style.display = 'none'; document.getElementById('f-fab-wrapper').style.display = 'flex'; bootMap(); startLocationTracking(); checkForOfficeRoute(); }
-        else { showToast("❌ חובה חיבור רשת לאיפוס ראשוני"); showAuthScreen(); }
+        if (db) {
+            _applyShadowEvents();
+            _applyOutboxToView(); // Show pending changes even offline
+            document.getElementById('f-login').style.display = 'none';
+            document.getElementById('f-fab-wrapper').style.display = 'flex';
+            bootMap(); startLocationTracking(); checkForOfficeRoute();
+        } else { showToast("❌ חובה חיבור רשת לאיפוס ראשוני"); showAuthScreen(); }
     }
 
     function checkForOfficeRoute() {
@@ -1059,8 +1099,14 @@ const fieldApp = (function () {
 
     function _ffcDeleteTask(bldgEnc, aptIdx, taskIdx) {
         const bldg = decodeURIComponent(bldgEnc);
-        db[bldg].apts[aptIdx].tasks.splice(taskIdx, 1);
+        const fam = db[bldg].apts[aptIdx];
+        const removed = fam.tasks?.[taskIdx];
+        fam.tasks.splice(taskIdx, 1);
         storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'delete_task', bldg, aptName: fam.name, taskIdx, timestamp: new Date().toISOString(), payload: removed });
+        storageSet(OUTBOX_KEY, outbox);
+        pushOutboxToDrive().catch(e => console.warn('[Outbox] delete_task error:', e));
         renderTasks();
         _ffcRender(bldgEnc, aptIdx, 'tasks');
     }
@@ -1087,8 +1133,13 @@ const fieldApp = (function () {
         const bldg = decodeURIComponent(bldgEnc);
         const fam = db[bldg].apts[aptIdx];
         const arr = fam.interactions || fam.history || [];
+        const removed = arr[logIdx];
         arr.splice(logIdx, 1);
         storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'delete_log', bldg, aptName: fam.name, logIdx, timestamp: new Date().toISOString(), payload: removed });
+        storageSet(OUTBOX_KEY, outbox);
+        pushOutboxToDrive().catch(e => console.warn('[Outbox] delete_log error:', e));
         _ffcRender(bldgEnc, aptIdx, 'logs');
     }
 
@@ -1097,12 +1148,17 @@ const fieldApp = (function () {
         const amount = document.getElementById('ffc-don-amount').value.trim();
         const date = document.getElementById('ffc-don-date').value;
         const reason = document.getElementById('ffc-don-reason').value.trim();
-        if (!amount) return;
+        if (!amount || isNaN(parseFloat(amount))) { showToast('יש להזין סכום תקין'); return; }
         const fam = db[bldg].apts[aptIdx];
         if (!fam.donations) fam.donations = [];
         const dateStr = date ? new Date(date).toLocaleDateString('he-IL') : new Date().toLocaleDateString('he-IL');
-        fam.donations.push({ amount, date: dateStr, reason: reason || 'כללי' });
+        const donation = { amount: parseFloat(amount), date: dateStr, reason: reason || 'כללי' };
+        fam.donations.push(donation);
         storageSet(DATA_KEY, db);
+        const outbox = storageGet(OUTBOX_KEY) || [];
+        outbox.push({ type: 'add_donation', bldg, aptName: fam.name, timestamp: new Date().toISOString(), payload: donation });
+        storageSet(OUTBOX_KEY, outbox);
+        pushOutboxToDrive().catch(e => console.warn('[Outbox] donation error:', e));
         _ffcRender(bldgEnc, aptIdx, 'donations');
     }
 

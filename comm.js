@@ -164,6 +164,7 @@ window.renderCallList = function() {
 
         const phoneBtns = phones.slice(0, 2).map((ph, pi) => {
             let cp = String(ph).replace(/\D/g, '');
+            if (cp.length < 7) return ''; // מספר לא תקין
             if (cp.startsWith('0')) cp = '972' + cp.substring(1);
             const lbl = pi === 0 ? (apt.father?.split(' ')[0] || 'אבא') : (apt.mother?.split(' ')[0] || 'אמא');
             return `<a href="tel:+${cp}" class="call-btn" onclick="event.stopPropagation()">
@@ -318,7 +319,11 @@ window.sendCommSMS = async function() {
     if (!valid.length) return showToast('אין נמענים עם מספר טלפון', 'error');
 
     const svc = appSettings.commServices || {};
-    if (svc.smsProvider === 'twilio' && svc.twilioSid && svc.twilioToken) {
+    if (svc.smsProvider === 'twilio') {
+        if (!svc.twilioSid || !svc.twilioToken || !svc.twilioFrom) {
+            showToast('הגדרות Twilio חסרות — בדוק SID, Token ומספר שולח', 'error');
+            return;
+        }
         await _sendViaTwilio(valid, text, svc);
     } else {
         // sms: URI — works on mobile; desktop shows helper

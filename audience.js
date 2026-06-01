@@ -348,13 +348,15 @@ function _valHTML(k, op, i, saved) {
             const cfs = appSettings.customFields || [];
             const [cf='',cv=''] = (saved||'').split('|||');
             const needsVal = !['קיים','ריק'].includes(op);
+            const cfJ = JSON.stringify(cf);
+            const cvJ = JSON.stringify(cv);
             return `<select class="aud-flt-sel" style="flex:0 0 auto;"
-                        onchange="audFltChange(${i},'v',this.value+'|||${esc(cv)}')">
+                        onchange="audFltChange(${i},'v',this.value+'|||'+${cvJ})">
                     <option value="">בחר שדה...</option>
                     ${cfs.map(f=>`<option value="${esc(f)}" ${cf===f?'selected':''}>${esc(f)}</option>`).join('')}
                 </select>
                 ${needsVal ? `<input class="inline-input aud-flt-inp" placeholder="ערך..." value="${esc(cv)}"
-                    oninput="audFltChange(${i},'v','${esc(cf)}|||'+this.value)">` : ''}`;
+                    oninput="audFltChange(${i},'v',${cfJ}+'|||'+this.value)">` : ''}`;
         }
         default:
             return `<input class="inline-input aud-flt-inp" placeholder="טקסט חופשי..." value="${esc(saved||'')}"

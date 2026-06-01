@@ -213,55 +213,55 @@ window.confirmPrimaryChange = () => {
     showToast('כתובת בית חב"ד עודכנה ונשמרה!', 'success');
 };
 
-// ── Google OAuth — Redirect Flow (no popup, works with COOP headers) ──
-// Instead of opening a popup, we redirect the page to Google's auth endpoint.
-// Google redirects back with the token in the URL hash (#access_token=...).
+// ── Google OAuth via GIS tokenClient — supports fully silent background refresh ──
+window.tokenClient = null;
+
+function _initTokenClient() {
+    if (typeof google === 'undefined' || window.tokenClient) return;
+    window.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (resp) => {
+            if (resp.error) {
+                console.warn('GIS auth error:', resp.error);
+                accessToken = null;
+                const splash = document.getElementById('splash-screen');
+                if (splash) { splash.style.opacity = '0'; setTimeout(() => { splash.style.display = 'none'; }, 600); }
+                document.getElementById('auth-overlay').style.display = 'flex';
+                return;
+            }
+            const expiresIn = parseInt(resp.expires_in || 3600, 10);
+            accessToken = resp.access_token;
+            const expiresAt = Date.now() + expiresIn * 1000;
+            localStorage.setItem('gdrive_session', JSON.stringify({ token: accessToken, expiresAt }));
+            localStorage.setItem('crm_logged_in', 'true');
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('splash-screen').style.display = 'flex';
+            scheduleTokenRefresh();
+            // Execute pending callback (e.g., from ensureAuthAndExecute or manualSync)
+            if (window._pendingAuthCallback) {
+                const cb = window._pendingAuthCallback;
+                window._pendingAuthCallback = null;
+                cb();
+            } else {
+                syncWithDrive();
+            }
+        }
+    });
+}
 
 window.handleGoogleLogin = function() {
-    localStorage.removeItem('gdrive_session');
-    accessToken = null;
-
-    const redirectUri = encodeURIComponent(location.origin + location.pathname);
-    const scope      = encodeURIComponent(SCOPES);
-    const url = [
-        'https://accounts.google.com/o/oauth2/v2/auth',
-        '?client_id=' + CLIENT_ID,
-        '&redirect_uri=' + redirectUri,
-        '&response_type=token',
-        '&scope=' + scope,
-        '&prompt=select_account',
-        '&include_granted_scopes=true'
-    ].join('');
-
-    // Save current db to localStorage before leaving so no data is lost
+    _initTokenClient();
+    if (!window.tokenClient) {
+        showToast('ספריית Google טרם נטענה — נסה שוב', 'warning');
+        return;
+    }
     try { localStorage.setItem('community_data_final', JSON.stringify(db)); } catch(e) {}
-    location.href = url;
+    window.tokenClient.requestAccessToken({ prompt: 'consent' });
 };
 
-// ── On page load: check if Google redirected back with a token in the hash ──
-function checkOAuthRedirect() {
-    const hash = location.hash;
-    if (!hash || !hash.includes('access_token')) return false;
-
-    // Parse the hash fragment
-    const params = {};
-    hash.slice(1).split('&').forEach(part => {
-        const [k, v] = part.split('=');
-        params[k] = decodeURIComponent(v || '');
-    });
-
-    if (params.access_token) {
-        const expiresIn = parseInt(params.expires_in || '3500', 10);
-        accessToken = params.access_token;
-        const expiresAt = Date.now() + expiresIn * 1000;
-        localStorage.setItem('gdrive_session', JSON.stringify({ token: accessToken, expiresAt }));
-        // Clean the token from the URL so it is not visible / bookmarked
-        history.replaceState(null, '', location.pathname);
-        scheduleTokenRefresh();
-        return true;
-    }
-    return false;
-}
+// No longer used — kept for backward compatibility only
+function checkOAuthRedirect() { return false; }
 
 window.onload = () => {
     let lastLogin = localStorage.getItem('last_login_date');
@@ -270,21 +270,23 @@ window.onload = () => {
 
     // שם השליחות לברכה מותאמת אישית
     const prefs = JSON.parse(localStorage.getItem('crm_prefs') || '{}');
-    const missionName = prefs.missionName || '';
-    const greetingName = missionName ? `${missionName}` : 'למערכת';
+    const _rawName = prefs.missionName || '';
+    const missionName = _rawName.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-    if(lastLogin === todayStr) {
-        welcomeDiv.innerHTML = missionName
-            ? `ברוך הבא, <strong>${missionName}</strong>! ממשיכים את המומנטום 🚀`
-            : `איזה כיף שחזרת! ממשיכים את המומנטום 🚀`;
-    } else if(lastLogin) {
-        welcomeDiv.innerHTML = missionName
-            ? `ברוך שובך, <strong>${missionName}</strong>! בוא נראה מה תעשה היום 🔥`
-            : `ברוך שובך! פעם קודמת היית אש, בוא נראה מה תעשה היום 🔥`;
-    } else {
-        welcomeDiv.innerHTML = missionName
-            ? `ברוך הבא, <strong>${missionName}</strong>! כאן מתחילים להפוך את העולם 🌍`
-            : `ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍`;
+    if(welcomeDiv) {
+        if(lastLogin === todayStr) {
+            welcomeDiv.innerHTML = missionName
+                ? `ברוך הבא, <strong>${missionName}</strong>! ממשיכים את המומנטום 🚀`
+                : `איזה כיף שחזרת! ממשיכים את המומנטום 🚀`;
+        } else if(lastLogin) {
+            welcomeDiv.innerHTML = missionName
+                ? `ברוך שובך, <strong>${missionName}</strong>! בוא נראה מה תעשה היום 🔥`
+                : `ברוך שובך! פעם קודמת היית אש, בוא נראה מה תעשה היום 🔥`;
+        } else {
+            welcomeDiv.innerHTML = missionName
+                ? `ברוך הבא, <strong>${missionName}</strong>! כאן מתחילים להפוך את העולם 🌍`
+                : `ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍`;
+        }
     }
     localStorage.setItem('last_login_date', todayStr);
 
@@ -322,23 +324,47 @@ window.onload = () => {
     }
     document.getElementById('smartSearch').addEventListener('input', debounce(handleOmniSearch));
 
-    // Check if Google just redirected back with a token in the URL hash
-    const redirectedWithToken = checkOAuthRedirect();
+    _initTokenClient();
 
     const session = JSON.parse(localStorage.getItem('gdrive_session'));
-    if (session && session.token && session.expiresAt > new Date().getTime()) {
+    const tokenValid = session && session.token && session.expiresAt > Date.now() + 60000;
+
+    if (tokenValid) {
+        // Valid cached token — use immediately
         accessToken = session.token;
-        if (!redirectedWithToken) scheduleTokenRefresh();
-        document.getElementById('auth-overlay').style.display='none';
-        document.getElementById('splash-screen').style.display='flex';
+        scheduleTokenRefresh();
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('splash-screen').style.display = 'flex';
         syncWithDrive();
+    } else if (localStorage.getItem('crm_logged_in') === 'true') {
+        // Token expired but user has logged in before — try silent GIS refresh
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('splash-screen').style.display = 'flex';
+        if (window.tokenClient) {
+            window.tokenClient.requestAccessToken({ prompt: '' });
+        } else {
+            // GIS SDK may not be loaded yet — retry after a moment
+            setTimeout(() => {
+                _initTokenClient();
+                if (window.tokenClient) {
+                    window.tokenClient.requestAccessToken({ prompt: '' });
+                } else {
+                    document.getElementById('splash-screen').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('splash-screen').style.display = 'none';
+                        document.getElementById('auth-overlay').style.display = 'flex';
+                    }, 600);
+                }
+            }, 1500);
+        }
     } else {
+        // First-time user — show login screen
         document.getElementById('google-btn').innerHTML = `<button class="btn btn-primary" style="padding:12px 20px; font-size:16px;" onclick="handleGoogleLogin()"><i class="fab fa-google"></i> התחבר לענן</button>`;
         setTimeout(() => {
-            document.getElementById('splash-screen').style.opacity='0';
+            document.getElementById('splash-screen').style.opacity = '0';
             setTimeout(() => {
-                document.getElementById('splash-screen').style.display='none';
-                document.getElementById('auth-overlay').style.display='flex';
+                document.getElementById('splash-screen').style.display = 'none';
+                document.getElementById('auth-overlay').style.display = 'flex';
             }, 800);
         }, 1500);
     }
@@ -4263,6 +4289,13 @@ function showToast(msg, type='info') {
 
 // --- תבניות ---
 let commRecipients = [];
+// Bridge scope gap: audience.js writes window.commRecipients, but app.js functions
+// close over the local `let` above. This proxy keeps both references in sync.
+Object.defineProperty(window, 'commRecipients', {
+    get: () => commRecipients,
+    set: (v) => { commRecipients = Array.isArray(v) ? v : []; },
+    configurable: true,
+});
 
 window.renderTemplates = () => {
     const c = document.getElementById('templatesListContainer');

@@ -151,12 +151,16 @@ window.checkLifecycleAlerts = function () {
                     if (diff >= 0 && diff <= 7)
                         alerts.push({ type: 'birthday', diff, urgent: diff <= 2,
                             label: `יום הולדת של ${child.name} (${apt.name || bldg})`, bldg, idx });
-                    // Bar/Bat mitzvah coming in ≤ 60 days
-                    const bmDate = _dateAtAge(child.dob, 13);
+                    // Bar/Bat mitzvah coming in ≤ 60 days (girls at 12, boys at 13)
+                    const isGirl = child.gender === 'female' || child.gender === 'f';
+                    const bmAge  = isGirl ? 12 : 13;
+                    const bmType = isGirl ? 'bat_mitzvah' : 'bar_mitzvah';
+                    const bmLabel = isGirl ? 'בת מצווה' : 'בר מצווה';
+                    const bmDate = _dateAtAge(child.dob, bmAge);
                     const bmDiff = Math.round((bmDate - today) / 86400000);
                     if (bmDiff >= 0 && bmDiff <= 60)
-                        alerts.push({ type: 'bar_mitzvah', diff: bmDiff, urgent: bmDiff <= 7,
-                            label: `בר מצווה של ${child.name} (${apt.name || bldg}) — בעוד ${bmDiff} ימים`, bldg, idx });
+                        alerts.push({ type: bmType, diff: bmDiff, urgent: bmDiff <= 7,
+                            label: `${bmLabel} של ${child.name} (${apt.name || bldg}) — בעוד ${bmDiff} ימים`, bldg, idx });
                 }
             });
 
@@ -257,14 +261,17 @@ function _evDef(type) {
 }
 
 function _daysUntilNextAnniversary(dateStr, today) {
-    const d    = new Date(dateStr);
+    // Use noon to avoid UTC/local timezone off-by-one on date-only strings
+    const d    = new Date(dateStr.length === 10 ? dateStr + 'T12:00:00' : dateStr);
+    if (isNaN(d)) return 9999;
     const next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
     if (next < today) next.setFullYear(today.getFullYear() + 1);
     return Math.round((next - today) / 86400000);
 }
 
 function _dateAtAge(dob, age) {
-    const d = new Date(dob);
+    const d = new Date(dob.length === 10 ? dob + 'T12:00:00' : dob);
+    if (isNaN(d)) return new Date(0);
     return new Date(d.getFullYear() + age, d.getMonth(), d.getDate());
 }
 

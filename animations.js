@@ -76,7 +76,7 @@ ready(function() {
         // אתחול על הטאב הפעיל
         const activeTab = tabsContainer.querySelector('.main-tab.active');
         if (activeTab) {
-            setTimeout(() => positionPill(activeTab, false), 50);
+            requestAnimationFrame(() => positionPill(activeTab, false));
         }
 
         // האזן לשינוי טאב
@@ -162,20 +162,20 @@ ready(function() {
 
     // ── 5. MODAL ANIMATIONS ─────────────────────────────────
     if (window.gsap) {
-        // המתן שכל ה-modals ייפתחו ואז אנים
+        const _animatedModals = new WeakSet();
         const observer = new MutationObserver(mutations => {
             mutations.forEach(m => {
                 m.target.querySelectorAll && m.target.querySelectorAll('.modal').forEach(modal => {
                     if (modal.style.display === 'flex') {
                         const content = modal.querySelector('.modal-content');
-                        if (content && !content._gsapAnimated) {
-                            content._gsapAnimated = true;
+                        if (content && !_animatedModals.has(content)) {
+                            _animatedModals.add(content);
                             gsap.fromTo(content,
                                 { y: 32, scale: .95, opacity: 0 },
                                 { y: 0,  scale: 1,   opacity: 1,
-                                  duration: .45, ease: 'back.out(1.3)' }
+                                  duration: .45, ease: 'back.out(1.3)',
+                                  onComplete: () => _animatedModals.delete(content) }
                             );
-                            setTimeout(() => { content._gsapAnimated = false; }, 600);
                         }
                     }
                 });
