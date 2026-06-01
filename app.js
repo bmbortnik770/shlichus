@@ -1893,10 +1893,43 @@ async function fetchBuildingsFromOverpass(polygon) {
     } catch(e){ console.warn('Overpass failed:',e); return null; }
 }
 
+// ── Dialog: כרטיס קיים עם נתונים ────────────────────────────
+function showBuildingConflictDialog(displayName, aptCount) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML = `
+            <div style="background:var(--bg-card,#fff);border-radius:16px;padding:24px;max-width:380px;width:90%;direction:rtl;font-family:inherit;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+                <div style="font-weight:700;font-size:16px;margin-bottom:6px;color:var(--text-main,#111);">כרטיס קיים עם נתונים</div>
+                <div style="font-size:13px;color:var(--text-muted,#64748b);margin-bottom:20px;">
+                    הכרטיס <strong>${displayName}</strong> מכיל <strong>${aptCount}</strong> משפחות.<br>הסיווג השתנה — מה לעשות עם הנתונים?
+                </div>
+                <div style="display:flex;flex-direction:column;gap:9px;">
+                    <button data-r="noaddr" style="padding:10px 14px;border-radius:10px;border:1.5px solid var(--border-light,#e2e8f0);background:var(--bg-body,#f8fafc);cursor:pointer;font-size:13px;font-weight:600;text-align:right;font-family:inherit;">
+                        <i class="fas fa-map-marker-slash" style="margin-left:8px;color:#64748b;"></i>העבר לכתובת ללא מיקום
+                    </button>
+                    <button data-r="move" style="padding:10px 14px;border-radius:10px;border:1.5px solid var(--border-light,#e2e8f0);background:var(--bg-body,#f8fafc);cursor:pointer;font-size:13px;font-weight:600;text-align:right;font-family:inherit;">
+                        <i class="fas fa-exchange-alt" style="margin-left:8px;color:#3b82f6;"></i>העבר לכתובת אחרת...
+                    </button>
+                    <button data-r="delete" style="padding:10px 14px;border-radius:10px;border:1.5px solid #fee2e2;background:#fef2f2;cursor:pointer;font-size:13px;font-weight:600;text-align:right;color:#ef4444;font-family:inherit;">
+                        <i class="fas fa-trash" style="margin-left:8px;"></i>מחק את הנתונים
+                    </button>
+                    <button data-r="keep" style="padding:10px 14px;border-radius:10px;border:none;background:none;cursor:pointer;font-size:12px;text-align:center;color:var(--text-muted,#94a3b8);font-family:inherit;">
+                        השאר כפי שהוא
+                    </button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelectorAll('button[data-r]').forEach(btn => {
+            btn.onclick = () => { document.body.removeChild(overlay); resolve(btn.dataset.r); };
+        });
+    });
+}
+
 // ── יצירת/עדכון כרטיסי db מתיחום ────────────────────────────
 async function syncTerritoryCardsToDb() {
-    const collected = appSettings.territory?.collectedBuildings || {};
-    const classify  = appSettings.territory?.buildingClassify   || {};
+    const collected  = appSettings.territory?.collectedBuildings || {};
+    const classify   = appSettings.territory?.buildingClassify   || {};
     const categories = appSettings.territory?.categories || tmCategories;
     const keys = Object.keys(collected);
     if (!keys.length) return;
@@ -1908,11 +1941,10 @@ async function syncTerritoryCardsToDb() {
     showToast(`מעבד ${keys.length} מבנים...`, 'info');
 
     for (const key of keys) {
-        const bldg     = collected[key];
-        const entry    = classify[key];
-        const catId    = entry?.catId || 'residential';
-        const cat      = categories.find(c => c.id === catId) || { hasCard: true };
-        if (!cat.hasCard) continue;
+        const bldg  = collected[key];
+        const entry = classify[key];
+        const catId = entry?.catId || 'residential';
+        const cat   = categories.find(c => c.id === catId) || { hasCard: true };
 
         const [lng, lat] = bldg.center;
         const geom = entry?.geometry || bldg.geometry;
@@ -1920,7 +1952,7 @@ async function syncTerritoryCardsToDb() {
                       : geom?.type === 'MultiPolygon' ? geom.coordinates[0][0]
                       : null;
 
-        // גיאוקודינג — כתובת מהקואורדינטות
+        // גיאוקודינג
         let address = null;
         try {
             const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=address&language=he${proximityParam}&access_token=${mapboxgl.accessToken}`);
@@ -1928,17 +1960,51 @@ async function syncTerritoryCardsToDb() {
             if (d.features?.length) address = (d.features[0].place_name_he || d.features[0].place_name).split(',')[0].trim();
         } catch(e) {}
 
-        const dbKey = address || `@${key}`;
+        const dbKey      = address || `@${key}`;
+        const displayName = address || entry?.name || 'מבנה ללא כתובת';
+        const existing   = db[dbKey];
 
-        if (db[dbKey]) {
-            if (!db[dbKey].info.polygon && polygon) { db[dbKey].info.polygon = polygon; updated++; }
-            if (!db[dbKey].info.category) db[dbKey].info.category = catId;
-        } else {
-            db[dbKey] = { info: { address, coords: bldg.center, polygon, category: catId, buildingName: entry?.name || '', code: '', rep: '', notes: '' }, apts: [] };
-            created++;
+        // כרטיס קיים — בדוק אם צריך לטפל בו
+        if (existing) {
+            const hasData      = (existing.apts?.length || 0) > 0;
+            const catChanged   = existing.info?.category && existing.info.category !== catId;
+            const nowIrrelevant = !cat.hasCard;
+
+            if (hasData && (catChanged || nowIrrelevant)) {
+                // שאל את המשתמש
+                const action = await showBuildingConflictDialog(displayName, existing.apts.length);
+                if (action === 'noaddr') {
+                    db[NO_ADDRESS_KEY].apts.push(...existing.apts);
+                    delete db[dbKey];
+                } else if (action === 'move') {
+                    const newAddr = await showCustomDialog({ title: 'כתובת חדשה', message: `לאיזו כתובת להעביר את המשפחות מ-"${displayName}"?`, showInput: true, showCancel: true, defaultValue: '' });
+                    if (newAddr) {
+                        if (!db[newAddr]) db[newAddr] = { info: { code:'', rep:'', notes:'', coords: null }, apts: [] };
+                        db[newAddr].apts.push(...existing.apts);
+                        delete db[dbKey];
+                    } else { continue; } // ביטול — לא נוגעים
+                } else if (action === 'delete') {
+                    delete db[dbKey];
+                } else { // keep
+                    if (!existing.info.polygon && polygon) existing.info.polygon = polygon;
+                    continue;
+                }
+            } else if (!nowIrrelevant) {
+                // אין שינוי קריטי — עדכן שקט
+                if (!existing.info.polygon && polygon) { existing.info.polygon = polygon; updated++; }
+                if (!existing.info.category) existing.info.category = catId;
+                continue;
+            } else {
+                continue; // לא רלוונטי + ריק — לא יוצרים כרטיס
+            }
         }
 
-        await new Promise(r => setTimeout(r, 120)); // ~8 בקשות לשנייה
+        // צור כרטיס חדש (גם אחרי מחיקה למעלה)
+        if (!cat.hasCard) continue;
+        db[dbKey] = { info: { address, coords: bldg.center, polygon, category: catId, buildingName: entry?.name || '', code: '', rep: '', notes: '' }, apts: [] };
+        created++;
+
+        await new Promise(r => setTimeout(r, 120));
     }
 
     saveDB();
