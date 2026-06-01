@@ -9,7 +9,7 @@
 }
 
 const CLIENT_ID = '348261974014-242r9b0dvctlka7rj3aetu81v96ere46.apps.googleusercontent.com';
-const SCOPES = 'email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/contacts.readonly';
+const SCOPES = 'email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/gmail.send';
 let accessToken = null, driveFileId = null;
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
@@ -4159,7 +4159,51 @@ window.sendCommEmail = async () => {
     document.getElementById('emRecipientCount').innerText = 0;
 };
 
-window._doSendEmail = function(prov, subj, text, emails) {
+// שולח מייל בודד דרך Gmail API (ללא פתיחת חלון)
+async function _sendOneGmailAPI(toEmail, subj, body) {
+    if (!accessToken) return false;
+    const msg = [
+        'Content-Type: text/plain; charset="UTF-8"',
+        'MIME-Version: 1.0',
+        `To: ${toEmail}`,
+        `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subj)))}?=`,
+        '',
+        body,
+    ].join('\r\n');
+    const raw = btoa(unescape(encodeURIComponent(msg)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw }),
+    });
+    if (res.status === 403) {
+        // scope חסר — בקש הרשאה מחדש
+        showToast('נדרשת הרשאה לשליחת מיילים — מפנה לאישור...', 'warning');
+        setTimeout(() => {
+            if (window.tokenClient) window.tokenClient.requestAccessToken({ prompt: 'consent' });
+        }, 1500);
+        return 'reauth';
+    }
+    return res.ok;
+}
+
+window._doSendEmail = async function(prov, subj, text, emails) {
+    // Gmail — שלח ישיר דרך API ללא פתיחת חלון
+    if (prov === 'gmail' && accessToken) {
+        setSyncStatus('wait', 'שולח מיילים...');
+        let sent = 0, failed = 0, reauth = false;
+        for (const email of emails) {
+            const result = await _sendOneGmailAPI(email, subj, text);
+            if (result === 'reauth') { reauth = true; break; }
+            result ? sent++ : failed++;
+            if (emails.length > 1) await new Promise(r => setTimeout(r, 300));
+        }
+        setSyncStatus('ok', 'מסונכרן');
+        if (!reauth) showToast(`✅ ${sent} מיילים נשלחו${failed ? `, ${failed} נכשלו` : ''}`, sent > 0 ? 'success' : 'error');
+        return;
+    }
+    // ספקים אחרים — פתח ממשק כתיבה
     const bcc = emails.join(',');
     const su = encodeURIComponent(subj), bo = encodeURIComponent(text);
     let ok = true;

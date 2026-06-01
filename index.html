@@ -29,8 +29,40 @@
 </head>
 <body>
 
-<div id="splash-screen"><i class="fas fa-globe-americas pulse-logo"></i><h2 style="margin:0;font-size:28px;">מערכת ניהול קהילה</h2><p style="color:#94a3b8;margin-top:10px;"><i class="fas fa-spinner fa-spin"></i> מתחבר לענן וטוען נתונים...</p></div>
-<div id="auth-overlay"><div class="auth-card"><i class="fas fa-cloud-upload-alt" style="font-size:50px;color:var(--accent);margin-bottom:20px;"></i><h2 style="margin:0 0 10px 0;">התחברות למערכת</h2><p style="color:var(--text-muted);font-size:14px;margin-bottom:25px;">המערכת מגובה בענן פרטי. אנא התחבר.</p><div id="google-btn" style="display:flex;justify-content:center;"></div><div style="margin-top:16px; text-align:center;"><button onclick="continueWithoutLogin()" style="background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer; text-decoration:underline; font-family:inherit;">המשך ללא התחברות (מצב מקומי בלבד)</button></div></div></div>
+<div id="splash-screen">
+    <div class="splash-bg"></div>
+    <div class="splash-content">
+        <div class="auth-logo-wrap">
+            <div class="auth-logo-ring"></div>
+            <div class="auth-logo-inner">
+                <i class="fas fa-map-marked-alt"></i>
+            </div>
+        </div>
+        <h2 class="auth-system-name">שליחות <span>CRM</span></h2>
+        <p style="color:rgba(255,255,255,.5);margin-top:8px;font-size:14px;"><i class="fas fa-spinner fa-spin" style="margin-left:7px;"></i>מתחבר לענן וטוען נתונים...</p>
+    </div>
+</div>
+
+<div id="auth-overlay">
+    <div class="auth-bg-layer"></div>
+    <div class="auth-grid-layer"></div>
+    <div class="auth-card">
+        <div class="auth-logo-wrap">
+            <div class="auth-logo-ring"></div>
+            <div class="auth-logo-inner">
+                <i class="fas fa-map-marked-alt"></i>
+            </div>
+        </div>
+        <h1 class="auth-system-name">שליחות <span>CRM</span></h1>
+        <p class="auth-tagline">הגע לכל יהודי בשכונה שלך</p>
+        <div class="auth-divider"></div>
+        <p class="auth-sub">היכנס עם חשבון Google שלך<br>הנתונים שמורים ב-Drive הפרטי שלך בלבד</p>
+        <div id="google-btn" style="display:flex;justify-content:center;margin-bottom:16px;"></div>
+        <button onclick="continueWithoutLogin()" class="auth-local-btn">
+            <i class="fas fa-laptop" style="margin-left:7px;"></i>המשך ללא התחברות (מצב מקומי)
+        </button>
+    </div>
+</div>
 <div id="toast-container"></div>
 
 <div id="sidebar">

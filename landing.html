@@ -1115,7 +1115,7 @@ function submitForm(e) {
     const msg = `🆕 ליד חדש — שליחות CRM\nשם: ${name} ${last}\nטלפון: ${phone}${email ? '\nמייל: '+email : ''}\nעיר: ${city || 'לא צוין'}\nתוכנית: ${plans[plan] || 'לא נבחר'}`;
 
     // ← החלף את המספר שלך כאן (ספרות בלבד, כולל קוד מדינה)
-    const OWNER_PHONE = '972XXXXXXXXX';
+    const OWNER_PHONE = '972586646809';
     window.open(`https://api.whatsapp.com/send?phone=${OWNER_PHONE}&text=${encodeURIComponent(msg)}`, '_blank');
 
     document.getElementById('leadForm').style.display = 'none';
