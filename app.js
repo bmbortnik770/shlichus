@@ -607,6 +607,7 @@ let tmCategories = [
     { id: 'irrelevant',  name: 'לא רלוונטי',   color: '#94a3b8', hasCard: false },
 ];
 let tmBuildingClassify = {}; // { featureKey: { catId, name, geometry, center } }
+let tmCollectedBuildings = {}; // { featureKey: { center, geometry } } — all buildings in territory
 let tmPanelCityGeocoder = null;
 
 // ── משתנה Draw instance ──
@@ -838,6 +839,8 @@ window.confirmTerritoryDrawing = () => {
     appSettings.territory.manualBuildings = tmManualBuildings;
     appSettings.territory.buildingClassify = tmBuildingClassify;
     appSettings.territory.categories = tmCategories;
+    appSettings.territory.collectedBuildings = tmCollectedBuildings;
+    tmCollectedBuildings = {};
 
     showTerritoryInfo(missionName || 'ציור ידני', areaKm2, tempTerritorySource);
     document.getElementById('territoryMapEditorModal').style.display = 'none';
@@ -851,6 +854,7 @@ window.confirmTerritoryDrawing = () => {
 
     localStorage.setItem('crm_prefs', JSON.stringify(appSettings));
     showToast('תיחום נשמר ✓', 'success');
+    setTimeout(() => syncTerritoryCardsToDb(), 800);
 };
 
 
@@ -1023,7 +1027,16 @@ function tmCountBuildings() {
             if (!center) return;
             const isManualRemoved = tmManualBuildings[key]?.added === false;
             const isManualAdded = tmManualBuildings[key]?.added === true;
-            if (isManualAdded || (!isManualRemoved && pointInPolygon(center, polygon))) count++;
+            const inTerritory = isManualAdded || (!isManualRemoved && pointInPolygon(center, polygon));
+            if (inTerritory) {
+                count++;
+                let geom = f.geometry;
+                if (!geom?.coordinates?.length) {
+                    const [cx, cy] = center, d = 0.00015;
+                    geom = { type: 'Polygon', coordinates: [[[cx-d,cy-d],[cx+d,cy-d],[cx+d,cy+d],[cx-d,cy+d],[cx-d,cy-d]]] };
+                }
+                tmCollectedBuildings[key] = { center, geometry: geom };
+            }
         });
         const totalEl = document.getElementById('tmBuildingsTotal');
         const countEl = document.getElementById('tmPolyBuildingCount');
@@ -1880,6 +1893,58 @@ async function fetchBuildingsFromOverpass(polygon) {
     } catch(e){ console.warn('Overpass failed:',e); return null; }
 }
 
+// ── יצירת/עדכון כרטיסי db מתיחום ────────────────────────────
+async function syncTerritoryCardsToDb() {
+    const collected = appSettings.territory?.collectedBuildings || {};
+    const classify  = appSettings.territory?.buildingClassify   || {};
+    const categories = appSettings.territory?.categories || tmCategories;
+    const keys = Object.keys(collected);
+    if (!keys.length) return;
+
+    const homeCoords = appSettings.homeLocation?.coords || appSettings.center;
+    const proximityParam = homeCoords ? `&proximity=${homeCoords[0]},${homeCoords[1]}` : '';
+
+    let created = 0, updated = 0;
+    showToast(`מעבד ${keys.length} מבנים...`, 'info');
+
+    for (const key of keys) {
+        const bldg     = collected[key];
+        const entry    = classify[key];
+        const catId    = entry?.catId || 'residential';
+        const cat      = categories.find(c => c.id === catId) || { hasCard: true };
+        if (!cat.hasCard) continue;
+
+        const [lng, lat] = bldg.center;
+        const geom = entry?.geometry || bldg.geometry;
+        const polygon = geom?.type === 'Polygon'      ? geom.coordinates[0]
+                      : geom?.type === 'MultiPolygon' ? geom.coordinates[0][0]
+                      : null;
+
+        // גיאוקודינג — כתובת מהקואורדינטות
+        let address = null;
+        try {
+            const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=address&language=he${proximityParam}&access_token=${mapboxgl.accessToken}`);
+            const d = await r.json();
+            if (d.features?.length) address = (d.features[0].place_name_he || d.features[0].place_name).split(',')[0].trim();
+        } catch(e) {}
+
+        const dbKey = address || `@${key}`;
+
+        if (db[dbKey]) {
+            if (!db[dbKey].info.polygon && polygon) { db[dbKey].info.polygon = polygon; updated++; }
+            if (!db[dbKey].info.category) db[dbKey].info.category = catId;
+        } else {
+            db[dbKey] = { info: { address, coords: bldg.center, polygon, category: catId, buildingName: entry?.name || '', code: '', rep: '', notes: '' }, apts: [] };
+            created++;
+        }
+
+        await new Promise(r => setTimeout(r, 120)); // ~8 בקשות לשנייה
+    }
+
+    saveDB();
+    showToast(`✓ ${created} כרטיסים חדשים · ${updated} עודכנו`, 'success');
+}
+
 // ── Point-in-polygon ───────────────────────────────────────────
 function pointInPolygon([px, py], polygon) {
     try {
@@ -2677,13 +2742,51 @@ map.on('mousemove', (e) => {
     const features = map.queryRenderedFeatures(e.point, { layers: ['3d-buildings'] });
     if (!features.length) hoverPopup.remove();
 });
-map.on('click', '3d-buildings', async (e) => { hoverPopup.remove(); try { const r=await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${e.lngLat.lng},${e.lngLat.lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`); const d=await r.json(); let addr=`מיקום (${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)})`; if(d.features&&d.features.length>0) addr=(d.features[0].place_name_he||d.features[0].place_name).split(',')[0].trim(); currentBldg=addr; if(!db[currentBldg]) db[currentBldg]={info:{code:'',rep:'',notes:'',coords:[e.lngLat.lng,e.lngLat.lat]},apts:[]}; openBuildingModal(); } catch(err){showToast("שגיאת כתובת","warning");} });
+map.on('click', '3d-buildings', async (e) => {
+    hoverPopup.remove();
+    const clickPt = [e.lngLat.lng, e.lngLat.lat];
+
+    // בדוק אם הנקודה בתוך פוליגון של כרטיס קיים
+    for (const [key, entry] of Object.entries(db)) {
+        if (key === '__BOARDS__' || key === '__SETTINGS__' || key === 'meta' || key === NO_ADDRESS_KEY) continue;
+        if (!entry?.info?.polygon) continue;
+        try {
+            const ring = entry.info.polygon;
+            const closed = ring[0][0] === ring[ring.length-1][0] && ring[0][1] === ring[ring.length-1][1] ? ring : [...ring, ring[0]];
+            if (pointInPolygon(clickPt, closed)) { currentBldg = key; openBuildingModal(); return; }
+        } catch(e) {}
+    }
+
+    // אין פוליגון שמור — geocoding רגיל
+    try {
+        const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${e.lngLat.lng},${e.lngLat.lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`);
+        const d = await r.json();
+        let addr = `מיקום (${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)})`;
+        if (d.features?.length) addr = (d.features[0].place_name_he || d.features[0].place_name).split(',')[0].trim();
+
+        // שמור פוליגון של הבניין הנלחץ לשימוש עתידי
+        const clicked = map.queryRenderedFeatures(e.point, { layers: ['3d-buildings'] });
+        let polygon = null;
+        if (clicked.length) {
+            const geom = clicked[0].geometry;
+            polygon = geom?.type === 'Polygon' ? geom.coordinates[0]
+                    : geom?.type === 'MultiPolygon' ? geom.coordinates[0][0] : null;
+        }
+
+        currentBldg = addr;
+        if (!db[currentBldg]) db[currentBldg] = { info: { code:'', rep:'', notes:'', coords:[e.lngLat.lng, e.lngLat.lat], polygon }, apts:[] };
+        else if (!db[currentBldg].info.polygon && polygon) db[currentBldg].info.polygon = polygon;
+        openBuildingModal();
+    } catch(err) { showToast("שגיאת כתובת", "warning"); }
+});
 
 function getAllPhones(a) { return [a.fatherPhone, a.motherPhone, ...(a.childrenList||[]).map(c=>c.phone)].filter(Boolean); }
 function getAllEmails(a) { return [a.fatherEmail, a.motherEmail, ...(a.childrenList||[]).map(c=>c.email)].filter(Boolean); }
 
 window.openBuildingModal = function() {
-    const b = db[currentBldg]; document.getElementById('bModalTitle').innerHTML = `<i class="fas fa-building" style="color:var(--accent);"></i> ${currentBldg}`;
+    const b = db[currentBldg];
+    const displayName = b.info?.address || b.info?.buildingName || (currentBldg.startsWith('@') ? 'מבנה ללא כתובת' : currentBldg);
+    document.getElementById('bModalTitle').innerHTML = `<i class="fas fa-building" style="color:var(--accent);"></i> ${displayName}`;
     let c = b.info.coords || (currentBldg !== NO_ADDRESS_KEY ? currentBldg.split(',').map(Number) : null);
     document.getElementById('bModalNavBtn').innerHTML = (c&&!isNaN(c[0])) ? `<a href="https://waze.com/ul?ll=${c[1]},${c[0]}&navigate=yes" target="_blank" class="btn btn-outline" style="padding:4px 10px; font-size:12px; border-radius:15px; width:auto; border-color:#33ccff; color:#33ccff;"><i class="fab fa-waze"></i> נווט</a>` : '';
     
