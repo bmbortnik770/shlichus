@@ -934,7 +934,7 @@ window.tmClearAll = () => {
 
 window.closeTerritoryEditor = () => {
     document.getElementById('territoryMapEditorModal').style.display = 'none';
-    if (tmMap) { try { tmMap.remove(); } catch(e) {} tmMap = null; }
+    if (tmMap) { try { tmMap.remove(); } catch(e) {} tmMap = null; _tmColorMoveHandler = null; }
     tmDraw = null;
     tmPanelCityGeocoder = null;
 };
@@ -974,7 +974,7 @@ window.confirmTerritoryDrawing = () => {
     const st = document.getElementById('obDrawStatus');
     if (st) st.innerText = `✓ ${tmPoints.length} נקודות, שטח: ${areaKm2 < 1 ? (areaKm2*100).toFixed(1)+' דונם' : areaKm2.toFixed(2)+' קמ"ר'}`;
 
-    if (tmMap) { try { tmMap.remove(); } catch(e) {} tmMap = null; }
+    if (tmMap) { try { tmMap.remove(); } catch(e) {} tmMap = null; _tmColorMoveHandler = null; }
     tmDraw = null;
     tmPanelCityGeocoder = null;
 
@@ -1077,16 +1077,20 @@ window.switchTmTab = (tab) => {
     if (buildingsHint) buildingsHint.style.display = tab === 'buildings' ? 'block' : 'none';
     if (classifyHint) classifyHint.style.display = tab === 'classify' ? 'block' : 'none';
     if (tab === 'buildings') {
-        // Draw במצב passive
         try { if (tmDraw) tmDraw.changeMode('simple_select'); } catch(e) {}
         tmCountBuildings();
         tmRenderManualBuildingsList();
+        tmScheduleColorUpdate();
     }
     if (tab === 'classify') {
-        // Draw במצב passive
         try { if (tmDraw) tmDraw.changeMode('simple_select'); } catch(e) {}
         try { tmRenderCategories(); } catch(e) { console.error('[tmRenderCategories on classify tab]', e); }
         try { tmRenderClassifySummary(); } catch(e) {}
+        tmScheduleColorUpdate();
+    }
+    if (tab === 'draw') {
+        // חזרה לאפור ב-draw mode
+        try { tmMap?.setPaintProperty('tm-buildings-highlight', 'fill-extrusion-color', '#d1d5db'); } catch(e) {}
     }
     if (tab === 'draw') {
         // החזר ל-draw mode
@@ -1174,6 +1178,7 @@ function tmCountBuildings() {
         if (countEl) countEl.innerText = count;
         if (!appSettings.territory) appSettings.territory = {};
         appSettings.territory.buildingCount = count;
+        tmRenderBuildingColors();
     };
 
     // Wait for map to finish rendering tiles before querying features
@@ -1181,6 +1186,98 @@ function tmCountBuildings() {
         doCount();
     } else {
         tmMap.once('idle', doCount);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── צביעה דינמית של מבנים בעורך הטריטוריה ─────────────────
+// ══════════════════════════════════════════════════════════════
+let _tmColorMoveHandler = null;
+
+function tmRenderBuildingColors() {
+    if (!tmMap || !tmMap.isStyleLoaded() || tmPoints.length < 3) {
+        // אם אין פוליגון — אפס לאפור
+        try { tmMap?.setPaintProperty('tm-buildings-highlight', 'fill-extrusion-color', '#d1d5db'); } catch(e) {}
+        return;
+    }
+    const polygon = [...tmPoints, tmPoints[0]];
+    const features = tmMap.queryRenderedFeatures({ layers: ['tm-buildings-highlight'] });
+    const seen = new Set();
+
+    // אפס featureState לכל המבנים הנוכחיים
+    features.forEach(f => {
+        if (!f.id) return;
+        try { tmMap.removeFeatureState({ source: 'composite', sourceLayer: 'building', id: f.id }); } catch(e) {}
+    });
+
+    // סמן כל מבנה לפי מצבו
+    features.forEach(f => {
+        if (!f.id) return;
+        const key = tmBuildingKey(f);
+        if (seen.has(key)) return;
+        seen.add(key);
+        const center = tmBuildingCenter(f);
+        if (!center) return;
+
+        const state = {};
+
+        if (tmCurrentTab === 'buildings') {
+            const isRemoved = tmManualBuildings[key]?.added === false;
+            const isAdded   = tmManualBuildings[key]?.added === true;
+            const inPolygon = pointInPolygon(center, polygon);
+            if (isRemoved)                          state.tm_removed = true;
+            else if (isAdded)                       state.tm_added   = true;
+            else if (inPolygon)                     state.tm_in      = true;
+        } else if (tmCurrentTab === 'classify') {
+            const catId = tmBuildingClassify[key]?.catId;
+            if (catId) state[`tm_c_${catId}`] = true;
+        }
+
+        if (Object.keys(state).length > 0) {
+            try { tmMap.setFeatureState({ source: 'composite', sourceLayer: 'building', id: f.id }, state); } catch(e) {}
+        }
+    });
+
+    // בנה ביטוי צבע לפי הטאב
+    let colorExpr;
+    if (tmCurrentTab === 'buildings') {
+        colorExpr = [
+            'case',
+            ['boolean', ['feature-state', 'tm_removed'], false], '#ef4444', // אדום — הוסר
+            ['boolean', ['feature-state', 'tm_added'],   false], '#3b82f6', // כחול — נוסף ידנית
+            ['boolean', ['feature-state', 'tm_in'],      false], '#10b981', // ירוק — בתיחום
+            '#d1d5db' // אפור — מחוץ
+        ];
+    } else if (tmCurrentTab === 'classify') {
+        colorExpr = ['case'];
+        tmCategories.forEach(cat => {
+            if (cat.id === 'irrelevant') return;
+            colorExpr.push(['boolean', ['feature-state', `tm_c_${cat.id}`], false]);
+            colorExpr.push(cat.color);
+        });
+        colorExpr.push('#d1d5db');
+    } else {
+        colorExpr = '#d1d5db';
+    }
+
+    try { tmMap.setPaintProperty('tm-buildings-highlight', 'fill-extrusion-color', colorExpr); } catch(e) {}
+    try { tmMap.setPaintProperty('tm-buildings-highlight', 'fill-extrusion-opacity', 0.85); } catch(e) {}
+}
+
+function tmScheduleColorUpdate() {
+    if (!tmMap) return;
+    if (tmMap.isStyleLoaded() && tmMap.areTilesLoaded()) {
+        tmRenderBuildingColors();
+    } else {
+        tmMap.once('idle', tmRenderBuildingColors);
+    }
+    // רענן גם אחרי גלילה — tiles חדשים
+    if (!_tmColorMoveHandler) {
+        _tmColorMoveHandler = () => {
+            clearTimeout(tmMap._colorMoveTimeout);
+            tmMap._colorMoveTimeout = setTimeout(tmRenderBuildingColors, 300);
+        };
+        tmMap.on('moveend', _tmColorMoveHandler);
     }
 }
 
@@ -1220,6 +1317,7 @@ function tmHandleBuildingClick(e) {
     else tmManualBuildings[key] = { added: true, coords: center };
     tmCountBuildings();
     tmRenderManualBuildingsList();
+    tmScheduleColorUpdate();
 }
 
 // ── לחיצה על מבנה — לשונית סיווג ──
@@ -1334,6 +1432,7 @@ window.tmSetBuildingCategory = (key, catId, name, popupContentEl, subCatId) => {
     else document.querySelectorAll('.mapboxgl-popup').forEach(p => p.remove());
     if (window._tmPendingGeometry?.[key]) delete window._tmPendingGeometry[key];
     tmRenderClassifySummary();
+    tmScheduleColorUpdate();
     showToast('קטגוריה נשמרה ✓', 'success');
 };
 
