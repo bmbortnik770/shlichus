@@ -2363,6 +2363,10 @@ function ensureMinimumUnits(bldgKey, aptNum) {
 
 // ── סריקה ראשית ─────────────────────────────────────────────────
 async function startTerritoryUnitsScan() {
+    // FROZEN — ממתין לרכבה מחדש
+    showToast('סריקת יחידות דיור אינה פעילה כרגע', 'info');
+    return;
+
     const btn=document.getElementById('btnScanUnits');
     const statusEl=document.getElementById('unitsScanStatus');
     const summaryEl=document.getElementById('unitsScanSummary');
