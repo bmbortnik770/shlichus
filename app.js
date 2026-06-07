@@ -956,7 +956,16 @@ window.confirmTerritoryDrawing = () => {
     appSettings.territory.manualBuildings = tmManualBuildings;
     appSettings.territory.buildingClassify = tmBuildingClassify;
     appSettings.territory.categories = tmCategories;
-    appSettings.territory.collectedBuildings = tmCollectedBuildings;
+    // מזג collected buildings — אם המשתמש לא עבר ל"מבנים" tmCollectedBuildings ריק,
+    // לכן שומרים את מה שהיה קיים ורק מוסיפים מבנים חדשים
+    if (Object.keys(tmCollectedBuildings).length > 0) {
+        appSettings.territory.collectedBuildings = {
+            ...(appSettings.territory.collectedBuildings || {}),
+            ...tmCollectedBuildings
+        };
+    }
+    // אם collectedBuildings עדיין ריק לגמרי — אתחל כdictionary ריק
+    if (!appSettings.territory.collectedBuildings) appSettings.territory.collectedBuildings = {};
     tmCollectedBuildings = {};
 
     showTerritoryInfo(missionName || 'ציור ידני', areaKm2, tempTerritorySource);
@@ -1153,6 +1162,10 @@ function tmCountBuildings() {
                     geom = { type: 'Polygon', coordinates: [[[cx-d,cy-d],[cx+d,cy-d],[cx+d,cy+d],[cx-d,cy+d],[cx-d,cy-d]]] };
                 }
                 tmCollectedBuildings[key] = { center, geometry: geom };
+                // סיווג אוטומטי כמגורים אם לא סווג עדיין
+                if (!tmBuildingClassify[key]) {
+                    tmBuildingClassify[key] = { catId: tmGetDefaultCatId(), subCatId: null, name: '', geometry: geom, center };
+                }
             }
         });
         const totalEl = document.getElementById('tmBuildingsTotal');
@@ -2261,7 +2274,7 @@ async function syncTerritoryCardsToDb() {
     }
 
     saveDB();
-    updateBuildingStatsCard();
+    updateBuildingStatsCardDebounced();
     showToast(`✓ ${created} כרטיסים חדשים · ${updated} עודכנו`, 'success');
 }
 
@@ -2350,10 +2363,6 @@ function ensureMinimumUnits(bldgKey, aptNum) {
 
 // ── סריקה ראשית ─────────────────────────────────────────────────
 async function startTerritoryUnitsScan() {
-    // FROZEN — disabled temporarily to prevent overwriting existing building markers
-    showToast('סריקת דירות מושהית זמנית', 'info');
-    return;
-
     const btn=document.getElementById('btnScanUnits');
     const statusEl=document.getElementById('unitsScanStatus');
     const summaryEl=document.getElementById('unitsScanSummary');
@@ -2466,7 +2475,13 @@ window.startTerritoryUnitsScan = startTerritoryUnitsScan;
 // ── סטטיסטיקת מבנים לפי סיווג ─────────────────────
 // ══════════════════════════════════════════════════════
 let _bldgStatsChart = null;
-let _bldgStatsActiveFilter = null; // null = הכל, catId = קטגוריה
+let _bldgStatsActiveFilter = null;
+let _bldgStatsUpdateTimer = null;
+
+function updateBuildingStatsCardDebounced() {
+    clearTimeout(_bldgStatsUpdateTimer);
+    _bldgStatsUpdateTimer = setTimeout(updateBuildingStatsCard, 400);
+}
 
 function computeBuildingStats() {
     const byCategory = {};
@@ -2630,7 +2645,7 @@ function updateCoverageStats() {
         if(s.verifiedBldgs>0){vr.style.display='block';document.getElementById('coverageVerifiedCount').innerText=s.verifiedBldgs;}
         else vr.style.display='none';
     }
-    updateBuildingStatsCard();
+    updateBuildingStatsCardDebounced();
     if (typeof renderLifecycleAlerts === 'function') renderLifecycleAlerts();
 }
 
@@ -3251,7 +3266,8 @@ function getAllEmails(a) { return [a.fatherEmail, a.motherEmail, ...(a.childrenL
 window.openBuildingModal = function() {
     const b = db[currentBldg];
     // ניתוב לפי קטגוריית הבניין — מוסד או מגורים
-    const bldgCatId = b.info?.categoryId || 'residential';
+    // בודק categoryId (חדש) ו-category (ישן) לתאימות לאחור
+    const bldgCatId = b.info?.categoryId || b.info?.category || 'residential';
     const bldgCat = tmCategories.find(c => c.id === bldgCatId);
     if (bldgCat && bldgCat.cardType === 'institution') {
         openInstitutionCard(currentBldg);
