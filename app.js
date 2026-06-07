@@ -598,13 +598,105 @@ function showTerritoryInfo(name, areaKm2, source) {
 let tmCurrentTab = 'draw'; // draw | buildings | classify
 let tmManualBuildings = {}; // { featureKey: { added: true/false, coords, category } }
 let tmCategories = [
-    { id: 'residential', name: 'מגורים',      color: '#3b82f6', hasCard: true },
-    { id: 'business',    name: 'עסק',          color: '#f59e0b', hasCard: true },
-    { id: 'education',   name: 'חינוך',        color: '#10b981', hasCard: true },
-    { id: 'synagogue',   name: 'בית כנסת',     color: '#8b5cf6', hasCard: true },
-    { id: 'medical',     name: 'רפואי',         color: '#ef4444', hasCard: true },
-    { id: 'offices',     name: 'משרדים',       color: '#6366f1', hasCard: true },
-    { id: 'irrelevant',  name: 'לא רלוונטי',   color: '#94a3b8', hasCard: false },
+    {
+        id: 'residential', name: 'מגורים', color: '#3b82f6', hasCard: true,
+        emoji: '🏠', isDefault: true, cardType: 'residential',
+        subCategories: [
+            { id: 'residential_apt',   name: 'דירת מגורים',  color: '#3b82f6' },
+            { id: 'residential_house', name: 'בית פרטי',     color: '#60a5fa' },
+            { id: 'residential_bldg',  name: 'בניין מגורים', color: '#1d4ed8' },
+        ],
+        defaultFields: []
+    },
+    {
+        id: 'synagogue', name: 'דת ובית כנסת', color: '#8b5cf6', hasCard: true,
+        emoji: '🕍', isDefault: false, cardType: 'institution',
+        subCategories: [
+            { id: 'synagogue_chabad',     name: 'בית חב"ד',      color: '#8b5cf6' },
+            { id: 'synagogue_general',    name: 'בית כנסת',       color: '#7c3aed' },
+            { id: 'synagogue_institution',name: 'מוסד דתי',       color: '#6d28d9' },
+        ],
+        defaultFields: [
+            { id: 'contactName', label: 'שם הרב / איש קשר', type: 'text' },
+            { id: 'phone',       label: 'טלפון',             type: 'phone' },
+            { id: 'prayerTimes', label: 'זמני תפילה',        type: 'textarea' },
+            { id: 'hours',       label: 'שעות פעילות',       type: 'text' },
+            { id: 'notes',       label: 'הערות',             type: 'textarea' },
+        ]
+    },
+    {
+        id: 'education', name: 'חינוך', color: '#10b981', hasCard: true,
+        emoji: '📚', isDefault: false, cardType: 'institution',
+        subCategories: [
+            { id: 'education_kindergarten', name: 'גן ילדים',         color: '#34d399' },
+            { id: 'education_school',       name: 'בית ספר',           color: '#10b981' },
+            { id: 'education_college',      name: 'מכללה / אוניברסיטה',color: '#059669' },
+            { id: 'education_other',        name: 'מוסד חינוכי אחר',   color: '#047857' },
+        ],
+        defaultFields: [
+            { id: 'contactName', label: 'שם המנהל / איש קשר', type: 'text' },
+            { id: 'phone',       label: 'טלפון',               type: 'phone' },
+            { id: 'ageGroup',    label: 'גילאים',               type: 'text' },
+            { id: 'hours',       label: 'שעות פעילות',         type: 'text' },
+            { id: 'notes',       label: 'הערות',               type: 'textarea' },
+        ]
+    },
+    {
+        id: 'medical', name: 'בריאות', color: '#ef4444', hasCard: true,
+        emoji: '🏥', isDefault: false, cardType: 'institution',
+        subCategories: [
+            { id: 'medical_clinic',   name: 'קליניקה / מרפאה', color: '#ef4444' },
+            { id: 'medical_pharmacy', name: 'בית מרקחת',       color: '#dc2626' },
+            { id: 'medical_hospital', name: 'בית חולים',        color: '#b91c1c' },
+            { id: 'medical_other',    name: 'שירות רפואי אחר', color: '#f87171' },
+        ],
+        defaultFields: [
+            { id: 'contactName', label: 'שם הרופא / איש קשר', type: 'text' },
+            { id: 'phone',       label: 'טלפון',               type: 'phone' },
+            { id: 'hours',       label: 'שעות קבלה',           type: 'text' },
+            { id: 'specialty',   label: 'התמחות',              type: 'text' },
+            { id: 'notes',       label: 'הערות',               type: 'textarea' },
+        ]
+    },
+    {
+        id: 'business', name: 'עסקים', color: '#f59e0b', hasCard: true,
+        emoji: '🏪', isDefault: false, cardType: 'institution',
+        subCategories: [
+            { id: 'business_store',      name: 'חנות',          color: '#f59e0b' },
+            { id: 'business_restaurant', name: 'מסעדה / בית קפה',color: '#d97706' },
+            { id: 'business_office',     name: 'משרד / עסק',    color: '#b45309' },
+            { id: 'business_other',      name: 'עסק אחר',       color: '#fbbf24' },
+        ],
+        defaultFields: [
+            { id: 'contactName', label: 'שם בעל העסק / איש קשר', type: 'text' },
+            { id: 'phone',       label: 'טלפון',                  type: 'phone' },
+            { id: 'hours',       label: 'שעות פתיחה',             type: 'text' },
+            { id: 'website',     label: 'אתר אינטרנט',            type: 'url' },
+            { id: 'notes',       label: 'הערות',                  type: 'textarea' },
+        ]
+    },
+    {
+        id: 'offices', name: 'משרדים ומוסדות', color: '#6366f1', hasCard: true,
+        emoji: '🏢', isDefault: false, cardType: 'institution',
+        subCategories: [
+            { id: 'offices_govt',    name: 'מוסד ממשלתי', color: '#6366f1' },
+            { id: 'offices_org',     name: 'עמותה / ארגון',color: '#4f46e5' },
+            { id: 'offices_general', name: 'משרד כללי',   color: '#4338ca' },
+        ],
+        defaultFields: [
+            { id: 'contactName', label: 'איש קשר',        type: 'text' },
+            { id: 'phone',       label: 'טלפון',           type: 'phone' },
+            { id: 'hours',       label: 'שעות פעילות',    type: 'text' },
+            { id: 'website',     label: 'אתר',             type: 'url' },
+            { id: 'notes',       label: 'הערות',           type: 'textarea' },
+        ]
+    },
+    {
+        id: 'irrelevant', name: 'לא רלוונטי', color: '#94a3b8', hasCard: false,
+        emoji: '🚫', isDefault: false, cardType: 'none',
+        subCategories: [],
+        defaultFields: []
+    },
 ];
 let tmBuildingClassify = {}; // { featureKey: { catId, name, geometry, center } }
 let tmCollectedBuildings = {}; // { featureKey: { center, geometry } } — all buildings in territory
@@ -620,7 +712,16 @@ window.openTerritoryMapEditor = (source) => {
     // טען נתונים שמורים
     if (appSettings.territory?.manualBuildings) tmManualBuildings = { ...appSettings.territory.manualBuildings };
     if (appSettings.territory?.buildingClassify) tmBuildingClassify = { ...appSettings.territory.buildingClassify };
-    if (appSettings.territory?.categories) tmCategories = [...appSettings.territory.categories];
+    if (appSettings.territory?.categories?.length) {
+        // מזג קטגוריות שמורות עם הגדרות חדשות (תאימות לאחור)
+        const saved = appSettings.territory.categories;
+        tmCategories = tmCategories.map(def => {
+            const stored = saved.find(s => s.id === def.id);
+            return stored ? { ...def, ...stored, subCategories: stored.subCategories || def.subCategories, defaultFields: stored.defaultFields || def.defaultFields } : def;
+        });
+        // קטגוריות מותאמות אישית שנוספו
+        saved.forEach(s => { if (!tmCategories.find(c => c.id === s.id)) tmCategories.push(s); });
+    }
 
     const nameEl = document.getElementById('tmMissionNameInput');
     if (nameEl) nameEl.value = appSettings.territory?.missionName || document.getElementById('settingsMissionName')?.value || '';
@@ -1132,35 +1233,72 @@ function tmHandleClassifyClick(e) {
     window._tmPendingGeometry = window._tmPendingGeometry || {};
     window._tmPendingGeometry[key] = { geometry, center };
 
-    new mapboxgl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '300px' })
-        .setLngLat(center || e.lngLat)
-        .setHTML(`
-            <div style="font-family:inherit; direction:rtl; padding:4px;">
+    const currentSubCat = tmBuildingClassify[key]?.subCatId || '';
+    const mainCatSelected = currentCat !== 'residential' ? currentCat : 'residential';
+
+    const _buildPopupHTML = (selectedMainCatId) => {
+        const mainCat = tmCategories.find(c => c.id === selectedMainCatId);
+        const subCats = mainCat?.subCategories || [];
+        return `
+            <div style="font-family:inherit; direction:rtl; padding:4px; min-width:240px;">
                 <div style="font-weight:700; font-size:13px; margin-bottom:8px; color:#111;">סיווג מבנה</div>
                 <input id="tmBldgNameInput" type="text" placeholder="שם המבנה (אופציונלי)..."
                     value="${currentName}"
                     style="width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; margin-bottom:10px; font-family:inherit; direction:rtl;">
-                <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="font-size:11px; font-weight:600; color:#6b7280; margin-bottom:6px;">קטגוריה ראשית</div>
+                <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:${subCats.length ? '12px' : '0'};">
                     ${tmCategories.map(cat => `
-                        <button onclick="window.tmSetBuildingCategory('${key}','${cat.id}',document.getElementById('tmBldgNameInput')?.value||'',this.closest('.mapboxgl-popup-content'))"
+                        <button onclick="window._tmSelectMainCat('${key}','${cat.id}')"
                             style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:8px;
-                                   border:2px solid ${cat.id === currentCat ? cat.color : '#e2e8f0'};
-                                   background:${cat.id === currentCat ? cat.color+'22' : 'white'};
-                                   cursor:pointer; font-family:inherit; font-size:12px; font-weight:${cat.id === currentCat ? '700':'500'}; color:#374151;">
+                                   border:2px solid ${cat.id === selectedMainCatId ? cat.color : '#e2e8f0'};
+                                   background:${cat.id === selectedMainCatId ? cat.color+'22' : 'white'};
+                                   cursor:pointer; font-family:inherit; font-size:12px; font-weight:${cat.id === selectedMainCatId ? '700':'500'}; color:#374151;">
                             <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};flex-shrink:0;"></span>
-                            ${cat.name}
+                            ${cat.emoji || ''} ${cat.name}
                         </button>
                     `).join('')}
                 </div>
-            </div>
-        `)
+                ${subCats.length ? `
+                <div style="font-size:11px; font-weight:600; color:#6b7280; margin-bottom:6px; border-top:1px solid #e2e8f0; padding-top:10px;">תת-קטגוריה</div>
+                <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px;">
+                    ${subCats.map(sc => `
+                        <button onclick="window.tmSetBuildingCategory('${key}','${selectedMainCatId}',document.getElementById('tmBldgNameInput')?.value||'',null,'${sc.id}'); document.querySelectorAll('.mapboxgl-popup').forEach(p=>p.remove());"
+                            style="display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:8px;
+                                   border:2px solid ${sc.id === currentSubCat ? sc.color : '#e2e8f0'};
+                                   background:${sc.id === currentSubCat ? sc.color+'22' : '#f9fafb'};
+                                   cursor:pointer; font-family:inherit; font-size:11px; font-weight:${sc.id === currentSubCat ? '700':'400'}; color:#374151;">
+                            <span style="width:8px;height:8px;border-radius:50%;background:${sc.color};flex-shrink:0;"></span>
+                            ${sc.name}
+                        </button>
+                    `).join('')}
+                </div>` : ''}
+                <button onclick="window.tmSetBuildingCategory('${key}','${selectedMainCatId}',document.getElementById('tmBldgNameInput')?.value||'',null,null); document.querySelectorAll('.mapboxgl-popup').forEach(p=>p.remove());"
+                    style="width:100%; padding:8px; background:${mainCat?.color||'#3b82f6'}; color:white; border:none; border-radius:8px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;">
+                    ✓ שמור${subCats.length ? ' ללא תת-קטגוריה' : ''}
+                </button>
+            </div>`;
+    };
+
+    window._tmSelectMainCat = (bldgKey, catId) => {
+        const popup = document.querySelector('.mapboxgl-popup-content');
+        if (popup) popup.innerHTML = _buildPopupHTML(catId);
+    };
+
+    new mapboxgl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '280px' })
+        .setLngLat(center || e.lngLat)
+        .setHTML(_buildPopupHTML(mainCatSelected))
         .addTo(tmMap);
 }
 
 // ── הגדרת קטגוריה למבנה ──
-window.tmSetBuildingCategory = (key, catId, name, popupContentEl) => {
+window.tmSetBuildingCategory = (key, catId, name, popupContentEl, subCatId) => {
     const pending = window._tmPendingGeometry?.[key];
-    tmBuildingClassify[key] = { catId, name: name || '', geometry: pending?.geometry || null, center: pending?.center || null };
+    tmBuildingClassify[key] = {
+        catId, subCatId: subCatId || null,
+        name: name || '',
+        geometry: pending?.geometry || null,
+        center: pending?.center || null
+    };
     if (popupContentEl) { const p = popupContentEl.closest?.('.mapboxgl-popup'); if (p) p.remove(); }
     else document.querySelectorAll('.mapboxgl-popup').forEach(p => p.remove());
     if (window._tmPendingGeometry?.[key]) delete window._tmPendingGeometry[key];
@@ -1184,29 +1322,92 @@ function tmRenderManualBuildingsList() {
     `).join('');
 }
 
-// ── רינדור קטגוריות ──
+// ── רינדור מנהל קטגוריות מלא ──
 function tmRenderCategories() {
     const list = document.getElementById('tmCategoriesList');
     if (!list) return;
     list.innerHTML = tmCategories.map((cat, i) => `
-        <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--bg-body); border-radius:8px; border:1px solid var(--border-light);">
-            <div style="width:12px;height:12px;border-radius:50%;background:${cat.color};flex-shrink:0;"></div>
-            <div style="flex:1; font-size:12px; font-weight:600; color:var(--text-main);">${cat.name}</div>
-            <div style="font-size:11px; color:var(--text-muted);">${cat.hasCard ? '📋 כרטיס' : ''}</div>
-            ${['residential','business','education','offices','irrelevant'].includes(cat.id) ? '' :
-                `<button onclick="tmCategories.splice(${i},1); tmRenderCategories();"
-                    style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;"><i class="fas fa-trash"></i></button>`}
+        <div style="background:var(--bg-body); border-radius:10px; border:1px solid var(--border-light); overflow:hidden; margin-bottom:6px;">
+            <!-- שורת קטגוריה ראשית -->
+            <div style="display:flex; align-items:center; gap:8px; padding:9px 10px;">
+                <input type="color" value="${cat.color}"
+                    onchange="tmCategories[${i}].color=this.value; tmRenderCategories();"
+                    style="width:22px;height:22px;border:none;border-radius:4px;cursor:pointer;padding:0;background:none;flex-shrink:0;">
+                <input type="text" value="${cat.name}"
+                    onchange="tmCategories[${i}].name=this.value;"
+                    style="flex:1;border:none;background:transparent;font-size:12px;font-weight:600;color:var(--text-main);font-family:inherit;direction:rtl;outline:none;">
+                ${cat.isDefault ? '<span style="font-size:10px;background:var(--accent);color:white;padding:2px 6px;border-radius:10px;flex-shrink:0;">ברירת מחדל</span>' :
+                    `<button onclick="tmCategories.forEach(c=>c.isDefault=false); tmCategories[${i}].isDefault=true; tmRenderCategories();"
+                        title="הגדר כברירת מחדל"
+                        style="background:none;border:1px solid var(--border-light);color:var(--text-muted);cursor:pointer;font-size:10px;border-radius:10px;padding:2px 6px;flex-shrink:0;">הגדר כברירת מחדל</button>`}
+                <button onclick="window.tmToggleCatExpand(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:2px 4px;">
+                    <i class="fas fa-chevron-down" id="tmCatChevron_${i}"></i>
+                </button>
+                ${!['residential','irrelevant'].includes(cat.id) ?
+                    `<button onclick="if(confirm('למחוק קטגוריה זו?')) { tmCategories.splice(${i},1); tmRenderCategories(); }"
+                        style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;"><i class="fas fa-trash"></i></button>` : ''}
+            </div>
+            <!-- תת-קטגוריות (מוסתרות ברירת מחדל) -->
+            <div id="tmCatExpand_${i}" style="display:none; border-top:1px solid var(--border-light); padding:8px 10px; background:var(--surface);">
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">תת-קטגוריות:</div>
+                ${(cat.subCategories||[]).map((sc, si) => `
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+                        <input type="color" value="${sc.color}"
+                            onchange="tmCategories[${i}].subCategories[${si}].color=this.value;"
+                            style="width:18px;height:18px;border:none;border-radius:3px;cursor:pointer;padding:0;background:none;">
+                        <input type="text" value="${sc.name}"
+                            onchange="tmCategories[${i}].subCategories[${si}].name=this.value;"
+                            style="flex:1;border:1px solid var(--border-light);background:var(--bg-body);font-size:11px;color:var(--text-main);font-family:inherit;direction:rtl;border-radius:5px;padding:3px 6px;">
+                        <button onclick="tmCategories[${i}].subCategories.splice(${si},1); tmRenderCategories();"
+                            style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:11px;"><i class="fas fa-times"></i></button>
+                    </div>
+                `).join('')}
+                <button onclick="window.tmAddSubCategory(${i})"
+                    style="font-size:11px;color:var(--accent);background:none;border:1px dashed var(--accent);border-radius:6px;padding:4px 10px;cursor:pointer;width:100%;margin-top:4px;">
+                    + הוסף תת-קטגוריה
+                </button>
+            </div>
         </div>
     `).join('');
 }
 
-// ── הוספת קטגוריה חדשה ──
+window.tmToggleCatExpand = (i) => {
+    const el = document.getElementById(`tmCatExpand_${i}`);
+    const chevron = document.getElementById(`tmCatChevron_${i}`);
+    if (!el) return;
+    const isOpen = el.style.display !== 'none';
+    el.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.className = isOpen ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+};
+
+window.tmAddSubCategory = (i) => {
+    const name = prompt('שם התת-קטגוריה:');
+    if (!name?.trim()) return;
+    if (!tmCategories[i].subCategories) tmCategories[i].subCategories = [];
+    tmCategories[i].subCategories.push({
+        id: `${tmCategories[i].id}_${Date.now()}`,
+        name: name.trim(),
+        color: tmCategories[i].color
+    });
+    tmRenderCategories();
+    document.getElementById(`tmCatExpand_${i}`)?.style && (document.getElementById(`tmCatExpand_${i}`).style.display = 'block');
+};
+
+// ── הוספת קטגוריה ראשית חדשה ──
 window.tmAddCategory = () => {
     const name = document.getElementById('tmNewCategoryName')?.value?.trim();
     const color = document.getElementById('tmNewCategoryColor')?.value || '#6366f1';
     const hasCard = document.getElementById('tmNewCategoryHasCard')?.checked ?? true;
     if (!name) { showToast('יש להזין שם קטגוריה', 'warning'); return; }
-    tmCategories.push({ id: 'custom_' + Date.now(), name, color, hasCard });
+    tmCategories.splice(tmCategories.length - 1, 0, {
+        id: 'custom_' + Date.now(), name, color, hasCard,
+        emoji: '📌', isDefault: false, cardType: 'institution',
+        subCategories: [], defaultFields: [
+            { id: 'contactName', label: 'איש קשר', type: 'text' },
+            { id: 'phone',       label: 'טלפון',   type: 'phone' },
+            { id: 'notes',       label: 'הערות',   type: 'textarea' },
+        ]
+    });
     tmRenderCategories();
     if (document.getElementById('tmNewCategoryName')) document.getElementById('tmNewCategoryName').value = '';
     showToast(`קטגוריה "${name}" נוספה ✓`, 'success');
@@ -1246,15 +1447,31 @@ let _tmReassignPoiIdx = null;
 
 const _POI_EMOJI = { synagogue:'🕍', education:'📚', medical:'🏥', business:'🏪', offices:'🏢' };
 
+function tmGetDefaultCatId() {
+    return (tmCategories.find(c => c.isDefault) || tmCategories[0]).id;
+}
+
 function _osmToCatId(tags) {
     const a = tags.amenity || '';
-    if (a === 'place_of_worship') return 'synagogue';
-    if (['school','university','college','kindergarten'].includes(a)) return 'education';
-    if (['clinic','hospital','pharmacy','doctors','dentist'].includes(a)) return 'medical';
-    if (tags.shop) return 'business';
-    if (tags.office) return 'offices';
-    if (['bank','restaurant','cafe','fast_food','bar'].includes(a)) return 'business';
-    return 'business';
+    // דת
+    if (a === 'place_of_worship') return { catId: 'synagogue', subCatId: 'synagogue_general' };
+    // חינוך
+    if (a === 'kindergarten') return { catId: 'education', subCatId: 'education_kindergarten' };
+    if (['school'].includes(a)) return { catId: 'education', subCatId: 'education_school' };
+    if (['university','college'].includes(a)) return { catId: 'education', subCatId: 'education_college' };
+    if (['library','community_centre','arts_centre'].includes(a)) return { catId: 'education', subCatId: 'education_other' };
+    // בריאות
+    if (['clinic','doctors','dentist'].includes(a)) return { catId: 'medical', subCatId: 'medical_clinic' };
+    if (a === 'pharmacy') return { catId: 'medical', subCatId: 'medical_pharmacy' };
+    if (a === 'hospital') return { catId: 'medical', subCatId: 'medical_hospital' };
+    // משרדים ומוסדות
+    if (tags.office || ['townhall','post_office','police','fire_station'].includes(a)) return { catId: 'offices', subCatId: 'offices_govt' };
+    // עסקים
+    if (tags.shop) return { catId: 'business', subCatId: 'business_store' };
+    if (['restaurant','cafe','fast_food','bar','pub'].includes(a)) return { catId: 'business', subCatId: 'business_restaurant' };
+    if (['bank','atm','fuel'].includes(a)) return { catId: 'business', subCatId: 'business_other' };
+    // ברירת מחדל — קטגוריית הברירת מחדל של המשתמש
+    return { catId: tmGetDefaultCatId(), subCatId: null };
 }
 
 function _osmGetName(tags) {
@@ -1289,6 +1506,7 @@ function _tmApplyPOIToBuilding(poi, bldgKey) {
     const pending = window._tmPendingGeometry?.[bldgKey];
     tmBuildingClassify[bldgKey] = {
         catId: poi.catId,
+        subCatId: poi.subCatId || null,
         name: poi.name,
         phone: poi.phone,
         website: poi.website,
@@ -1338,13 +1556,13 @@ way["office"](${bbox});
             else if (el.center) { lat = el.center.lat; lng = el.center.lon; }
             else continue;
             if (!pointInPolygon([lng, lat], polygon)) continue;
-            const catId = _osmToCatId(tags);
+            const { catId, subCatId } = _osmToCatId(tags);
             const cat = tmCategories.find(c => c.id === catId) || { name: 'אחר', color: '#6366f1' };
             const address = _osmGetAddress(tags);
             const safeName = encodeURIComponent(name + (address ? ' ' + address : ''));
             pois.push({
                 osmId: el.id, osmType: el.type,
-                name, catId, catName: cat.name, catColor: cat.color,
+                name, catId, subCatId, catName: cat.name, catColor: cat.color,
                 phone: tags.phone || tags['contact:phone'] || tags['contact:mobile'] || '',
                 website: tags.website || tags['contact:website'] || '',
                 hours: tags.opening_hours || '',
@@ -2001,7 +2219,24 @@ async function syncTerritoryCardsToDb() {
 
         // צור כרטיס חדש (גם אחרי מחיקה למעלה)
         if (!cat.hasCard) continue;
-        db[dbKey] = { info: { address, coords: bldg.center, polygon, category: catId, buildingName: entry?.name || '', code: '', rep: '', notes: '' }, apts: [] };
+        const subCatId = entry?.subCatId || null;
+        const cardType = cat.cardType || 'residential';
+        db[dbKey] = {
+            info: {
+                address, coords: bldg.center, polygon,
+                category: catId, categoryId: catId, subCategoryId: subCatId,
+                cardType, buildingName: entry?.name || '',
+                institutionName: entry?.name || '',
+                institutionData: {
+                    phone: entry?.phone || '',
+                    website: entry?.website || '',
+                    hours: entry?.hours || '',
+                },
+                customFields: {},
+                code: '', rep: '', notes: ''
+            },
+            apts: []
+        };
         created++;
 
         await new Promise(r => setTimeout(r, 120));
@@ -2851,6 +3086,13 @@ function getAllEmails(a) { return [a.fatherEmail, a.motherEmail, ...(a.childrenL
 
 window.openBuildingModal = function() {
     const b = db[currentBldg];
+    // ניתוב לפי קטגוריית הבניין — מוסד או מגורים
+    const bldgCatId = b.info?.categoryId || 'residential';
+    const bldgCat = tmCategories.find(c => c.id === bldgCatId);
+    if (bldgCat && bldgCat.cardType === 'institution') {
+        openInstitutionCard(currentBldg);
+        return;
+    }
     const displayName = b.info?.address || b.info?.buildingName || (currentBldg.startsWith('@') ? 'מבנה ללא כתובת' : currentBldg);
     document.getElementById('bModalTitle').innerHTML = `<i class="fas fa-building" style="color:var(--accent);"></i> ${displayName}`;
     let c = b.info.coords || (currentBldg !== NO_ADDRESS_KEY ? currentBldg.split(',').map(Number) : null);
@@ -2906,7 +3148,94 @@ window.markDirty = () => {
     autoSave();
 };
 
-window.closeModals = () => { 
+// ══════════════════════════════════════════════════════════════
+// כרטיסיית מוסד — לבניינים שאינם מגורים
+// ══════════════════════════════════════════════════════════════
+window.openInstitutionCard = function(bldgKey) {
+    const b = db[bldgKey];
+    if (!b) return;
+    const catId = b.info?.categoryId || 'residential';
+    const subCatId = b.info?.subCategoryId || null;
+    const cat = tmCategories.find(c => c.id === catId) || tmCategories[0];
+    const subCat = subCatId ? (cat.subCategories||[]).find(s => s.id === subCatId) : null;
+    const displayName = b.info?.institutionName || b.info?.address || b.info?.buildingName || bldgKey;
+    const data = b.info?.institutionData || {};
+    const fields = cat.defaultFields || [];
+    const customFields = b.info?.customFields || {};
+
+    const fieldsHTML = fields.map(f => {
+        const val = data[f.id] || '';
+        if (f.type === 'textarea') return `
+            <div style="margin-bottom:12px;">
+                <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">${f.label}</label>
+                <textarea id="instField_${f.id}" rows="2"
+                    style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border-light);border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;background:var(--bg-body);color:var(--text-main);"
+                >${escapeHTML(val)}</textarea>
+            </div>`;
+        return `
+            <div style="margin-bottom:12px;">
+                <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">${f.label}</label>
+                <input type="${f.type === 'phone' ? 'tel' : f.type === 'url' ? 'url' : 'text'}" id="instField_${f.id}"
+                    value="${escapeHTML(val)}"
+                    style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border-light);border-radius:8px;font-family:inherit;font-size:13px;background:var(--bg-body);color:var(--text-main);">
+            </div>`;
+    }).join('');
+
+    const customHTML = Object.entries(customFields).map(([k, v]) => `
+        <div style="margin-bottom:8px;display:flex;gap:6px;align-items:center;">
+            <input type="text" value="${escapeHTML(k)}" placeholder="שם שדה"
+                onchange="db['${escapeHTML(bldgKey)}'].info.customFields[this.value]=db['${escapeHTML(bldgKey)}'].info.customFields['${escapeHTML(k)}']; delete db['${escapeHTML(bldgKey)}'].info.customFields['${escapeHTML(k)}'];"
+                style="flex:0.4;padding:6px;border:1px solid var(--border-light);border-radius:6px;font-size:12px;background:var(--bg-body);color:var(--text-main);">
+            <input type="text" value="${escapeHTML(v)}" placeholder="ערך"
+                onchange="db['${escapeHTML(bldgKey)}'].info.customFields['${escapeHTML(k)}']=this.value;"
+                style="flex:0.6;padding:6px;border:1px solid var(--border-light);border-radius:6px;font-size:12px;background:var(--bg-body);color:var(--text-main);">
+            <button onclick="delete db['${escapeHTML(bldgKey)}'].info.customFields['${escapeHTML(k)}']; openInstitutionCard('${escapeHTML(bldgKey)}');"
+                style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;"><i class="fas fa-times"></i></button>
+        </div>`).join('');
+
+    const modal = document.getElementById('institutionCardModal');
+    if (!modal) return;
+    document.getElementById('instModalTitle').innerHTML =
+        `<span style="color:${cat.color}">${cat.emoji||'🏢'}</span> ${escapeHTML(displayName)}`;
+    document.getElementById('instModalBadge').innerHTML =
+        `<span style="background:${cat.color}22;color:${cat.color};border:1px solid ${cat.color}44;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">${cat.name}${subCat ? ' · ' + subCat.name : ''}</span>`;
+    document.getElementById('instModalName').value = b.info?.institutionName || '';
+    document.getElementById('instModalFields').innerHTML = fieldsHTML;
+    document.getElementById('instModalCustomFields').innerHTML = customHTML;
+    document.getElementById('instModalNotes').value = b.info?.notes || '';
+    modal.dataset.bldgKey = bldgKey;
+    modal.style.display = 'flex';
+};
+
+window.saveInstitutionCard = function() {
+    const modal = document.getElementById('institutionCardModal');
+    const bldgKey = modal?.dataset.bldgKey;
+    if (!bldgKey || !db[bldgKey]) return;
+    const cat = tmCategories.find(c => c.id === (db[bldgKey].info?.categoryId || 'residential')) || tmCategories[0];
+    const fields = cat.defaultFields || [];
+    if (!db[bldgKey].info) db[bldgKey].info = {};
+    db[bldgKey].info.institutionName = document.getElementById('instModalName').value.trim();
+    db[bldgKey].info.notes = document.getElementById('instModalNotes').value.trim();
+    db[bldgKey].info.institutionData = {};
+    fields.forEach(f => {
+        const el = document.getElementById(`instField_${f.id}`);
+        if (el) db[bldgKey].info.institutionData[f.id] = el.value;
+    });
+    saveDB();
+    showToast('נשמר ✓', 'success');
+    modal.style.display = 'none';
+};
+
+window.addInstitutionCustomField = function() {
+    const modal = document.getElementById('institutionCardModal');
+    const bldgKey = modal?.dataset.bldgKey;
+    if (!bldgKey || !db[bldgKey]) return;
+    if (!db[bldgKey].info.customFields) db[bldgKey].info.customFields = {};
+    db[bldgKey].info.customFields['שדה חדש'] = '';
+    openInstitutionCard(bldgKey);
+};
+
+window.closeModals = () => {
     isDirty = false; 
     pendingMoveMode = false; // התיקון: איפוס מצב העברה
     tempSelectedAddress = null;

@@ -65,6 +65,57 @@
 </div>
 <div id="toast-container"></div>
 
+<!-- ══ מודאל כרטיסיית מוסד ══ -->
+<div id="institutionCardModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:520px; width:95%; max-height:90vh; overflow-y:auto; border-radius:18px; padding:0;">
+        <!-- כותרת -->
+        <div style="padding:18px 20px 14px; border-bottom:1px solid var(--border-light); display:flex; align-items:center; gap:12px; position:sticky; top:0; background:var(--surface); z-index:1; border-radius:18px 18px 0 0;">
+            <div style="flex:1;">
+                <div id="instModalTitle" style="font-size:18px; font-weight:800; color:var(--text-main);"></div>
+                <div id="instModalBadge" style="margin-top:4px;"></div>
+            </div>
+            <button onclick="document.getElementById('institutionCardModal').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;"><i class="fas fa-times"></i></button>
+        </div>
+        <!-- תוכן -->
+        <div style="padding:20px;">
+            <!-- שם המוסד -->
+            <div style="margin-bottom:14px;">
+                <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">שם המוסד / המבנה</label>
+                <input type="text" id="instModalName" placeholder="שם המוסד..."
+                    style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-light);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg-body);color:var(--text-main);">
+            </div>
+            <!-- שדות לפי קטגוריה -->
+            <div id="instModalFields"></div>
+            <!-- שדות מותאמים אישית -->
+            <div style="border-top:1px solid var(--border-light); margin-top:16px; padding-top:14px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text-muted);">שדות נוספים</div>
+                    <button onclick="addInstitutionCustomField()"
+                        style="font-size:11px;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:8px;padding:4px 10px;cursor:pointer;">
+                        <i class="fas fa-plus"></i> הוסף שדה
+                    </button>
+                </div>
+                <div id="instModalCustomFields"></div>
+            </div>
+            <!-- הערות -->
+            <div style="margin-top:14px;">
+                <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">הערות כלליות</label>
+                <textarea id="instModalNotes" rows="3" placeholder="הערות..."
+                    style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-light);border-radius:10px;font-family:inherit;font-size:13px;resize:vertical;background:var(--bg-body);color:var(--text-main);"></textarea>
+            </div>
+        </div>
+        <!-- כפתורי פעולה -->
+        <div style="padding:14px 20px; border-top:1px solid var(--border-light); display:flex; gap:10px; position:sticky; bottom:0; background:var(--surface); border-radius:0 0 18px 18px;">
+            <button onclick="saveInstitutionCard()" class="btn btn-primary" style="flex:1;">
+                <i class="fas fa-save"></i> שמור
+            </button>
+            <button onclick="document.getElementById('institutionCardModal').style.display='none'" class="btn btn-outline" style="flex:0.4;">
+                ביטול
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="sidebar">
     <!-- ══ Sidebar Header — Premium ══ -->
     <div id="sidebar-header" style="padding-bottom:16px; border-bottom:1px solid var(--border-light); margin-bottom:4px;">
