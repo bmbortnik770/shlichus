@@ -713,14 +713,24 @@ window.openTerritoryMapEditor = (source) => {
     if (appSettings.territory?.manualBuildings) tmManualBuildings = { ...appSettings.territory.manualBuildings };
     if (appSettings.territory?.buildingClassify) tmBuildingClassify = { ...appSettings.territory.buildingClassify };
     if (appSettings.territory?.categories?.length) {
-        // מזג קטגוריות שמורות עם הגדרות חדשות (תאימות לאחור)
         const saved = appSettings.territory.categories;
+        // מזג קטגוריות שמורות עם הגדרות חדשות (תאימות לאחור)
         tmCategories = tmCategories.map(def => {
             const stored = saved.find(s => s.id === def.id);
             return stored ? { ...def, ...stored, subCategories: stored.subCategories || def.subCategories, defaultFields: stored.defaultFields || def.defaultFields } : def;
         });
         // קטגוריות מותאמות אישית שנוספו
         saved.forEach(s => { if (!tmCategories.find(c => c.id === s.id)) tmCategories.push(s); });
+        // ודא שרק קטגוריה אחת היא ברירת המחדל
+        const defaults = tmCategories.filter(c => c.isDefault);
+        if (defaults.length > 1) {
+            // שמור רק את הראשון שנשמר כ-isDefault
+            const keepId = saved.find(s => s.isDefault)?.id || 'residential';
+            tmCategories.forEach(c => { c.isDefault = (c.id === keepId); });
+        } else if (defaults.length === 0) {
+            const res = tmCategories.find(c => c.id === 'residential');
+            if (res) res.isDefault = true;
+        }
     }
 
     const nameEl = document.getElementById('tmMissionNameInput');
@@ -1239,11 +1249,13 @@ function tmHandleClassifyClick(e) {
     const _buildPopupHTML = (selectedMainCatId) => {
         const mainCat = tmCategories.find(c => c.id === selectedMainCatId);
         const subCats = mainCat?.subCategories || [];
+        // שמור ערך שהמשתמש הקליד אם הpopup כבר פתוח
+        const liveNameVal = document.getElementById('tmBldgNameInput')?.value ?? currentName;
         return `
             <div style="font-family:inherit; direction:rtl; padding:4px; min-width:240px;">
                 <div style="font-weight:700; font-size:13px; margin-bottom:8px; color:#111;">סיווג מבנה</div>
                 <input id="tmBldgNameInput" type="text" placeholder="שם המבנה (אופציונלי)..."
-                    value="${currentName}"
+                    value="${escapeHTML(liveNameVal)}"
                     style="width:100%; box-sizing:border-box; padding:6px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; margin-bottom:10px; font-family:inherit; direction:rtl;">
                 <div style="font-size:11px; font-weight:600; color:#6b7280; margin-bottom:6px;">קטגוריה ראשית</div>
                 <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:${subCats.length ? '12px' : '0'};">
@@ -2162,7 +2174,7 @@ async function syncTerritoryCardsToDb() {
         const bldg  = collected[key];
         const entry = classify[key];
         const catId = entry?.catId || 'residential';
-        const cat   = categories.find(c => c.id === catId) || { hasCard: true };
+        const cat   = categories.find(c => c.id === catId) || { hasCard: true, cardType: 'residential' };
 
         const [lng, lat] = bldg.center;
         const geom = entry?.geometry || bldg.geometry;
@@ -3181,17 +3193,21 @@ window.openInstitutionCard = function(bldgKey) {
             </div>`;
     }).join('');
 
-    const customHTML = Object.entries(customFields).map(([k, v]) => `
+    const bkJ = JSON.stringify(bldgKey); // JSON.stringify בטוח ל-JS inline
+    const customHTML = Object.entries(customFields).map(([k, v]) => {
+        const kJ = JSON.stringify(k);
+        return `
         <div style="margin-bottom:8px;display:flex;gap:6px;align-items:center;">
             <input type="text" value="${escapeHTML(k)}" placeholder="שם שדה"
-                onchange="db['${escapeHTML(bldgKey)}'].info.customFields[this.value]=db['${escapeHTML(bldgKey)}'].info.customFields['${escapeHTML(k)}']; delete db['${escapeHTML(bldgKey)}'].info.customFields['${escapeHTML(k)}'];"
+                onchange="(function(el){var db_=db[${bkJ}].info.customFields; var nv=el.value; db_[nv]=db_[${kJ}]; delete db_[${kJ}]; openInstitutionCard(${bkJ});})(this)"
                 style="flex:0.4;padding:6px;border:1px solid var(--border-light);border-radius:6px;font-size:12px;background:var(--bg-body);color:var(--text-main);">
             <input type="text" value="${escapeHTML(v)}" placeholder="ערך"
-                onchange="db['${escapeHTML(bldgKey)}'].info.customFields['${escapeHTML(k)}']=this.value;"
+                onchange="db[${bkJ}].info.customFields[${kJ}]=this.value;"
                 style="flex:0.6;padding:6px;border:1px solid var(--border-light);border-radius:6px;font-size:12px;background:var(--bg-body);color:var(--text-main);">
-            <button onclick="delete db['${escapeHTML(bldgKey)}'].info.customFields['${escapeHTML(k)}']; openInstitutionCard('${escapeHTML(bldgKey)}');"
+            <button onclick="delete db[${bkJ}].info.customFields[${kJ}]; openInstitutionCard(${bkJ});"
                 style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;"><i class="fas fa-times"></i></button>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 
     const modal = document.getElementById('institutionCardModal');
     if (!modal) return;
