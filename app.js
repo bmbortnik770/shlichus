@@ -812,13 +812,14 @@ window.openTerritoryMapEditor = (source) => {
 
             // אם יש פוליגון קיים — טען אותו ל-Draw
             if (tempTerritoryPolygon && tempTerritoryPolygon.length >= 3) {
-                const ring = window._isPolygonClosed(tempTerritoryPolygon)
-                    ? tempTerritoryPolygon : [...tempTerritoryPolygon, tempTerritoryPolygon[0]];
-                tmDraw.add({ type:'Feature', geometry:{ type:'Polygon', coordinates:[ring] } });
-                tmUpdateFromDraw();
-                // עבור למצב עריכה אחרי טעינה
-                const features = tmDraw.getAll().features;
-                if (features.length > 0) tmDraw.changeMode('direct_select', { featureId: features[0].id });
+                try {
+                    const ring = window._isPolygonClosed(tempTerritoryPolygon)
+                        ? tempTerritoryPolygon : [...tempTerritoryPolygon, tempTerritoryPolygon[0]];
+                    tmDraw.add({ type:'Feature', geometry:{ type:'Polygon', coordinates:[ring] } });
+                    tmUpdateFromDraw();
+                    // simple_select בטוח יותר מ-direct_select שדורש featureId תקף
+                    try { tmDraw.changeMode('simple_select'); } catch(e) {}
+                } catch(e) { console.warn('[TM load polygon error]', e); }
             }
 
             // hover על מבנים

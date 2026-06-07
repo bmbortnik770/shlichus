@@ -591,9 +591,9 @@ window.deleteAudSegment = function(e, i) {
 };
 
 // Auto-init: render saved segments and initial list when entering comm view
-const _origSwitchMainView = window.switchMainView;
+const _origSwitchMainView_audience = window.switchMainView;
 window.switchMainView = function(view) {
-    if (_origSwitchMainView) _origSwitchMainView(view);
+    if (_origSwitchMainView_audience) _origSwitchMainView_audience(view);
     if (view === 'comm') {
         _audExpanded = true;
         _buildStylePills();

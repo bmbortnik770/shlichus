@@ -33,9 +33,9 @@ function initTasksEngine() {
 }
 
 // קריאה לאתחול לאחר switchMainView (הטאסק קונטיינר רק אז מרונדר)
-const _origSwitchMainView = window.switchMainView;
+const _origSwitchMainView_tasks = window.switchMainView;
 window.switchMainView = function(viewName) {
-    _origSwitchMainView(viewName);
+    _origSwitchMainView_tasks(viewName);
     if(viewName === 'tasks') initTasksEngine();
 };
 
