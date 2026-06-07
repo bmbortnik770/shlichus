@@ -286,6 +286,32 @@
         <div id="goalStats" style="font-size:11px; font-weight:800; color:var(--warning); text-align:center; margin-top:5px;"></div>
     </div>
 
+    <!-- ══ Buildings Stats Card ══ -->
+    <div id="buildingsStatsCard" style="display:none; background:var(--surface); border:1px solid var(--border-light); border-radius:12px; box-shadow:var(--card-shadow); overflow:hidden;">
+        <!-- כותרת — לחיצה פותחת/סוגרת -->
+        <div onclick="toggleBuildingsStats()" style="display:flex; align-items:center; justify-content:space-between; padding:11px 14px; cursor:pointer; user-select:none;">
+            <div style="display:flex; align-items:center; gap:7px;">
+                <i class="fas fa-building" style="color:var(--accent); font-size:13px;"></i>
+                <span style="font-size:12px; font-weight:700; color:var(--text-main);">מבנים בשליחות</span>
+                <span id="bldgStatsTotalBadge" style="background:var(--accent); color:white; font-size:11px; font-weight:700; padding:1px 8px; border-radius:20px;">0</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span id="bldgStatsFilterLabel" style="font-size:11px; color:var(--text-muted);"></span>
+                <i id="bldgStatsChevron" class="fas fa-chevron-down" style="color:var(--text-muted); font-size:11px; transition:transform 0.2s;"></i>
+            </div>
+        </div>
+        <!-- תוכן מתרחב -->
+        <div id="bldgStatsExpanded" style="display:none; border-top:1px solid var(--border-light);">
+            <!-- כפתורי סינון -->
+            <div id="bldgStatsFilters" style="display:flex; flex-wrap:wrap; gap:5px; padding:10px 12px 6px;"></div>
+            <!-- גרף -->
+            <div style="padding:8px 14px 14px; display:flex; flex-direction:column; align-items:center;">
+                <canvas id="bldgStatsChart" style="max-height:180px;"></canvas>
+                <div id="bldgStatsLegend" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; justify-content:center;"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- ══ Coverage ══ -->
     <div id="coverageCard" style="display:none; background:var(--surface); border:1px solid var(--border-light); border-radius:12px; padding:12px; box-shadow:var(--card-shadow);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;">
