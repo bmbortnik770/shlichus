@@ -464,7 +464,7 @@ if (window.gsap) {
 }
 
 // ── 12. SEARCH CLEAR BUTTON ──────────────────────────────
-ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     const search = document.getElementById('smartSearch');
     const clearBtn = document.getElementById('searchClearBtn');
     if (search && clearBtn) {

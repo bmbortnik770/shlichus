@@ -13,7 +13,9 @@ const SCOPES = 'email profile https://www.googleapis.com/auth/drive.file https:/
 let accessToken = null, driveFileId = null;
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
-mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.3.0/mapbox-gl-rtl-text.js', null, true);
+if (mapboxgl.getRTLTextPluginStatus() === 'unavailable') {
+    mapboxgl.setRTLTextPlugin('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.3.0/mapbox-gl-rtl-text.js', null, true);
+}
 const NO_ADDRESS_KEY = "__NO_ADDRESS__";
 
 let markerColorMode = 'status';
