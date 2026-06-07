@@ -402,8 +402,9 @@ const fieldApp = (function () {
         };
 
         try {
-            // צור את הקובץ ב-Drive
-            const meta = { name: filename, mimeType: 'application/json' };
+            // צור את הקובץ ב-Drive (בתיקיית field-updates אם קיימת)
+            const fieldFolderId = localStorage.getItem('drive_field_updates_folder_id');
+            const meta = { name: filename, mimeType: 'application/json', ...(fieldFolderId ? { parents: [fieldFolderId] } : {}) };
             const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));

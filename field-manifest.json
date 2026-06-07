@@ -1,7 +1,7 @@
 {
   "id": "/shlichus/field.html",
-  "name": "שליחות CRM - שטח",
-  "short_name": "שליחות",
+  "name": "השליחות שלי - שטח",
+  "short_name": "השליחות שלי",
   "description": "מערכת ניהול לשליחי חב\"ד בשטח",
   "start_url": "/shlichus/field.html",
   "display": "standalone",

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מערכת ניהול קהילה - CRM</title>
+    <title>השליחות שלי</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,10 +35,10 @@
         <div class="auth-logo-wrap">
             <div class="auth-logo-ring"></div>
             <div class="auth-logo-inner">
-                <i class="fas fa-map-marked-alt"></i>
+                <img src="icon-512.png" style="width:56px;height:56px;border-radius:50%;object-fit:cover;">
             </div>
         </div>
-        <h2 class="auth-system-name">שליחות <span>CRM</span></h2>
+        <h2 class="auth-system-name">השליחות <span>שלי</span></h2>
         <p style="color:rgba(255,255,255,.5);margin-top:8px;font-size:14px;"><i class="fas fa-spinner fa-spin" style="margin-left:7px;"></i>מתחבר לענן וטוען נתונים...</p>
     </div>
 </div>
@@ -50,10 +50,10 @@
         <div class="auth-logo-wrap">
             <div class="auth-logo-ring"></div>
             <div class="auth-logo-inner">
-                <i class="fas fa-map-marked-alt"></i>
+                <img src="icon-512.png" style="width:56px;height:56px;border-radius:50%;object-fit:cover;">
             </div>
         </div>
-        <h1 class="auth-system-name">שליחות <span>CRM</span></h1>
+        <h1 class="auth-system-name">השליחות <span>שלי</span></h1>
         <p class="auth-tagline">הגע לכל יהודי בשכונה שלך</p>
         <div class="auth-divider"></div>
         <p class="auth-sub">היכנס עם חשבון Google שלך<br>הנתונים שמורים ב-Drive הפרטי שלך בלבד</p>
@@ -1965,6 +1965,22 @@ function toggleDrivePanel() {
                             <label style="display:flex; align-items:center; gap:6px; padding:7px 12px; background:var(--bg-body); border:2px solid var(--border-light); border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">
                                 <input type="radio" name="territoryDisplayMode" value="none" onchange="updateTerritoryDisplay()" style="accent-color:var(--accent);"> ללא
                             </label>
+                        </div>
+                    </div>
+
+                    <!-- יבוא נתוני נדל"ן -->
+                    <div style="background:var(--surface); border-radius:10px; border:1px solid var(--border-light); padding:12px; margin-top:12px;">
+                        <div style="font-weight:700; font-size:13px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-landmark" style="color:#8b5cf6;"></i> יבוא מרשות המסים (נדל"ן)
+                        </div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">חפש בניינים באתר נדל"ן, הרץ את ה-Bookmarklet, הדבק את התוצאה כאן.</div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button onclick="openNadlanImport()" class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px; border-color:#8b5cf6; color:#8b5cf6;">
+                                <i class="fas fa-file-import"></i> יבא נתוני נדל"ן
+                            </button>
+                            <button onclick="showNadlanBookmarklet()" class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px; border-color:#64748b; color:#64748b;">
+                                <i class="fas fa-bookmark"></i> קבל Bookmarklet
+                            </button>
                         </div>
                     </div>
 

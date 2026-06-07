@@ -1,4 +1,57 @@
-﻿function handleAuth(resp) {
+﻿// ── מבנה תיקיות Google Drive ──────────────────────────────────
+const ROOT_FOLDER_NAME = 'השליחות שלי';
+let rootFolderId        = localStorage.getItem('drive_root_folder_id') || null;
+let fieldUpdatesFolderId = localStorage.getItem('drive_field_updates_folder_id') || null;
+let whatsappFolderId    = localStorage.getItem('drive_whatsapp_folder_id') || null;
+let backupsFolderId     = localStorage.getItem('drive_backups_folder_id') || null;
+
+async function ensureSubfolder(name, parentId, storageKey) {
+    const stored = localStorage.getItem(storageKey);
+    if (stored) return stored;
+    const q = encodeURIComponent(`name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`);
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id)`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const { files } = await res.json();
+    let folderId;
+    if (files && files.length > 0) {
+        folderId = files[0].id;
+    } else {
+        const create = await fetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
+        });
+        folderId = (await create.json()).id;
+    }
+    localStorage.setItem(storageKey, folderId);
+    return folderId;
+}
+
+async function ensureFolderStructure() {
+    if (!rootFolderId) {
+        const q = encodeURIComponent(`name='${ROOT_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id)`, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const { files } = await res.json();
+        if (files && files.length > 0) {
+            rootFolderId = files[0].id;
+        } else {
+            const create = await fetch('https://www.googleapis.com/drive/v3/files', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: ROOT_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' })
+            });
+            rootFolderId = (await create.json()).id;
+        }
+        localStorage.setItem('drive_root_folder_id', rootFolderId);
+    }
+    fieldUpdatesFolderId = await ensureSubfolder('field-updates', rootFolderId, 'drive_field_updates_folder_id');
+    whatsappFolderId     = await ensureSubfolder('whatsapp-agent', rootFolderId, 'drive_whatsapp_folder_id');
+    backupsFolderId      = await ensureSubfolder('backups', rootFolderId, 'drive_backups_folder_id');
+    // חשוף את ה-ID של field-updates לאפליקציית השטח
+    localStorage.setItem('drive_field_updates_folder_id', fieldUpdatesFolderId);
+}
+// ─────────────────────────────────────────────────────────────
+
+function handleAuth(resp) {
     // Legacy handler — only called if GIS SDK popup somehow fires
     if (!resp || !resp.access_token) return;
     accessToken = resp.access_token;
@@ -218,7 +271,9 @@ function scheduleTokenRefresh() {
 async function syncWithDrive(forcePull = false) {
     setSyncStatus('wait', 'שואב...');
     try {
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='community_data_final.json'&spaces=drive`, { headers: { Authorization: `Bearer ${accessToken}` } });
+        await ensureFolderStructure();
+        const parentQ = rootFolderId ? ` and '${rootFolderId}' in parents` : '';
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`name='community_data_final.json'${parentQ}`)}&spaces=drive`, { headers: { Authorization: `Bearer ${accessToken}` } });
         if (!res.ok) {
             if (res.status === 401 || res.status === 403) {
                 localStorage.removeItem('gdrive_session');
@@ -270,7 +325,9 @@ async function syncWithDrive(forcePull = false) {
                 }
             }
         } else {
-            const create = await fetch('https://www.googleapis.com/drive/v3/files', { method:'POST', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'}, body:JSON.stringify({name:'community_data_final.json',mimeType:'application/json'}) });
+            const createMeta = { name: 'community_data_final.json', mimeType: 'application/json' };
+            if (rootFolderId) createMeta.parents = [rootFolderId];
+            const create = await fetch('https://www.googleapis.com/drive/v3/files', { method:'POST', headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'}, body:JSON.stringify(createMeta) });
             driveFileId = (await create.json()).id;
             await pushToDrive();
         }
@@ -335,7 +392,8 @@ async function mergeOutboxUpdates() {
     // מאפשר טריגר ידני לעקוף את דגל הסשן
     if (_fieldUpdatesSessionHandled && !window._fieldUpdatesManualTrigger) return;
     try {
-        const q = encodeURIComponent("name contains 'mobile_update_' and trashed = false");
+        const folderFilter = fieldUpdatesFolderId ? ` and '${fieldUpdatesFolderId}' in parents` : '';
+        const q = encodeURIComponent(`name contains 'mobile_update_' and trashed = false${folderFilter}`);
         const listRes = await fetch(
             `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,createdTime)&orderBy=createdTime`,
             { headers: { Authorization: `Bearer ${accessToken}` } }
