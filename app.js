@@ -738,8 +738,8 @@ window.openTerritoryMapEditor = (source) => {
 
     document.getElementById('territoryMapEditorModal').style.display = 'flex';
     switchTmTab('draw');
-    tmRenderCategories();
-    tmRenderClassifySummary();
+    try { tmRenderCategories(); } catch(e) { console.error('[tmRenderCategories]', e); }
+    try { tmRenderClassifySummary(); } catch(e) { console.error('[tmRenderClassifySummary]', e); }
 
     setTimeout(() => {
         tmInitPanelCityGeocoder();
@@ -831,8 +831,11 @@ window.openTerritoryMapEditor = (source) => {
             // לחיצה על מבנה — ישירות על השכבה (לא דרך map.click כדי לא להתנגש עם Draw)
             tmMap.on('click', 'tm-buildings-highlight', (e) => {
                 e.preventDefault && e.preventDefault();
-                if (tmCurrentTab === 'buildings') tmHandleBuildingClick(e);
-                else if (tmCurrentTab === 'classify') tmHandleClassifyClick(e);
+                console.log('[TM click] tab=', tmCurrentTab);
+                try {
+                    if (tmCurrentTab === 'buildings') tmHandleBuildingClick(e);
+                    else if (tmCurrentTab === 'classify') tmHandleClassifyClick(e);
+                } catch(err) { console.error('[TM click error]', err); }
             });
         });
 
@@ -1070,8 +1073,8 @@ window.switchTmTab = (tab) => {
     if (tab === 'classify') {
         // Draw במצב passive
         try { if (tmDraw) tmDraw.changeMode('simple_select'); } catch(e) {}
-        tmRenderCategories();
-        tmRenderClassifySummary();
+        try { tmRenderCategories(); } catch(e) { console.error('[tmRenderCategories on classify tab]', e); }
+        try { tmRenderClassifySummary(); } catch(e) {}
     }
     if (tab === 'draw') {
         // החזר ל-draw mode
