@@ -1219,10 +1219,8 @@ function toggleDrivePanel() {
             <div class="form-group"><label>איש קשר בבניין</label><input type="text" id="bModalRep"></div>
             <div class="form-group"><label>הערות</label><textarea id="bModalNotes" rows="3"></textarea></div>
 
-            <!-- סטטוס GIS + רלוונטיות -->
+            <!-- סוג הבניין -->
             <div style="margin-top:12px; background:var(--bg-body); border-radius:10px; border:1px solid var(--border-light); padding:10px;">
-                <div style="font-weight:700; font-size:12px; margin-bottom:8px; color:var(--text-main);"><i class="fas fa-city" style="color:var(--accent);"></i> סטטוס GIS</div>
-                <div id="bldgGisStatus" style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">לא ידוע</div>
                 <div style="font-weight:700; font-size:12px; margin-bottom:6px; color:var(--text-main);">סוג הבניין:</div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
                     <label style="display:flex; align-items:center; gap:5px; font-size:12px; cursor:pointer;">
@@ -2061,24 +2059,6 @@ function toggleDrivePanel() {
                         </div>
                     </div>
 
-                    <!-- סריקת דירות מ-GIS עירוני -->
-                    <div style="background:var(--surface); border-radius:10px; border:1px solid var(--border-light); padding:12px; margin-top:12px;">
-                        <div style="font-weight:700; font-size:13px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                            <i class="fas fa-city" style="color:var(--accent);"></i> נתוני דירות מ-GIS עירוני
-                        </div>
-                        <div id="unitsScanStatus" style="font-size:12px; color:var(--text-muted); margin-bottom:10px; min-height:18px;"></div>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <button id="btnScanUnits" onclick="showToast('סריקת GIS הושבתה זמנית לתחזוקה — יחזור בקרוב 🔧', 'info')" class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px; border-color:#94a3b8; color:#94a3b8; opacity:0.6;">
-                                <i class="fas fa-sync-alt"></i> סרוק דירות (בתחזוקה)
-                            </button>
-                            <button onclick="regeocodeAllBuildings()" class="btn btn-outline" style="width:auto; padding:8px 14px; font-size:13px; border-color:#3b82f6; color:#3b82f6;">
-                                <i class="fas fa-map-pin"></i> תקן מיקומים
-                            </button>
-                            <div id="unitsScanSummary" style="display:none; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:7px 12px; font-size:12px; color:#065f46;">
-                                <i class="fas fa-check-circle"></i> <span id="unitsScanSummaryText"></span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </details>
