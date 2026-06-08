@@ -2228,6 +2228,144 @@ window.setBldgStatsFilter = function(catId) {
     _renderBuildingStatsContent(computeBuildingStats());
 };
 
+// ══════════════════════════════════════════════════════
+// ── סטטיסטיקת מבנים לפי סיווג ─────────────────────
+// ══════════════════════════════════════════════════════
+let _bldgStatsChart = null;
+let _bldgStatsActiveFilter = null;
+let _bldgStatsUpdateTimer = null;
+
+function updateBuildingStatsCardDebounced() {
+    clearTimeout(_bldgStatsUpdateTimer);
+    _bldgStatsUpdateTimer = setTimeout(updateBuildingStatsCard, 400);
+}
+
+function computeBuildingStats() {
+    const byCategory = {};
+    let total = 0;
+    for (const k of Object.keys(db)) {
+        if (k === '__BOARDS__' || k === 'meta' || k === NO_ADDRESS_KEY || k === '__SETTINGS__') continue;
+        if (!db[k]?.info) continue;
+        total++;
+        const catId = db[k].info.categoryId || db[k].info.category || 'residential';
+        byCategory[catId] = (byCategory[catId] || 0) + 1;
+    }
+    return { total, byCategory };
+}
+
+function updateBuildingStatsCard() {
+    const card = document.getElementById('buildingsStatsCard');
+    if (!card) return;
+    const stats = computeBuildingStats();
+    if (stats.total === 0) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+
+    const badge = document.getElementById('bldgStatsTotalBadge');
+    if (badge) {
+        const shown = _bldgStatsActiveFilter
+            ? (stats.byCategory[_bldgStatsActiveFilter] || 0)
+            : stats.total;
+        badge.textContent = shown;
+    }
+
+    const filterLabel = document.getElementById('bldgStatsFilterLabel');
+    if (filterLabel) {
+        if (_bldgStatsActiveFilter) {
+            const cat = tmCategories.find(c => c.id === _bldgStatsActiveFilter);
+            filterLabel.textContent = cat ? cat.name : '';
+        } else {
+            filterLabel.textContent = '';
+        }
+    }
+
+    const expanded = document.getElementById('bldgStatsExpanded');
+    if (expanded && expanded.style.display !== 'none') {
+        _renderBuildingStatsContent(stats);
+    }
+}
+
+function _renderBuildingStatsContent(stats) {
+    const filtersEl = document.getElementById('bldgStatsFilters');
+    if (filtersEl) {
+        const activeCats = tmCategories.filter(c => stats.byCategory[c.id] > 0);
+        filtersEl.innerHTML = `
+            <button onclick="window.setBldgStatsFilter(null)"
+                style="padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; cursor:pointer; border:2px solid ${!_bldgStatsActiveFilter ? 'var(--accent)' : 'var(--border-light)'}; background:${!_bldgStatsActiveFilter ? 'var(--accent)' : 'var(--bg-body)'}; color:${!_bldgStatsActiveFilter ? 'white' : 'var(--text-muted)'};">
+                הכל (${stats.total})
+            </button>
+            ${activeCats.map(cat => `
+                <button onclick="window.setBldgStatsFilter('${cat.id}')"
+                    style="padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; cursor:pointer; border:2px solid ${_bldgStatsActiveFilter === cat.id ? cat.color : 'var(--border-light)'}; background:${_bldgStatsActiveFilter === cat.id ? cat.color + '22' : 'var(--bg-body)'}; color:${_bldgStatsActiveFilter === cat.id ? cat.color : 'var(--text-muted)'};">
+                    ${cat.emoji || ''} ${cat.name} (${stats.byCategory[cat.id] || 0})
+                </button>
+            `).join('')}`;
+    }
+
+    const canvas = document.getElementById('bldgStatsChart');
+    if (!canvas) return;
+    const activeCats = tmCategories.filter(c => (stats.byCategory[c.id] || 0) > 0 && c.id !== 'irrelevant');
+    const data = activeCats.map(c => stats.byCategory[c.id] || 0);
+    const colors = activeCats.map(c => c.color);
+    const labels = activeCats.map(c => `${c.emoji || ''} ${c.name}`);
+
+    if (_bldgStatsChart) { _bldgStatsChart.destroy(); _bldgStatsChart = null; }
+
+    const highlightCat = _bldgStatsActiveFilter;
+    const displayData = highlightCat
+        ? activeCats.map(c => c.id === highlightCat ? (stats.byCategory[c.id] || 0) : 0)
+        : data;
+
+    _bldgStatsChart = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data: displayData,
+                backgroundColor: highlightCat
+                    ? colors.map((c, i) => activeCats[i].id === highlightCat ? c : c + '33')
+                    : colors,
+                borderWidth: 2,
+                borderColor: 'var(--surface)',
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '62%',
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} מבנים` } }
+            }
+        }
+    });
+
+    const legendEl = document.getElementById('bldgStatsLegend');
+    if (legendEl) {
+        legendEl.innerHTML = activeCats.map((cat, i) => `
+            <div style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted); cursor:pointer;"
+                onclick="window.setBldgStatsFilter('${cat.id}')">
+                <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};flex-shrink:0;${highlightCat && highlightCat !== cat.id ? 'opacity:0.3;' : ''}"></span>
+                ${cat.name}: <b style="color:${cat.color};">${data[i]}</b>
+            </div>`).join('');
+    }
+}
+
+window.toggleBuildingsStats = function() {
+    const expanded = document.getElementById('bldgStatsExpanded');
+    const chevron = document.getElementById('bldgStatsChevron');
+    if (!expanded) return;
+    const isOpen = expanded.style.display !== 'none';
+    expanded.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+    if (!isOpen) _renderBuildingStatsContent(computeBuildingStats());
+};
+
+window.setBldgStatsFilter = function(catId) {
+    _bldgStatsActiveFilter = catId;
+    updateBuildingStatsCard();
+    _renderBuildingStatsContent(computeBuildingStats());
+};
+
 function computeCoverageStats() {
     let totalUnits=0,families=0,verifiedBldgs=0;
     for(const k of Object.keys(db)){
@@ -2450,6 +2588,7 @@ window.openUnitsEditor = () => {
     document.getElementById('unitsEditorBldgName').innerText=currentBldg;
     document.getElementById('unitsEditorCurrentInfo').innerHTML=ui
         ?`<strong>${ui.count}</strong> דירות`
+        :'אין נתונים — לא ידוע מספר הדירות';
     document.getElementById('unitsEditorInput').value=ui?.count||'';
     document.getElementById('unitsEditorModal').style.display='flex';
     setTimeout(()=>document.getElementById('unitsEditorInput').focus(),80);
