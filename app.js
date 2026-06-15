@@ -2396,6 +2396,46 @@ function updateCoverageStats() {
     if (typeof renderLifecycleAlerts === 'function') renderLifecycleAlerts();
 }
 
+// ── סטטיסטיקות טריטוריה (שוחזר אחרי ניקוי GIS) ─────────────────
+function computeTerritoryStats() {
+    let totalBuildings = 0, totalUnits = 0, verifiedUnits = 0;
+    for(const [k,v] of Object.entries(db)) {
+        if(k==='__BOARDS__'||k==='meta'||k===NO_ADDRESS_KEY||k==='__SETTINGS__') continue;
+        if(v?.info?.relevance === 'irrelevant') continue;
+        totalBuildings++;
+        const u = v.info?.units;
+        if(u?.count > 0) {
+            totalUnits += u.count;
+            if(u.source === 'VERIFIED') verifiedUnits += u.count;
+        }
+    }
+    return { totalBuildings, totalUnits, verifiedUnits };
+}
+
+function updateTerritoryStatsDisplay() {
+    const stats = computeTerritoryStats();
+    const statsEl = document.getElementById('settingsTerritoryStats');
+    if(statsEl && stats.totalBuildings > 0) {
+        statsEl.style.display = 'block';
+        statsEl.innerHTML = `
+            <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:8px;">
+                <div style="text-align:center;">
+                    <div style="font-size:22px; font-weight:900; color:var(--accent);">${stats.totalBuildings}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">בניינים</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:22px; font-weight:900; color:#10b981;">${stats.totalUnits}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">דירות בתחום</div>
+                </div>
+                ${stats.verifiedUnits > 0 ? `<div style="text-align:center;">
+                    <div style="font-size:22px; font-weight:900; color:#6366f1;">${stats.verifiedUnits}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">מאומתות</div>
+                </div>` : ''}
+            </div>`;
+    }
+    return stats;
+}
+
 // ── מפת קומות — render ─────────────────────────────────────────
 
 /*
