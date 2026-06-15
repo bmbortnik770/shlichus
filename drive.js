@@ -198,7 +198,7 @@ window.fixOverwrittenCoords = async () => {
         }
     }
     await geocodeMissingAddresses();
-    renderGISBuildingLayer();
+    try { renderGISBuildingLayer(); } catch(e) {} // GIS layer הוקפא — מוגן עד לבנייה מחדש
     showToast(`✓ תוקנו ${fixed} מיקומים`, 'success');
 };
 
