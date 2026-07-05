@@ -1,0 +1,4 @@
+node_modules/
+nadlan-results-*.json
+screen.png
+.claude/
