@@ -5867,7 +5867,7 @@ window._syncTextInterval = setInterval(() => {
 
 // סנכרון אוטומטי כל 30 שניות — רק אם המשתמש לא באמצע עריכה והטוקן בתוקף
 window._autoSyncInterval = setInterval(() => {
-    const session = JSON.parse(localStorage.getItem('gdrive_session'));
+    const session = getStoredJSON('gdrive_session', null);
     const isTokenValid = session && session.expiresAt > (new Date().getTime() + 60000);
     if(accessToken && !isDirty && isTokenValid) {
         syncWithDrive();

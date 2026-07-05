@@ -2219,10 +2219,12 @@ document.addEventListener('keydown', function(e) {
     for (const id of modals) {
         const el = document.getElementById(id);
         if (el && el.style.display !== 'none' && el.style.display !== '') {
-            el.style.display = 'none';
-            // אפס dirty flag אם סוגרים clientModal
-            if (id === 'clientModal' && isDirty) {
-                isDirty = false;
+            // clientModal עובר דרך attemptCloseCrmModal — מבקש אישור אם יש שינויים לא שמורים
+            if (id === 'clientModal') {
+                if (typeof attemptCloseCrmModal === 'function') attemptCloseCrmModal();
+                else el.style.display = 'none';
+            } else {
+                el.style.display = 'none';
             }
             break; // סגור רק modal אחד בכל פעם
         }

@@ -305,8 +305,10 @@ async function syncWithDrive(forcePull = false) {
                 const localFamilies = countFamilies(db);
                 const remoteFamilies = countFamilies(remote);
 
-                // Force pull if: explicitly requested, local is empty, or remote has significantly more data
-                if(forcePull || localFamilies === 0 || remoteFamilies > localFamilies * 1.5) {
+                // Force pull רק כשהתבקש במפורש או כשאין נתונים מקומיים.
+                // בעבר גם remoteFamilies > localFamilies*1.5 דרס — זה מחק עריכות מקומיות
+                // (למשל אחרי מחיקה מכוונת של הרבה משפחות). עכשיו במקרה כזה ממזגים.
+                if(forcePull || localFamilies === 0) {
                     db = remote;
                     showToast(`נטענו ${remoteFamilies} משפחות מהענן! ✅`, 'success');
                 } else if(remoteTime > localTime) {
@@ -1034,8 +1036,19 @@ window.forcePullFromDrive = async function() {
 };
 
 // שמירה מקומית
+let _quotaWarned = false;
 function saveLocal() {
-    localStorage.setItem('community_data_final', JSON.stringify(db));
+    try {
+        localStorage.setItem('community_data_final', JSON.stringify(db));
+        _quotaWarned = false;
+    } catch (e) {
+        // localStorage מוגבל (~5MB) — אל תפיל את שרשרת השמירה, והזהר פעם אחת
+        console.error('saveLocal failed:', e);
+        if (!_quotaWarned) {
+            _quotaWarned = true;
+            showToast('אחסון מקומי מלא — הנתונים נשמרים לענן בלבד. מומלץ לגבות', 'warning');
+        }
+    }
 }
 
 // queue לשמירה — מונע התנגשויות
@@ -1062,14 +1075,34 @@ async function pushToDrive() {
     isSaving = true;
     setSyncStatus('wait', 'שומר...');
     try {
-        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+        const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
             method: 'PATCH',
             headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(db)
         });
+        // fetch לא נכשל על שגיאת HTTP — חובה לבדוק res.ok, אחרת 401 (טוקן פג) מוצג כ"נשמר"
+        if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+                localStorage.removeItem('gdrive_session');
+                accessToken = null;
+                setSyncStatus('error', 'פג תוקף — לא נשמר לענן');
+                if (window.tokenClient) {
+                    // רענון שקט; אחרי חיבור מחדש — נסה לשמור שוב
+                    window._pendingAuthCallback = () => queueSave();
+                    window.tokenClient.requestAccessToken({ prompt: '' });
+                } else {
+                    showToast('חיבור Google פג — השינויים נשמרו מקומית בלבד. לחץ "סנכרן"', 'warning');
+                }
+            } else {
+                setSyncStatus('error', 'שגיאה בשמירה לענן');
+                showToast(`שמירה לענן נכשלה (${res.status}) — הנתונים שמורים מקומית`, 'error');
+            }
+            return;
+        }
         setSyncStatus('ok', 'נשמר');
     } catch(e) {
         setSyncStatus('error', 'שגיאה');
+        showToast('שמירה לענן נכשלה (בעיית רשת) — הנתונים שמורים מקומית', 'error');
         console.error(e);
     } finally {
         isSaving = false;
