@@ -11,8 +11,16 @@ const VIEWS = [
   { key: 'donations', label: 'תרומות' },
 ] as const;
 
+const SYNC_LABEL: Record<string, string> = {
+  offline: 'מקומי',
+  syncing: 'מסתנכרן…',
+  synced: 'מסונכרן עם הענן',
+  'auth-needed': 'לא מחובר',
+  error: 'שגיאת סנכרון',
+};
+
 export function App() {
-  const { db, status, load } = useCrm();
+  const { db, status, load, sync, syncError, login, pullFromCloud } = useCrm();
   const [view, setView] = useState<string>('table');
 
   useEffect(() => {
@@ -34,17 +42,31 @@ export function App() {
             </button>
           ))}
         </nav>
+        <div className="sync-box">
+          <span className={`sync-chip sync-${sync}`}>{SYNC_LABEL[sync]}</span>
+          {sync === 'auth-needed' && (
+            <button className="login-btn" onClick={() => void login()}>התחברות Google</button>
+          )}
+          {sync === 'synced' && (
+            <button className="login-btn" onClick={() => void pullFromCloud()}>משוך מהענן</button>
+          )}
+          {syncError && <span className="sync-err">{syncError}</span>}
+        </div>
         <p className="beta-note">
-          גרסת v2 בבנייה — המערכת הקיימת ממשיכה לעבוד במקביל על אותם נתונים.
+          גרסת v2 בבנייה — קריאה בלבד. המערכת הקיימת ממשיכה לעבוד במקביל על אותם נתונים.
         </p>
       </aside>
       <main className="content">
         {status === 'loading' && <p>טוען נתונים…</p>}
         {status === 'empty' && (
-          <p>
-            אין עדיין נתונים מקומיים בדפדפן הזה. בגרסה הבאה: התחברות Google וטעינה מהענן —
-            בינתיים המערכת הקיימת ממשיכה לעבוד כרגיל.
-          </p>
+          <div>
+            <p>אין עדיין נתונים מקומיים בדפדפן הזה.</p>
+            <p>
+              {sync === 'auth-needed'
+                ? 'התחבר ל-Google בכפתור משמאל כדי למשוך את הנתונים מהענן.'
+                : 'המערכת הקיימת ממשיכה לעבוד כרגיל.'}
+            </p>
+          </div>
         )}
         {status === 'ready' && db && (
           <>
