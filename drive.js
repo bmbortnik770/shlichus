@@ -503,6 +503,8 @@ async function _autoApplyFieldUpdates(updateFiles, totalEvents) {
 
     if (applied > 0) {
         db.meta.lastModified = Date.now();
+        db["__SETTINGS__"] = appSettings;
+        try { localStorage.setItem("crm_prefs", JSON.stringify(appSettings)); } catch(e) { console.error(e); }
         await pushToDrive();
         saveLocal();
         if (typeof refreshMap === 'function') refreshMap();
@@ -679,6 +681,8 @@ window.applySelectedFieldUpdates = async function() {
 
     if (applied > 0) {
         db.meta.lastModified = Date.now();
+        db["__SETTINGS__"] = appSettings;
+        try { localStorage.setItem("crm_prefs", JSON.stringify(appSettings)); } catch(e) { console.error(e); }
         await pushToDrive();
         saveLocal();
         refreshMap();
