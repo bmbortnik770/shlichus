@@ -21,13 +21,31 @@ export function BuildingModal({ db, bldg, onClose }: Props) {
   const apts = liveApts(entry?.apts);
   const info: BuildingInfo = entry?.info ?? {};
 
+  const units = (info.units ?? {}) as { count?: number };
   const [infoForm, setInfoForm] = useState({
     code: String(info.code ?? ''),
     rep: String(info.rep ?? ''),
     notes: String(info.notes ?? ''),
     category: String(info.categoryId ?? info.category ?? 'residential'),
+    unitsCount: units.count ? String(units.count) : '',
+    instName: String((info as Record<string, unknown>).instName ?? ''),
+    instPhone: String((info as Record<string, unknown>).instPhone ?? ''),
   });
   const categories = getCategories(db);
+  const isInstitution = infoForm.category !== 'residential' && infoForm.category !== 'irrelevant';
+
+  const saveInfo = () => {
+    const patch: Record<string, unknown> = {
+      code: infoForm.code, rep: infoForm.rep, notes: infoForm.notes, category: infoForm.category,
+    };
+    const n = parseInt(infoForm.unitsCount, 10);
+    if (!isNaN(n) && n >= 1) {
+      // אותו מבנה כמו saveManualUnitsCount בישן
+      patch.units = { ...(info.units ?? {}), source: 'VERIFIED', count: n, verifiedAt: Date.now() };
+    }
+    if (isInstitution) { patch.instName = infoForm.instName; patch.instPhone = infoForm.instPhone; }
+    void updateBuildingInfo(bldg, patch);
+  };
 
   const selectedApt: Apartment | undefined =
     selectedIdx !== null ? entry?.apts[selectedIdx] : undefined;
@@ -115,6 +133,26 @@ export function BuildingModal({ db, bldg, onClose }: Props) {
                 ))}
               </select>
             </label>
+            {isInstitution && (
+              <>
+                <label className="edit-field">
+                  <span>שם המוסד</span>
+                  <input value={infoForm.instName} onChange={(e) => setInfoForm({ ...infoForm, instName: e.target.value })} />
+                </label>
+                <label className="edit-field">
+                  <span>טלפון המוסד</span>
+                  <input dir="ltr" value={infoForm.instPhone} onChange={(e) => setInfoForm({ ...infoForm, instPhone: e.target.value })} />
+                </label>
+              </>
+            )}
+            <label className="edit-field">
+              <span>מספר דירות בבניין</span>
+              <input
+                type="number" min={1} dir="ltr" style={{ maxWidth: 120 }}
+                value={infoForm.unitsCount}
+                onChange={(e) => setInfoForm({ ...infoForm, unitsCount: e.target.value })}
+              />
+            </label>
             <label className="edit-field">
               <span>קוד כניסה</span>
               <input value={infoForm.code} onChange={(e) => setInfoForm({ ...infoForm, code: e.target.value })} />
@@ -128,7 +166,7 @@ export function BuildingModal({ db, bldg, onClose }: Props) {
               <textarea rows={3} value={infoForm.notes} onChange={(e) => setInfoForm({ ...infoForm, notes: e.target.value })} />
             </label>
             <div className="edit-actions">
-              <button className="save-btn" onClick={() => void updateBuildingInfo(bldg, infoForm)}>שמירה</button>
+              <button className="save-btn" onClick={saveInfo}>שמירה</button>
             </div>
           </section>
         )}

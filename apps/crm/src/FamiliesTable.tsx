@@ -73,6 +73,7 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
   const updateApt = useCrm((s) => s.updateApt);
   const deleteApt = useCrm((s) => s.deleteApt);
   const addApt = useCrm((s) => s.addApt);
+  const splitFamily = useCrm((s) => s.splitFamily);
   // הדירה הנבחרת נגזרת מה-db בכל רנדר — נשארת עדכנית אחרי שמירה
   const selectedApt = selected ? getBuilding(db, selected.bldg)?.apts[selected.idx] : undefined;
 
@@ -253,6 +254,10 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
           apt={selectedApt}
           onClose={() => setSelected(null)}
           onSave={(patch) => updateApt(selected.bldg, selected.idx, patch)}
+          onSplit={async (memberName) => {
+            const created = await splitFamily(selected.bldg, selected.idx, memberName);
+            if (created) setSelected(created);
+          }}
         />
       )}
     </section>

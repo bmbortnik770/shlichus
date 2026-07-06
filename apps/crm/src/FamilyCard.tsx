@@ -7,6 +7,7 @@ interface Props {
   apt: Apartment;
   onClose: () => void;
   onSave: (patch: Partial<Apartment>) => Promise<void>;
+  onSplit?: (memberName: string) => Promise<void>;
 }
 
 const TABS = [
@@ -53,7 +54,7 @@ function Input({ label, value, onChange, dir }: { label: string; value: string; 
   );
 }
 
-export function FamilyCard({ bldg, apt, onClose, onSave }: Props) {
+export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
   const [tab, setTab] = useState<string>('details');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -254,6 +255,17 @@ export function FamilyCard({ bldg, apt, onClose, onSave }: Props) {
               {(apt as { lifeStatus?: string }).lifeStatus !== 'deceased' && (
                 <button className="cancel-btn" onClick={() => void markDeceased()}>
                   <i className="fas fa-candle-holder" /> תיעוד פטירה
+                </button>
+              )}
+              {onSplit && (
+                <button
+                  className="cancel-btn"
+                  onClick={() => {
+                    const name = window.prompt('שם בן/בת המשפחה לכרטיס הנפרד:');
+                    if (name?.trim()) void onSplit(name.trim());
+                  }}
+                >
+                  <i className="fas fa-people-arrows" /> פיצול כרטיס
                 </button>
               )}
             </div>

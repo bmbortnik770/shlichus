@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { buildingKeys, getBuilding, liveApts, type Db } from '@shlichus/core';
+import { buildingKeys, getBuilding, getCategories, liveApts, type Db } from '@shlichus/core';
 import { useCrm, familyCount } from './store';
 import { FamiliesTable } from './FamiliesTable';
 import { TasksView } from './TasksView';
@@ -58,6 +58,45 @@ function urgentCount(db: Db): number {
     });
   }
   return n;
+}
+
+/** דיאגרמת מבנים לפי קטגוריה — כמו ה-widget בישן, ב-conic-gradient */
+function BuildingsPie({ db }: { db: Db }) {
+  const cats = getCategories(db);
+  const counts = new Map<string, number>();
+  for (const key of buildingKeys(db)) {
+    const info = getBuilding(db, key)?.info;
+    const cat = String(info?.categoryId ?? info?.category ?? 'residential');
+    counts.set(cat, (counts.get(cat) ?? 0) + 1);
+  }
+  const total = [...counts.values()].reduce((s, n) => s + n, 0);
+  if (!total) return null;
+  let acc = 0;
+  const stops: string[] = [];
+  const legend: { name: string; color: string; n: number }[] = [];
+  for (const c of cats) {
+    const n = counts.get(c.id) ?? 0;
+    if (!n) continue;
+    const from = (acc / total) * 360;
+    acc += n;
+    stops.push(`${c.color} ${from}deg ${(acc / total) * 360}deg`);
+    legend.push({ name: c.name, color: c.color, n });
+  }
+  return (
+    <div className="side-section">
+      <h4>מבנים לפי קטגוריה ({total})</h4>
+      <div className="pie-row">
+        <div className="pie" style={{ background: `conic-gradient(${stops.join(', ')})` }} />
+        <div className="pie-legend">
+          {legend.map((l) => (
+            <div key={l.name}>
+              <span className="dot" style={{ background: l.color }} /> {l.name} · {l.n}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** ציוני דרך קרובים (30 יום) להתראות השבוע */
@@ -229,6 +268,8 @@ export function App() {
             </div>
           </div>
         )}
+
+        {db && <BuildingsPie db={db} />}
 
         {alerts.length > 0 && (
           <div className="side-section">

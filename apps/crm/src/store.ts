@@ -33,6 +33,8 @@ interface CrmState {
   /** מחיקה רכה — tombstone; המחיקה שורדת סנכרון מכל מכשיר */
   deleteApt: (bldg: string, idx: number) => Promise<void>;
   updateBuildingInfo: (bldg: string, patch: Record<string, unknown>) => Promise<void>;
+  /** פיצול כרטיס — יוצר כרטיס נפרד לבן משפחה, עם קישור דו-כיווני כמו בישן */
+  splitFamily: (bldg: string, idx: number, memberName: string) => Promise<{ bldg: string; idx: number } | null>;
   /** ייבוא משפחות; מחזיר {imported, skipped} — כפילות לפי כתובת+שם+דירה מדולגת */
   importFamilies: (rows: { name: string; bldg: string; num: string; phone: string; style: string; tags: string[] }[]) => Promise<{ imported: number; skipped: number }>;
 }
@@ -154,6 +156,35 @@ export const useCrm = create<CrmState>((set, get) => {
     if (!apt) return;
     softDeleteApt(apt);
     await persistAndPush();
+  },
+
+  splitFamily: async (bldg, idx, memberName) => {
+    const db = get().db;
+    const orig = getBuilding(db ?? {}, bldg)?.apts[idx];
+    if (!db || !orig) return null;
+    const splitDate = new Date().toISOString().slice(0, 10);
+    if (!getBuilding(db, NO_ADDRESS_KEY)) {
+      (db as Record<string, unknown>)[NO_ADDRESS_KEY] = { info: { code: '', rep: '', notes: '', coords: null }, apts: [] };
+    }
+    const target = getBuilding(db, NO_ADDRESS_KEY)!;
+    // אותו מבנה כמו confirmSplitMember בישן
+    target.apts.push({
+      id: `apt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name: memberName,
+      style: orig.style ?? '',
+      tags: [...(orig.tags ?? [])],
+      childrenList: [], boards: {}, customData: {}, customFields: {}, milestones: [],
+      interactions: [{ date: splitDate, type: 'פיצול כרטיס', text: `נפצל מכרטיס משפחת ${orig.name ?? ''}`, member: 'family' }],
+      donations: [], tasks: [],
+      splitDate, linkedFrom: `${bldg}|${idx}`,
+      updatedAt: Date.now(),
+    });
+    const newIdx = target.apts.length - 1;
+    if (!orig.splits) orig.splits = [];
+    (orig.splits as unknown[]).push({ memberName, splitDate, linkedTo: `${NO_ADDRESS_KEY}|${newIdx}` });
+    orig.updatedAt = Date.now();
+    await persistAndPush();
+    return { bldg: NO_ADDRESS_KEY, idx: newIdx };
   },
 
   importFamilies: async (rows) => {

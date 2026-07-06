@@ -59,6 +59,50 @@ function ListEditor({
   );
 }
 
+/** ניהול סוגי אירועים — אותו מבנה כמו appSettings.customEventTypes בישן */
+function EventTypesEditor({ db }: { db: Db }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const types = ((db.__SETTINGS__?.customEventTypes ?? []) as { id: string; label: string; emoji?: string; recurring?: boolean }[]);
+  const [label, setLabel] = useState('');
+  const [emoji, setEmoji] = useState('🎉');
+  const [recurring, setRecurring] = useState(true);
+
+  return (
+    <>
+      {types.length === 0 && <p className="placeholder">אין סוגים מותאמים — משתמשים במובנים.</p>}
+      <ul className="tpl-list">
+        {types.map((t) => (
+          <li key={t.id}>
+            <div><strong>{t.emoji} {t.label}</strong>{t.recurring ? <span className="tpl-text"> · חוזר שנתית</span> : null}</div>
+            <button
+              className="close-btn" aria-label={`מחיקת ${t.label}`}
+              onClick={() => void updateSettings({ customEventTypes: types.filter((x) => x.id !== t.id) })}
+            >✕</button>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="chip-add"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!label.trim()) return;
+          void updateSettings({
+            customEventTypes: [...types, { id: 'custom_' + Date.now(), label: label.trim(), emoji, color: '#3b82f6', recurring }],
+          });
+          setLabel('');
+        }}
+      >
+        <input value={emoji} onChange={(e) => setEmoji(e.target.value)} style={{ maxWidth: 56, textAlign: 'center' }} />
+        <input value={label} placeholder="שם סוג האירוע…" onChange={(e) => setLabel(e.target.value)} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5 }}>
+          <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} /> חוזר
+        </label>
+        <button type="submit" className="login-btn">הוספה</button>
+      </form>
+    </>
+  );
+}
+
 export function SettingsView({ db }: { db: Db }) {
   const updateSettings = useCrm((s) => s.updateSettings);
   const settings = db.__SETTINGS__ ?? {};
@@ -121,6 +165,10 @@ export function SettingsView({ db }: { db: Db }) {
             <button type="submit" className="login-btn">הוספת תבנית</button>
           </form>
         </div>
+      </div>
+      <div className="settings-card" style={{ marginTop: 14 }}>
+        <h3>סוגי אירועים מותאמים</h3>
+        <EventTypesEditor db={db} />
       </div>
       <div style={{ marginTop: 14 }}>
         <ImportCsv onDone={() => window.location.reload()} />
