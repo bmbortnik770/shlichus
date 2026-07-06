@@ -314,6 +314,9 @@ async function syncWithDrive(forcePull = false) {
                 } else if(remoteTime > localTime) {
                     db = mergeDB(db, remote);
                 } else if(localTime > remoteTime) {
+                    // מזג לפני דחיפה — שינויים שנכתבו לענן ממקור אחר (v2/מכשיר שני)
+                    // לא יידרסו; הדירה עם updatedAt המאוחר מנצחת
+                    db = mergeDB(db, remote);
                     await pushToDrive();
                 } else {
                     db = mergeDB(db, remote);
