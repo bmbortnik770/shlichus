@@ -12,6 +12,7 @@ import { CirclesView } from './CirclesView';
 
 // המפה נטענת עצלה — mapbox-gl כבד ולא נחוץ בשאר המסכים
 const MapView = lazy(() => import('./MapView').then((m) => ({ default: m.MapView })));
+import { BuildingModal } from './BuildingModal';
 
 // אותו ניווט ראשי כמו המערכת הקיימת
 const MAIN_TABS = [
@@ -76,6 +77,7 @@ export function App() {
   const [view, setView] = useState<string>('map');
   const [activitySub, setActivitySub] = useState<string>('tasks');
   const [tableQuery, setTableQuery] = useState('');
+  const [openBldg, setOpenBldg] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -140,9 +142,10 @@ export function App() {
             <>
               {view === 'map' && (
                 <Suspense fallback={<p className="placeholder">טוען מפה…</p>}>
-                  <MapView db={db} onOpenBuilding={openTableWith} />
+                  <MapView db={db} onOpenBuilding={setOpenBldg} />
                 </Suspense>
               )}
+              {openBldg && <BuildingModal db={db} bldg={openBldg} onClose={() => setOpenBldg(null)} />}
               {view === 'table' && <FamiliesTable db={db} initialQuery={tableQuery} />}
               {view === 'activity' && activitySub === 'tasks' && <TasksView db={db} />}
               {view === 'activity' && activitySub === 'events' && <EventsView db={db} />}

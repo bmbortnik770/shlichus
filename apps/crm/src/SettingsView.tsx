@@ -1,6 +1,17 @@
 import { useState } from 'react';
 import type { Db } from '@shlichus/core';
+import { mergeDb, saveLocal } from '@shlichus/core';
 import { useCrm } from './store';
+
+/** ייצוא גיבוי JSON מלא — כמו exportData בישן */
+function exportBackup(db: Db) {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `גיבוי-השליחות-שלי-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 function ListEditor({
   title,
@@ -109,6 +120,36 @@ export function SettingsView({ db }: { db: Db }) {
             <button type="submit" className="login-btn">הוספת תבנית</button>
           </form>
         </div>
+      </div>
+      <div className="settings-card" style={{ marginTop: 14 }}>
+        <h3>גיבוי ושחזור</h3>
+        <div className="edit-actions">
+          <button className="login-btn" onClick={() => exportBackup(db)}>
+            <i className="fas fa-download" /> ייצוא גיבוי מלא (JSON)
+          </button>
+          <label className="login-btn" style={{ cursor: 'pointer' }}>
+            <i className="fas fa-upload" /> ייבוא גיבוי
+            <input
+              type="file"
+              accept=".json"
+              style={{ display: 'none' }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                  const imported = JSON.parse(await file.text()) as Db;
+                  if (!window.confirm('לייבא את הגיבוי? הוא ימוזג עם הנתונים הקיימים (שום דבר לא יימחק).')) return;
+                  const merged = mergeDb(db, imported);
+                  await saveLocal(merged);
+                  window.location.reload();
+                } catch {
+                  window.alert('הקובץ אינו גיבוי תקין');
+                }
+              }}
+            />
+          </label>
+        </div>
+        <p className="tpl-text">הייבוא ממזג — רשומות חדשות מתווספות, קיימות מתעדכנות לפי החדש מביניהן.</p>
       </div>
       <p className="drawer-note" style={{ marginTop: 16 }}>
         השינויים נשמרים לענן ומשותפים עם המערכת הקיימת. הגדרות מתקדמות (קטגוריות, מיקום בית,

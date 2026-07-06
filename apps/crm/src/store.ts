@@ -32,6 +32,7 @@ interface CrmState {
   addApt: (bldg: string) => Promise<{ bldg: string; idx: number } | null>;
   /** מחיקה רכה — tombstone; המחיקה שורדת סנכרון מכל מכשיר */
   deleteApt: (bldg: string, idx: number) => Promise<void>;
+  updateBuildingInfo: (bldg: string, patch: Record<string, unknown>) => Promise<void>;
 }
 
 const drive = new DriveSync({ tokenProvider: browserTokens });
@@ -150,6 +151,14 @@ export const useCrm = create<CrmState>((set, get) => {
     const apt = getBuilding(db ?? {}, bldg)?.apts[idx];
     if (!apt) return;
     softDeleteApt(apt);
+    await persistAndPush();
+  },
+
+  updateBuildingInfo: async (bldg, patch) => {
+    const db = get().db;
+    const entry = getBuilding(db ?? {}, bldg);
+    if (!entry) return;
+    entry.info = { ...entry.info, ...patch, updatedAt: Date.now() };
     await persistAndPush();
   },
 

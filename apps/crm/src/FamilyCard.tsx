@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Apartment, Donation, InteractionLog, Task } from '@shlichus/core';
 import { NO_ADDRESS_KEY } from '@shlichus/core';
 
@@ -71,6 +71,17 @@ export function FamilyCard({ bldg, apt, onClose, onSave }: Props) {
 
   const phone = apt.fatherPhone || apt.motherPhone || '';
   const wa = phone ? `https://wa.me/972${phone.replace(/\D/g, '').replace(/^0/, '')}` : '';
+
+  // ESC סוגר — עם אישור אם באמצע עריכה (כמו התיקון במערכת הישנה)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (editing && !window.confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?')) return;
+      onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [editing, onClose]);
 
   const saveDetails = async () => {
     setSaving(true);
