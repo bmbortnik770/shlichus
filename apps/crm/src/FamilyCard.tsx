@@ -216,6 +216,24 @@ export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
           {apt.style ? ` · ${apt.style}` : ''}
         </p>
 
+        <div className="heb-today">
+          <i className="fas fa-calendar" /> היום: {(() => {
+            const h = hebrewParts(new Date());
+            return h ? `${formatHebrew(h.day, h.monthName)} ${h.year ? '' : ''}` : '';
+          })()}
+          {(() => {
+            const latest = (apt.interactions ?? []).reduce((max, i) => {
+              const t = new Date(i.date ?? '').getTime();
+              return isNaN(t) ? max : Math.max(max, t);
+            }, 0);
+            const days = latest ? Math.floor((Date.now() - latest) / 86400000) : null;
+            return (
+              <span className={`contact-badge ${days === null ? 'none' : days > 60 ? 'stale' : days > 21 ? 'aging' : 'fresh'}`} style={{ marginInlineStart: 'auto' }}>
+                {days === null ? 'אין תיעוד קשר' : days === 0 ? 'קשר היום' : `קשר לפני ${days} י׳`}
+              </span>
+            );
+          })()}
+        </div>
         <div className="card-tabs">
           {TABS.map((t) => (
             <button key={t.key} className={tab === t.key ? 'active' : ''} onClick={() => setTab(t.key)}>
