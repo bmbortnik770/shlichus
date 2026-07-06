@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Db } from '@shlichus/core';
 import { mergeDb, saveLocal } from '@shlichus/core';
 import { useCrm } from './store';
+import { ImportCsv } from './ImportCsv';
 
 /** ייצוא גיבוי JSON מלא — כמו exportData בישן */
 function exportBackup(db: Db) {
@@ -120,6 +121,9 @@ export function SettingsView({ db }: { db: Db }) {
             <button type="submit" className="login-btn">הוספת תבנית</button>
           </form>
         </div>
+      </div>
+      <div style={{ marginTop: 14 }}>
+        <ImportCsv onDone={() => window.location.reload()} />
       </div>
       <div className="settings-card" style={{ marginTop: 14 }}>
         <h3>גיבוי ושחזור</h3>

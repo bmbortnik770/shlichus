@@ -260,6 +260,30 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
 .field-value { color: var(--ink); }
 .drawer-note { font-size: 12px; color: var(--ink-faint); background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; }
 
+/* Command Palette */
+.palette {
+  width: min(520px, 94vw);
+  background: var(--surface); border-radius: 16px;
+  box-shadow: var(--shadow-md); overflow: hidden;
+}
+.palette-search {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px; border-bottom: 1px solid var(--line);
+  color: var(--ink-faint);
+}
+.palette-search input { flex: 1; border: 0; background: none; outline: none; font-size: 15px; color: var(--ink); font-family: inherit; }
+.palette-search kbd { font-size: 10px; border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; color: var(--ink-faint); }
+.palette-list { list-style: none; margin: 0; padding: 6px; max-height: 340px; overflow-y: auto; }
+.palette-list button {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  border: 0; background: none; cursor: pointer; text-align: start;
+  padding: 10px 12px; border-radius: 10px; font-family: inherit; color: var(--ink);
+}
+.palette-list button.active { background: var(--accent-soft); }
+.palette-list button i { width: 20px; text-align: center; color: var(--accent); }
+.palette-list .p-label { font-size: 14px; font-weight: 700; }
+.palette-list .p-sub { font-size: 12px; color: var(--ink-faint); margin-inline-start: auto; }
+
 /* נפטר + אבני דרך */
 .deceased-banner {
   display: flex; align-items: center; gap: 10px;

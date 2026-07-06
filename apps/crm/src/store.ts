@@ -33,6 +33,8 @@ interface CrmState {
   /** מחיקה רכה — tombstone; המחיקה שורדת סנכרון מכל מכשיר */
   deleteApt: (bldg: string, idx: number) => Promise<void>;
   updateBuildingInfo: (bldg: string, patch: Record<string, unknown>) => Promise<void>;
+  /** ייבוא משפחות; מחזיר {imported, skipped} — כפילות לפי כתובת+שם+דירה מדולגת */
+  importFamilies: (rows: { name: string; bldg: string; num: string; phone: string; style: string; tags: string[] }[]) => Promise<{ imported: number; skipped: number }>;
 }
 
 const drive = new DriveSync({ tokenProvider: browserTokens });
@@ -152,6 +154,33 @@ export const useCrm = create<CrmState>((set, get) => {
     if (!apt) return;
     softDeleteApt(apt);
     await persistAndPush();
+  },
+
+  importFamilies: async (rows) => {
+    const db = get().db;
+    if (!db) return { imported: 0, skipped: 0 };
+    let imported = 0, skipped = 0;
+    for (const r of rows) {
+      const key = r.bldg.trim() || NO_ADDRESS_KEY;
+      if (!getBuilding(db, key)) {
+        (db as Record<string, unknown>)[key] = { info: { code: '', rep: '', notes: '', coords: null }, apts: [] };
+      }
+      const entry = getBuilding(db, key)!;
+      const exists = entry.apts.some(
+        (a) => !a.deletedAt && (a.name ?? '') === r.name.trim() && (a.num ?? '') === r.num.trim()
+      );
+      if (exists) { skipped++; continue; }
+      entry.apts.push({
+        id: `apt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: r.name.trim(), num: r.num.trim(),
+        fatherPhone: r.phone.trim(), style: r.style.trim(),
+        tags: r.tags, boards: {}, childrenList: [], interactions: [], donations: [], tasks: [],
+        customFields: {}, updatedAt: Date.now(),
+      });
+      imported++;
+    }
+    if (imported > 0) await persistAndPush();
+    return { imported, skipped };
   },
 
   updateBuildingInfo: async (bldg, patch) => {

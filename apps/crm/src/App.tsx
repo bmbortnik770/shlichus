@@ -13,6 +13,12 @@ import { CirclesView } from './CirclesView';
 // המפה נטענת עצלה — mapbox-gl כבד ולא נחוץ בשאר המסכים
 const MapView = lazy(() => import('./MapView').then((m) => ({ default: m.MapView })));
 import { BuildingModal } from './BuildingModal';
+import { CommandPalette } from './CommandPalette';
+
+function applyTheme(theme: string) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('v2_theme', theme);
+}
 
 // אותו ניווט ראשי כמו המערכת הקיימת
 const MAIN_TABS = [
@@ -78,10 +84,23 @@ export function App() {
   const [activitySub, setActivitySub] = useState<string>('tasks');
   const [tableQuery, setTableQuery] = useState('');
   const [openBldg, setOpenBldg] = useState<string | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     void load();
+    applyTheme(localStorage.getItem('v2_theme') ?? 'light');
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [load]);
+
+  const toggleDark = () =>
+    applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 
   const alerts = useMemo(() => (db ? upcomingAlerts(db) : []), [db]);
 
@@ -94,13 +113,14 @@ export function App() {
     <div className="shell">
       <main className="main-area">
         <div className="topbar">
-          <div className="top-search">
+          <div className="top-search" onClick={() => setPaletteOpen(true)} style={{ cursor: 'pointer' }}>
             <i className="fas fa-search" />
             <input
               placeholder="חיפוש מהיר"
               value={view === 'table' ? tableQuery : ''}
               onChange={(e) => openTableWith(e.target.value)}
             />
+            <kbd style={{ fontSize: 10, border: '1px solid var(--line)', borderRadius: 5, padding: '1px 6px' }}>Ctrl+K</kbd>
           </div>
           <nav className="top-nav">
             {MAIN_TABS.map((t) => (
@@ -146,6 +166,16 @@ export function App() {
                 </Suspense>
               )}
               {openBldg && <BuildingModal db={db} bldg={openBldg} onClose={() => setOpenBldg(null)} />}
+              {paletteOpen && (
+                <CommandPalette
+                  db={db}
+                  onNavigate={setView}
+                  onOpenFamily={openTableWith}
+                  onToggleDark={toggleDark}
+                  onSync={() => void pullFromCloud()}
+                  onClose={() => setPaletteOpen(false)}
+                />
+              )}
               {view === 'table' && <FamiliesTable db={db} initialQuery={tableQuery} />}
               {view === 'activity' && activitySub === 'tasks' && <TasksView db={db} />}
               {view === 'activity' && activitySub === 'events' && <EventsView db={db} />}
@@ -169,6 +199,13 @@ export function App() {
           <button
             className="close-btn"
             style={{ marginInlineStart: 'auto' }}
+            title="מצב כהה/בהיר"
+            onClick={toggleDark}
+          >
+            <i className="fas fa-moon" />
+          </button>
+          <button
+            className="close-btn"
             title="הגדרות"
             onClick={() => setView('settings')}
           >
