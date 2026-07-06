@@ -48,6 +48,10 @@ function toRows(db: Db): Row[] {
 export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?: string }) {
   const [query, setQuery] = useState(initialQuery);
   const [sortBy, setSortBy] = useState<'name' | 'bldg' | 'style'>('name');
+  const [styleFilter, setStyleFilter] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
+  const allStyles = (db.__SETTINGS__?.styles ?? []) as string[];
+  const allTags = (db.__SETTINGS__?.tags ?? []) as string[];
   const [selected, setSelected] = useState<{ bldg: string; idx: number } | null>(null);
   const updateApt = useCrm((s) => s.updateApt);
   // הדירה הנבחרת נגזרת מה-db בכל רנדר — נשארת עדכנית אחרי שמירה
@@ -56,24 +60,43 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
   const rows = useMemo(() => toRows(db), [db]);
   const filtered = useMemo(() => {
     const q = query.trim();
-    const matched = q
-      ? rows.filter((r) =>
-          [r.name, r.bldg, r.phone, r.style, ...r.tags].some((f) => f.includes(q))
-        )
-      : rows;
+    const matched = rows.filter(
+      (r) =>
+        (!styleFilter || r.style === styleFilter) &&
+        (!tagFilter || r.tags.includes(tagFilter)) &&
+        (!q || [r.name, r.bldg, r.phone, r.style, ...r.tags].some((f) => f.includes(q)))
+    );
     return [...matched].sort((a, b) => (a[sortBy] || '').localeCompare(b[sortBy] || '', 'he'));
-  }, [rows, query, sortBy]);
+  }, [rows, query, sortBy, styleFilter, tagFilter]);
 
   return (
     <section>
       <div className="table-toolbar">
+        <h2 className="view-title"><i className="fas fa-list" /> אינדקס קהילה</h2>
+        <span className="count">{filtered.length} משפחות</span>
+      </div>
+      <div className="filter-row">
         <input
           type="search"
-          placeholder="חיפוש שם, כתובת, טלפון, תגית…"
+          placeholder="חיפוש מהיר — שם, טלפון, רחוב…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          style={{ flex: 1, maxWidth: 300, padding: '7px 14px', border: '1px solid var(--line)', borderRadius: 999, background: 'var(--surface)', color: 'var(--ink)', fontSize: 13 }}
         />
-        <span className="count">{filtered.length} משפחות</span>
+        <label className="filter-pill">
+          <i className="fas fa-palette" /> סגנון
+          <select value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)}>
+            <option value="">הכל</option>
+            {allStyles.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+        <label className="filter-pill">
+          <i className="fas fa-tags" /> תגיות
+          <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+            <option value="">הכל</option>
+            {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
       </div>
       <div className="table-wrap">
         <table>
@@ -94,8 +117,13 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
                 className="clickable"
                 onClick={() => setSelected({ bldg: r.bldg, idx: r.idx })}
               >
-                <td>{r.name || '—'}</td>
-                <td>{r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : `${r.bldg} ${r.num}`.trim()}</td>
+                <td className="fam-name">{r.name || '—'}</td>
+                <td>
+                  <span className="addr-link">
+                    <i className="fas fa-map-marker-alt" />
+                    {r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : `${r.bldg} ${r.num}`.trim()}
+                  </span>
+                </td>
                 <td dir="ltr">{r.phone}</td>
                 <td>{r.style}</td>
                 <td>
@@ -107,7 +135,7 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
                     </span>
                   )}
                 </td>
-                <td>{r.tags.join(' · ')}</td>
+                <td>{r.tags.map((t) => <span className="tag-chip" key={t}>{t}</span>)}</td>
               </tr>
             ))}
           </tbody>
