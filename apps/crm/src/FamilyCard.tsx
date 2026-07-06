@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Apartment, Donation, InteractionLog, Task } from '@shlichus/core';
-import { NO_ADDRESS_KEY } from '@shlichus/core';
+import type { Apartment, Donation, InteractionLog, Milestone, Task } from '@shlichus/core';
+import { NO_ADDRESS_KEY, daysUntil, formatHebrew, hebrewParts } from '@shlichus/core';
 
 interface Props {
   bldg: string;
@@ -12,9 +12,19 @@ interface Props {
 const TABS = [
   { key: 'details', label: 'פרטים', icon: 'fa-user' },
   { key: 'activity', label: 'פעילות', icon: 'fa-bolt' },
+  { key: 'milestones', label: 'אבני דרך', icon: 'fa-calendar-star' },
   { key: 'tasks', label: 'משימות', icon: 'fa-check-double' },
   { key: 'donations', label: 'תרומות', icon: 'fa-hand-holding-heart' },
 ] as const;
+
+// סוגי ציוני דרך כמו במערכת הקיימת
+const MS_TYPES = [
+  { key: 'birthday', label: 'יום הולדת' },
+  { key: 'yahrzeit', label: 'יארצייט' },
+  { key: 'anniversary', label: 'יום נישואין' },
+  { key: 'barmitzva', label: 'בר/בת מצווה' },
+  { key: 'other', label: 'אחר' },
+];
 
 // סוגי אינטראקציה כמו במערכת הקיימת
 const LOG_TYPES = ['שיחה', 'ביקור', 'WhatsApp', 'מייל', 'פגישה', 'אחר'];
@@ -68,6 +78,9 @@ export function FamilyCard({ bldg, apt, onClose, onSave }: Props) {
   const [taskDue, setTaskDue] = useState('');
   const [donAmount, setDonAmount] = useState('');
   const [donCampaign, setDonCampaign] = useState('');
+  const [msType, setMsType] = useState('birthday');
+  const [msLabel, setMsLabel] = useState('');
+  const [msDate, setMsDate] = useState('');
 
   const phone = apt.fatherPhone || apt.motherPhone || '';
   const wa = phone ? `https://wa.me/972${phone.replace(/\D/g, '').replace(/^0/, '')}` : '';
@@ -118,6 +131,55 @@ export function FamilyCard({ bldg, apt, onClose, onSave }: Props) {
     await onSave({ tasks });
   };
 
+  const addMilestone = async () => {
+    if (!msDate) return;
+    const h = hebrewParts(new Date(msDate + 'T12:00:00'));
+    if (!h) { window.alert('תאריך לא תקין'); return; }
+    setSaving(true);
+    const typeLabel = MS_TYPES.find((t) => t.key === msType)?.label ?? msType;
+    const m: Milestone = {
+      id: Date.now(),
+      type: msType,
+      label: msLabel.trim() || `${typeLabel} — ${apt.name ?? ''}`,
+      monthName: h.monthName,
+      day: h.day,
+      gregDate: msDate,
+    };
+    await onSave({ milestones: [...(apt.milestones ?? []), m] });
+    setMsLabel(''); setMsDate('');
+    setSaving(false);
+  };
+
+  const removeMilestone = async (id: unknown) => {
+    if (!window.confirm('להסיר את ציון הדרך?')) return;
+    await onSave({ milestones: (apt.milestones ?? []).filter((m) => (m as { id?: unknown }).id !== id) });
+  };
+
+  const markDeceased = async () => {
+    const who = window.prompt('מי נפטר/ה? (אב / אם / שם אחר)');
+    if (!who) return;
+    const date = window.prompt('תאריך פטירה לועזי (YYYY-MM-DD):', new Date().toISOString().slice(0, 10));
+    if (!date) return;
+    const h = hebrewParts(new Date(date + 'T12:00:00'));
+    const milestones = [...(apt.milestones ?? [])];
+    if (h) {
+      milestones.push({
+        id: Date.now(), type: 'yahrzeit',
+        label: `יארצייט ${who} — ${apt.name ?? ''}`,
+        monthName: h.monthName, day: h.day, gregDate: date, autoCreated: true,
+      } as Milestone);
+    }
+    await onSave({
+      lifeStatus: 'deceased',
+      deceasedInfo: { who, date, recordedAt: new Date().toISOString() },
+      milestones,
+    } as Partial<Apartment>);
+  };
+
+  const restoreActive = async () => {
+    await onSave({ lifeStatus: '', deceasedInfo: undefined } as Partial<Apartment>);
+  };
+
   const addDonation = async () => {
     const amount = Number(donAmount);
     if (!amount) return;
@@ -161,6 +223,16 @@ export function FamilyCard({ bldg, apt, onClose, onSave }: Props) {
           ))}
         </div>
 
+        {(apt as { lifeStatus?: string }).lifeStatus === 'deceased' && (
+          <div className="deceased-banner">
+            <i className="fas fa-candle-holder" /> ‏
+            {String((apt as { deceasedInfo?: { who?: string } }).deceasedInfo?.who ?? '')} ע״ה
+            <button className="cancel-btn" style={{ padding: '3px 12px', fontSize: 12 }} onClick={() => void restoreActive()}>
+              החזרה לסטטוס פעיל
+            </button>
+          </div>
+        )}
+
         {tab === 'details' && !editing && (
           <>
             <section>
@@ -175,9 +247,16 @@ export function FamilyCard({ bldg, apt, onClose, onSave }: Props) {
                 <Field label="ילדים" value={apt.childrenList!.map((c) => c.name).filter(Boolean).join(', ')} />
               )}
             </section>
-            <button className="edit-btn" onClick={() => setEditing(true)}>
-              <i className="fas fa-pen" /> עריכת פרטים
-            </button>
+            <div className="edit-actions">
+              <button className="edit-btn" onClick={() => setEditing(true)}>
+                <i className="fas fa-pen" /> עריכת פרטים
+              </button>
+              {(apt as { lifeStatus?: string }).lifeStatus !== 'deceased' && (
+                <button className="cancel-btn" onClick={() => void markDeceased()}>
+                  <i className="fas fa-candle-holder" /> תיעוד פטירה
+                </button>
+              )}
+            </div>
           </>
         )}
 
@@ -228,6 +307,45 @@ export function FamilyCard({ bldg, apt, onClose, onSave }: Props) {
                   {logs.map((l, i) => (
                     <li key={i}><strong>{l.date ?? ''}</strong> {l.type ? `· ${l.type}` : ''} — {String(l.text ?? l.notes ?? '')}</li>
                   ))}
+                </ul>
+              )}
+            </section>
+          </>
+        )}
+
+        {tab === 'milestones' && (
+          <>
+            <section className="quick-add">
+              <div className="quick-add-row">
+                <select className="board-select" value={msType} onChange={(e) => setMsType(e.target.value)}>
+                  {MS_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                </select>
+                <input type="date" value={msDate} onChange={(e) => setMsDate(e.target.value)} style={{ maxWidth: 150 }} />
+                <input placeholder="תיאור (לא חובה)" value={msLabel} onChange={(e) => setMsLabel(e.target.value)} />
+                <button className="edit-btn" disabled={saving || !msDate} onClick={() => void addMilestone()}>הוסף</button>
+              </div>
+              <p className="tpl-text">התאריך העברי מחושב אוטומטית והאירוע חוזר כל שנה לפי הלוח העברי.</p>
+            </section>
+            <section>
+              <h3>ציוני דרך ({(apt.milestones ?? []).length})</h3>
+              {(apt.milestones ?? []).length === 0 ? <p className="placeholder">אין ציוני דרך.</p> : (
+                <ul className="task-list">
+                  {(apt.milestones ?? []).map((m, i) => {
+                    const ms = m as { id?: unknown; label?: string; day?: number; monthName?: string };
+                    const days = ms.day && ms.monthName ? daysUntil(ms.monthName, ms.day) : null;
+                    return (
+                      <li key={i} className="task">
+                        <span className="task-text">
+                          {String(ms.label ?? '')}
+                          {ms.day && ms.monthName ? ` · ${formatHebrew(ms.day, ms.monthName)}` : ''}
+                        </span>
+                        <span className="task-meta">
+                          {days !== null && (days === 0 ? 'היום!' : `בעוד ${days} ימים`)}
+                          <button className="chip-x" title="הסרה" onClick={() => void removeMilestone(ms.id)}>✕</button>
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>

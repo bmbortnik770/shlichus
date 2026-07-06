@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { type Db, buildingKeys, getBuilding, liveApts } from '@shlichus/core';
+import { type Db, buildingKeys, daysUntil, formatHebrew, getBuilding, liveApts } from '@shlichus/core';
 
 interface FieldEvent {
   id?: string;
@@ -15,6 +15,7 @@ interface MilestoneRow {
   hebDate: string;
   gregDate: string;
   family: string;
+  days: number | null;
 }
 
 export function EventsView({ db }: { db: Db }) {
@@ -30,17 +31,20 @@ export function EventsView({ db }: { db: Db }) {
       if (!entry) continue;
       liveApts(entry.apts).forEach((a) => {
         ((a.milestones ?? []) as Record<string, unknown>[]).forEach((m) => {
+          const day = Number(m.day) || 0;
+          const monthName = String(m.monthName ?? '');
           out.push({
             label: String(m.label ?? m.type ?? ''),
-            hebDate: [m.day, m.monthName].filter(Boolean).join(' '),
+            hebDate: day && monthName ? formatHebrew(day, monthName) : '',
             gregDate: String(m.gregDate ?? ''),
             family: a.name || key,
+            days: day && monthName ? daysUntil(monthName, day) : null,
           });
         });
       });
     }
-    // הקרובים קודם לפי תאריך לועזי
-    return out.sort((a, b) => a.gregDate.localeCompare(b.gregDate));
+    // הקרובים קודם — לפי המופע הבא בלוח העברי
+    return out.sort((a, b) => (a.days ?? 9999) - (b.days ?? 9999));
   }, [db]);
 
   return (
@@ -79,12 +83,19 @@ export function EventsView({ db }: { db: Db }) {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>אירוע</th><th>תאריך עברי</th><th>תאריך לועזי</th><th>משפחה</th></tr>
+              <tr><th>אירוע</th><th>מתי</th><th>תאריך עברי</th><th>תאריך לועזי מקורי</th><th>משפחה</th></tr>
             </thead>
             <tbody>
               {milestones.map((m, i) => (
                 <tr key={i}>
                   <td>{m.label}</td>
+                  <td>
+                    {m.days === null ? '' : (
+                      <span className={`contact-badge ${m.days <= 7 ? 'stale' : m.days <= 30 ? 'aging' : 'none'}`}>
+                        {m.days === 0 ? 'היום!' : `בעוד ${m.days} ימים`}
+                      </span>
+                    )}
+                  </td>
                   <td>{m.hebDate}</td>
                   <td>{m.gregDate}</td>
                   <td>{m.family}</td>

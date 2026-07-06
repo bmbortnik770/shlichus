@@ -260,6 +260,20 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
 .field-value { color: var(--ink); }
 .drawer-note { font-size: 12px; color: var(--ink-faint); background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; }
 
+/* נפטר + אבני דרך */
+.deceased-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 9px 14px;
+  font-size: 13px; font-weight: 700; color: var(--ink-soft);
+  margin-bottom: 14px;
+}
+.chip-x {
+  border: 0; background: none; color: var(--ink-faint);
+  cursor: pointer; font-size: 11px; margin-inline-start: 8px;
+}
+.chip-x:hover { color: var(--danger); }
+
 /* מודל בניין */
 .bldg-fam-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .bldg-fam-item {
