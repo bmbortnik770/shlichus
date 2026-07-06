@@ -291,6 +291,69 @@ tbody tr.clickable { cursor: pointer; }
   cursor: pointer;
 }
 
+/* ── מפה ── */
+.map-shell { margin-top: 22px; position: relative; }
+.map-canvas {
+  height: calc(100vh - 220px);
+  min-height: 380px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.map-hint {
+  position: absolute;
+  bottom: 10px; inset-inline-start: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-sm);
+}
+.map-marker {
+  width: 30px; height: 30px;
+  border-radius: 50% 50% 50% 4px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 2px solid #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transform: rotate(-45deg);
+}
+.map-marker:hover { filter: brightness(1.15); }
+.map-fallback {
+  margin-top: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 28px;
+  color: var(--ink-soft);
+}
+
+/* ── משימות ── */
+.view-title { font-size: 19px; font-weight: 700; }
+.task-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px 16px;
+  box-shadow: var(--shadow-sm);
+}
+.task label { display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; }
+.task input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+.task-text { font-size: 14px; }
+.task.done .task-text { text-decoration: line-through; color: var(--ink-faint); }
+.task-meta { font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+.amount { font-variant-numeric: tabular-nums; font-weight: 600; }
+
 /* ── מובייל ── */
 @media (max-width: 720px) {
   .shell { flex-direction: column; }

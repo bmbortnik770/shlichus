@@ -24,11 +24,45 @@ interface CrmState {
   pullFromCloud: () => Promise<void>;
   login: () => Promise<void>;
   updateApt: (bldg: string, idx: number, patch: Partial<Apartment>) => Promise<void>;
+  updateGeneralTask: (taskIdx: number, done: boolean) => Promise<void>;
 }
 
 const drive = new DriveSync({ tokenProvider: browserTokens });
 
-export const useCrm = create<CrmState>((set, get) => ({
+export const useCrm = create<CrmState>((set, get) => {
+  /** שמירה מקומית + דחיפה בטוחה לענן — משותף לכל פעולות הכתיבה */
+  const persistAndPush = async () => {
+    const db = get().db;
+    if (!db) return;
+    db.meta = { ...(db.meta ?? { lastModified: 0 }), lastModified: Date.now() };
+    const next = { ...db };
+    set({ db: next });
+    await saveLocal(next);
+
+    if (!hasValidSession()) {
+      set({ sync: 'auth-needed' });
+      return;
+    }
+    set({ sync: 'syncing', syncError: null });
+    try {
+      if (!drive.fileId) {
+        const pulled = await drive.pull();
+        if (!pulled) { set({ sync: 'offline' }); return; } // אין קובץ בענן — v2 לא יוצרת אחד
+      }
+      // pull-merge-push עם בדיקת revision: שום צד לא נדרס
+      const final = await drive.safeSave(get().db!);
+      set({ db: { ...final }, sync: 'synced' });
+      await saveLocal(final);
+    } catch (e) {
+      const authIssue = e instanceof Error && e.name === 'AuthRequiredError';
+      set({
+        sync: authIssue ? 'auth-needed' : 'error',
+        syncError: authIssue ? null : 'השינוי נשמר מקומית; הסנכרון לענן ייעשה בחיבור הבא',
+      });
+    }
+  };
+
+  return {
   db: null,
   status: 'loading',
   sync: 'offline',
@@ -74,37 +108,21 @@ export const useCrm = create<CrmState>((set, get) => ({
     const entry = getBuilding(db, bldg);
     const apt = entry?.apts[idx];
     if (!entry || !apt) return;
-
     entry.apts[idx] = { ...apt, ...patch, updatedAt: Date.now() };
-    db.meta = { ...(db.meta ?? { lastModified: 0 }), lastModified: Date.now() };
-    const next = { ...db };
-    set({ db: next });
-    await saveLocal(next);
-
-    // דחיפה לענן — best effort; בלי חיבור נשאר מקומי (הישן ימזג בהמשך)
-    if (!hasValidSession()) {
-      set({ sync: 'auth-needed' });
-      return;
-    }
-    set({ sync: 'syncing', syncError: null });
-    try {
-      if (!drive.fileId) {
-        const pulled = await drive.pull();
-        if (!pulled) { set({ sync: 'offline' }); return; } // אין קובץ בענן — v2 לא יוצרת אחד
-      }
-      // pull-merge-push עם בדיקת revision: שום צד לא נדרס
-      const final = await drive.safeSave(get().db!);
-      set({ db: { ...final }, sync: 'synced' });
-      await saveLocal(final);
-    } catch (e) {
-      const authIssue = e instanceof Error && e.name === 'AuthRequiredError';
-      set({
-        sync: authIssue ? 'auth-needed' : 'error',
-        syncError: authIssue ? null : 'השינוי נשמר מקומית; הסנכרון לענן ייעשה בחיבור הבא',
-      });
-    }
+    await persistAndPush();
   },
-}));
+
+  updateGeneralTask: async (taskIdx, done) => {
+    const db = get().db;
+    if (!db?.meta) return;
+    const tasks = (db.meta.generalTasks ?? []) as { done?: boolean }[];
+    if (!tasks[taskIdx]) return;
+    tasks[taskIdx] = { ...tasks[taskIdx], done };
+    db.meta.generalTasks = [...tasks];
+    await persistAndPush();
+  },
+  };
+});
 
 export function familyCount(db: Db): number {
   return buildingKeys(db).reduce((sum, k) => sum + liveApts(getBuilding(db, k)?.apts).length, 0);

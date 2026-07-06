@@ -83,12 +83,51 @@ export function mergeDb(local: Db, remote: Db): Db {
     result.__SETTINGS__ = rt > lt ? rs : ls;
   }
 
-  result.meta = {
-    ...local.meta,
-    ...result.meta,
-    lastModified: Math.max(local.meta?.lastModified ?? 0, remote.meta?.lastModified ?? 0),
-  };
+  result.meta = mergeMeta(local.meta, remote.meta);
   return result;
+}
+
+/**
+ * מיזוג meta — חשוב במיוחד כי אפליקציית השטח כותבת לכאן דרך המערכת הישנה:
+ * meta.events (אירועים) ו-meta.generalTasks (משימות כלליות).
+ */
+function mergeMeta(local: Db['meta'], remote: Db['meta']): NonNullable<Db['meta']> {
+  const lt = local?.lastModified ?? 0;
+  const rt = remote?.lastModified ?? 0;
+  // בסיס: הצד המאוחר; ואז מיזוג פרטני לשדות המצטברים
+  const base = { ...(rt > lt ? local : remote), ...(rt > lt ? remote : local) };
+
+  // משימות כלליות: איחוד לפי טקסט+תאריך; "בוצע" מנצח (סומן באחד המכשירים — נשאר מסומן)
+  const lTasks = (local?.generalTasks ?? []) as { text?: string; date?: string; done?: boolean }[];
+  const rTasks = (remote?.generalTasks ?? []) as { text?: string; date?: string; done?: boolean }[];
+  if (lTasks.length || rTasks.length) {
+    const map = new Map<string, { text?: string; date?: string; done?: boolean }>();
+    for (const t of [...lTasks, ...rTasks]) {
+      const key = `${t.text ?? ''}|${t.date ?? ''}`;
+      const existing = map.get(key);
+      map.set(key, existing ? { ...existing, ...t, done: !!(existing.done || t.done) } : t);
+    }
+    base.generalTasks = [...map.values()];
+  }
+
+  // אירועים: איחוד לפי id; לכפילות — הרשומה עם יותר נרשמים/נוכחות (הצטברות משטח)
+  type Ev = { id?: string; registrants?: unknown[]; attendance?: unknown[] };
+  const lEvents = (local?.events ?? []) as Ev[];
+  const rEvents = (remote?.events ?? []) as Ev[];
+  if (lEvents.length || rEvents.length) {
+    const map = new Map<string, Ev>();
+    for (const ev of [...lEvents, ...rEvents]) {
+      const key = ev.id ?? JSON.stringify(ev);
+      const existing = map.get(key);
+      if (!existing) { map.set(key, ev); continue; }
+      const size = (e: Ev) => (e.registrants?.length ?? 0) + (e.attendance?.length ?? 0);
+      map.set(key, size(ev) >= size(existing) ? ev : existing);
+    }
+    base.events = [...map.values()];
+  }
+
+  base.lastModified = Math.max(lt, rt);
+  return base as NonNullable<Db['meta']>;
 }
 
 /**

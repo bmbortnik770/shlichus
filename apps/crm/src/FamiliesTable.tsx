@@ -33,8 +33,8 @@ function toRows(db: Db): Row[] {
   return rows;
 }
 
-export function FamiliesTable({ db }: { db: Db }) {
-  const [query, setQuery] = useState('');
+export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?: string }) {
+  const [query, setQuery] = useState(initialQuery);
   const [sortBy, setSortBy] = useState<'name' | 'bldg' | 'style'>('name');
   const [selected, setSelected] = useState<{ bldg: string; idx: number } | null>(null);
   const updateApt = useCrm((s) => s.updateApt);

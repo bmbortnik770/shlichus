@@ -88,6 +88,39 @@ describe('mergeDb — info, לוחות והגדרות (שהישן זרק)', () =
   });
 });
 
+describe('mergeDb — meta: אירועים ומשימות מהשטח', () => {
+  it('משימות כלליות מתאחדות משני הצדדים; "בוצע" מנצח', () => {
+    const local: Db = { meta: { lastModified: 100, generalTasks: [
+      { text: 'א', date: '1', done: true }, { text: 'ב', date: '2', done: false },
+    ] } };
+    const remote: Db = { meta: { lastModified: 200, generalTasks: [
+      { text: 'א', date: '1', done: false }, { text: 'ג', date: '3', done: false },
+    ] } };
+    const tasks = mergeDb(local, remote).meta!.generalTasks as { text: string; done: boolean }[];
+    expect(tasks.map((t) => t.text).sort()).toEqual(['א', 'ב', 'ג']);
+    expect(tasks.find((t) => t.text === 'א')!.done).toBe(true);
+  });
+
+  it('אירועים מתאחדים לפי id; גרסה עם יותר נרשמים מנצחת', () => {
+    const local: Db = { meta: { lastModified: 100, events: [
+      { id: 'e1', name: 'התוועדות', registrants: [{ name: 'א' }] },
+    ] } };
+    const remote: Db = { meta: { lastModified: 200, events: [
+      { id: 'e1', name: 'התוועדות', registrants: [{ name: 'א' }, { name: 'ב' }] },
+      { id: 'e2', name: 'שיעור' },
+    ] } };
+    const events = mergeDb(local, remote).meta!.events as { id: string; registrants?: unknown[] }[];
+    expect(events.map((e) => e.id).sort()).toEqual(['e1', 'e2']);
+    expect(events.find((e) => e.id === 'e1')!.registrants).toHaveLength(2);
+  });
+
+  it('שדות meta אחרים — הצד המאוחר מנצח', () => {
+    const local: Db = { meta: { lastModified: 100, someFlag: 'ישן' } };
+    const remote: Db = { meta: { lastModified: 200, someFlag: 'חדש' } };
+    expect(mergeDb(local, remote).meta!.someFlag).toBe('חדש');
+  });
+});
+
 describe('aptIdentity — תאימות לאחור', () => {
   it('בלי id — זהות לפי name_num כמו בישן', () => {
     expect(aptIdentity({ name: 'כהן', num: '3' })).toBe('legacy:כהן_3');
