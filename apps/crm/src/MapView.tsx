@@ -10,6 +10,19 @@ interface Marker {
   key: string;
   coords: [number, number];
   families: number;
+  color: string;
+}
+
+// אותה פלטת צבעי סגנון כמו במערכת הקיימת (getColorForString)
+const CHART_STYLE_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
+
+function styleColor(db: Db, style: string | undefined): string {
+  if (!style) return '#94a3b8';
+  const custom = (db.__SETTINGS__?.styleColors ?? {}) as Record<string, string>;
+  if (custom[style]) return custom[style];
+  const styles = (db.__SETTINGS__?.styles ?? []) as string[];
+  const idx = styles.indexOf(style);
+  return idx === -1 ? '#94a3b8' : CHART_STYLE_COLORS[idx % CHART_STYLE_COLORS.length]!;
 }
 
 function collectMarkers(db: Db): Marker[] {
@@ -18,7 +31,12 @@ function collectMarkers(db: Db): Marker[] {
     const entry = getBuilding(db, key);
     const c = entry?.info?.coords;
     if (!c || !Array.isArray(c) || c.length !== 2 || isNaN(c[0]!) || isNaN(c[1]!)) continue;
-    out.push({ key, coords: c as [number, number], families: liveApts(entry!.apts).length });
+    const apts = liveApts(entry!.apts);
+    // צבע לפי הסגנון הנפוץ בבניין — כמו מצב ברירת המחדל בישן
+    const counts = new Map<string, number>();
+    apts.forEach((a) => { if (a.style) counts.set(a.style, (counts.get(a.style) ?? 0) + 1); });
+    const dominant = [...counts.entries()].sort((x, y) => y[1] - x[1])[0]?.[0];
+    out.push({ key, coords: c as [number, number], families: apts.length, color: styleColor(db, dominant) });
   }
   return out;
 }
@@ -27,6 +45,7 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [failed, setFailed] = useState(false);
+  const [satellite, setSatellite] = useState(false);
   const markers = collectMarkers(db);
 
   useEffect(() => {
@@ -49,6 +68,7 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
         el.className = 'map-marker';
         el.textContent = String(m.families || '');
         el.title = m.key;
+        el.style.background = m.color;
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           onOpenBuilding(m.key);
@@ -82,9 +102,20 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
     );
   }
 
+  const toggleSatellite = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const next = !satellite;
+    map.setStyle(next ? 'mapbox://styles/mapbox/satellite-streets-v12' : 'mapbox://styles/mapbox/streets-v12');
+    setSatellite(next);
+  };
+
   return (
     <div className="map-shell">
       <div ref={container} className="map-canvas" />
+      <button className="map-style-btn" onClick={toggleSatellite} title="לוויין / מפה">
+        <i className={`fas ${satellite ? 'fa-map' : 'fa-satellite'}`} />
+      </button>
       <div className="map-hint">{markers.length} בניינים על המפה · לחיצה על סמן פותחת את הבניין</div>
     </div>
   );

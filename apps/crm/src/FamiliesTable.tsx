@@ -50,8 +50,24 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
   const [sortBy, setSortBy] = useState<'name' | 'bldg' | 'style'>('name');
   const [styleFilter, setStyleFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
+  const [smartView, setSmartView] = useState('v_all');
   const allStyles = (db.__SETTINGS__?.styles ?? []) as string[];
   const allTags = (db.__SETTINGS__?.tags ?? []) as string[];
+  const smartViews = ((db.__SETTINGS__?.smartViews ?? []) as { id: string; name: string; rule: string }[]);
+
+  // כללי התצוגות החכמות של המערכת הקיימת
+  const smartRule = (r: Row): boolean => {
+    const rule = smartViews.find((v) => v.id === smartView)?.rule ?? 'none';
+    if (rule === 'no_visit_3m') return r.lastContactDays === null || r.lastContactDays > 90;
+    if (rule === 'bday_month') {
+      const apt = getBuilding(db, r.bldg)?.apts[r.idx];
+      const month = new Date().getMonth();
+      return ((apt?.milestones ?? []) as { type?: string; gregDate?: string }[]).some(
+        (m) => String(m.type ?? '').includes('birthday') && new Date(m.gregDate ?? '').getMonth() === month
+      );
+    }
+    return true;
+  };
   const [selected, setSelected] = useState<{ bldg: string; idx: number } | null>(null);
   const [bulk, setBulk] = useState<Set<string>>(new Set());
   const updateApt = useCrm((s) => s.updateApt);
@@ -110,12 +126,14 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
     const q = query.trim();
     const matched = rows.filter(
       (r) =>
+        smartRule(r) &&
         (!styleFilter || r.style === styleFilter) &&
         (!tagFilter || r.tags.includes(tagFilter)) &&
         (!q || [r.name, r.bldg, r.phone, r.style, ...r.tags].some((f) => f.includes(q)))
     );
     return [...matched].sort((a, b) => (a[sortBy] || '').localeCompare(b[sortBy] || '', 'he'));
-  }, [rows, query, sortBy, styleFilter, tagFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, query, sortBy, styleFilter, tagFilter, smartView, db]);
 
   return (
     <section>
@@ -145,6 +163,14 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
           onChange={(e) => setQuery(e.target.value)}
           style={{ flex: 1, maxWidth: 300, padding: '7px 14px', border: '1px solid var(--line)', borderRadius: 999, background: 'var(--surface)', color: 'var(--ink)', fontSize: 13 }}
         />
+        {smartViews.length > 0 && (
+          <label className="filter-pill">
+            <i className="fas fa-magic" /> תצוגה חכמה
+            <select value={smartView} onChange={(e) => setSmartView(e.target.value)}>
+              {smartViews.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          </label>
+        )}
         <label className="filter-pill">
           <i className="fas fa-palette" /> סגנון
           <select value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)}>
