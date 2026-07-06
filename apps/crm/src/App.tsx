@@ -4,6 +4,8 @@ import { useCrm, familyCount } from './store';
 import { FamiliesTable } from './FamiliesTable';
 import { TasksView } from './TasksView';
 import { DonationsView } from './DonationsView';
+import { EventsView } from './EventsView';
+import { KanbanView } from './KanbanView';
 
 // המפה נטענת עצלה — mapbox-gl כבד ולא נחוץ בשאר המסכים
 const MapView = lazy(() => import('./MapView').then((m) => ({ default: m.MapView })));
@@ -12,6 +14,8 @@ const VIEWS = [
   { key: 'map', label: 'מפה' },
   { key: 'table', label: 'רשימת משפחות' },
   { key: 'tasks', label: 'משימות' },
+  { key: 'events', label: 'אירועים' },
+  { key: 'kanban', label: 'קנבן' },
   { key: 'donations', label: 'תרומות' },
   { key: 'comm', label: 'מרכז תקשורת' },
 ] as const;
@@ -99,6 +103,8 @@ export function App() {
               </Suspense>
             )}
             {view === 'tasks' && <TasksView db={db} />}
+            {view === 'events' && <EventsView db={db} />}
+            {view === 'kanban' && <KanbanView db={db} />}
             {view === 'donations' && <DonationsView db={db} />}
             {view === 'comm' && (
               <p className="placeholder">מרכז התקשורת יעבור בשלב הבא של ההגירה — בינתיים במערכת הקיימת.</p>

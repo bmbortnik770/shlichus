@@ -354,6 +354,59 @@ tbody tr.clickable { cursor: pointer; }
 .task-meta { font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
 .amount { font-variant-numeric: tabular-nums; font-weight: 600; }
 
+/* ── אירועים ── */
+.section-title { font-size: 15px; font-weight: 700; margin: 22px 0 10px; color: var(--ink); }
+.event-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.event-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+.event-name { font-weight: 700; font-size: 15px; }
+.event-meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+.event-regs { font-size: 12.5px; color: var(--ink-faint); margin-top: 8px; border-top: 1px solid var(--line); padding-top: 7px; }
+
+/* ── קנבן ── */
+.board-select, .stage-select {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: inherit;
+}
+.kanban { display: flex; gap: 14px; overflow-x: auto; align-items: flex-start; padding-bottom: 10px; }
+.kanban-col {
+  min-width: 220px; flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.kanban-col-head {
+  font-size: 13px; font-weight: 700; color: var(--ink-soft);
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 2px 4px 6px;
+}
+.col-count {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; font-size: 11px; padding: 1px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.kanban-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.kanban-card-name { font-size: 14px; font-weight: 600; }
+
 /* ── מובייל ── */
 @media (max-width: 720px) {
   .shell { flex-direction: column; }
