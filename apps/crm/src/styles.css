@@ -441,6 +441,46 @@ tbody tr.clickable { cursor: pointer; }
 .recipient-name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recipient-meta { font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 .recipient-style { font-size: 11px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--ink-soft); white-space: nowrap; }
+.channel-tabs { display: flex; gap: 4px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 3px; }
+.chan { border: 0; background: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; color: var(--ink-soft); cursor: pointer; }
+.chan.active { background: var(--surface); color: var(--accent); font-weight: 700; box-shadow: var(--shadow-sm); }
+
+/* ── קשר אחרון ── */
+.contact-badge { font-size: 12px; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.contact-badge.fresh { background: var(--success-bg); color: var(--success); }
+.contact-badge.aging { background: var(--warn-bg); color: var(--warn); }
+.contact-badge.stale { background: var(--danger-bg); color: var(--danger); }
+.contact-badge.none { background: var(--surface-2); color: var(--ink-faint); }
+
+/* ── הגדרות ── */
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 18px; }
+.settings-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.settings-card h3 { font-size: 14px; font-weight: 700; color: var(--accent); }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 6px 3px 12px; font-size: 13px;
+}
+.chip button { border: 0; background: none; color: var(--ink-faint); cursor: pointer; font-size: 11px; padding: 2px 5px; }
+.chip button:hover { color: var(--danger); }
+.chip-add, .tpl-add { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-add input, .tpl-add input, .tpl-add textarea {
+  flex: 1; min-width: 140px;
+  padding: 7px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--ink); font-size: 13.5px; font-family: inherit;
+}
+.tpl-add { flex-direction: column; }
+.tpl-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tpl-list li {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 12px;
+}
+.tpl-text { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
 
 /* ── מובייל ── */
 @media (max-width: 720px) {

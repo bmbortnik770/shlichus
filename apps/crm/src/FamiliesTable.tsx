@@ -11,6 +11,17 @@ interface Row {
   phone: string;
   style: string;
   tags: string[];
+  lastContactDays: number | null;
+}
+
+/** ימים מאז האינטראקציה האחרונה — זהה ללוגיקת scoring.js בישן */
+function lastContactDays(interactions: { date?: string }[] | undefined): number | null {
+  if (!interactions?.length) return null;
+  const latest = interactions.reduce((max, i) => {
+    const t = new Date(i.date ?? '').getTime();
+    return isNaN(t) ? max : Math.max(max, t);
+  }, 0);
+  return latest ? Math.floor((Date.now() - latest) / 86400000) : null;
 }
 
 function toRows(db: Db): Row[] {
@@ -27,6 +38,7 @@ function toRows(db: Db): Row[] {
         phone: a.fatherPhone || a.motherPhone || '',
         style: a.style ?? '',
         tags: a.tags ?? [],
+        lastContactDays: lastContactDays(a.interactions),
       });
     });
   }
@@ -71,6 +83,7 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
               <th onClick={() => setSortBy('bldg')}>כתובת</th>
               <th>טלפון</th>
               <th onClick={() => setSortBy('style')}>סגנון</th>
+              <th>קשר אחרון</th>
               <th>תגיות</th>
             </tr>
           </thead>
@@ -85,6 +98,15 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
                 <td>{r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : `${r.bldg} ${r.num}`.trim()}</td>
                 <td dir="ltr">{r.phone}</td>
                 <td>{r.style}</td>
+                <td>
+                  {r.lastContactDays === null ? (
+                    <span className="contact-badge none">אין תיעוד</span>
+                  ) : (
+                    <span className={`contact-badge ${r.lastContactDays > 60 ? 'stale' : r.lastContactDays > 21 ? 'aging' : 'fresh'}`}>
+                      {r.lastContactDays === 0 ? 'היום' : `לפני ${r.lastContactDays} ימים`}
+                    </span>
+                  )}
+                </td>
                 <td>{r.tags.join(' · ')}</td>
               </tr>
             ))}

@@ -8,6 +8,7 @@ interface Recipient {
   idx: number;
   name: string;
   phone: string;
+  email: string;
   style: string;
   tags: string[];
   sent: boolean;
@@ -31,6 +32,7 @@ export function CommView({ db }: { db: Db }) {
   const [text, setText] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sentKeys, setSentKeys] = useState<Set<string>>(new Set());
+  const [channel, setChannel] = useState<'whatsapp' | 'email'>('whatsapp');
 
   const templates = ((db.__SETTINGS__?.templates ?? []) as { title?: string; text?: string }[]);
   const styles = (db.__SETTINGS__?.styles ?? []) as string[];
@@ -42,13 +44,16 @@ export function CommView({ db }: { db: Db }) {
       if (!entry) continue;
       liveApts(entry.apts).forEach((a) => {
         const phone = a.fatherPhone || a.motherPhone || '';
-        if (!phone) return; // וואטסאפ דורש טלפון
+        const email = a.fatherEmail || a.motherEmail || '';
+        // וואטסאפ דורש טלפון; מייל דורש כתובת
+        if (channel === 'whatsapp' ? !phone : !email) return;
         out.push({
           key: `${key}|${entry.apts.indexOf(a)}`,
           bldg: key,
           idx: entry.apts.indexOf(a),
           name: a.name ?? '',
           phone,
+          email,
           style: a.style ?? '',
           tags: a.tags ?? [],
           sent: false,
@@ -56,7 +61,7 @@ export function CommView({ db }: { db: Db }) {
       });
     }
     return out.sort((a, b) => a.name.localeCompare(b.name, 'he'));
-  }, [db]);
+  }, [db, channel]);
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -82,12 +87,20 @@ export function CommView({ db }: { db: Db }) {
 
   const chosen = filtered.filter((r) => selected.has(r.key));
 
-  /** שליחה לנמען: פותח וואטסאפ + מתעד אינטראקציה בפורמט של המערכת הקיימת */
+  /** שליחה לנמען: פותח וואטסאפ/מייל + מתעד אינטראקציה בפורמט של המערכת הקיימת */
   const sendTo = async (r: Recipient) => {
-    const wp = waPhone(r.phone);
-    if (!wp) return;
     const personal = personalize(text, r.name);
-    window.open(`https://wa.me/${wp}?text=${encodeURIComponent(personal)}`, '_blank');
+    if (channel === 'whatsapp') {
+      const wp = waPhone(r.phone);
+      if (!wp) return;
+      window.open(`https://wa.me/${wp}?text=${encodeURIComponent(personal)}`, '_blank');
+    } else {
+      if (!r.email) return;
+      window.open(
+        `mailto:${r.email}?subject=${encodeURIComponent('הודעה מבית חב"ד')}&body=${encodeURIComponent(personal)}`,
+        '_blank'
+      );
+    }
 
     const now = new Date();
     const entry = getBuilding(db, r.bldg);
@@ -96,9 +109,9 @@ export function CommView({ db }: { db: Db }) {
     const interactions = [
       {
         date: `${now.toLocaleDateString('he-IL')} ${now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`,
-        type: 'WhatsApp',
+        type: channel === 'whatsapp' ? 'WhatsApp' : 'מייל',
         notes: personal.substring(0, 120),
-        channel: 'whatsapp',
+        channel,
         source: 'comm_hub',
         result: '',
       },
@@ -111,7 +124,11 @@ export function CommView({ db }: { db: Db }) {
   return (
     <section>
       <div className="table-toolbar">
-        <h2 className="view-title">מרכז תקשורת — WhatsApp</h2>
+        <h2 className="view-title">מרכז תקשורת</h2>
+        <div className="channel-tabs">
+          <button className={channel === 'whatsapp' ? 'chan active' : 'chan'} onClick={() => setChannel('whatsapp')}>WhatsApp</button>
+          <button className={channel === 'email' ? 'chan active' : 'chan'} onClick={() => setChannel('email')}>מייל</button>
+        </div>
         <span className="count">{chosen.length} נבחרו מתוך {filtered.length}</span>
       </div>
 
@@ -148,8 +165,8 @@ export function CommView({ db }: { db: Db }) {
                   {sentKeys.has(r.key) ? (
                     <span className="sent-badge">נשלח ✓</span>
                   ) : (
-                    <button className="save-btn wa" onClick={() => void sendTo(r)}>
-                      שליחה בוואטסאפ
+                    <button className={channel === 'whatsapp' ? 'save-btn wa' : 'save-btn'} onClick={() => void sendTo(r)}>
+                      {channel === 'whatsapp' ? 'שליחה בוואטסאפ' : 'שליחה במייל'}
                     </button>
                   )}
                 </div>
@@ -180,7 +197,7 @@ export function CommView({ db }: { db: Db }) {
                 <label>
                   <input type="checkbox" checked={selected.has(r.key)} onChange={() => toggle(r.key)} />
                   <span className="recipient-name">{r.name || r.bldg}</span>
-                  <span className="recipient-meta" dir="ltr">{r.phone}</span>
+                  <span className="recipient-meta" dir="ltr">{channel === 'whatsapp' ? r.phone : r.email}</span>
                   {r.style && <span className="recipient-style">{r.style}</span>}
                 </label>
               </li>

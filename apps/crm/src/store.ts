@@ -25,6 +25,7 @@ interface CrmState {
   login: () => Promise<void>;
   updateApt: (bldg: string, idx: number, patch: Partial<Apartment>) => Promise<void>;
   updateGeneralTask: (taskIdx: number, done: boolean) => Promise<void>;
+  updateSettings: (patch: Record<string, unknown>) => Promise<void>;
 }
 
 const drive = new DriveSync({ tokenProvider: browserTokens });
@@ -109,6 +110,13 @@ export const useCrm = create<CrmState>((set, get) => {
     const apt = entry?.apts[idx];
     if (!entry || !apt) return;
     entry.apts[idx] = { ...apt, ...patch, updatedAt: Date.now() };
+    await persistAndPush();
+  },
+
+  updateSettings: async (patch) => {
+    const db = get().db;
+    if (!db) return;
+    db.__SETTINGS__ = { ...(db.__SETTINGS__ ?? {}), ...patch, updatedAt: Date.now() };
     await persistAndPush();
   },
 

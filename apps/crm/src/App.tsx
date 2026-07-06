@@ -7,6 +7,8 @@ import { DonationsView } from './DonationsView';
 import { EventsView } from './EventsView';
 import { KanbanView } from './KanbanView';
 import { CommView } from './CommView';
+import { SettingsView } from './SettingsView';
+import { CirclesView } from './CirclesView';
 
 // המפה נטענת עצלה — mapbox-gl כבד ולא נחוץ בשאר המסכים
 const MapView = lazy(() => import('./MapView').then((m) => ({ default: m.MapView })));
@@ -18,7 +20,9 @@ const VIEWS = [
   { key: 'events', label: 'אירועים' },
   { key: 'kanban', label: 'קנבן' },
   { key: 'donations', label: 'תרומות' },
+  { key: 'circles', label: 'מעגלי קשר' },
   { key: 'comm', label: 'מרכז תקשורת' },
+  { key: 'settings', label: 'הגדרות' },
 ] as const;
 
 const SYNC_LABEL: Record<string, string> = {
@@ -107,7 +111,9 @@ export function App() {
             {view === 'events' && <EventsView db={db} />}
             {view === 'kanban' && <KanbanView db={db} />}
             {view === 'donations' && <DonationsView db={db} />}
+            {view === 'circles' && <CirclesView db={db} />}
             {view === 'comm' && <CommView db={db} />}
+            {view === 'settings' && <SettingsView db={db} />}
           </>
         )}
       </main>
