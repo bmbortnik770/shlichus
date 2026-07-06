@@ -1,0 +1,15 @@
+{
+  "name": "השליחות שלי",
+  "short_name": "השליחות שלי",
+  "dir": "rtl",
+  "lang": "he",
+  "start_url": "/shlichus/v2/",
+  "scope": "/shlichus/v2/",
+  "display": "standalone",
+  "background_color": "#eef2f8",
+  "theme_color": "#3b82f6",
+  "icons": [
+    { "src": "/shlichus/v2/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/shlichus/v2/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
