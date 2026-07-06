@@ -260,6 +260,52 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
 .field-value { color: var(--ink); }
 .drawer-note { font-size: 12px; color: var(--ink-faint); background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; }
 
+/* פעולות שורה + bulk */
+.row-actions { display: flex; gap: 8px; }
+.row-actions a {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); color: var(--success); font-size: 12px;
+}
+.row-actions a:hover { background: var(--success-bg); }
+.bulk-check { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.bulk-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--accent); color: #fff;
+  border-radius: var(--radius-pill); padding: 8px 18px; margin-bottom: 12px;
+  font-size: 13px; font-weight: 700; box-shadow: var(--shadow-md);
+}
+.bulk-bar button {
+  border: 1px solid rgba(255,255,255,.4); background: none; color: #fff;
+  border-radius: var(--radius-pill); padding: 4px 14px; font-size: 12.5px; cursor: pointer;
+}
+.bulk-bar button:hover { background: rgba(255,255,255,.15); }
+.bulk-bar button.danger { border-color: #fecaca; color: #fecaca; }
+
+/* טאבי כרטיס — כמו במערכת הקיימת */
+.card-tabs {
+  display: flex; gap: 2px; border-bottom: 2px solid var(--line);
+  margin-bottom: 16px;
+}
+.card-tabs button {
+  border: 0; background: none; cursor: pointer;
+  padding: 9px 16px; font-size: 13.5px; font-weight: 600;
+  color: var(--ink-soft);
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+}
+.card-tabs button i { margin-inline-end: 5px; font-size: 12px; }
+.card-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+.card-tabs button:hover { color: var(--ink); }
+
+/* הוספה מהירה בכרטיס */
+.quick-add { background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; }
+.quick-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.quick-add-row input {
+  flex: 1; min-width: 120px; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink); font-size: 13px; font-family: inherit;
+}
+
 /* עריכה בכרטיס */
 .edit-btn {
   padding: 7px 18px; border: 0; background: var(--accent); color: #fff;

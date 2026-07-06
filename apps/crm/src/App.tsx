@@ -219,7 +219,15 @@ export function App() {
           </p>
         </div>
 
-        <button className="fab" title="מעבר לקהילה" onClick={() => setView('table')}>
+        <button
+          className="fab"
+          title="משפחה חדשה"
+          onClick={() => {
+            // מעבר לקהילה — כפתור "משפחה חדשה" שם פותח כרטיס ריק
+            setView('table');
+            setTimeout(() => (document.querySelector('.table-toolbar .edit-btn') as HTMLButtonElement)?.click(), 80);
+          }}
+        >
           <i className="fas fa-plus" />
         </button>
       </aside>

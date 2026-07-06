@@ -3,12 +3,14 @@ import {
   type Apartment,
   type Db,
   DriveSync,
+  NO_ADDRESS_KEY,
   buildingKeys,
   getBuilding,
   liveApts,
   loadLocal,
   migrateFromLocalStorage,
   saveLocal,
+  softDeleteApt,
 } from '@shlichus/core';
 import { browserTokens, hasValidSession, interactiveLogin } from './auth';
 import { mergeDb } from '@shlichus/core';
@@ -26,6 +28,10 @@ interface CrmState {
   updateApt: (bldg: string, idx: number, patch: Partial<Apartment>) => Promise<void>;
   updateGeneralTask: (taskIdx: number, done: boolean) => Promise<void>;
   updateSettings: (patch: Record<string, unknown>) => Promise<void>;
+  /** הוספת משפחה; מחזירה את המפתח והאינדקס לפתיחת הכרטיס */
+  addApt: (bldg: string) => Promise<{ bldg: string; idx: number } | null>;
+  /** מחיקה רכה — tombstone; המחיקה שורדת סנכרון מכל מכשיר */
+  deleteApt: (bldg: string, idx: number) => Promise<void>;
 }
 
 const drive = new DriveSync({ tokenProvider: browserTokens });
@@ -117,6 +123,33 @@ export const useCrm = create<CrmState>((set, get) => {
     const db = get().db;
     if (!db) return;
     db.__SETTINGS__ = { ...(db.__SETTINGS__ ?? {}), ...patch, updatedAt: Date.now() };
+    await persistAndPush();
+  },
+
+  addApt: async (bldg) => {
+    const db = get().db;
+    if (!db) return null;
+    const key = bldg || NO_ADDRESS_KEY;
+    if (!getBuilding(db, key)) {
+      (db as Record<string, unknown>)[key] = { info: { code: '', rep: '', notes: '', coords: null }, apts: [] };
+    }
+    const entry = getBuilding(db, key)!;
+    const styles = (db.__SETTINGS__?.styles ?? []) as string[];
+    entry.apts.push({
+      id: `apt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name: '', num: '', style: styles[0] ?? '',
+      tags: [], boards: {}, childrenList: [], interactions: [], donations: [], tasks: [],
+      customFields: {}, updatedAt: Date.now(),
+    });
+    await persistAndPush();
+    return { bldg: key, idx: entry.apts.length - 1 };
+  },
+
+  deleteApt: async (bldg, idx) => {
+    const db = get().db;
+    const apt = getBuilding(db ?? {}, bldg)?.apts[idx];
+    if (!apt) return;
+    softDeleteApt(apt);
     await persistAndPush();
   },
 
