@@ -219,12 +219,12 @@ export function App() {
               )}
               {view === 'table' && <FamiliesTable db={db} initialQuery={tableQuery} />}
               {view === 'activity' && activitySub === 'dashboard' && <DashboardView db={db} onOpenFamily={openTableWith} />}
-              {view === 'activity' && activitySub === 'tasks' && <TasksView db={db} />}
+              {view === 'activity' && activitySub === 'tasks' && <TasksView db={db} onOpenFamily={openTableWith} />}
               {view === 'activity' && activitySub === 'events' && <EventsView db={db} />}
               {view === 'activity' && activitySub === 'kanban' && <KanbanView db={db} />}
               {view === 'activity' && activitySub === 'circles' && <CirclesView db={db} />}
               {view === 'comm' && <CommView db={db} />}
-              {view === 'donations' && <DonationsView db={db} />}
+              {view === 'donations' && <DonationsView db={db} onOpenFamily={openTableWith} />}
               {view === 'settings' && <SettingsView db={db} />}
             </>
           )}

@@ -499,6 +499,36 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
   font-size: 11.5px; cursor: pointer; font-family: inherit; color: var(--ink-soft);
 }
 .log-btns button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* מרכז תרומות */
+.camp-row { display: flex; flex-direction: column; gap: 4px; }
+.camp-head { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; }
+.camp-amt { color: var(--success); font-variant-numeric: tabular-nums; }
+.camp-bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.camp-bar div { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #10b981, #34d399); }
+.donor-list { display: flex; flex-direction: column; gap: 8px; }
+.donor-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 16px;
+  box-shadow: var(--shadow-sm); cursor: pointer; text-align: start;
+  font-family: inherit; color: var(--ink); font-size: 14px;
+}
+.donor-row:hover { box-shadow: var(--shadow-md); }
+.donor-badge {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #10b981, #14b8a6); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 14px;
+}
+.donor-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.donor-total { color: var(--success); font-weight: 800; font-variant-numeric: tabular-nums; }
+.fam-chip {
+  border: 1px solid var(--accent); background: none; color: var(--accent);
+  border-radius: var(--radius-pill); padding: 2px 11px; font-size: 11.5px;
+  cursor: pointer; font-family: inherit; font-weight: 600;
+}
+.fam-chip:hover { background: var(--accent-soft); }
 .channel-tabs { display: flex; gap: 4px; background: var(--surface-2); border-radius: var(--radius-pill); padding: 3px; }
 .chan { border: 0; background: none; padding: 6px 16px; border-radius: var(--radius-pill); font-size: 13px; color: var(--ink-soft); cursor: pointer; font-weight: 600; }
 .chan.active { background: var(--accent); color: #fff; }

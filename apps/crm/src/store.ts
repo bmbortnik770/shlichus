@@ -27,6 +27,7 @@ interface CrmState {
   login: () => Promise<void>;
   updateApt: (bldg: string, idx: number, patch: Partial<Apartment>) => Promise<void>;
   updateGeneralTask: (taskIdx: number, done: boolean) => Promise<void>;
+  addGeneralTask: (text: string, date: string) => Promise<void>;
   updateSettings: (patch: Record<string, unknown>) => Promise<void>;
   /** הוספת משפחה; מחזירה את המפתח והאינדקס לפתיחת הכרטיס */
   addApt: (bldg: string) => Promise<{ bldg: string; idx: number } | null>;
@@ -227,6 +228,15 @@ export const useCrm = create<CrmState>((set, get) => {
     const entry = getBuilding(db ?? {}, bldg);
     if (!entry) return;
     entry.info = { ...entry.info, ...patch, updatedAt: Date.now() };
+    await persistAndPush();
+  },
+
+  addGeneralTask: async (text, date) => {
+    const db = get().db;
+    if (!db) return;
+    if (!db.meta) db.meta = { lastModified: 0 };
+    // אותו מבנה כמו add_general_task מהשטח
+    db.meta.generalTasks = [...((db.meta.generalTasks ?? []) as unknown[]), { text, date, done: false }];
     await persistAndPush();
   },
 
