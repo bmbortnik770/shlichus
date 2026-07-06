@@ -14,6 +14,7 @@ import { CirclesView } from './CirclesView';
 const MapView = lazy(() => import('./MapView').then((m) => ({ default: m.MapView })));
 import { BuildingModal } from './BuildingModal';
 import { CommandPalette } from './CommandPalette';
+import { DashboardView } from './DashboardView';
 
 function applyTheme(theme: string) {
   document.documentElement.dataset.theme = theme;
@@ -30,10 +31,11 @@ const MAIN_TABS = [
 ] as const;
 
 const ACTIVITY_SUBS = [
+  { key: 'dashboard', label: 'לוח בקרה' },
   { key: 'tasks', label: 'משימות' },
   { key: 'events', label: 'אירועים' },
-  { key: 'kanban', label: 'קנבן' },
-  { key: 'circles', label: 'מעגלי קשר' },
+  { key: 'kanban', label: 'פרויקטים' },
+  { key: 'circles', label: 'מעגלים' },
 ] as const;
 
 const SYNC_LABEL: Record<string, string> = {
@@ -120,7 +122,7 @@ function upcomingAlerts(db: Db): string[] {
 export function App() {
   const { db, status, load, sync, syncError, login, pullFromCloud } = useCrm();
   const [view, setView] = useState<string>('map');
-  const [activitySub, setActivitySub] = useState<string>('tasks');
+  const [activitySub, setActivitySub] = useState<string>('dashboard');
   const [tableQuery, setTableQuery] = useState('');
   const [openBldg, setOpenBldg] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -216,6 +218,7 @@ export function App() {
                 />
               )}
               {view === 'table' && <FamiliesTable db={db} initialQuery={tableQuery} />}
+              {view === 'activity' && activitySub === 'dashboard' && <DashboardView db={db} onOpenFamily={openTableWith} />}
               {view === 'activity' && activitySub === 'tasks' && <TasksView db={db} />}
               {view === 'activity' && activitySub === 'events' && <EventsView db={db} />}
               {view === 'activity' && activitySub === 'kanban' && <KanbanView db={db} />}

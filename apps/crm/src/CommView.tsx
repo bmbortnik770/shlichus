@@ -12,6 +12,7 @@ interface Recipient {
   style: string;
   tags: string[];
   sent: boolean;
+  lastContactDays: number | null;
 }
 
 /** טלפון ישראלי → פורמט wa.me (ללא 0 מוביל, עם 972) */
@@ -33,6 +34,15 @@ export function CommView({ db }: { db: Db }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sentKeys, setSentKeys] = useState<Set<string>>(new Set());
   const [channel, setChannel] = useState<'whatsapp' | 'email'>('whatsapp');
+  const [quickFilter, setQuickFilter] = useState('all');
+
+  // צ'יפים חכמים לקהל היעד — כמו בישן
+  const QUICK_FILTERS = [
+    { key: 'all', label: 'כולם' },
+    { key: 'no60', label: '60+ יום' },
+    { key: 'no30', label: '30+ יום' },
+    { key: 'tasks', label: 'יש משימות' },
+  ];
 
   const templates = ((db.__SETTINGS__?.templates ?? []) as { title?: string; text?: string }[]);
   const styles = (db.__SETTINGS__?.styles ?? []) as string[];
@@ -47,6 +57,10 @@ export function CommView({ db }: { db: Db }) {
         const email = a.fatherEmail || a.motherEmail || '';
         // וואטסאפ דורש טלפון; מייל דורש כתובת
         if (channel === 'whatsapp' ? !phone : !email) return;
+        const latest = (a.interactions ?? []).reduce((max, i) => {
+          const t = new Date(i.date ?? '').getTime();
+          return isNaN(t) ? max : Math.max(max, t);
+        }, 0);
         out.push({
           key: `${key}|${entry.apts.indexOf(a)}`,
           bldg: key,
@@ -57,7 +71,9 @@ export function CommView({ db }: { db: Db }) {
           style: a.style ?? '',
           tags: a.tags ?? [],
           sent: false,
-        });
+          lastContactDays: latest ? Math.floor((Date.now() - latest) / 86400000) : null,
+          hasTasks: (a.tasks ?? []).some((t) => !t.done),
+        } as Recipient & { hasTasks: boolean });
       });
     }
     return out.sort((a, b) => a.name.localeCompare(b.name, 'he'));
@@ -65,12 +81,16 @@ export function CommView({ db }: { db: Db }) {
 
   const filtered = useMemo(() => {
     const q = query.trim();
-    return recipients.filter(
-      (r) =>
+    return recipients.filter((r) => {
+      if (quickFilter === 'no60' && !(r.lastContactDays === null || r.lastContactDays > 60)) return false;
+      if (quickFilter === 'no30' && !(r.lastContactDays === null || r.lastContactDays > 30)) return false;
+      if (quickFilter === 'tasks' && !(r as Recipient & { hasTasks?: boolean }).hasTasks) return false;
+      return (
         (!styleFilter || r.style === styleFilter) &&
         (!q || [r.name, r.bldg, r.phone, ...r.tags].some((f) => f.includes(q)))
-    );
-  }, [recipients, query, styleFilter]);
+      );
+    });
+  }, [recipients, query, styleFilter, quickFilter]);
 
   const toggle = (key: string) =>
     setSelected((s) => {
@@ -176,6 +196,21 @@ export function CommView({ db }: { db: Db }) {
         </div>
 
         <div className="comm-recipients">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <strong style={{ fontSize: 14 }}><i className="fas fa-users" style={{ color: 'var(--accent)' }} /> קהל יעד</strong>
+            <span className="count">{chosen.length === 0 ? 'לא נבחרו' : `${chosen.length} נבחרו`}</span>
+          </div>
+          <div className="chip-row">
+            {QUICK_FILTERS.map((f) => (
+              <button
+                key={f.key}
+                className={`aud-chip ${quickFilter === f.key ? 'active' : ''}`}
+                onClick={() => setQuickFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           <div className="table-toolbar" style={{ margin: 0 }}>
             <input
               type="search"

@@ -33,6 +33,7 @@ interface CrmState {
   /** מחיקה רכה — tombstone; המחיקה שורדת סנכרון מכל מכשיר */
   deleteApt: (bldg: string, idx: number) => Promise<void>;
   updateBuildingInfo: (bldg: string, patch: Record<string, unknown>) => Promise<void>;
+  updateBoards: (boards: Db['__BOARDS__']) => Promise<void>;
   /** פיצול כרטיס — יוצר כרטיס נפרד לבן משפחה, עם קישור דו-כיווני כמו בישן */
   splitFamily: (bldg: string, idx: number, memberName: string) => Promise<{ bldg: string; idx: number } | null>;
   /** ייבוא משפחות; מחזיר {imported, skipped} — כפילות לפי כתובת+שם+דירה מדולגת */
@@ -212,6 +213,13 @@ export const useCrm = create<CrmState>((set, get) => {
     }
     if (imported > 0) await persistAndPush();
     return { imported, skipped };
+  },
+
+  updateBoards: async (boards) => {
+    const db = get().db;
+    if (!db) return;
+    db.__BOARDS__ = boards;
+    await persistAndPush();
   },
 
   updateBuildingInfo: async (bldg, patch) => {

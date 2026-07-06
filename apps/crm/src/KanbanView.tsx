@@ -11,9 +11,34 @@ interface Card {
 
 export function KanbanView({ db }: { db: Db }) {
   const updateApt = useCrm((s) => s.updateApt);
+  const updateBoards = useCrm((s) => s.updateBoards);
   const boards = (db.__BOARDS__ ?? []).filter((b) => !b.archived);
   const [boardId, setBoardId] = useState(boards[0]?.id ?? '');
   const board: Board | undefined = boards.find((b) => b.id === boardId) ?? boards[0];
+
+  const newBoard = async () => {
+    const name = window.prompt('שם הלוח החדש:');
+    if (!name?.trim()) return;
+    const b: Board = {
+      id: 'b_' + Date.now(), name: name.trim(),
+      columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'],
+      archived: false, updatedAt: Date.now(),
+    };
+    await updateBoards([...(db.__BOARDS__ ?? []), b]);
+    setBoardId(b.id);
+  };
+
+  const editColumns = async () => {
+    if (!board) return;
+    const cur = board.columns.join(', ');
+    const next = window.prompt('עמודות הלוח (מופרדות בפסיק):', cur);
+    if (!next?.trim()) return;
+    const columns = next.split(',').map((c) => c.trim()).filter(Boolean);
+    if (columns.length === 0) return;
+    await updateBoards(
+      (db.__BOARDS__ ?? []).map((b) => (b.id === board.id ? { ...b, columns, updatedAt: Date.now() } : b))
+    );
+  };
 
   const cards = useMemo(() => {
     if (!board) return [];
@@ -36,17 +61,27 @@ export function KanbanView({ db }: { db: Db }) {
     void updateApt(card.bldg, card.idx, { boards: { ...(apt.boards ?? {}), [board!.id]: stage } });
   };
 
-  if (!board) return <p className="placeholder">אין לוחות עדיין — אפשר ליצור במערכת הקיימת.</p>;
+  if (!board) {
+    return (
+      <section>
+        <div className="table-toolbar">
+          <h2 className="view-title"><i className="fas fa-columns" /> לוחות פרויקטים</h2>
+          <button className="edit-btn" onClick={() => void newBoard()}><i className="fas fa-plus" /> לוח חדש</button>
+        </div>
+        <p className="placeholder">אין לוחות עדיין — צור את הראשון.</p>
+      </section>
+    );
+  }
 
   return (
     <section>
       <div className="table-toolbar">
-        <h2 className="view-title">קנבן</h2>
-        {boards.length > 1 && (
-          <select className="board-select" value={board.id} onChange={(e) => setBoardId(e.target.value)}>
-            {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        )}
+        <h2 className="view-title"><i className="fas fa-columns" /> לוחות פרויקטים</h2>
+        <select className="board-select" value={board.id} onChange={(e) => setBoardId(e.target.value)}>
+          {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <button className="login-btn" onClick={() => void editColumns()}><i className="fas fa-cog" /> ערוך עמודות</button>
+        <button className="edit-btn" onClick={() => void newBoard()}><i className="fas fa-plus" /> לוח חדש</button>
         <span className="count">{cards.length} כרטיסים</span>
       </div>
       <div className="kanban">
