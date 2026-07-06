@@ -244,6 +244,53 @@ tbody tr.clickable { cursor: pointer; }
   padding: 10px 12px;
 }
 
+/* ── עריכה בכרטיס ── */
+.drawer-actions { display: flex; align-items: center; gap: 8px; }
+.edit-btn {
+  padding: 7px 16px;
+  border: 1px solid var(--accent);
+  background: none;
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.edit-btn:hover { background: var(--accent-soft); }
+.edit-form { display: flex; flex-direction: column; gap: 12px; }
+.edit-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-soft); }
+.edit-field input, .edit-field textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.edit-field input:focus, .edit-field textarea:focus { border-color: var(--accent); outline: none; }
+.edit-actions { display: flex; gap: 10px; margin-top: 6px; }
+.save-btn {
+  padding: 9px 26px;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.save-btn:disabled, .cancel-btn:disabled { opacity: .6; cursor: default; }
+.cancel-btn {
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink-soft);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  cursor: pointer;
+}
+
 /* ── מובייל ── */
 @media (max-width: 720px) {
   .shell { flex-direction: column; }

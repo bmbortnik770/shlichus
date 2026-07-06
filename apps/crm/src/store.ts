@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import {
+  type Apartment,
   type Db,
   DriveSync,
   buildingKeys,
@@ -22,6 +23,7 @@ interface CrmState {
   load: () => Promise<void>;
   pullFromCloud: () => Promise<void>;
   login: () => Promise<void>;
+  updateApt: (bldg: string, idx: number, patch: Partial<Apartment>) => Promise<void>;
 }
 
 const drive = new DriveSync({ tokenProvider: browserTokens });
@@ -64,6 +66,43 @@ export const useCrm = create<CrmState>((set, get) => ({
   login: async () => {
     const token = await interactiveLogin();
     if (token) await get().pullFromCloud();
+  },
+
+  updateApt: async (bldg, idx, patch) => {
+    const db = get().db;
+    if (!db) return;
+    const entry = getBuilding(db, bldg);
+    const apt = entry?.apts[idx];
+    if (!entry || !apt) return;
+
+    entry.apts[idx] = { ...apt, ...patch, updatedAt: Date.now() };
+    db.meta = { ...(db.meta ?? { lastModified: 0 }), lastModified: Date.now() };
+    const next = { ...db };
+    set({ db: next });
+    await saveLocal(next);
+
+    // דחיפה לענן — best effort; בלי חיבור נשאר מקומי (הישן ימזג בהמשך)
+    if (!hasValidSession()) {
+      set({ sync: 'auth-needed' });
+      return;
+    }
+    set({ sync: 'syncing', syncError: null });
+    try {
+      if (!drive.fileId) {
+        const pulled = await drive.pull();
+        if (!pulled) { set({ sync: 'offline' }); return; } // אין קובץ בענן — v2 לא יוצרת אחד
+      }
+      // pull-merge-push עם בדיקת revision: שום צד לא נדרס
+      const final = await drive.safeSave(get().db!);
+      set({ db: { ...final }, sync: 'synced' });
+      await saveLocal(final);
+    } catch (e) {
+      const authIssue = e instanceof Error && e.name === 'AuthRequiredError';
+      set({
+        sync: authIssue ? 'auth-needed' : 'error',
+        syncError: authIssue ? null : 'השינוי נשמר מקומית; הסנכרון לענן ייעשה בחיבור הבא',
+      });
+    }
   },
 }));
 

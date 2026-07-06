@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { type Apartment, type Db, buildingKeys, getBuilding, liveApts, NO_ADDRESS_KEY } from '@shlichus/core';
+import { type Db, buildingKeys, getBuilding, liveApts, NO_ADDRESS_KEY } from '@shlichus/core';
 import { FamilyCard } from './FamilyCard';
+import { useCrm } from './store';
 
 interface Row {
   bldg: string;
@@ -35,7 +36,10 @@ function toRows(db: Db): Row[] {
 export function FamiliesTable({ db }: { db: Db }) {
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'bldg' | 'style'>('name');
-  const [selected, setSelected] = useState<{ bldg: string; apt: Apartment } | null>(null);
+  const [selected, setSelected] = useState<{ bldg: string; idx: number } | null>(null);
+  const updateApt = useCrm((s) => s.updateApt);
+  // הדירה הנבחרת נגזרת מה-db בכל רנדר — נשארת עדכנית אחרי שמירה
+  const selectedApt = selected ? getBuilding(db, selected.bldg)?.apts[selected.idx] : undefined;
 
   const rows = useMemo(() => toRows(db), [db]);
   const filtered = useMemo(() => {
@@ -75,10 +79,7 @@ export function FamiliesTable({ db }: { db: Db }) {
               <tr
                 key={`${r.bldg}|${r.idx}`}
                 className="clickable"
-                onClick={() => {
-                  const apt = getBuilding(db, r.bldg)?.apts[r.idx];
-                  if (apt) setSelected({ bldg: r.bldg, apt });
-                }}
+                onClick={() => setSelected({ bldg: r.bldg, idx: r.idx })}
               >
                 <td>{r.name || '—'}</td>
                 <td>{r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : `${r.bldg} ${r.num}`.trim()}</td>
@@ -90,7 +91,14 @@ export function FamiliesTable({ db }: { db: Db }) {
           </tbody>
         </table>
       </div>
-      {selected && <FamilyCard bldg={selected.bldg} apt={selected.apt} onClose={() => setSelected(null)} />}
+      {selected && selectedApt && (
+        <FamilyCard
+          bldg={selected.bldg}
+          apt={selectedApt}
+          onClose={() => setSelected(null)}
+          onSave={(patch) => updateApt(selected.bldg, selected.idx, patch)}
+        />
+      )}
     </section>
   );
 }
