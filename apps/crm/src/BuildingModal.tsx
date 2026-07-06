@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { type Apartment, type BuildingInfo, type Db, getBuilding, liveApts } from '@shlichus/core';
+import { type Apartment, type BuildingInfo, type Db, getBuilding, getCategories, liveApts } from '@shlichus/core';
 import { FamilyCard } from './FamilyCard';
 import { useCrm } from './store';
 
@@ -25,7 +25,9 @@ export function BuildingModal({ db, bldg, onClose }: Props) {
     code: String(info.code ?? ''),
     rep: String(info.rep ?? ''),
     notes: String(info.notes ?? ''),
+    category: String(info.categoryId ?? info.category ?? 'residential'),
   });
+  const categories = getCategories(db);
 
   const selectedApt: Apartment | undefined =
     selectedIdx !== null ? entry?.apts[selectedIdx] : undefined;
@@ -101,6 +103,18 @@ export function BuildingModal({ db, bldg, onClose }: Props) {
 
         {tab === 'info' && (
           <section className="edit-form">
+            <label className="edit-field">
+              <span>קטגוריה</span>
+              <select
+                className="board-select"
+                value={infoForm.category}
+                onChange={(e) => setInfoForm({ ...infoForm, category: e.target.value })}
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.emoji ?? ''} {c.name}</option>
+                ))}
+              </select>
+            </label>
             <label className="edit-field">
               <span>קוד כניסה</span>
               <input value={infoForm.code} onChange={(e) => setInfoForm({ ...infoForm, code: e.target.value })} />
