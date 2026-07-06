@@ -491,6 +491,14 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
   cursor: pointer; font-family: inherit;
 }
 .aud-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.call-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; width: 100%; }
+.log-btns { display: flex; gap: 5px; }
+.log-btns button {
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: var(--radius-pill); padding: 3px 11px;
+  font-size: 11.5px; cursor: pointer; font-family: inherit; color: var(--ink-soft);
+}
+.log-btns button:hover { border-color: var(--accent); color: var(--accent); }
 .channel-tabs { display: flex; gap: 4px; background: var(--surface-2); border-radius: var(--radius-pill); padding: 3px; }
 .chan { border: 0; background: none; padding: 6px 16px; border-radius: var(--radius-pill); font-size: 13px; color: var(--ink-soft); cursor: pointer; font-weight: 600; }
 .chan.active { background: var(--accent); color: #fff; }
