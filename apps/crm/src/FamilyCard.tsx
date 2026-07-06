@@ -145,7 +145,7 @@ export function FamilyCard({ bldg, apt, onClose, onSave }: Props) {
                 <h3>אינטראקציות אחרונות</h3>
                 <ul>
                   {logs.map((l, i) => (
-                    <li key={i}><strong>{l.date ?? ''}</strong> {l.type ? `· ${l.type}` : ''} — {String(l.text ?? '')}</li>
+                    <li key={i}><strong>{l.date ?? ''}</strong> {l.type ? `· ${l.type}` : ''} — {String(l.text ?? l.notes ?? '')}</li>
                   ))}
                 </ul>
               </section>

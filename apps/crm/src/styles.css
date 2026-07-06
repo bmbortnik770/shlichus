@@ -407,6 +407,41 @@ tbody tr.clickable { cursor: pointer; }
 }
 .kanban-card-name { font-size: 14px; font-weight: 600; }
 
+/* ── מרכז תקשורת ── */
+.comm-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+@media (max-width: 900px) { .comm-layout { grid-template-columns: 1fr; } }
+.comm-compose, .comm-recipients {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; gap: 12px;
+  min-width: 0;
+}
+.comm-preview {
+  font-size: 13px; color: var(--ink-soft);
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+}
+.send-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.send-row {
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 8px 12px; font-size: 14px;
+}
+.save-btn.wa { background: #1faa53; padding: 7px 14px; font-size: 13px; }
+.sent-badge { color: var(--success); font-size: 13px; font-weight: 600; }
+.recipient-list { list-style: none; padding: 0; margin: 0; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.recipient label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; }
+.recipient label:hover { background: var(--surface-2); }
+.recipient.active label { background: var(--accent-soft); }
+.recipient input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+.recipient-name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recipient-meta { font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.recipient-style { font-size: 11px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--ink-soft); white-space: nowrap; }
+
 /* ── מובייל ── */
 @media (max-width: 720px) {
   .shell { flex-direction: column; }

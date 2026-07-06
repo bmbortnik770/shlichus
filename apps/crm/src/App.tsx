@@ -6,6 +6,7 @@ import { TasksView } from './TasksView';
 import { DonationsView } from './DonationsView';
 import { EventsView } from './EventsView';
 import { KanbanView } from './KanbanView';
+import { CommView } from './CommView';
 
 // המפה נטענת עצלה — mapbox-gl כבד ולא נחוץ בשאר המסכים
 const MapView = lazy(() => import('./MapView').then((m) => ({ default: m.MapView })));
@@ -106,9 +107,7 @@ export function App() {
             {view === 'events' && <EventsView db={db} />}
             {view === 'kanban' && <KanbanView db={db} />}
             {view === 'donations' && <DonationsView db={db} />}
-            {view === 'comm' && (
-              <p className="placeholder">מרכז התקשורת יעבור בשלב הבא של ההגירה — בינתיים במערכת הקיימת.</p>
-            )}
+            {view === 'comm' && <CommView db={db} />}
           </>
         )}
       </main>
