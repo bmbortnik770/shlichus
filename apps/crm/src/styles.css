@@ -554,6 +554,16 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
   cursor: pointer; font-family: inherit; font-weight: 600;
 }
 .fam-chip:hover { background: var(--accent-soft); }
+.status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-inline-end: 8px; vertical-align: middle; }
+.cols-menu {
+  position: absolute; top: calc(100% + 6px); inset-inline-end: 0; z-index: 30;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 6px;
+  min-width: 180px; max-height: 320px; overflow-y: auto;
+}
+.cols-menu label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.cols-menu input { accent-color: var(--accent); }
 .score-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
 .score-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;

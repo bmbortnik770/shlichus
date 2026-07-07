@@ -234,7 +234,7 @@ export function App() {
                   onClose={() => setPaletteOpen(false)}
                 />
               )}
-              {view === 'table' && <FamiliesTable db={db} initialQuery={tableQuery} />}
+              {view === 'table' && <FamiliesTable db={db} initialQuery={tableQuery} onOpenBuilding={setOpenBldg} />}
               {view === 'activity' && activitySub === 'dashboard' && <DashboardView db={db} onOpenFamily={openTableWith} />}
               {view === 'activity' && activitySub === 'tasks' && <TasksView db={db} onOpenFamily={openTableWith} />}
               {view === 'activity' && activitySub === 'events' && <EventsView db={db} />}

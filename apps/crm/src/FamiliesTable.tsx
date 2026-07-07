@@ -1,83 +1,142 @@
 import { useMemo, useState } from 'react';
-import { type Db, buildingKeys, getBuilding, liveApts, NO_ADDRESS_KEY } from '@shlichus/core';
+import {
+  type Apartment, type Db,
+  NO_ADDRESS_KEY, buildingKeys, getBuilding, getStatusColor, liveApts,
+} from '@shlichus/core';
 import { FamilyCard } from './FamilyCard';
 import { useCrm } from './store';
 
 interface Row {
   bldg: string;
   idx: number;
-  name: string;
-  num: string;
-  phone: string;
-  style: string;
-  tags: string[];
-  lastContactDays: number | null;
+  apt: Apartment;
 }
 
-/** ימים מאז האינטראקציה האחרונה — זהה ללוגיקת scoring.js בישן */
-function lastContactDays(interactions: { date?: string }[] | undefined): number | null {
-  if (!interactions?.length) return null;
-  const latest = interactions.reduce((max, i) => {
-    const t = new Date(i.date ?? '').getTime();
-    return isNaN(t) ? max : Math.max(max, t);
-  }, 0);
-  return latest ? Math.floor((Date.now() - latest) / 86400000) : null;
+/* עמודות זהות ל-allTableCols בישן */
+const BASE_COLS = [
+  { id: 'address', label: 'כתובת', sortable: true },
+  { id: 'name', label: 'משפחה', sortable: true },
+  { id: 'father', label: 'שם האב', sortable: true },
+  { id: 'mother', label: 'שם האם', sortable: true },
+  { id: 'phone', label: 'טלפונים', sortable: false },
+  { id: 'email', label: 'מיילים', sortable: false },
+  { id: 'style', label: 'סגנון', sortable: true },
+  { id: 'boards', label: 'פרויקטים', sortable: false },
+  { id: 'tags', label: 'תגיות', sortable: false },
+  { id: 'children', label: 'כמות ילדים', sortable: false },
+  { id: 'notes', label: 'הערות פנימיות', sortable: false },
+  { id: 'lastContact', label: 'קשר אחרון', sortable: true },
+] as const;
+
+// ברירת המחדל של הישן
+const DEFAULT_VISIBLE = ['address', 'name', 'boards', 'tags', 'lastContact', 'actions'];
+
+function lastContactDate(a: Apartment): string {
+  const logs = a.interactions ?? [];
+  if (!logs.length) return '';
+  return [...logs].sort((x, y) => new Date(String(y.date)).getTime() - new Date(String(x.date)).getTime())[0]?.date?.toString() ?? '';
 }
 
-function toRows(db: Db): Row[] {
-  const rows: Row[] = [];
-  for (const key of buildingKeys(db)) {
-    const entry = getBuilding(db, key);
-    if (!entry) continue;
-    liveApts(entry.apts).forEach((a) => {
-      rows.push({
-        bldg: key,
-        idx: entry.apts.indexOf(a),
-        name: a.name ?? '',
-        num: a.num ?? '',
-        phone: a.fatherPhone || a.motherPhone || '',
-        style: a.style ?? '',
-        tags: a.tags ?? [],
-        lastContactDays: lastContactDays(a.interactions),
-      });
-    });
-  }
-  return rows;
-}
+function cleanPhone(p: string) { return p.replace(/\D/g, ''); }
 
-export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?: string }) {
+export function FamiliesTable({
+  db, initialQuery = '', onOpenBuilding,
+}: { db: Db; initialQuery?: string; onOpenBuilding?: (key: string) => void }) {
   const [query, setQuery] = useState(initialQuery);
-  const [sortBy, setSortBy] = useState<'name' | 'bldg' | 'style'>('name');
+  const [sort, setSort] = useState<{ column: string; direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
   const [styleFilter, setStyleFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [smartView, setSmartView] = useState('v_all');
-  const allStyles = (db.__SETTINGS__?.styles ?? []) as string[];
-  const allTags = (db.__SETTINGS__?.tags ?? []) as string[];
-  const smartViews = ((db.__SETTINGS__?.smartViews ?? []) as { id: string; name: string; rule: string }[]);
+  const [colsMenu, setColsMenu] = useState(false);
+  const [selected, setSelected] = useState<{ bldg: string; idx: number } | null>(null);
+  const [bulk, setBulk] = useState<Set<string>>(new Set());
 
-  // כללי התצוגות החכמות של המערכת הקיימת
+  const updateApt = useCrm((s) => s.updateApt);
+  const deleteApt = useCrm((s) => s.deleteApt);
+  const addApt = useCrm((s) => s.addApt);
+  const splitFamily = useCrm((s) => s.splitFamily);
+  const updateSettings = useCrm((s) => s.updateSettings);
+
+  const settings = db.__SETTINGS__ ?? {};
+  const allStyles = (settings.styles ?? []) as string[];
+  const allTags = (settings.tags ?? []) as string[];
+  const customFields = (settings.customFields ?? []) as string[];
+  const smartViews = ((settings.smartViews ?? []) as { id: string; name: string; rule: string }[]);
+  const boardsById = new Map(((db.__BOARDS__ ?? []) as { id: string; name: string }[]).map((b) => [b.id, b.name]));
+  const density = String(settings.tableDensity ?? 'normal');
+
+  const allCols = useMemo(() => ([
+    ...BASE_COLS,
+    ...customFields.map((f) => ({ id: `custom_${f}`, label: f, sortable: true })),
+    { id: 'actions', label: 'פעולות מהירות', sortable: false },
+  ]), [customFields]);
+
+  const visible = ((settings.visibleColumns ?? DEFAULT_VISIBLE) as string[]);
+  const shownCols = allCols.filter((c) => visible.includes(c.id));
+
+  const rows = useMemo(() => {
+    const out: Row[] = [];
+    for (const key of buildingKeys(db)) {
+      const entry = getBuilding(db, key);
+      if (!entry) continue;
+      liveApts(entry.apts).forEach((a) => out.push({ bldg: key, idx: entry.apts.indexOf(a), apt: a }));
+    }
+    return out;
+  }, [db]);
+
   const smartRule = (r: Row): boolean => {
     const rule = smartViews.find((v) => v.id === smartView)?.rule ?? 'none';
-    if (rule === 'no_visit_3m') return r.lastContactDays === null || r.lastContactDays > 90;
+    if (rule === 'no_visit_3m') {
+      const d = lastContactDate(r.apt);
+      return !d || Date.now() - new Date(d).getTime() > 90 * 86400000;
+    }
     if (rule === 'bday_month') {
-      const apt = getBuilding(db, r.bldg)?.apts[r.idx];
       const month = new Date().getMonth();
-      return ((apt?.milestones ?? []) as { type?: string; gregDate?: string }[]).some(
+      return ((r.apt.milestones ?? []) as { type?: string; gregDate?: string }[]).some(
         (m) => String(m.type ?? '').includes('birthday') && new Date(m.gregDate ?? '').getMonth() === month
       );
     }
     return true;
   };
-  const [selected, setSelected] = useState<{ bldg: string; idx: number } | null>(null);
-  const [bulk, setBulk] = useState<Set<string>>(new Set());
-  const updateApt = useCrm((s) => s.updateApt);
-  const deleteApt = useCrm((s) => s.deleteApt);
-  const addApt = useCrm((s) => s.addApt);
-  const splitFamily = useCrm((s) => s.splitFamily);
-  // הדירה הנבחרת נגזרת מה-db בכל רנדר — נשארת עדכנית אחרי שמירה
-  const selectedApt = selected ? getBuilding(db, selected.bldg)?.apts[selected.idx] : undefined;
 
-  const rowKey = (r: { bldg: string; idx: number }) => `${r.bldg}|${r.idx}`;
+  const filtered = useMemo(() => {
+    const q = query.trim();
+    const matched = rows.filter((r) => {
+      const a = r.apt;
+      return (
+        smartRule(r) &&
+        (!styleFilter || a.style === styleFilter) &&
+        (!tagFilter || (a.tags ?? []).includes(tagFilter)) &&
+        (!q || [a.name, r.bldg, a.fatherPhone, a.motherPhone, a.father, a.mother, a.style, ...(a.tags ?? [])]
+          .some((f) => String(f ?? '').includes(q)))
+      );
+    });
+    // מיון כמו tableSort בישן
+    const { column, direction } = sort;
+    const val = (r: Row): string => {
+      const a = r.apt;
+      if (column === 'name') return a.name ?? '';
+      if (column === 'address') return r.bldg === NO_ADDRESS_KEY ? '' : r.bldg;
+      if (column === 'father') return a.father ?? '';
+      if (column === 'mother') return a.mother ?? '';
+      if (column === 'style') return a.style ?? '';
+      if (column === 'lastContact') return lastContactDate(a);
+      if (column.startsWith('custom_')) return String((a.customFields as Record<string, unknown>)?.[column.slice(7)] ?? '');
+      return '';
+    };
+    return [...matched].sort((x, y) => {
+      const a = val(x), b = val(y);
+      if (a < b) return direction === 'asc' ? -1 : 1;
+      if (a > b) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, query, sort, styleFilter, tagFilter, smartView, db]);
+
+  const sortBy = (col: string) =>
+    setSort((s) => ({ column: col, direction: s.column === col && s.direction === 'asc' ? 'desc' : 'asc' }));
+
+  const rowKey = (r: Row) => `${r.bldg}|${r.idx}`;
   const toggleBulk = (k: string) =>
     setBulk((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
 
@@ -86,11 +145,10 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
     if (created) setSelected(created);
   };
 
-  const exportCsv = (rows: Row[]) => {
-    const head = ['משפחה', 'כתובת', 'דירה', 'טלפון', 'סגנון', 'תגיות'];
-    const lines = rows.map((r) =>
-      [r.name, r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : r.bldg, r.num, r.phone, r.style, r.tags.join('|')]
-        .map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')
+  const exportCsv = () => {
+    const head = shownCols.filter((c) => c.id !== 'actions').map((c) => c.label);
+    const lines = filtered.map((r) =>
+      shownCols.filter((c) => c.id !== 'actions').map((c) => `"${cellText(r, c.id).replace(/"/g, '""')}"`).join(',')
     );
     const blob = new Blob(['﻿' + [head.join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
@@ -100,15 +158,32 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
     URL.revokeObjectURL(a.href);
   };
 
-  const bulkDelete = async () => {
-    if (!window.confirm(`למחוק ${bulk.size} משפחות? (המחיקה מסתנכרנת לכל המכשירים)`)) return;
-    for (const k of bulk) {
-      const [b, i] = k.split('|');
-      await deleteApt(b!, Number(i));
+  const cellText = (r: Row, colId: string): string => {
+    const a = r.apt;
+    switch (colId) {
+      case 'address': return r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : `${r.bldg} ${a.num ?? ''}`.trim();
+      case 'name': return a.name ?? '';
+      case 'father': return a.father ?? '';
+      case 'mother': return a.mother ?? '';
+      case 'phone': return [a.fatherPhone, a.motherPhone].filter(Boolean).join(' · ');
+      case 'email': return [a.fatherEmail, a.motherEmail].filter(Boolean).join(' · ');
+      case 'style': return a.style ?? '';
+      case 'boards': return Object.keys(a.boards ?? {}).map((id) => boardsById.get(id) ?? '').filter(Boolean).join(' · ');
+      case 'tags': return (a.tags ?? []).join(' · ');
+      case 'children': return String((a.childrenList ?? []).length || '');
+      case 'notes': return (a.notes ?? '').slice(0, 40);
+      case 'lastContact': return lastContactDate(a);
+      default:
+        if (colId.startsWith('custom_')) return String((a.customFields as Record<string, unknown>)?.[colId.slice(7)] ?? '');
+        return '';
     }
-    setBulk(new Set());
   };
 
+  const bulkDelete = async () => {
+    if (!window.confirm(`למחוק ${bulk.size} משפחות? (המחיקה מסתנכרנת לכל המכשירים)`)) return;
+    for (const k of bulk) { const [b, i] = k.split('|'); await deleteApt(b!, Number(i)); }
+    setBulk(new Set());
+  };
   const bulkAddTag = async () => {
     const tag = window.prompt('איזו תגית להוסיף לנבחרות?');
     if (!tag?.trim()) return;
@@ -122,19 +197,8 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
     setBulk(new Set());
   };
 
-  const rows = useMemo(() => toRows(db), [db]);
-  const filtered = useMemo(() => {
-    const q = query.trim();
-    const matched = rows.filter(
-      (r) =>
-        smartRule(r) &&
-        (!styleFilter || r.style === styleFilter) &&
-        (!tagFilter || r.tags.includes(tagFilter)) &&
-        (!q || [r.name, r.bldg, r.phone, r.style, ...r.tags].some((f) => f.includes(q)))
-    );
-    return [...matched].sort((a, b) => (a[sortBy] || '').localeCompare(b[sortBy] || '', 'he'));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, query, sortBy, styleFilter, tagFilter, smartView, db]);
+  const selectedApt = selected ? getBuilding(db, selected.bldg)?.apts[selected.idx] : undefined;
+  const padY = density === 'compact' ? 7 : density === 'spacious' ? 18 : 13;
 
   return (
     <section>
@@ -144,18 +208,56 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
         <button className="edit-btn" onClick={() => void quickAdd()}>
           <i className="fas fa-plus" /> משפחה חדשה
         </button>
-        <button className="login-btn" onClick={() => exportCsv(filtered)}>
-          <i className="fas fa-file-export" /> ייצוא
+        {/* צפיפות — כמו setDensity בישן */}
+        <span className="channel-tabs" title="צפיפות תצוגה">
+          {(['compact', 'normal', 'spacious'] as const).map((d) => (
+            <button
+              key={d}
+              className={density === d ? 'chan active' : 'chan'}
+              title={d === 'compact' ? 'צפוף' : d === 'normal' ? 'רגיל' : 'מרווח'}
+              onClick={() => void updateSettings({ tableDensity: d })}
+            >
+              <i className={`fas ${d === 'compact' ? 'fa-grip-lines' : d === 'normal' ? 'fa-align-justify' : 'fa-expand-arrows-alt'}`} />
+            </button>
+          ))}
+        </span>
+        <span style={{ position: 'relative' }}>
+          <button className="login-btn" onClick={() => setColsMenu((v) => !v)}>
+            <i className="fas fa-table-columns" /> הגדרות טבלה
+          </button>
+          {colsMenu && (
+            <div className="cols-menu">
+              {allCols.map((c) => (
+                <label key={c.id}>
+                  <input
+                    type="checkbox"
+                    checked={visible.includes(c.id)}
+                    onChange={() =>
+                      void updateSettings({
+                        visibleColumns: visible.includes(c.id) ? visible.filter((x) => x !== c.id) : [...visible, c.id],
+                      })
+                    }
+                  />
+                  {c.label}
+                </label>
+              ))}
+            </div>
+          )}
+        </span>
+        <button className="login-btn" onClick={exportCsv}>
+          <i className="fas fa-file-excel" /> ייצוא
         </button>
       </div>
+
       {bulk.size > 0 && (
         <div className="bulk-bar">
-          <span>{bulk.size} נבחרו</span>
+          <span>{bulk.size} סומנו</span>
           <button onClick={() => void bulkAddTag()}><i className="fas fa-tag" /> תגית</button>
           <button className="danger" onClick={() => void bulkDelete()}><i className="fas fa-trash" /> מחיקה</button>
           <button onClick={() => setBulk(new Set())}>נקה בחירה</button>
         </div>
       )}
+
       <div className="filter-row">
         <input
           type="search"
@@ -187,67 +289,70 @@ export function FamiliesTable({ db, initialQuery = '' }: { db: Db; initialQuery?
           </select>
         </label>
       </div>
+
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
               <th style={{ width: 34 }}></th>
-              <th onClick={() => setSortBy('name')}>משפחה</th>
-              <th onClick={() => setSortBy('bldg')}>כתובת</th>
-              <th>טלפון</th>
-              <th onClick={() => setSortBy('style')}>סגנון</th>
-              <th>קשר אחרון</th>
-              <th>תגיות</th>
-              <th>פעולות</th>
+              {shownCols.map((c) => (
+                <th key={c.id} onClick={c.sortable ? () => sortBy(c.id === 'lastContact' ? 'lastContact' : c.id) : undefined}
+                    style={{ cursor: c.sortable ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>
+                  {c.label}
+                  {sort.column === c.id && <i className={`fas fa-caret-${sort.direction === 'asc' ? 'up' : 'down'}`} style={{ marginInlineStart: 4 }} />}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => (
-              <tr
-                key={`${r.bldg}|${r.idx}`}
-                className="clickable"
-                onClick={() => setSelected({ bldg: r.bldg, idx: r.idx })}
-              >
-                <td onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    className="bulk-check"
-                    checked={bulk.has(rowKey(r))}
-                    onChange={() => toggleBulk(rowKey(r))}
-                  />
-                </td>
-                <td className="fam-name">{r.name || '—'}</td>
-                <td>
-                  <span className="addr-link">
-                    <i className="fas fa-map-marker-alt" />
-                    {r.bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : `${r.bldg} ${r.num}`.trim()}
-                  </span>
-                </td>
-                <td dir="ltr">{r.phone}</td>
-                <td>{r.style}</td>
-                <td>
-                  {r.lastContactDays === null ? (
-                    <span className="contact-badge none">אין תיעוד</span>
-                  ) : (
-                    <span className={`contact-badge ${r.lastContactDays > 60 ? 'stale' : r.lastContactDays > 21 ? 'aging' : 'fresh'}`}>
-                      {r.lastContactDays === 0 ? 'היום' : `לפני ${r.lastContactDays} ימים`}
-                    </span>
-                  )}
-                </td>
-                <td>{r.tags.map((t) => <span className="tag-chip" key={t}>{t}</span>)}</td>
-                <td onClick={(e) => e.stopPropagation()}>
-                  {r.phone && (
-                    <span className="row-actions">
-                      <a href={`tel:${r.phone}`} title="חיוג"><i className="fas fa-phone" /></a>
-                      <a href={`https://wa.me/972${r.phone.replace(/\D/g, '').replace(/^0/, '')}`} target="_blank" rel="noreferrer" title="וואטסאפ"><i className="fab fa-whatsapp" /></a>
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {filtered.map((r) => {
+              const a = r.apt;
+              const phone = a.fatherPhone || a.motherPhone || '';
+              const email = a.fatherEmail || a.motherEmail || '';
+              return (
+                <tr key={rowKey(r)} className="clickable" onClick={() => setSelected({ bldg: r.bldg, idx: r.idx })}>
+                  <td onClick={(e) => e.stopPropagation()} style={{ paddingTop: padY, paddingBottom: padY }}>
+                    <input type="checkbox" className="bulk-check" checked={bulk.has(rowKey(r))} onChange={() => toggleBulk(rowKey(r))} />
+                  </td>
+                  {shownCols.map((c) => (
+                    <td key={c.id} style={{ paddingTop: padY, paddingBottom: padY }}>
+                      {c.id === 'address' ? (
+                        <span
+                          className="addr-link"
+                          onClick={(e) => {
+                            if (r.bldg !== NO_ADDRESS_KEY && onOpenBuilding) { e.stopPropagation(); onOpenBuilding(r.bldg); }
+                          }}
+                        >
+                          <i className="fas fa-map-marker-alt" /> {cellText(r, 'address')}
+                        </span>
+                      ) : c.id === 'name' ? (
+                        <span className="fam-name">{a.name || '—'}</span>
+                      ) : c.id === 'tags' ? (
+                        (a.tags ?? []).map((t) => <span className="tag-chip" key={t}>{t}</span>)
+                      ) : c.id === 'lastContact' ? (
+                        <span style={{ whiteSpace: 'nowrap' }}>
+                          <span className="status-dot" style={{ background: getStatusColor(a, settings) }} />
+                          {lastContactDate(a) || '—'}
+                        </span>
+                      ) : c.id === 'actions' ? (
+                        <span className="row-actions" onClick={(e) => e.stopPropagation()}>
+                          {phone && <a href={`tel:${cleanPhone(phone)}`} title="חייג"><i className="fas fa-phone" /></a>}
+                          {phone && <a href={`https://wa.me/972${cleanPhone(phone).replace(/^0/, '')}`} target="_blank" rel="noreferrer" title="וואטסאפ" style={{ color: '#25D366' }}><i className="fab fa-whatsapp" /></a>}
+                          {phone && <a href={`sms:${cleanPhone(phone)}`} title="SMS" style={{ color: '#0ea5e9' }}><i className="fas fa-sms" /></a>}
+                          {email && <a href={`mailto:${email}`} title="שלח מייל" style={{ color: '#ea4335' }}><i className="fas fa-envelope" /></a>}
+                        </span>
+                      ) : (
+                        cellText(r, c.id)
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+
       {selected && selectedApt && (
         <FamilyCard
           bldg={selected.bldg}
