@@ -616,3 +616,27 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
   .top-nav .nav-item span { display: none; }
   .top-search { display: none; }
 }
+
+/* הגדרות — סקשנים מתקפלים כמו המודל הישן */
+.settings-col { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
+.settings-sec {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.settings-sec summary {
+  list-style: none; cursor: pointer; font-weight: 700; font-size: 14px;
+  padding: 15px 18px; display: flex; align-items: center; gap: 10px;
+}
+.settings-sec summary i { color: var(--accent); }
+.settings-sec summary::-webkit-details-marker { display: none; }
+.settings-sec .sec-body { padding: 0 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+.settings-sec .sec-body .settings-card { border: 0; box-shadow: none; padding: 0; }
+
+/* עורך תיחום */
+.tm-modal {
+  width: min(980px, 96vw); height: min(720px, 92vh);
+  background: var(--surface); border-radius: 16px;
+  display: flex; flex-direction: column; box-shadow: var(--shadow-md); overflow: hidden;
+}
+.tm-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 18px 10px; }
+.tm-map { flex: 1; min-height: 320px; }

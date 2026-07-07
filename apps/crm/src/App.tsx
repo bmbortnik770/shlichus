@@ -242,7 +242,7 @@ export function App() {
               {view === 'activity' && activitySub === 'circles' && <CirclesView db={db} />}
               {view === 'comm' && <CommView db={db} />}
               {view === 'donations' && <DonationsView db={db} onOpenFamily={openTableWith} />}
-              {view === 'settings' && <SettingsView db={db} onGoMap={() => setView('map')} />}
+              {view === 'settings' && <SettingsView db={db} />}
             </>
           )}
         </div>

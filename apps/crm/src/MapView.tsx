@@ -68,14 +68,10 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
-  const drawPointsRef = useRef<[number, number][]>([]);
   const [failed, setFailed] = useState(false);
   const [satellite, setSatellite] = useState(false);
   const [colorMode, setColorMode] = useState<ColorMode>('status');
-  const [drawing, setDrawing] = useState(false);
-  const [drawCount, setDrawCount] = useState(0);
   const [markerCount, setMarkerCount] = useState(0);
-  const updateSettings = useCrm((s) => s.updateSettings);
   const ensureBuilding = useCrm((s) => s.ensureBuilding);
   const dbRef = useRef(db);
   dbRef.current = db;
@@ -223,7 +219,6 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
       });
 
       map.on('click', '3d-buildings', (e) => {
-        if (drawPointsRef.current.length || (map.getCanvas().style.cursor === 'crosshair')) return; // במצב ציור — לא
         hoverPopup.remove();
         const clickPt: [number, number] = [e.lngLat.lng, e.lngLat.lat];
         const cur = dbRef.current;
@@ -278,22 +273,6 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, colorMode]);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !drawing) return;
-    const onClick = (e: mapboxgl.MapMouseEvent) => {
-      drawPointsRef.current.push([e.lngLat.lng, e.lngLat.lat]);
-      setDrawCount(drawPointsRef.current.length);
-      renderTerritory(map, drawPointsRef.current.length >= 3 ? drawPointsRef.current : undefined);
-    };
-    map.on('click', onClick);
-    map.getCanvas().style.cursor = 'crosshair';
-    return () => {
-      map.off('click', onClick);
-      map.getCanvas().style.cursor = '';
-    };
-  }, [drawing]);
-
   const flyToHome = () => {
     // זהה ל-flyToHome בישן
     if (home.coords && mapRef.current) {
@@ -303,31 +282,11 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
     }
   };
 
-  const startDraw = () => { drawPointsRef.current = []; setDrawCount(0); setDrawing(true); };
-  const saveDraw = async () => {
-    const pts = drawPointsRef.current;
-    if (pts.length < 3) { window.alert('צריך לפחות 3 נקודות לתיחום'); return; }
-    const ring: [number, number][] = [...pts, pts[0]!];
-    await updateSettings({ territory: { ...territory, polygon: ring, displayMode: territory.displayMode ?? 'border' } });
-    setDrawing(false);
-    if (mapRef.current) renderTerritory(mapRef.current, ring);
-  };
-  const cancelDraw = () => {
-    setDrawing(false);
-    drawPointsRef.current = [];
-    if (mapRef.current) renderTerritory(mapRef.current, territory.polygon);
-  };
-  const clearTerritory = async () => {
-    if (!window.confirm('להסיר את תיחום הטריטוריה?')) return;
-    await updateSettings({ territory: { ...territory, polygon: undefined } });
-    if (mapRef.current) renderTerritory(mapRef.current, undefined);
-  };
   const toggleSatellite = () => {
     const map = mapRef.current;
     if (!map) return;
     const next = !satellite;
     map.setStyle(next ? 'mapbox://styles/mapbox/satellite-streets-v12' : 'mapbox://styles/mapbox/streets-v12');
-    map.once('idle', () => renderTerritory(map, drawing ? drawPointsRef.current : territory.polygon));
     setSatellite(next);
   };
 
@@ -353,24 +312,6 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
             <option value="territory">בתיחום / מחוץ</option>
           </select>
         </label>
-        {!drawing ? (
-          <>
-            <button className="map-ctl-btn" onClick={startDraw} title="ציור תיחום טריטוריה">
-              <i className="fas fa-draw-polygon" /> תיחום
-            </button>
-            {territory.polygon && (
-              <button className="map-ctl-btn" onClick={() => void clearTerritory()} title="הסרת תיחום">
-                <i className="fas fa-eraser" />
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            <span className="map-draw-hint">{drawCount} נקודות — לחץ על המפה להוספה</span>
-            <button className="map-ctl-btn primary" onClick={() => void saveDraw()}>שמירת תיחום</button>
-            <button className="map-ctl-btn" onClick={cancelDraw}>ביטול</button>
-          </>
-        )}
       </div>
       {home.coords && (
         <button className="map-home-btn" onClick={flyToHome} title="חזרה לבית חב״ד" id="btnGoHome">

@@ -3,6 +3,7 @@ import type { Db } from '@shlichus/core';
 import { DEFAULT_SCORING_RULES, type ScoringRules, mergeDb, saveLocal } from '@shlichus/core';
 import { useCrm } from './store';
 import { ImportCsv } from './ImportCsv';
+import { TerritoryEditor } from './TerritoryEditor';
 
 /* מבנה זהה למודל ההגדרות הישן: מיקום מרכזי → אזור השליחות → מראה ותצוגה →
    תגיות/סגנונות/שדות → גיבוי → ניקוד מעורבות → קמפיינים → ניקוד וסימון אוטומטי */
@@ -73,7 +74,8 @@ function HomeLocationCard({ db }: { db: Db }) {
 }
 
 /** 2. אזור השליחות — שם + תיחום, כמו shlichutAreaDetails בישן */
-function TerritoryCard({ db, onGoMap }: { db: Db; onGoMap: () => void }) {
+function TerritoryCard({ db }: { db: Db }) {
+  const [editorOpen, setEditorOpen] = useState(false);
   const updateSettings = useCrm((s) => s.updateSettings);
   const territory = (db.__SETTINGS__?.territory ?? {}) as Record<string, unknown>;
   const [name, setName] = useState(String(territory.missionName ?? ''));
@@ -90,11 +92,12 @@ function TerritoryCard({ db, onGoMap }: { db: Db; onGoMap: () => void }) {
         <button className="login-btn" onClick={() => void updateSettings({ territory: { ...territory, missionName: name.trim() } })}>
           שמירת שם
         </button>
-        <button className="login-btn" onClick={onGoMap}>
-          <i className="fas fa-draw-polygon" /> {hasPolygon ? 'עריכת תיחום במפה' : 'ציור תיחום במפה'}
+        <button className="login-btn" id="btnOpenTerritoryEditor" onClick={() => setEditorOpen(true)}>
+          <i className="fas fa-draw-polygon" /> {hasPolygon ? 'עריכת תיחום' : 'פתח עורך תיחום'}
         </button>
       </div>
       <p className="tpl-text">{hasPolygon ? '✓ מוגדר תיחום שליחות' : 'טרם הוגדר תיחום'}</p>
+      {editorOpen && <TerritoryEditor db={db} onClose={() => setEditorOpen(false)} />}
     </div>
   );
 }
@@ -387,21 +390,29 @@ function EventTypesEditor({ db }: { db: Db }) {
   );
 }
 
-export function SettingsView({ db, onGoMap }: { db: Db; onGoMap?: () => void }) {
+export function SettingsView({ db }: { db: Db }) {
   return (
     <section>
       <div className="table-toolbar">
         <h2 className="view-title"><i className="fas fa-cog" /> הגדרות</h2>
       </div>
 
-      {/* סדר הסקשנים זהה למודל ההגדרות הישן */}
-      <div className="settings-grid">
+      {/* סדר וסגנון זהים למודל ההגדרות הישן: סקשנים מתקפלים בעמודה אחת */}
+      <div className="settings-col">
         <HomeLocationCard db={db} />
-        <TerritoryCard db={db} onGoMap={onGoMap ?? (() => {})} />
+        <details className="settings-sec" open>
+          <summary><i className="fas fa-draw-polygon" /> אזור השליחות</summary>
+          <div className="sec-body"><TerritoryCard db={db} /></div>
+        </details>
         <AppearanceCard db={db} />
-        <TagsCard db={db} />
-        <StylesCard db={db} />
-        <CustomFieldsCard db={db} />
+        <details className="settings-sec">
+          <summary><i className="fas fa-sliders" /> התאמה אישית — תגיות, סגנונות ושדות</summary>
+          <div className="sec-body">
+            <TagsCard db={db} />
+            <StylesCard db={db} />
+            <CustomFieldsCard db={db} />
+          </div>
+        </details>
       </div>
 
       <div className="settings-card" style={{ marginTop: 14 }}>
