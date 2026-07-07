@@ -62,6 +62,7 @@ export function BuildingModal({ db, bldg, onClose }: Props) {
   if (selectedApt && selectedIdx !== null) {
     return (
       <FamilyCard
+        db={db}
         bldg={bldg}
         apt={selectedApt}
         onClose={() => setSelectedIdx(null)}

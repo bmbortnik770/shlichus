@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { Apartment, Donation, InteractionLog, Milestone, Task } from '@shlichus/core';
+import type { Apartment, Db, Donation, InteractionLog, Milestone, Task } from '@shlichus/core';
 import { NO_ADDRESS_KEY, daysUntil, formatHebrew, hebrewParts } from '@shlichus/core';
 
 interface Props {
   bldg: string;
   apt: Apartment;
+  db?: Db;
   onClose: () => void;
   onSave: (patch: Partial<Apartment>) => Promise<void>;
   onSplit?: (memberName: string) => Promise<void>;
@@ -59,10 +60,11 @@ function Input({ label, value, onChange, dir }: { label: string; value: string; 
   );
 }
 
-export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
+export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
   const [tab, setTab] = useState<string>('details');
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  // טופס חי תמיד — כמו clientModal בישן
   const [form, setForm] = useState({
     name: apt.name ?? '',
     num: apt.num ?? '',
@@ -71,11 +73,16 @@ export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
     fatherPhone: apt.fatherPhone ?? '',
     motherPhone: apt.motherPhone ?? '',
     fatherEmail: apt.fatherEmail ?? '',
+    motherEmail: apt.motherEmail ?? '',
     style: apt.style ?? '',
     notes: apt.notes ?? '',
-    tags: (apt.tags ?? []).join(', '),
   });
-  const setF = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const [tags, setTags] = useState<string[]>([...(apt.tags ?? [])]);
+  const [children, setChildren] = useState<{ name?: string; phone?: string }[]>([...(apt.childrenList ?? [])]);
+  const [boards, setBoards] = useState<Record<string, string>>({ ...((apt.boards ?? {}) as Record<string, string>) });
+  const [custom, setCustom] = useState<Record<string, unknown>>({ ...((apt.customData ?? apt.customFields ?? {}) as Record<string, unknown>) });
+  const setF = (k: keyof typeof form) => (v: string) => { setForm((f) => ({ ...f, [k]: v })); setDirty(true); };
+  const editing = dirty; // תאימות ל-ESC עם אישור
 
   // טפסי הוספה מהירים
   const [logType, setLogType] = useState('שיחה');
@@ -107,14 +114,14 @@ export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
 
   const saveDetails = async () => {
     setSaving(true);
+    // אותם שדות כמו saveClientWithAuthCheck בישן (customData=customFields)
     await onSave({
-      name: form.name, num: form.num, father: form.father, mother: form.mother,
-      fatherPhone: form.fatherPhone, motherPhone: form.motherPhone, fatherEmail: form.fatherEmail,
-      style: form.style, notes: form.notes,
-      tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
-    });
+      ...form,
+      tags, childrenList: children, boards,
+      customData: custom, customFields: custom,
+    } as Partial<Apartment>);
     setSaving(false);
-    setEditing(false);
+    setDirty(false);
   };
 
   const addLog = async () => {
@@ -277,23 +284,86 @@ export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
           </div>
         )}
 
-        {tab === 'details' && !editing && (
-          <>
-            <section>
-              <Field label="אב" value={apt.father} />
-              <Field label="טלפון אב" value={apt.fatherPhone} />
-              <Field label="אם" value={apt.mother} />
-              <Field label="טלפון אם" value={apt.motherPhone} />
-              <Field label="מייל" value={apt.fatherEmail || apt.motherEmail} />
-              <Field label="הערות" value={apt.notes} />
-              {(apt.tags?.length ?? 0) > 0 && <Field label="תגיות" value={apt.tags!.join(' · ')} />}
-              {(apt.childrenList?.length ?? 0) > 0 && (
-                <Field label="ילדים" value={apt.childrenList!.map((c) => c.name).filter(Boolean).join(', ')} />
-              )}
-            </section>
+        {tab === 'details' && (
+          <section className="edit-form">
+            <div className="form-grid">
+              <Input label="שם משפחה" value={form.name} onChange={setF('name')} />
+              <Input label="דירה" value={form.num} onChange={setF('num')} />
+              <Input label="שם האב" value={form.father} onChange={setF('father')} />
+              <Input label="טלפון אב" value={form.fatherPhone} onChange={setF('fatherPhone')} dir="ltr" />
+              <Input label="שם האם" value={form.mother} onChange={setF('mother')} />
+              <Input label="טלפון אם" value={form.motherPhone} onChange={setF('motherPhone')} dir="ltr" />
+              <Input label="מייל אב" value={form.fatherEmail} onChange={setF('fatherEmail')} dir="ltr" />
+              <Input label="מייל אם" value={form.motherEmail} onChange={setF('motherEmail')} dir="ltr" />
+              <label className="edit-field">
+                <span>סגנון</span>
+                <select className="board-select" value={form.style} onChange={(e) => setF('style')(e.target.value)}>
+                  <option value=""></option>
+                  {((db?.__SETTINGS__?.styles ?? []) as string[]).map((st) => <option key={st} value={st}>{st}</option>)}
+                </select>
+              </label>
+              {((db?.__SETTINGS__?.customFields ?? []) as string[]).map((f) => (
+                <Input key={f} label={f} value={String(custom[f] ?? '')} onChange={(v) => { setCustom((c) => ({ ...c, [f]: v })); setDirty(true); }} />
+              ))}
+            </div>
+
+            <label className="edit-field">
+              <span>תגיות</span>
+              <div className="chip-row">
+                {((db?.__SETTINGS__?.tags ?? []) as string[]).map((t) => (
+                  <button
+                    key={t} type="button"
+                    className={'tag-bubble ' + (tags.includes(t) ? 'active' : '')}
+                    onClick={() => { setTags((x) => x.includes(t) ? x.filter((y) => y !== t) : [...x, t]); setDirty(true); }}
+                  >{t}</button>
+                ))}
+              </div>
+            </label>
+
+            <label className="edit-field">
+              <span>ילדים</span>
+              {children.map((c, i) => (
+                <div className="quick-add-row" key={i}>
+                  <input placeholder="שם" value={c.name ?? ''} onChange={(e) => { setChildren((arr) => arr.map((x, xi) => xi === i ? { ...x, name: e.target.value } : x)); setDirty(true); }} />
+                  <input placeholder="טלפון" dir="ltr" value={c.phone ?? ''} onChange={(e) => { setChildren((arr) => arr.map((x, xi) => xi === i ? { ...x, phone: e.target.value } : x)); setDirty(true); }} />
+                  <button type="button" className="chip-x" onClick={() => { setChildren((arr) => arr.filter((_, xi) => xi !== i)); setDirty(true); }}>✕</button>
+                </div>
+              ))}
+              <button type="button" className="login-btn" style={{ alignSelf: 'flex-start' }} onClick={() => { setChildren((arr) => [...arr, { name: '', phone: '' }]); setDirty(true); }}>
+                <i className="fas fa-plus" /> הוסף ילד/ה
+              </button>
+            </label>
+
+            {(db?.__BOARDS__ ?? []).filter((b) => !b.archived).length > 0 && (
+              <label className="edit-field">
+                <span>שיוך ללוחות פרויקטים</span>
+                <div className="chip-row">
+                  {(db!.__BOARDS__ ?? []).filter((b) => !b.archived).map((b) => (
+                    <button
+                      key={b.id} type="button"
+                      className={'tag-bubble ' + (boards[b.id] ? 'active' : '')}
+                      onClick={() => {
+                        setBoards((x) => {
+                          const n = { ...x };
+                          if (n[b.id]) delete n[b.id]; else n[b.id] = b.columns[0] ?? '';
+                          return n;
+                        });
+                        setDirty(true);
+                      }}
+                    >{b.name}</button>
+                  ))}
+                </div>
+              </label>
+            )}
+
+            <label className="edit-field">
+              <span>הערות פנימיות</span>
+              <textarea rows={3} value={form.notes} onChange={(e) => setF('notes')(e.target.value)} />
+            </label>
+
             <div className="edit-actions">
-              <button className="edit-btn" onClick={() => setEditing(true)}>
-                <i className="fas fa-pen" /> עריכת פרטים
+              <button className="save-btn" disabled={saving || !dirty} onClick={() => void saveDetails()}>
+                {saving ? 'שומר…' : dirty ? 'שמור שינויים' : 'נשמר ✓'}
               </button>
               {(apt as { lifeStatus?: string }).lifeStatus !== 'deceased' && (
                 <button className="cancel-btn" onClick={() => void markDeceased()}>
@@ -311,30 +381,6 @@ export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
                   <i className="fas fa-people-arrows" /> פיצול כרטיס
                 </button>
               )}
-            </div>
-          </>
-        )}
-
-        {tab === 'details' && editing && (
-          <section className="edit-form">
-            <Input label="שם משפחה" value={form.name} onChange={setF('name')} />
-            <Input label="דירה" value={form.num} onChange={setF('num')} />
-            <Input label="אב" value={form.father} onChange={setF('father')} />
-            <Input label="טלפון אב" value={form.fatherPhone} onChange={setF('fatherPhone')} dir="ltr" />
-            <Input label="אם" value={form.mother} onChange={setF('mother')} />
-            <Input label="טלפון אם" value={form.motherPhone} onChange={setF('motherPhone')} dir="ltr" />
-            <Input label="מייל" value={form.fatherEmail} onChange={setF('fatherEmail')} dir="ltr" />
-            <Input label="סגנון" value={form.style} onChange={setF('style')} />
-            <Input label="תגיות (מופרדות בפסיק)" value={form.tags} onChange={setF('tags')} />
-            <label className="edit-field">
-              <span>הערות</span>
-              <textarea rows={3} value={form.notes} onChange={(e) => setF('notes')(e.target.value)} />
-            </label>
-            <div className="edit-actions">
-              <button className="save-btn" disabled={saving} onClick={() => void saveDetails()}>
-                {saving ? 'שומר…' : 'שמירה'}
-              </button>
-              <button className="cancel-btn" disabled={saving} onClick={() => setEditing(false)}>ביטול</button>
             </div>
           </section>
         )}

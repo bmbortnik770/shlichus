@@ -355,6 +355,7 @@ export function FamiliesTable({
 
       {selected && selectedApt && (
         <FamilyCard
+          db={db}
           bldg={selected.bldg}
           apt={selectedApt}
           onClose={() => setSelected(null)}

@@ -640,3 +640,13 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
 }
 .tm-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 18px 10px; }
 .tm-map { flex: 1; min-height: 320px; }
+
+/* טופס כרטיס כמו הישן */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+@media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } }
+.tag-bubble {
+  border: 1px solid var(--line); background: var(--surface-2);
+  border-radius: 999px; padding: 4px 14px; font-size: 12.5px; font-weight: 600;
+  color: var(--ink-soft); cursor: pointer; font-family: inherit;
+}
+.tag-bubble.active { background: var(--accent); border-color: var(--accent); color: #fff; }
