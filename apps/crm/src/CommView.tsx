@@ -42,6 +42,7 @@ const DOC_CHANNELS: Record<string, string> = {
 
 export function CommView({ db }: { db: Db }) {
   const updateApt = useCrm((s) => s.updateApt);
+  const updateSettings = useCrm((s) => s.updateSettings);
   const [commTab, setCommTab] = useState<string>('compose');
   const [query, setQuery] = useState('');
   const [styleFilter, setStyleFilter] = useState('');
@@ -278,6 +279,28 @@ export function CommView({ db }: { db: Db }) {
             <button className="login-btn" onClick={toggleAll}>
               {selected.size === filtered.length && filtered.length > 0 ? 'נקה הכל' : 'בחר הכל'}
             </button>
+            {(((db.__SETTINGS__?.savedSegments ?? []) as { name: string; keys: string[] }[]).length > 0) && (
+              <select
+                className="board-select" defaultValue=""
+                onChange={(e) => {
+                  const seg = ((db.__SETTINGS__?.savedSegments ?? []) as { name: string; keys: string[] }[])[Number(e.target.value)];
+                  if (seg) setSelected(new Set(seg.keys));
+                }}
+              >
+                <option value="" disabled>📂 סגמנט שמור…</option>
+                {((db.__SETTINGS__?.savedSegments ?? []) as { name: string }[]).map((sg, i) => (
+                  <option key={i} value={i}>{sg.name}</option>
+                ))}
+              </select>
+            )}
+            {chosen.length > 0 && (
+              <button className="login-btn" onClick={() => {
+                const name = window.prompt('שם הסגמנט:');
+                if (!name?.trim()) return;
+                const cur = ((db.__SETTINGS__?.savedSegments ?? []) as { name: string; keys: string[] }[]);
+                void updateSettings({ savedSegments: [...cur, { name: name.trim(), keys: chosen.map((r) => r.key) }] });
+              }}><i className="fas fa-bookmark" /> שמור כסגמנט</button>
+            )}
           </div>
           <ul className="recipient-list">
             {filtered.map((r) => (

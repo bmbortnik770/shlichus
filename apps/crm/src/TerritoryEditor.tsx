@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { type Db, getTerritory, pointInPolygon } from '@shlichus/core';
+import { type Db, getCategories, getTerritory, pointInPolygon } from '@shlichus/core';
 import { useCrm } from './store';
 
 /** עורך תיחום — מודל נפרד עם מפה משלו, כמו territoryMapEditorModal בישן.
@@ -42,8 +42,10 @@ export function TerritoryEditor({ db, onClose }: { db: Db; onClose: () => void }
   const [pointCount, setPointCount] = useState(0);
   const [bldgCount, setBldgCount] = useState(0);
   const [satellite, setSatellite] = useState(false);
+  const [pois, setPois] = useState<{ key: string; name: string; coords: [number, number]; catId: string }[]>([]);
   const updateSettings = useCrm((s) => s.updateSettings);
   const territory = getTerritory(db);
+  const categories = getCategories(db);
 
   const renderDraw = (map: mapboxgl.Map) => {
     const pts = pointsRef.current;
@@ -139,6 +141,43 @@ export function TerritoryEditor({ db, onClose }: { db: Db; onClose: () => void }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+
+  /** סריקת מוסדות (POI) בתוך התיחום — כמו tmScanPOIs בישן */
+  const scanPois = () => {
+    const map = mapRef.current;
+    const pts = pointsRef.current;
+    if (!map || pts.length < 3) { window.alert('צייר תיחום קודם'); return; }
+    const polygon: [number, number][] = [...pts, pts[0]!];
+    const feats = map.queryRenderedFeatures(undefined, { layers: ['poi-label'] }).slice(0, 200);
+    const found: { key: string; name: string; coords: [number, number]; catId: string }[] = [];
+    const seen = new Set<string>();
+    for (const f of feats as unknown as { geometry?: { coordinates?: number[] }; properties?: Record<string, unknown> }[]) {
+      const c = f.geometry?.coordinates as [number, number] | undefined;
+      const name = String(f.properties?.name ?? f.properties?.name_he ?? '');
+      if (!c || !name || !pointInPolygon(c, polygon)) continue;
+      const key = c[0].toFixed(5) + ',' + c[1].toFixed(5);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // ניחוש קטגוריה לפי maki/class כמו בישן
+      const cls = String(f.properties?.maki ?? f.properties?.class ?? '');
+      const catId = /relig|synagogue|place_of_worship/.test(cls) ? 'synagogue'
+        : /school|college|education/.test(cls) ? 'education'
+        : /hospital|doctor|pharmacy|medical/.test(cls) ? 'medical'
+        : /shop|grocery|restaurant|cafe|commercial/.test(cls) ? 'business' : 'offices';
+      found.push({ key, name, coords: c, catId });
+    }
+    setPois(found);
+    if (!found.length) window.alert('לא נמצאו מוסדות באזור הנראה — התקרב/הזז את המפה ונסה שוב');
+  };
+
+  const approvePoi = (p: { key: string; name: string; catId: string }, catId: string) => {
+    // אותו מבנה כמו buildingClassify בישן: {catId, name}
+    const classify = { ...((territory.buildingClassify ?? {}) as Record<string, unknown>) };
+    classify[p.key] = { catId, name: p.name };
+    void updateSettings({ territory: { ...territory, buildingClassify: classify } });
+    setPois((arr) => arr.filter((x) => x.key !== p.key));
+  };
+
   const undoPoint = () => {
     pointsRef.current.pop();
     setPointCount(pointsRef.current.length);
@@ -201,9 +240,25 @@ export function TerritoryEditor({ db, onClose }: { db: Db; onClose: () => void }
           <button className="map-ctl-btn" onClick={undoPoint} disabled={!pointCount}><i className="fas fa-undo" /> בטל נקודה</button>
           <button className="map-ctl-btn" onClick={clearAll}><i className="fas fa-eraser" /> נקה</button>
           <button className="map-ctl-btn" onClick={toggleSat}><i className={`fas ${satellite ? 'fa-map' : 'fa-satellite'}`} /></button>
+          <button className="map-ctl-btn" onClick={scanPois}><i className="fas fa-magnifying-glass-location" /> סרוק מוסדות</button>
           <button className="map-ctl-btn primary" onClick={() => void save()}><i className="fas fa-check" /> שמירת תיחום</button>
         </div>
         <div ref={container} className="tm-map" />
+        {pois.length > 0 && (
+          <div className="poi-list">
+            <strong style={{ fontSize: 13 }}>🏢 {pois.length} מוסדות זוהו בתיחום — אשר וסווג:</strong>
+            {pois.slice(0, 12).map((p) => (
+              <div className="poi-row" key={p.key}>
+                <span style={{ flex: 1, fontWeight: 600 }}>{p.name}</span>
+                <select className="board-select" value={p.catId} onChange={(e) => setPois((arr) => arr.map((x) => x.key === p.key ? { ...x, catId: e.target.value } : x))}>
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+                </select>
+                <button className="edit-btn" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => approvePoi(p, p.catId)}>אשר</button>
+                <button className="chip-x" onClick={() => setPois((arr) => arr.filter((x) => x.key !== p.key))}>דלג</button>
+              </div>
+            ))}
+          </div>
+        )}
         <p className="tpl-text" style={{ padding: '8px 18px' }}>
           לחץ על המפה להוספת נקודות תיחום — מבנים בפנים נצבעים ירוק ונספרים אוטומטית.
         </p>

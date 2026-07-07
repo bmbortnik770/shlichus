@@ -77,6 +77,31 @@ export function ImportCsv({ onDone }: { onDone: () => void }) {
     <div className="settings-card">
       <h3>ייבוא משפחות מ-CSV</h3>
       {rows.length === 0 && (
+        <div className="chip-add">
+          <input
+            placeholder="או הדבק קישור Google Sheets…" dir="ltr" id="sheetUrlInput"
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              const url = (e.target as HTMLInputElement).value.trim();
+              const m = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+              if (!m) { window.alert('קישור לא תקין'); return; }
+              void (async () => {
+                try {
+                  const r = await fetch(`https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv`);
+                  if (!r.ok) throw new Error();
+                  const parsed = parseCsv(await r.text());
+                  if (parsed.length < 2) { window.alert('הגיליון ריק'); return; }
+                  setRows(parsed);
+                  setMapping(guessMapping(parsed[0]!));
+                } catch {
+                  window.alert('לא ניתן לקרוא את הגיליון — ודא שהוא משותף כ"כל מי שיש לו קישור"');
+                }
+              })();
+            }}
+          />
+        </div>
+      )}
+      {rows.length === 0 && (
         <label className="login-btn" style={{ cursor: 'pointer', textAlign: 'center' }}>
           <i className="fas fa-file-csv" /> בחירת קובץ CSV
           <input

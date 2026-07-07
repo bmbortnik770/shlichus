@@ -4,6 +4,7 @@ import { DEFAULT_SCORING_RULES, type ScoringRules, mergeDb, saveLocal } from '@s
 import { useCrm } from './store';
 import { ImportCsv } from './ImportCsv';
 import { TerritoryEditor } from './TerritoryEditor';
+import { browserTokens } from './auth';
 
 /* מבנה זהה למודל ההגדרות הישן: מיקום מרכזי → אזור השליחות → מראה ותצוגה →
    תגיות/סגנונות/שדות → גיבוי → ניקוד מעורבות → קמפיינים → ניקוד וסימון אוטומטי */
@@ -452,6 +453,93 @@ function EventTypesEditor({ db }: { db: Db }) {
   );
 }
 
+
+/** סנכרון אנשי קשר Google — People API עם אותם scopes כמו הישן */
+function ContactsSyncCard({ db }: { db: Db }) {
+  const importFamilies = useCrm((s) => s.importFamilies);
+  const [busy, setBusy] = useState(false);
+  const [candidates, setCandidates] = useState<{ name: string; phone: string; sel: boolean }[] | null>(null);
+  const [result, setResult] = useState('');
+
+  const norm = (p: string) => p.replace(/\D/g, '').replace(/^972/, '0');
+
+  const scan = async () => {
+    setBusy(true); setResult('');
+    try {
+      const token = (await browserTokens.getToken()) ?? (await browserTokens.refresh());
+      if (!token) { setResult('יש להתחבר ל-Google קודם'); return; }
+      const existing = new Set<string>();
+      const { buildingKeys, getBuilding, liveApts } = await import('@shlichus/core');
+      for (const key of buildingKeys(db)) {
+        liveApts(getBuilding(db, key)?.apts).forEach((a) => {
+          [a.fatherPhone, a.motherPhone].forEach((p) => { if (p) existing.add(norm(String(p))); });
+        });
+      }
+      let pageToken = '';
+      const found: { name: string; phone: string; sel: boolean }[] = [];
+      do {
+        const url = new URL('https://people.googleapis.com/v1/people/me/connections');
+        url.searchParams.set('personFields', 'names,phoneNumbers');
+        url.searchParams.set('pageSize', '1000');
+        if (pageToken) url.searchParams.set('pageToken', pageToken);
+        const r = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = (await r.json()) as { connections?: { names?: { displayName?: string }[]; phoneNumbers?: { value?: string }[] }[]; nextPageToken?: string };
+        (d.connections ?? []).forEach((c) => {
+          const name = c.names?.[0]?.displayName ?? '';
+          const phone = c.phoneNumbers?.[0]?.value ?? '';
+          if (name && phone && !existing.has(norm(phone))) found.push({ name, phone, sel: false });
+        });
+        pageToken = d.nextPageToken ?? '';
+      } while (pageToken);
+      setCandidates(found);
+      if (!found.length) setResult('כל אנשי הקשר כבר במערכת ✓');
+    } catch {
+      setResult('שגיאה בטעינת אנשי קשר — ודא חיבור Google');
+    } finally { setBusy(false); }
+  };
+
+  const doImport = async () => {
+    const sel = (candidates ?? []).filter((c) => c.sel);
+    if (!sel.length) return;
+    const res = await importFamilies(sel.map((c) => ({ name: c.name, bldg: '', num: '', phone: c.phone, style: '', tags: [] })));
+    setResult(`יובאו ${res.imported} אנשי קשר ✓`);
+    setCandidates(null);
+  };
+
+  return (
+    <div className="settings-card">
+      <h3><i className="fab fa-google" /> סנכרון אנשי קשר Google</h3>
+      {!candidates && (
+        <button className="login-btn" disabled={busy} onClick={() => void scan()}>
+          {busy ? 'סורק…' : 'סרוק אנשי קשר חדשים'}
+        </button>
+      )}
+      {candidates && candidates.length > 0 && (
+        <>
+          <p className="tpl-text">{candidates.length} אנשי קשר שאינם במערכת — סמן לייבוא:</p>
+          <ul className="tpl-list" style={{ maxHeight: 240, overflowY: 'auto' }}>
+            {candidates.map((c, i) => (
+              <li key={i} style={{ padding: '6px 12px' }}>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={c.sel} onChange={() => setCandidates((arr) => arr!.map((x, xi) => xi === i ? { ...x, sel: !x.sel } : x))} />
+                  <strong>{c.name}</strong>
+                  <span className="tpl-text" dir="ltr">{c.phone}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="edit-actions">
+            <button className="save-btn" onClick={() => void doImport()}>ייבוא הנבחרים</button>
+            <button className="cancel-btn" onClick={() => setCandidates(null)}>ביטול</button>
+          </div>
+        </>
+      )}
+      {result && <p className="tpl-text">{result}</p>}
+    </div>
+  );
+}
+
 export function SettingsView({ db }: { db: Db }) {
   return (
     <section>
@@ -522,6 +610,9 @@ export function SettingsView({ db }: { db: Db }) {
 
       <div style={{ marginTop: 14 }}>
         <ImportCsv onDone={() => window.location.reload()} />
+      </div>
+      <div style={{ marginTop: 14 }}>
+        <ContactsSyncCard db={db} />
       </div>
     </section>
   );

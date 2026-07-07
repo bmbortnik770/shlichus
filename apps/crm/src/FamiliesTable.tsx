@@ -48,6 +48,7 @@ export function FamiliesTable({
   const styleFilter = filterStyle;
   const tagFilter = filterTag;
   const [smartView, setSmartView] = useState('v_all');
+  const [smartSort, setSmartSort] = useState('');
   const [colsMenu, setColsMenu] = useState(false);
   const [selected, setSelected] = useState<{ bldg: string; idx: number } | null>(null);
   const [bulk, setBulk] = useState<Set<string>>(new Set());
@@ -125,6 +126,15 @@ export function FamiliesTable({
       if (column.startsWith('custom_')) return String((a.customFields as Record<string, unknown>)?.[column.slice(7)] ?? '');
       return '';
     };
+    // מיון חכם — כמו customSmartSort בישן (לפי סוג האינטראקציה האחרונה)
+    if (smartSort) {
+      const typeMap: Record<string, string> = { last_call: 'שיחה', last_visit: 'ביקור' };
+      const latestOf = (r: Row) => {
+        const logs = (r.apt.interactions ?? []).filter((i) => i.type === typeMap[smartSort]);
+        return logs.length ? Math.max(...logs.map((l) => new Date(String(l.date)).getTime() || 0)) : 0;
+      };
+      return [...matched].sort((x, y) => latestOf(y) - latestOf(x));
+    }
     return [...matched].sort((x, y) => {
       const a = val(x), b = val(y);
       if (a < b) return direction === 'asc' ? -1 : 1;
@@ -132,7 +142,7 @@ export function FamiliesTable({
       return 0;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, query, sort, styleFilter, tagFilter, smartView, db]);
+  }, [rows, query, sort, styleFilter, tagFilter, smartView, smartSort, db]);
 
   const sortBy = (col: string) =>
     setSort((s) => ({ column: col, direction: s.column === col && s.direction === 'asc' ? 'desc' : 'asc' }));
@@ -245,6 +255,11 @@ export function FamiliesTable({
             </div>
           )}
         </span>
+        <select className="board-select" value={smartSort} onChange={(e) => setSmartSort(e.target.value)}>
+          <option value="">מיון רגיל (לפי עמודות)</option>
+          <option value="last_call">שיחה אחרונה קודם</option>
+          <option value="last_visit">ביקור אחרון קודם</option>
+        </select>
         <button className="login-btn" onClick={exportCsv}>
           <i className="fas fa-file-excel" /> ייצוא
         </button>

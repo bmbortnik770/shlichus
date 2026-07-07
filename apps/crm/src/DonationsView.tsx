@@ -11,6 +11,7 @@ interface Donor {
 
 /** מרכז תרומות — כמו בישן: KPI, לפי קמפיין, שורות תורמים */
 export function DonationsView({ db, onOpenFamily }: { db: Db; onOpenFamily?: (q: string) => void }) {
+  const [report, setReport] = useState<Donor | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'amount' | 'recent'>('amount');
 
@@ -83,7 +84,7 @@ export function DonationsView({ db, onOpenFamily }: { db: Db; onOpenFamily?: (q:
       {filtered.length === 0 ? <p className="placeholder">אין תרומות להצגה.</p> : (
         <div className="donor-list">
           {filtered.map((d, i) => (
-            <button className="donor-row" key={i} onClick={() => onOpenFamily?.(d.name)}>
+            <button className="donor-row" key={i} onClick={() => setReport(d)}>
               <span className="donor-badge">{d.count}</span>
               <span className="donor-main">
                 <strong>{d.name}</strong>
@@ -92,6 +93,42 @@ export function DonationsView({ db, onOpenFamily }: { db: Db; onOpenFamily?: (q:
               <span className="donor-total">{d.total.toLocaleString('he-IL')}₪</span>
             </button>
           ))}
+        </div>
+      )}
+      {report && (
+        <div className="drawer-backdrop" onClick={() => setReport(null)}>
+          <aside className="drawer" onClick={(e) => e.stopPropagation()}>
+            <header className="drawer-head">
+              <h2><i className="fas fa-file-invoice-dollar" style={{ color: 'var(--success)', marginInlineEnd: 8 }} />דוח תורם — {report.name}</h2>
+              <button className="close-btn" onClick={() => setReport(null)} aria-label="סגירה">✕</button>
+            </header>
+            <p className="drawer-sub">{report.bldg} · {report.count} תרומות · סה״כ <strong style={{ color: 'var(--success)' }}>{report.total.toLocaleString('he-IL')}₪</strong></p>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>תאריך</th><th>סכום</th><th>קמפיין</th></tr></thead>
+                <tbody>
+                  {(() => {
+                    for (const key of buildingKeys(db)) {
+                      const entry = getBuilding(db, key);
+                      if (!entry) continue;
+                      const apt = liveApts(entry.apts).find((a) => (a.name || key) === report.name && key === report.bldg);
+                      if (apt) return [...(apt.donations ?? [])].reverse().map((dn, i) => (
+                        <tr key={i}>
+                          <td>{String(dn.date ?? '')}</td>
+                          <td className="amount">{Number(dn.amount ?? 0).toLocaleString('he-IL')}₪</td>
+                          <td>{String(dn.campaign ?? '')}</td>
+                        </tr>
+                      ));
+                    }
+                    return null;
+                  })()}
+                </tbody>
+              </table>
+            </div>
+            <button className="login-btn" style={{ marginTop: 12 }} onClick={() => { setReport(null); onOpenFamily?.(report.name); }}>
+              <i className="fas fa-id-card" /> פתח את כרטיס המשפחה
+            </button>
+          </aside>
         </div>
       )}
     </section>
