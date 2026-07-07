@@ -676,3 +676,19 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
   background: var(--surface); border-radius: 18px;
   padding: 20px 24px; box-shadow: var(--shadow-md);
 }
+
+/* עוגת סגנונות (דונאט) + חיפוש סיידבר + כפתור בוצע */
+.pie.donut { position: relative; }
+.pie.donut::after { content: ''; position: absolute; inset: 22%; background: var(--surface); border-radius: 50%; }
+.side-search {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--radius-pill); padding: 8px 14px;
+  color: var(--ink-faint); font-size: 13px;
+}
+.side-search input { flex: 1; border: 0; background: none; outline: none; color: var(--ink); font-size: 13px; min-width: 0; }
+.task-done-btn {
+  border: 0; background: var(--success); color: #fff;
+  border-radius: 6px; width: 22px; height: 22px; cursor: pointer; font-size: 10px;
+  flex-shrink: 0;
+}

@@ -579,7 +579,12 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
             <section className="quick-add">
               <div className="quick-add-row">
                 <input type="number" placeholder="סכום ₪" value={donAmount} onChange={(e) => setDonAmount(e.target.value)} style={{ maxWidth: 110 }} dir="ltr" />
-                <input placeholder="קמפיין (לא חובה)" value={donCampaign} onChange={(e) => setDonCampaign(e.target.value)} />
+                <select className="board-select" value={donCampaign} onChange={(e) => setDonCampaign(e.target.value)}>
+                  <option value="">כללי</option>
+                  {(((db?.__SETTINGS__?.campaigns ?? []) as { key: string; label: string; active?: boolean }[]).filter((cc) => cc.active !== false)).map((cc) => (
+                    <option key={cc.key} value={cc.label}>{cc.label}</option>
+                  ))}
+                </select>
                 <button className="edit-btn" disabled={saving || !Number(donAmount)} onClick={() => void addDonation()}>הוסף תרומה</button>
               </div>
             </section>

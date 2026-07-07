@@ -64,7 +64,7 @@ function bldgMarkerColor(db: Db, key: string, mode: ColorMode): string {
   return SEVERITY_COLORS[maxVal]!;
 }
 
-export function MapView({ db, onOpenBuilding, filterStyle = '', filterTag = '' }: { db: Db; onOpenBuilding: (key: string) => void; filterStyle?: string; filterTag?: string }) {
+export function MapView({ db, onOpenBuilding, filterStyle = '', filterTag = '', flyTo = null }: { db: Db; onOpenBuilding: (key: string) => void; filterStyle?: string; filterTag?: string; flyTo?: [number, number] | null }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -278,6 +278,11 @@ export function MapView({ db, onOpenBuilding, filterStyle = '', filterTag = '' }
     if (mapRef.current) buildMarkers(mapRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, colorMode, filterStyle, filterTag]);
+
+  // טיסה לכתובת מחיפוש הסיידבר — כמו הגיאוקודר בישן
+  useEffect(() => {
+    if (flyTo && mapRef.current) mapRef.current.flyTo({ center: flyTo, zoom: 17.5, pitch: 60 });
+  }, [flyTo]);
 
   const flyToHome = () => {
     // זהה ל-flyToHome בישן

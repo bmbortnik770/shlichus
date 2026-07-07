@@ -62,6 +62,49 @@ function urgentCount(db: Db): number {
   return n;
 }
 
+/** חיתוך סגנונות המשפחות — כמו ה-doughnut בישן (stats לפי style) */
+function StylesPie({ db }: { db: Db }) {
+  const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
+  const styleColors = (db.__SETTINGS__?.styleColors ?? {}) as Record<string, string>;
+  const styles = (db.__SETTINGS__?.styles ?? []) as string[];
+  const counts = new Map<string, number>();
+  for (const key of buildingKeys(db)) {
+    liveApts(getBuilding(db, key)?.apts).forEach((a) => {
+      const st = a.style || 'ללא סגנון';
+      counts.set(st, (counts.get(st) ?? 0) + 1);
+    });
+  }
+  const total = [...counts.values()].reduce((s, n) => s + n, 0);
+  if (!total) return null;
+  const color = (st: string) => {
+    if (styleColors[st]) return styleColors[st];
+    const idx = styles.indexOf(st);
+    return idx === -1 ? '#94a3b8' : CHART_COLORS[idx % CHART_COLORS.length]!;
+  };
+  let acc = 0;
+  const stops: string[] = [];
+  const legend: { name: string; c: string; n: number }[] = [];
+  for (const [st, n] of [...counts.entries()].sort((a, b) => b[1] - a[1])) {
+    const from = (acc / total) * 360;
+    acc += n;
+    stops.push(`${color(st)} ${from}deg ${(acc / total) * 360}deg`);
+    legend.push({ name: st, c: color(st), n });
+  }
+  return (
+    <div className="side-section">
+      <h4>חיתוך סגנונות ({total})</h4>
+      <div className="pie-row">
+        <div className="pie donut" style={{ background: `conic-gradient(${stops.join(', ')})` }} />
+        <div className="pie-legend">
+          {legend.map((l) => (
+            <div key={l.name}><span className="dot" style={{ background: l.c }} /> {l.name} · {l.n}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** דיאגרמת מבנים לפי קטגוריה — כמו ה-widget בישן, ב-conic-gradient */
 function BuildingsPie({ db }: { db: Db }) {
   const cats = getCategories(db);
@@ -101,22 +144,26 @@ function BuildingsPie({ db }: { db: Db }) {
   );
 }
 
-/** ציוני דרך קרובים (30 יום) להתראות השבוע */
-function upcomingAlerts(db: Db): string[] {
-  const out: { when: string; text: string }[] = [];
-  const now = new Date();
-  const horizon = new Date(now.getTime() + 30 * 86400000);
+/** התראות השבוע — כמו kpiAlerts בישן: ימי הולדת החודש + משימות פתוחות עם ✓ */
+interface AlertItem { kind: 'task' | 'bday'; text: string; bldg?: string; idx?: number; taskIdx?: number }
+function weekAlerts(db: Db): AlertItem[] {
+  const out: AlertItem[] = [];
+  const month = new Date().getMonth();
   for (const key of buildingKeys(db)) {
-    liveApts(getBuilding(db, key)?.apts).forEach((a) => {
-      ((a.milestones ?? []) as Record<string, unknown>[]).forEach((m) => {
-        const g = new Date(String(m.gregDate ?? ''));
-        if (!isNaN(g.getTime()) && g >= now && g <= horizon) {
-          out.push({ when: g.toISOString(), text: `${m.label ?? 'אירוע'} — ${a.name ?? key}` });
-        }
+    const entry = getBuilding(db, key);
+    if (!entry) continue;
+    liveApts(entry.apts).forEach((a) => {
+      const idx = entry.apts.indexOf(a);
+      (a.childrenList ?? []).forEach((ch) => {
+        const dob = (ch as { dob?: string }).dob;
+        if (dob && new Date(dob).getMonth() === month) out.push({ kind: 'bday', text: `${ch.name ?? ''} (משפ׳ ${a.name ?? ''}) חוגג/ת החודש 🎂` });
+      });
+      (a.tasks ?? []).forEach((t, ti) => {
+        if (!t.done) out.push({ kind: 'task', text: `משפ׳ ${a.name ?? key}: ${t.text ?? ''}`, bldg: key, idx, taskIdx: ti });
       });
     });
   }
-  return out.sort((x, y) => x.when.localeCompare(y.when)).slice(0, 4).map((x) => x.text);
+  return out.slice(0, 6);
 }
 
 export function App() {
@@ -125,6 +172,8 @@ export function App() {
   const [activitySub, setActivitySub] = useState<string>('dashboard');
   const [tableQuery, setTableQuery] = useState('');
   const [openBldg, setOpenBldg] = useState<string | null>(null);
+  const [flyTo, setFlyTo] = useState<[number, number] | null>(null);
+  const [sideAddr, setSideAddr] = useState('');
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gStyle, setGStyle] = useState('');
@@ -146,7 +195,8 @@ export function App() {
   const toggleDark = () =>
     applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 
-  const alerts = useMemo(() => (db ? upcomingAlerts(db) : []), [db]);
+  const alerts = useMemo(() => (db ? weekAlerts(db) : []), [db]);
+  const updateApt = useCrm((st) => st.updateApt);
 
   // צבע ערכת נושא מההגדרות — כמו appSettings.themeColor בישן
   useEffect(() => {
@@ -247,7 +297,7 @@ export function App() {
             <>
               {view === 'map' && (
                 <Suspense fallback={<p className="placeholder">טוען מפה…</p>}>
-                  <MapView db={db} onOpenBuilding={setOpenBldg} filterStyle={gStyle} filterTag={gTag} />
+                  <MapView db={db} onOpenBuilding={setOpenBldg} filterStyle={gStyle} filterTag={gTag} flyTo={flyTo} />
                 </Suspense>
               )}
               {openBldg && <BuildingModal db={db} bldg={openBldg} onClose={() => setOpenBldg(null)} />}
@@ -311,6 +361,26 @@ export function App() {
 
         <div className="welcome-banner">ברוך הבא למערכת! כאן מתחילים להפוך את העולם 🌍</div>
 
+        <div className="side-search">
+          <i className="fas fa-search" />
+          <input
+            placeholder="📍 חפש אזור/כתובת במפה…"
+            value={sideAddr}
+            onChange={(e) => setSideAddr(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' || !sideAddr.trim()) return;
+              void (async () => {
+                const token = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
+                const r = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(sideAddr.trim())}.json?country=il&language=he&access_token=${token}`);
+                const d = (await r.json()) as { features?: { center: [number, number] }[] };
+                if (d.features?.[0]) { setView('map'); setFlyTo([...d.features[0].center] as [number, number]); }
+              })();
+            }}
+          />
+        </div>
+
+
+
         {db && (
           <div className="widget-row">
             <div className="widget">
@@ -326,6 +396,7 @@ export function App() {
           </div>
         )}
 
+        {db && <StylesPie db={db} />}
         {db && <BuildingsPie db={db} />}
 
         {alerts.length > 0 && (
@@ -333,7 +404,18 @@ export function App() {
             <h4>התראות השבוע:</h4>
             {alerts.map((a, i) => (
               <div className="alert-item" key={i}>
-                <i className="fas fa-calendar-day" /> {a}
+                {a.kind === 'task' ? <i className="fas fa-tasks" style={{ color: 'var(--accent)' }} /> : <i className="fas fa-birthday-cake" style={{ color: 'var(--warning)' }} />}
+                <span style={{ flex: 1 }}>{a.text}</span>
+                {a.kind === 'task' && (
+                  <button
+                    className="task-done-btn" title="סמן כבוצע"
+                    onClick={() => {
+                      const apt = getBuilding(db!, a.bldg!)?.apts[a.idx!];
+                      if (!apt) return;
+                      void updateApt(a.bldg!, a.idx!, { tasks: (apt.tasks ?? []).map((t, ti) => ti === a.taskIdx ? { ...t, done: true } : t) });
+                    }}
+                  ><i className="fas fa-check" /></button>
+                )}
               </div>
             ))}
           </div>
