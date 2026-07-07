@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useCrm } from './store';
+import { alertDialog } from './dialog';
 
 /** פירוק CSV בסיסי עם תמיכה בשדות מצוטטים */
 function parseCsv(text: string): string[][] {
@@ -58,7 +59,7 @@ export function ImportCsv({ onDone }: { onDone: () => void }) {
   };
 
   const doImport = async () => {
-    if (mapping.name === undefined) { window.alert('חובה למפות את עמודת שם המשפחה'); return; }
+    if (mapping.name === undefined) { void alertDialog('ייבוא', 'חובה למפות את עמודת שם המשפחה'); return; }
     setBusy(true);
     const data = rows.slice(1).map((r) => ({
       name: r[mapping.name!] ?? '',
@@ -84,17 +85,17 @@ export function ImportCsv({ onDone }: { onDone: () => void }) {
               if (e.key !== 'Enter') return;
               const url = (e.target as HTMLInputElement).value.trim();
               const m = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-              if (!m) { window.alert('קישור לא תקין'); return; }
+              if (!m) { void alertDialog('ייבוא', 'קישור לא תקין'); return; }
               void (async () => {
                 try {
                   const r = await fetch(`https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv`);
                   if (!r.ok) throw new Error();
                   const parsed = parseCsv(await r.text());
-                  if (parsed.length < 2) { window.alert('הגיליון ריק'); return; }
+                  if (parsed.length < 2) { void alertDialog('ייבוא', 'הגיליון ריק'); return; }
                   setRows(parsed);
                   setMapping(guessMapping(parsed[0]!));
                 } catch {
-                  window.alert('לא ניתן לקרוא את הגיליון — ודא שהוא משותף כ"כל מי שיש לו קישור"');
+                  void alertDialog('ייבוא', 'לא ניתן לקרוא את הגיליון — ודא שהוא משותף לכל מי שיש לו קישור');
                 }
               })();
             }}
@@ -110,7 +111,7 @@ export function ImportCsv({ onDone }: { onDone: () => void }) {
               const f = e.target.files?.[0];
               if (!f) return;
               const parsed = parseCsv(await f.text());
-              if (parsed.length < 2) { window.alert('הקובץ ריק או ללא שורות נתונים'); return; }
+              if (parsed.length < 2) { void alertDialog('ייבוא', 'הקובץ ריק או ללא שורות נתונים'); return; }
               setRows(parsed);
               setMapping(guessMapping(parsed[0]!));
             }}

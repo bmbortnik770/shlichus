@@ -15,6 +15,7 @@ import {
   statusSeverity,
 } from '@shlichus/core';
 import { useCrm } from './store';
+import { alertDialog } from './dialog';
 
 mapboxgl.accessToken =
   'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
@@ -255,7 +256,7 @@ export function MapView({ db, onOpenBuilding, filterStyle = '', filterTag = '', 
             await ensureBuilding(addr, { coords: clickPt, polygon });
             onOpenBuilding(addr);
           } catch {
-            window.alert('שגיאת כתובת');
+            void alertDialog('שגיאה', 'לא הצלחנו לזהות את הכתובת');
           }
         })();
       });
@@ -289,7 +290,7 @@ export function MapView({ db, onOpenBuilding, filterStyle = '', filterTag = '', 
     if (home.coords && mapRef.current) {
       mapRef.current.flyTo({ center: home.coords, zoom: 19, pitch: 60 });
     } else {
-      window.alert('לא הוגדר מיקום מרכזי. הגדר בהגדרות.');
+      void alertDialog('חזרה הביתה', 'לא הוגדר מיקום מרכזי — הגדר בהגדרות.');
     }
   };
 

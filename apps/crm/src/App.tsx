@@ -15,6 +15,7 @@ const MapView = lazy(() => import('./MapView').then((m) => ({ default: m.MapView
 import { BuildingModal } from './BuildingModal';
 import { CommandPalette } from './CommandPalette';
 import { DashboardView } from './DashboardView';
+import { DialogHost } from './dialog';
 
 function applyTheme(theme: string) {
   document.documentElement.dataset.theme = theme;
@@ -222,6 +223,7 @@ export function App() {
 
   return (
     <div className="shell">
+      <DialogHost />
       <main className="main-area">
         <div className="topbar">
           <div className="top-search" onClick={() => setPaletteOpen(true)} style={{ cursor: 'pointer' }}>

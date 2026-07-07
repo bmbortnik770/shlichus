@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { type Board, type Db, buildingKeys, getBuilding, liveApts } from '@shlichus/core';
 import { useCrm } from './store';
+import { confirmDialog, promptDialog } from './dialog';
 
 interface Card {
   bldg: string;
@@ -17,10 +18,10 @@ export function KanbanView({ db }: { db: Db }) {
   const board: Board | undefined = boards.find((b) => b.id === boardId) ?? boards[0];
 
   const newBoard = async () => {
-    const name = window.prompt('שם הלוח החדש:');
-    if (!name?.trim()) return;
+    const name = await promptDialog('לוח חדש', 'שם הלוח:');
+    if (!name) return;
     const b: Board = {
-      id: 'b_' + Date.now(), name: name.trim(),
+      id: 'b_' + Date.now(), name: name,
       columns: ['מתעניין חדש', 'בטיפול', 'פעיל קבוע', 'לא רלוונטי'],
       archived: false, updatedAt: Date.now(),
     };
@@ -31,8 +32,8 @@ export function KanbanView({ db }: { db: Db }) {
   const editColumns = async () => {
     if (!board) return;
     const cur = board.columns.join(', ');
-    const next = window.prompt('עמודות הלוח (מופרדות בפסיק):', cur);
-    if (!next?.trim()) return;
+    const next = await promptDialog('עריכת עמודות', 'עמודות הלוח (מופרדות בפסיק):', cur);
+    if (!next) return;
     const columns = next.split(',').map((c) => c.trim()).filter(Boolean);
     if (columns.length === 0) return;
     await updateBoards(
@@ -83,8 +84,10 @@ export function KanbanView({ db }: { db: Db }) {
         <button className="login-btn" onClick={() => void editColumns()}><i className="fas fa-cog" /> ערוך עמודות</button>
         <button className="edit-btn" onClick={() => void newBoard()}><i className="fas fa-plus" /> לוח חדש</button>
         <button className="cancel-btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => {
-          if (window.confirm('להעביר את הלוח לארכיון?'))
-            void updateBoards((db.__BOARDS__ ?? []).map((b) => b.id === board.id ? { ...b, archived: true, updatedAt: Date.now() } : b));
+          void (async () => {
+            if (await confirmDialog('העברה לארכיון', `להעביר את הלוח "${board.name}" לארכיון?`))
+              void updateBoards((db.__BOARDS__ ?? []).map((b) => b.id === board.id ? { ...b, archived: true, updatedAt: Date.now() } : b));
+          })();
         }}><i className="fas fa-box-archive" /> ארכיון</button>
         <span className="count">{cards.length} כרטיסים</span>
       </div>

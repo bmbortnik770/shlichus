@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { type Db, buildingKeys, getBuilding, liveApts } from '@shlichus/core';
 import { useCrm } from './store';
+import { promptDialog } from './dialog';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 
 
@@ -295,10 +296,12 @@ export function CommView({ db }: { db: Db }) {
             )}
             {chosen.length > 0 && (
               <button className="login-btn" onClick={() => {
-                const name = window.prompt('שם הסגמנט:');
-                if (!name?.trim()) return;
-                const cur = ((db.__SETTINGS__?.savedSegments ?? []) as { name: string; keys: string[] }[]);
-                void updateSettings({ savedSegments: [...cur, { name: name.trim(), keys: chosen.map((r) => r.key) }] });
+                void (async () => {
+                  const name = await promptDialog('שמור סגמנט', 'שם הסגמנט:');
+                  if (!name) return;
+                  const cur = ((db.__SETTINGS__?.savedSegments ?? []) as { name: string; keys: string[] }[]);
+                  void updateSettings({ savedSegments: [...cur, { name, keys: chosen.map((r) => r.key) }] });
+                })();
               }}><i className="fas fa-bookmark" /> שמור כסגמנט</button>
             )}
           </div>

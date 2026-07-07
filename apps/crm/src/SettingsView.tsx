@@ -3,6 +3,7 @@ import type { Db } from '@shlichus/core';
 import { DEFAULT_SCORING_RULES, type ScoringRules, mergeDb, saveLocal } from '@shlichus/core';
 import { useCrm } from './store';
 import { ImportCsv } from './ImportCsv';
+import { alertDialog, confirmDialog } from './dialog';
 import { TerritoryEditor } from './TerritoryEditor';
 import { browserTokens } from './auth';
 
@@ -144,7 +145,7 @@ function TerritoryCard({ db }: { db: Db }) {
           </span>
           <button
             className="cancel-btn" style={{ marginInlineStart: 'auto', color: 'var(--danger)', borderColor: 'var(--danger)', padding: '4px 12px', fontSize: 12 }}
-            onClick={() => { if (window.confirm('להסיר את התיחום?')) saveTerritory({ polygon: undefined }); }}
+            onClick={() => { void (async () => { if (await confirmDialog('הסרת תיחום', 'להסיר את תיחום השליחות?', true)) saveTerritory({ polygon: undefined }); })(); }}
           >
             <i className="fas fa-trash" /> נקה
           </button>
@@ -577,12 +578,12 @@ export function SettingsView({ db }: { db: Db }) {
                 if (!file) return;
                 try {
                   const imported = JSON.parse(await file.text()) as Db;
-                  if (!window.confirm('לייבא את הגיבוי? הוא ימוזג עם הנתונים הקיימים (שום דבר לא יימחק).')) return;
+                  if (!(await confirmDialog('שחזור מגיבוי', 'לייבא את הגיבוי? הוא ימוזג עם הנתונים הקיימים — שום דבר לא יימחק.'))) return;
                   const merged = mergeDb(db, imported);
                   await saveLocal(merged);
                   window.location.reload();
                 } catch {
-                  window.alert('הקובץ אינו גיבוי תקין');
+                  void alertDialog('שחזור', 'הקובץ אינו גיבוי תקין');
                 }
               }}
             />

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { type Db, getCategories, getTerritory, pointInPolygon } from '@shlichus/core';
 import { useCrm } from './store';
+import { alertDialog } from './dialog';
 
 /** עורך תיחום — מודל נפרד עם מפה משלו, כמו territoryMapEditorModal בישן.
     כולל זיהוי בתים חי בתוך התיחום (tmCountBuildings) ושמירת collectedBuildings. */
@@ -146,7 +147,7 @@ export function TerritoryEditor({ db, onClose }: { db: Db; onClose: () => void }
   const scanPois = () => {
     const map = mapRef.current;
     const pts = pointsRef.current;
-    if (!map || pts.length < 3) { window.alert('צייר תיחום קודם'); return; }
+    if (!map || pts.length < 3) { void alertDialog('סריקת מוסדות', 'צייר תיחום קודם'); return; }
     const polygon: [number, number][] = [...pts, pts[0]!];
     const feats = map.queryRenderedFeatures(undefined, { layers: ['poi-label'] }).slice(0, 200);
     const found: { key: string; name: string; coords: [number, number]; catId: string }[] = [];
@@ -167,7 +168,7 @@ export function TerritoryEditor({ db, onClose }: { db: Db; onClose: () => void }
       found.push({ key, name, coords: c, catId });
     }
     setPois(found);
-    if (!found.length) window.alert('לא נמצאו מוסדות באזור הנראה — התקרב/הזז את המפה ונסה שוב');
+    if (!found.length) void alertDialog('סריקת מוסדות', 'לא נמצאו מוסדות באזור הנראה — התקרב/הזז את המפה ונסה שוב');
   };
 
   const approvePoi = (p: { key: string; name: string; catId: string }, catId: string) => {
@@ -193,7 +194,7 @@ export function TerritoryEditor({ db, onClose }: { db: Db; onClose: () => void }
 
   const save = async () => {
     const pts = pointsRef.current;
-    if (pts.length < 3) { window.alert('צריך לפחות 3 נקודות לתיחום'); return; }
+    if (pts.length < 3) { void alertDialog('תיחום', 'צריך לפחות 3 נקודות לתיחום'); return; }
     const ring: [number, number][] = [...pts, pts[0]!];
     // שמירה כמו הישן: polygon + מיזוג collectedBuildings (לא דורס קיימים)
     await updateSettings({

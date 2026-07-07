@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { type Db, buildingKeys, getBuilding, liveApts } from '@shlichus/core';
 import { useCrm } from './store';
+import { confirmDialog, promptDialog } from './dialog';
 
 interface Circle {
   id?: string;
@@ -33,16 +34,16 @@ export function CirclesView({ db }: { db: Db }) {
     return out.sort((a, b) => a.name.localeCompare(b.name, 'he'));
   }, [db]);
 
-  const newCircle = () => {
-    const name = window.prompt('שם המעגל החדש:');
-    if (!name?.trim()) return;
+  const newCircle = async () => {
+    const name = await promptDialog('מעגל חדש', 'שם המעגל:');
+    if (!name) return;
     void updateSettings({
-      connectionCircles: [...circles, { id: 'c_' + Date.now(), name: name.trim(), color: CIRCLE_COLORS[circles.length % CIRCLE_COLORS.length] }],
+      connectionCircles: [...circles, { id: 'c_' + Date.now(), name: name, color: CIRCLE_COLORS[circles.length % CIRCLE_COLORS.length] }],
     });
   };
 
-  const deleteCircle = (id: string) => {
-    if (!window.confirm('למחוק את המעגל? (החברים לא יימחקו)')) return;
+  const deleteCircle = async (id: string) => {
+    if (!(await confirmDialog('מחיקת מעגל', 'למחוק את המעגל? (החברים לא יימחקו)', true))) return;
     void updateSettings({ connectionCircles: circles.filter((c) => c.id !== id) });
   };
 
@@ -67,7 +68,7 @@ export function CirclesView({ db }: { db: Db }) {
     <section>
       <div className="table-toolbar">
         <h2 className="view-title"><i className="fas fa-circle-nodes" /> מעגלי קשר</h2>
-        <button className="edit-btn" onClick={newCircle}><i className="fas fa-plus" /> מעגל חדש</button>
+        <button className="edit-btn" onClick={() => void newCircle()}><i className="fas fa-plus" /> מעגל חדש</button>
         <span className="count">{circles.length} מעגלים</span>
       </div>
       {circles.length === 0 ? (
@@ -81,7 +82,7 @@ export function CirclesView({ db }: { db: Db }) {
               <div className="event-card" key={c.id ?? i} style={{ borderInlineStart: `4px solid ${c.color ?? '#3b82f6'}` }}>
                 <div className="drawer-head" style={{ marginBottom: 4 }}>
                   <div className="event-name">{c.name ?? 'מעגל'}</div>
-                  <button className="chip-x" title="מחיקת מעגל" onClick={() => deleteCircle(c.id!)}>✕</button>
+                  <button className="chip-x" title="מחיקת מעגל" onClick={() => void deleteCircle(c.id!)}>✕</button>
                 </div>
                 <div className="event-meta">{members.length} חברים</div>
                 <ul className="tpl-list" style={{ marginTop: 8 }}>

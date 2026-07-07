@@ -696,3 +696,14 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
 /* POI scan */
 .poi-list { padding: 8px 18px; display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; border-top: 1px solid var(--line); }
 .poi-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+/* דיאלוג מעוצב — מחליף את חלונות הדפדפן */
+.dlg {
+  width: min(420px, 94vw);
+  background: var(--surface); border-radius: 16px;
+  padding: 20px 22px; box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column; gap: 10px;
+  animation: popIn .18s ease;
+}
+.dlg-title { font-size: 17px; font-weight: 800; }
+.dlg-msg { font-size: 14px; color: var(--ink-soft); }

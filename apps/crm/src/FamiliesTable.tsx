@@ -5,6 +5,7 @@ import {
 } from '@shlichus/core';
 import { FamilyCard } from './FamilyCard';
 import { useCrm } from './store';
+import { confirmDialog, promptDialog } from './dialog';
 
 interface Row {
   bldg: string;
@@ -191,18 +192,18 @@ export function FamiliesTable({
   };
 
   const bulkDelete = async () => {
-    if (!window.confirm(`למחוק ${bulk.size} משפחות? (המחיקה מסתנכרנת לכל המכשירים)`)) return;
+    if (!(await confirmDialog('מחיקת משפחות', `למחוק ${bulk.size} משפחות? המחיקה מסתנכרנת לכל המכשירים.`, true))) return;
     for (const k of bulk) { const [b, i] = k.split('|'); await deleteApt(b!, Number(i)); }
     setBulk(new Set());
   };
   const bulkAddTag = async () => {
-    const tag = window.prompt('איזו תגית להוסיף לנבחרות?');
-    if (!tag?.trim()) return;
+    const tag = await promptDialog('הוספת תגית', 'איזו תגית להוסיף לנבחרות?');
+    if (!tag) return;
     for (const k of bulk) {
       const [b, i] = k.split('|');
       const apt = getBuilding(db, b!)?.apts[Number(i)];
-      if (apt && !(apt.tags ?? []).includes(tag.trim())) {
-        await updateApt(b!, Number(i), { tags: [...(apt.tags ?? []), tag.trim()] });
+      if (apt && !(apt.tags ?? []).includes(tag)) {
+        await updateApt(b!, Number(i), { tags: [...(apt.tags ?? []), tag] });
       }
     }
     setBulk(new Set());

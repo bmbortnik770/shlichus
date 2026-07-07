@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Apartment, Db, Donation, InteractionLog, Milestone, Task } from '@shlichus/core';
 import { NO_ADDRESS_KEY, daysUntil, formatHebrew, getAptScore, getStatusColor, hebrewParts, nextOccurrence } from '@shlichus/core';
+import { alertDialog, confirmDialog, formDialog } from './dialog';
 
 interface Props {
   bldg: string;
@@ -108,7 +109,12 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (editing && !window.confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?')) return;
+      if (editing) {
+        void (async () => {
+          if (await confirmDialog('שינויים לא שמורים', 'יש שינויים שלא שמרת. לצאת בכל זאת?')) onClose();
+        })();
+        return;
+      }
       onClose();
     };
     document.addEventListener('keydown', onKey);
@@ -156,13 +162,13 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
     if (msDateMode === 'heb') {
       // הזנת תאריך עברי ישירות — מחושב המופע הבא בלוח
       const next = nextOccurrence(msHebMonth, msHebDay);
-      if (!next) { window.alert('תאריך עברי לא תקין'); return; }
+      if (!next) { void alertDialog('אבני דרך', 'תאריך עברי לא תקין'); return; }
       gregDateStr = next.toISOString().slice(0, 10);
       h = { day: msHebDay, monthName: msHebMonth, year: 0 };
     } else {
       if (!msDate) return;
       h = hebrewParts(new Date(msDate + 'T12:00:00'));
-      if (!h) { window.alert('תאריך לא תקין'); return; }
+      if (!h) { void alertDialog('אבני דרך', 'תאריך לא תקין'); return; }
     }
     const msDateFinal = gregDateStr;
     setSaving(true);
@@ -182,27 +188,47 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
   };
 
   const removeMilestone = async (id: unknown) => {
-    if (!window.confirm('להסיר את ציון הדרך?')) return;
+    if (!(await confirmDialog('הסרת ציון דרך', 'להסיר את ציון הדרך?', true))) return;
     await onSave({ milestones: (apt.milestones ?? []).filter((m) => (m as { id?: unknown }).id !== id) });
   };
 
   const markDeceased = async () => {
-    const who = window.prompt('מי נפטר/ה? (אב / אם / שם אחר)');
-    if (!who) return;
-    const date = window.prompt('תאריך פטירה לועזי (YYYY-MM-DD):', new Date().toISOString().slice(0, 10));
-    if (!date) return;
-    const h = hebrewParts(new Date(date + 'T12:00:00'));
+    // דיאלוג כמו deceasedModal בישן: מי + תאריך + יארצייט אוטומטי
+    const r = await formDialog({
+      title: 'תיעוד פטירה',
+      message: apt.name ? `משפחת ${apt.name}` : undefined,
+      confirmLabel: 'שמירה',
+      fields: [
+        { key: 'who', label: 'מי נפטר/ה?', type: 'select', value: 'father', options: [
+          { value: 'father', label: `האב${form.father ? ' — ' + form.father : ''}` },
+          { value: 'mother', label: `האם${form.mother ? ' — ' + form.mother : ''}` },
+          { value: 'other', label: 'אחר' },
+        ] },
+        { key: 'otherName', label: 'שם (אם אחר)', type: 'text' },
+        { key: 'date', label: 'תאריך פטירה לועזי', type: 'date', value: new Date().toISOString().slice(0, 10) },
+        { key: 'yahrzeit', label: 'הוסף יארצייט שנתי אוטומטי', type: 'checkbox', value: true },
+      ],
+    });
+    if (!r) return;
+    const whoKey = String(r.who);
+    const who = whoKey === 'father' ? (form.father || 'האב') : whoKey === 'mother' ? (form.mother || 'האם') : String(r.otherName || 'ע״ה');
+    const date = String(r.date);
     const milestones = [...(apt.milestones ?? [])];
-    if (h) {
-      milestones.push({
-        id: Date.now(), type: 'yahrzeit',
-        label: `יארצייט ${who} — ${apt.name ?? ''}`,
-        monthName: h.monthName, day: h.day, gregDate: date, autoCreated: true,
-      } as Milestone);
+    if (r.yahrzeit && date) {
+      const h = hebrewParts(new Date(date + 'T12:00:00'));
+      if (h) {
+        const whoLabel = whoKey === 'father' ? 'האב' : whoKey === 'mother' ? 'האם' : who;
+        milestones.push({
+          id: Date.now(), type: 'yahrzeit',
+          label: `יארצייט ${whoLabel} — ${apt.name ?? ''}`,
+          monthName: h.monthName, day: h.day, gregDate: date, autoCreated: true,
+        } as Milestone);
+      }
     }
+    // אותו מבנה כמו confirmDeceased בישן
     await onSave({
       lifeStatus: 'deceased',
-      deceasedInfo: { who, date, recordedAt: new Date().toISOString() },
+      deceasedInfo: { who: whoKey, date, recordedAt: new Date().toISOString() },
       milestones,
     } as Partial<Apartment>);
   };
@@ -406,8 +432,26 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
                 <button
                   className="cancel-btn"
                   onClick={() => {
-                    const name = window.prompt('שם בן/בת המשפחה לכרטיס הנפרד:');
-                    if (name?.trim()) void onSplit(name.trim());
+                    void (async () => {
+                      const opts = [
+                        ...(form.father ? [{ value: form.father, label: `האב — ${form.father}` }] : []),
+                        ...(form.mother ? [{ value: form.mother, label: `האם — ${form.mother}` }] : []),
+                        ...children.filter((c) => c.name).map((c) => ({ value: c.name!, label: `ילד/ה — ${c.name}` })),
+                        { value: '__other__', label: 'שם אחר…' },
+                      ];
+                      const r = await formDialog({
+                        title: 'פיצול כרטיס',
+                        message: 'לאיזה בן משפחה ליצור כרטיס נפרד?',
+                        confirmLabel: 'פיצול',
+                        fields: [
+                          { key: 'member', label: 'בן/בת המשפחה', type: 'select', value: opts[0]?.value ?? '__other__', options: opts },
+                          { key: 'otherName', label: 'שם (אם אחר)', type: 'text' },
+                        ],
+                      });
+                      if (!r) return;
+                      const name = r.member === '__other__' ? String(r.otherName || '').trim() : String(r.member);
+                      if (name) void onSplit(name);
+                    })();
                   }}
                 >
                   <i className="fas fa-people-arrows" /> פיצול כרטיס
