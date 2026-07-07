@@ -35,6 +35,8 @@ interface CrmState {
   deleteApt: (bldg: string, idx: number) => Promise<void>;
   updateBuildingInfo: (bldg: string, patch: Record<string, unknown>) => Promise<void>;
   updateBoards: (boards: Db['__BOARDS__']) => Promise<void>;
+  /** יצירת בניין אם אינו קיים (לחיצה על מבנה במפה) — מבנה זהה לישן */
+  ensureBuilding: (bldg: string, info: Record<string, unknown>) => Promise<void>;
   /** פיצול כרטיס — יוצר כרטיס נפרד לבן משפחה, עם קישור דו-כיווני כמו בישן */
   splitFamily: (bldg: string, idx: number, memberName: string) => Promise<{ bldg: string; idx: number } | null>;
   /** ייבוא משפחות; מחזיר {imported, skipped} — כפילות לפי כתובת+שם+דירה מדולגת */
@@ -214,6 +216,20 @@ export const useCrm = create<CrmState>((set, get) => {
     }
     if (imported > 0) await persistAndPush();
     return { imported, skipped };
+  },
+
+  ensureBuilding: async (bldg, info) => {
+    const db = get().db;
+    if (!db) return;
+    const existing = getBuilding(db, bldg);
+    if (!existing) {
+      (db as Record<string, unknown>)[bldg] = { info: { code: '', rep: '', notes: '', ...info }, apts: [] };
+    } else if (!existing.info.polygon && info.polygon) {
+      existing.info = { ...existing.info, polygon: info.polygon };
+    } else {
+      return; // אין שינוי — אל תשמור
+    }
+    await persistAndPush();
   },
 
   updateBoards: async (boards) => {

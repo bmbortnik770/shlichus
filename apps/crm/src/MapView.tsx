@@ -76,6 +76,9 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
   const [drawCount, setDrawCount] = useState(0);
   const [markerCount, setMarkerCount] = useState(0);
   const updateSettings = useCrm((s) => s.updateSettings);
+  const ensureBuilding = useCrm((s) => s.ensureBuilding);
+  const dbRef = useRef(db);
+  dbRef.current = db;
 
   const settings = db.__SETTINGS__ ?? {};
   const territory = getTerritory(db);
@@ -179,6 +182,82 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
         'bottom-right'
       );
       mapRef.current = map;
+      (window as unknown as { __map?: mapboxgl.Map }).__map = map; // לבדיקות
+
+      // ── שכבת בניינים תלת-ממדית + ריחוף + לחיצה — העתק מדויק מהישן ──
+      const accent = String(dbRef.current.__SETTINGS__?.themeColor ?? '#3b82f6');
+      let hoveredStateId: string | number | null = null;
+      const hoverPopup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
+
+      map.on('style.load', () => {
+        if (!map.getLayer('3d-buildings')) {
+          map.addLayer({
+            id: '3d-buildings', source: 'composite', 'source-layer': 'building',
+            filter: ['==', 'extrude', 'true'], type: 'fill-extrusion', minzoom: 15,
+            paint: {
+              'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'hover'], false], accent, '#d1d5db'],
+              'fill-extrusion-height': ['get', 'height'],
+              'fill-extrusion-base': ['get', 'min_height'],
+              'fill-extrusion-opacity': 0.8,
+            },
+          });
+        }
+      });
+
+      map.on('mousemove', '3d-buildings', (e) => {
+        const features = (e as unknown as { features?: { id?: string | number }[] }).features;
+        if (!features?.length) return;
+        map.getCanvas().style.cursor = 'pointer';
+        if (hoveredStateId !== null) map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: hoveredStateId }, { hover: false });
+        hoveredStateId = features[0]!.id as string | number;
+        map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: hoveredStateId }, { hover: true });
+        hoverPopup.setLngLat(e.lngLat).setHTML(
+          '<div style="direction:rtl;font-weight:600;font-size:12px;color:' + accent + ';">👆 ניהול בניין</div>'
+        ).addTo(map);
+      });
+      map.on('mouseleave', '3d-buildings', () => {
+        map.getCanvas().style.cursor = '';
+        if (hoveredStateId !== null) map.setFeatureState({ source: 'composite', sourceLayer: 'building', id: hoveredStateId }, { hover: false });
+        hoveredStateId = null;
+        hoverPopup.remove();
+      });
+
+      map.on('click', '3d-buildings', (e) => {
+        if (drawPointsRef.current.length || (map.getCanvas().style.cursor === 'crosshair')) return; // במצב ציור — לא
+        hoverPopup.remove();
+        const clickPt: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+        const cur = dbRef.current;
+
+        // 1. נקודה בתוך פוליגון של כרטיס קיים → פתח אותו (כמו בישן)
+        for (const key of buildingKeys(cur)) {
+          const ring = getBuilding(cur, key)?.info?.polygon as [number, number][] | undefined;
+          if (!ring || ring.length < 3) continue;
+          if (pointInPolygon(clickPt, ring)) { onOpenBuilding(key); return; }
+        }
+
+        // 2. אחרת — reverse geocode, צור כרטיס עם coords+polygon, ופתח
+        void (async () => {
+          try {
+            const r = await fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${e.lngLat.lng},${e.lngLat.lat}.json?types=address&language=he&access_token=${mapboxgl.accessToken}`
+            );
+            const d = (await r.json()) as { features?: { place_name: string; place_name_he?: string }[] };
+            let addr = `מיקום (${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)})`;
+            if (d.features?.length) addr = (d.features[0]!.place_name_he || d.features[0]!.place_name).split(',')[0]!.trim();
+
+            const clicked = map.queryRenderedFeatures(e.point, { layers: ['3d-buildings'] });
+            let polygon: unknown = null;
+            const geom = (clicked[0] as unknown as { geometry?: { type?: string; coordinates?: unknown[][] } })?.geometry;
+            if (geom?.type === 'Polygon') polygon = geom.coordinates![0];
+            else if (geom?.type === 'MultiPolygon') polygon = (geom.coordinates![0] as unknown[][])[0];
+
+            await ensureBuilding(addr, { coords: clickPt, polygon });
+            onOpenBuilding(addr);
+          } catch {
+            window.alert('שגיאת כתובת');
+          }
+        })();
+      });
       buildMarkers(map);
       renderTerritory(map, territory.polygon);
     } catch (e) {
