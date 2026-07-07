@@ -33,6 +33,7 @@ const COMM_TABS = [
   { key: 'calls', label: 'חיוג', icon: 'fa-phone' },
   { key: 'history', label: 'היסטוריה', icon: 'fa-clock-rotate-left' },
   { key: 'docs', label: 'תיעודים', icon: 'fa-file-lines' },
+  { key: 'templates', label: 'תבניות', icon: 'fa-file-pen' },
 ] as const;
 
 const DOC_CHANNELS: Record<string, string> = {
@@ -163,6 +164,19 @@ export function CommView({ db }: { db: Db }) {
       <div className="table-toolbar">
         <h2 className="view-title">מרכז תקשורת</h2>
         <span className="count">{chosen.length} נבחרו מתוך {filtered.length}</span>
+        <span className="filter-pill" style={{ cursor: 'default', color: 'var(--accent)' }}>
+          <i className="fas fa-paper-plane" /> {(() => {
+            const cutoff = Date.now() - 30 * 86400000;
+            let n = 0;
+            for (const key of buildingKeys(db)) {
+              liveApts(getBuilding(db, key)?.apts).forEach((a) =>
+                (a.interactions ?? []).forEach((l) => {
+                  if (l.source === 'comm_hub' && new Date(String(l.date ?? '')).getTime() > cutoff) n++;
+                }));
+            }
+            return n;
+          })()} הודעות נשלחו החודש
+        </span>
       </div>
       <div className="card-tabs">
         {COMM_TABS.map((t) => (
@@ -174,6 +188,7 @@ export function CommView({ db }: { db: Db }) {
       {commTab === 'calls' && <CallsTab db={db} />}
       {commTab === 'history' && <HistoryTab db={db} />}
       {commTab === 'docs' && <DocsTab db={db} />}
+      {commTab === 'templates' && <TemplatesTab db={db} />}
       {commTab === 'compose' && (
       <>
       <div className="table-toolbar" style={{ margin: '0 0 10px' }}>
@@ -213,7 +228,7 @@ export function CommView({ db }: { db: Db }) {
             <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder="שלום משפחת [שם]…" />
           </label>
           {text && chosen[0] && (
-            <p className="comm-preview">תצוגה מקדימה: {personalize(text, chosen[0].name)}</p>
+            <p className="comm-preview"><i className="fas fa-eye" /> תצוגה מקדימה ({chosen[0].name}): {personalize(text, chosen[0].name)}</p>
           )}
           {chosen.length > 0 && text.trim() && (
             <div className="send-list">
@@ -545,6 +560,42 @@ function HistoryTab({ db }: { db: Db }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+
+/** טאב תבניות — ניהול מלא כמו בישן */
+function TemplatesTab({ db }: { db: Db }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const templates = ((db.__SETTINGS__?.templates ?? []) as { title?: string; text?: string }[]);
+  const [title, setTitle] = useState('');
+  const [text, setText] = useState('');
+
+  return (
+    <div className="comm-recipients" style={{ marginTop: 4 }}>
+      <ul className="tpl-list">
+        {templates.map((t, i) => (
+          <li key={i}>
+            <div>
+              <strong>{t.title}</strong>
+              <div className="tpl-text">{t.text}</div>
+            </div>
+            <button className="close-btn" aria-label={'מחיקת ' + (t.title ?? '')} onClick={() => void updateSettings({ templates: templates.filter((_, x) => x !== i) })}>✕</button>
+          </li>
+        ))}
+        {templates.length === 0 && <li className="placeholder">אין תבניות עדיין.</li>}
+      </ul>
+      <div className="quick-add">
+        <div className="quick-add-row"><input placeholder="שם התבנית…" value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+        <div className="quick-add-row"><input placeholder="טקסט — [שם] יוחלף בשם המשפחה" value={text} onChange={(e) => setText(e.target.value)} /></div>
+        <div className="quick-add-row">
+          <button className="save-btn" disabled={!title.trim() || !text.trim()} onClick={() => {
+            void updateSettings({ templates: [...templates, { title: title.trim(), text: text.trim() }] });
+            setTitle(''); setText('');
+          }}>שמירת תבנית</button>
+        </div>
+      </div>
     </div>
   );
 }

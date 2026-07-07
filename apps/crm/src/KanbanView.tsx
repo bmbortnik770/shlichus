@@ -82,16 +82,33 @@ export function KanbanView({ db }: { db: Db }) {
         </select>
         <button className="login-btn" onClick={() => void editColumns()}><i className="fas fa-cog" /> ערוך עמודות</button>
         <button className="edit-btn" onClick={() => void newBoard()}><i className="fas fa-plus" /> לוח חדש</button>
+        <button className="cancel-btn" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => {
+          if (window.confirm('להעביר את הלוח לארכיון?'))
+            void updateBoards((db.__BOARDS__ ?? []).map((b) => b.id === board.id ? { ...b, archived: true, updatedAt: Date.now() } : b));
+        }}><i className="fas fa-box-archive" /> ארכיון</button>
         <span className="count">{cards.length} כרטיסים</span>
       </div>
       <div className="kanban">
         {board.columns.map((col) => (
-          <div className="kanban-col" key={col}>
+          <div
+            className="kanban-col" key={col}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const key = e.dataTransfer.getData('text/plain');
+              const card = cards.find((c) => `${c.bldg}|${c.idx}` === key);
+              if (card && card.stage !== col) move(card, col);
+            }}
+          >
             <div className="kanban-col-head">
               {col} <span className="col-count">{cards.filter((c) => c.stage === col).length}</span>
             </div>
             {cards.filter((c) => c.stage === col).map((c) => (
-              <div className="kanban-card" key={`${c.bldg}|${c.idx}`}>
+              <div
+                className="kanban-card" key={`${c.bldg}|${c.idx}`}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData('text/plain', `${c.bldg}|${c.idx}`)}
+              >
                 <div className="kanban-card-name">{c.name}</div>
                 <select
                   className="stage-select"
