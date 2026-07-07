@@ -19,10 +19,11 @@ function exportBackup(db: Db) {
 
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
 
-/** 1. מיקום מרכזי במפה — כמו primaryLocation בישן */
+/** 1. מיקום מרכזי במפה — רדיו בית חב"ד/אחר כמו בישן */
 function HomeLocationCard({ db }: { db: Db }) {
   const updateSettings = useCrm((s) => s.updateSettings);
-  const home = (db.__SETTINGS__?.homeLocation ?? {}) as { address?: string; coords?: [number, number] };
+  const home = (db.__SETTINGS__?.homeLocation ?? {}) as { address?: string; coords?: [number, number]; isChabad?: boolean };
+  const [locType, setLocType] = useState<'chabad' | 'other'>(home.isChabad === false ? 'other' : 'chabad');
   const [editing, setEditing] = useState(false);
   const [addr, setAddr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -38,29 +39,31 @@ function HomeLocationCard({ db }: { db: Db }) {
       const data = (await res.json()) as { features?: { center: [number, number]; place_name: string }[] };
       const f = data.features?.[0];
       if (!f) { setMsg('הכתובת לא נמצאה — נסה לדייק'); return; }
-      // אותם מפתחות כמו confirmPrimaryChange בישן
       await updateSettings({
         primaryLocation: { coords: f.center, address: f.place_name },
-        homeLocation: { coords: f.center, address: f.place_name, isChabad: true },
+        homeLocation: { coords: f.center, address: f.place_name, isChabad: locType === 'chabad' },
       });
-      setMsg('כתובת בית חב״ד עודכנה ונשמרה!');
+      setMsg('הכתובת עודכנה ונשמרה!');
       setEditing(false);
-    } catch {
-      setMsg('שגיאה באיתור הכתובת');
-    } finally {
-      setBusy(false);
-    }
+    } catch { setMsg('שגיאה באיתור הכתובת'); } finally { setBusy(false); }
   };
 
   return (
     <div className="settings-card">
       <h3><i className="fas fa-map-marker-alt" /> מיקום מרכזי במפה</h3>
-      <p className="tpl-text">כתובת בית חב״ד: <strong>{home.address ?? 'לא הוגדר'}</strong></p>
-      {!editing ? (
-        <button className="login-btn" style={{ alignSelf: 'flex-start' }} onClick={() => setEditing(true)}>
+      <label className="radio-row">
+        <input type="radio" name="locType" checked={locType === 'chabad'} onChange={() => setLocType('chabad')} />
+        <strong>בית חב״ד</strong>
+        <button className="login-btn" style={{ padding: '4px 10px', fontSize: 12, marginInlineStart: 'auto' }} onClick={() => setEditing(true)}>
           <i className="fas fa-pen" /> שנה כתובת
         </button>
-      ) : (
+      </label>
+      <p className="tpl-text" style={{ marginInlineStart: 26 }}>כתובת נוכחית: <strong>{home.address ?? 'לא הוגדר'}</strong></p>
+      <label className="radio-row">
+        <input type="radio" name="locType" checked={locType === 'other'} onChange={() => { setLocType('other'); setEditing(true); }} />
+        אחר
+      </label>
+      {editing && (
         <div className="chip-add">
           <input placeholder="חפש את הכתובת הקבועה…" value={addr} onChange={(e) => setAddr(e.target.value)} />
           <button className="login-btn" disabled={busy || !addr.trim()} onClick={() => void locate()}>
@@ -73,30 +76,89 @@ function HomeLocationCard({ db }: { db: Db }) {
   );
 }
 
-/** 2. אזור השליחות — שם + תיחום, כמו shlichutAreaDetails בישן */
+/** 2. הגדרות מקום השליחות — ווידג'טים כמו shlichutAreaDetails בישן */
+function polygonAreaKm2(pts: [number, number][]): number {
+  if (!pts || pts.length < 3) return 0;
+  const R = 6371;
+  let area = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, y1] = pts[i]!;
+    const [x2, y2] = pts[(i + 1) % pts.length]!;
+    area += ((x2 - x1) * Math.PI / 180) * (2 + Math.sin(y1 * Math.PI / 180) + Math.sin(y2 * Math.PI / 180));
+  }
+  return Math.abs(area * R * R / 2);
+}
+
 function TerritoryCard({ db }: { db: Db }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const updateSettings = useCrm((s) => s.updateSettings);
   const territory = (db.__SETTINGS__?.territory ?? {}) as Record<string, unknown>;
   const [name, setName] = useState(String(territory.missionName ?? ''));
-  const hasPolygon = Array.isArray(territory.polygon) && (territory.polygon as unknown[]).length >= 3;
+  const [drawMode, setDrawMode] = useState(String(territory.drawMode ?? 'manual'));
+  const polygon = (territory.polygon ?? []) as [number, number][];
+  const hasPolygon = polygon.length >= 3;
+  const km2 = polygonAreaKm2(polygon);
+  const displayMode = String(territory.displayMode ?? 'border');
+
+  const saveTerritory = (patch: Record<string, unknown>) =>
+    void updateSettings({ territory: { ...territory, ...patch } });
 
   return (
     <div className="settings-card">
-      <h3><i className="fas fa-draw-polygon" /> אזור השליחות</h3>
+      <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <i className="fas fa-draw-polygon" /> הגדרות מקום השליחות
+        {hasPolygon && <span className="ok-badge">מוגדר</span>}
+      </h3>
       <label className="edit-field">
         <span><i className="fas fa-tag" /> שם מקום השליחות</span>
-        <input value={name} placeholder="למשל: שכונת רמות, בית חב״ד..." onChange={(e) => setName(e.target.value)} />
+        <input
+          value={name} placeholder="למשל: בית חב״ד רעננה…"
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => saveTerritory({ missionName: name.trim() })}
+        />
       </label>
-      <div className="edit-actions">
-        <button className="login-btn" onClick={() => void updateSettings({ territory: { ...territory, missionName: name.trim() } })}>
-          שמירת שם
-        </button>
-        <button className="login-btn" id="btnOpenTerritoryEditor" onClick={() => setEditorOpen(true)}>
-          <i className="fas fa-draw-polygon" /> {hasPolygon ? 'עריכת תיחום' : 'פתח עורך תיחום'}
-        </button>
+
+      <span className="tpl-text"><i className="fas fa-vector-square" /> תיחום אזור השליחות</span>
+      <div className="mode-row">
+        <label className={'mode-box' + (drawMode !== 'manual' ? ' active' : '')}>
+          <input type="radio" name="drawMode" checked={drawMode !== 'manual'} onChange={() => { setDrawMode('city'); saveTerritory({ drawMode: 'city' }); }} />
+          <span><strong>🏙️ עיר / יישוב</strong><br /><small>תיחום אוטומטי</small></span>
+        </label>
+        <label className={'mode-box' + (drawMode === 'manual' ? ' active' : '')}>
+          <input type="radio" name="drawMode" checked={drawMode === 'manual'} onChange={() => { setDrawMode('manual'); saveTerritory({ drawMode: 'manual' }); }} />
+          <span><strong>✏️ ציור ידני</strong><br /><small>שכונה / תת-שכונה</small></span>
+        </label>
       </div>
-      <p className="tpl-text">{hasPolygon ? '✓ מוגדר תיחום שליחות' : 'טרם הוגדר תיחום'}</p>
+
+      <button className="login-btn" id="btnOpenTerritoryEditor" style={{ borderColor: '#10b981', color: '#10b981' }} onClick={() => setEditorOpen(true)}>
+        <i className="fas fa-draw-polygon" /> {hasPolygon ? 'עריכת התיחום במפה' : 'פתח עורך תיחום'}
+      </button>
+
+      {hasPolygon && (
+        <div className="area-card">
+          <i className="fas fa-check-circle" style={{ color: '#10b981', fontSize: 18 }} />
+          <span>
+            <strong>אזור מתוחם</strong><br />
+            <small>שטח: <strong style={{ color: '#10b981' }}>{km2 < 1 ? (km2 * 100).toFixed(1) + ' דונם' : km2.toFixed(2) + ' קמ״ר'}</strong></small>
+          </span>
+          <button
+            className="cancel-btn" style={{ marginInlineStart: 'auto', color: 'var(--danger)', borderColor: 'var(--danger)', padding: '4px 12px', fontSize: 12 }}
+            onClick={() => { if (window.confirm('להסיר את התיחום?')) saveTerritory({ polygon: undefined }); }}
+          >
+            <i className="fas fa-trash" /> נקה
+          </button>
+        </div>
+      )}
+
+      <span className="tpl-text"><i className="fas fa-eye" /> תצוגת גבול על המפה</span>
+      <div className="mode-row">
+        {[['border', 'קו גבול'], ['fill', 'מילוי עדין'], ['none', 'ללא']].map(([k, v]) => (
+          <label key={k} className={'mode-box small' + (displayMode === k ? ' active' : '')}>
+            <input type="radio" name="dispMode" checked={displayMode === k} onChange={() => saveTerritory({ displayMode: k })} />
+            {v}
+          </label>
+        ))}
+      </div>
       {editorOpen && <TerritoryEditor db={db} onClose={() => setEditorOpen(false)} />}
     </div>
   );
@@ -393,9 +455,6 @@ function EventTypesEditor({ db }: { db: Db }) {
 export function SettingsView({ db }: { db: Db }) {
   return (
     <section>
-      <div className="table-toolbar">
-        <h2 className="view-title"><i className="fas fa-cog" /> הגדרות</h2>
-      </div>
 
       {/* סדר וסגנון זהים למודל ההגדרות הישן: סקשנים מתקפלים בעמודה אחת */}
       <div className="settings-col">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Apartment, Db, Donation, InteractionLog, Milestone, Task } from '@shlichus/core';
-import { NO_ADDRESS_KEY, daysUntil, formatHebrew, hebrewParts } from '@shlichus/core';
+import { NO_ADDRESS_KEY, daysUntil, formatHebrew, getAptScore, getStatusColor, hebrewParts, nextOccurrence } from '@shlichus/core';
 
 interface Props {
   bldg: string;
@@ -14,10 +14,9 @@ interface Props {
 const TABS = [
   { key: 'details', label: 'פרטים', icon: 'fa-user' },
   { key: 'activity', label: 'פעילות', icon: 'fa-bolt' },
-  { key: 'milestones', label: 'אבני דרך', icon: 'fa-calendar-star' },
-  { key: 'tasks', label: 'משימות', icon: 'fa-check-double' },
   { key: 'donations', label: 'תרומות', icon: 'fa-hand-holding-heart' },
   { key: 'docs', label: 'תיעוד', icon: 'fa-file-lines' },
+  { key: 'milestones', label: 'אבני דרך', icon: 'fa-calendar-star' },
 ] as const;
 
 const DOC_CHANNELS: Record<string, string> = {
@@ -92,6 +91,10 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
   const [donAmount, setDonAmount] = useState('');
   const [donCampaign, setDonCampaign] = useState('');
   const [msType, setMsType] = useState('birthday');
+  const [msRecurring, setMsRecurring] = useState(true); // ספירלי כברירת מחדל כמו בישן
+  const [msDateMode, setMsDateMode] = useState<'greg' | 'heb'>('greg');
+  const [msHebDay, setMsHebDay] = useState(15);
+  const [msHebMonth, setMsHebMonth] = useState('תשרי');
   const [msLabel, setMsLabel] = useState('');
   const [msDate, setMsDate] = useState('');
   const [docChannel, setDocChannel] = useState('general');
@@ -148,9 +151,20 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
   };
 
   const addMilestone = async () => {
-    if (!msDate) return;
-    const h = hebrewParts(new Date(msDate + 'T12:00:00'));
-    if (!h) { window.alert('תאריך לא תקין'); return; }
+    let gregDateStr = msDate;
+    let h = null as ReturnType<typeof hebrewParts>;
+    if (msDateMode === 'heb') {
+      // הזנת תאריך עברי ישירות — מחושב המופע הבא בלוח
+      const next = nextOccurrence(msHebMonth, msHebDay);
+      if (!next) { window.alert('תאריך עברי לא תקין'); return; }
+      gregDateStr = next.toISOString().slice(0, 10);
+      h = { day: msHebDay, monthName: msHebMonth, year: 0 };
+    } else {
+      if (!msDate) return;
+      h = hebrewParts(new Date(msDate + 'T12:00:00'));
+      if (!h) { window.alert('תאריך לא תקין'); return; }
+    }
+    const msDateFinal = gregDateStr;
     setSaving(true);
     const typeLabel = MS_TYPES.find((t) => t.key === msType)?.label ?? msType;
     const m: Milestone = {
@@ -159,7 +173,8 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
       label: msLabel.trim() || `${typeLabel} — ${apt.name ?? ''}`,
       monthName: h.monthName,
       day: h.day,
-      gregDate: msDate,
+      gregDate: msDateFinal,
+      recurring: msRecurring,
     };
     await onSave({ milestones: [...(apt.milestones ?? []), m] });
     setMsLabel(''); setMsDate('');
@@ -243,6 +258,23 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
             <button className="close-btn" onClick={onClose} aria-label="סגירה">✕</button>
           </div>
         </header>
+        <div className="chip-row" style={{ marginBottom: 8 }}>
+          {(() => {
+            const score = getAptScore(apt, db?.__SETTINGS__);
+            const color = getStatusColor(apt, db?.__SETTINGS__);
+            const label = score < 0 ? 'אין קשר' : color === '#10b981' ? `${score} — חם 🔥` : color === '#f59e0b' ? `${score} — פושר 🌤️` : `${score} — קר ❄️`;
+            return <span className="contact-badge" style={{ background: color + '22', color }}>{label}</span>;
+          })()}
+          {(() => {
+            const latest = (apt.interactions ?? []).reduce((max, i) => {
+              const t = new Date(i.date ?? '').getTime();
+              return isNaN(t) ? max : Math.max(max, t);
+            }, 0);
+            if (!latest) return <span className="contact-badge none">אין תיעוד</span>;
+            const days = Math.floor((Date.now() - latest) / 86400000);
+            return <span className="contact-badge fresh"><i className="fas fa-history" /> {days === 0 ? 'היום' : `לפני ${days} ימים`}</span>;
+          })()}
+        </div>
         <p className="drawer-sub">
           {bldg === NO_ADDRESS_KEY ? 'ללא כתובת' : `${bldg} ${apt.num ?? ''}`.trim()}
           {apt.style ? ` · ${apt.style}` : ''}
@@ -401,59 +433,7 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
                 <button className="edit-btn" disabled={saving || !logText.trim()} onClick={() => void addLog()}>תעד</button>
               </div>
             </section>
-            <section>
-              <h3>יומן פעילות ({logs.length})</h3>
-              {logs.length === 0 ? <p className="placeholder">אין תיעוד עדיין — התיעוד הראשון במרחק שורה אחת למעלה.</p> : (
-                <ul>
-                  {logs.map((l, i) => (
-                    <li key={i}><strong>{l.date ?? ''}</strong> {l.type ? `· ${l.type}` : ''} — {String(l.text ?? l.notes ?? '')}</li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </>
-        )}
 
-        {tab === 'milestones' && (
-          <>
-            <section className="quick-add">
-              <div className="quick-add-row">
-                <select className="board-select" value={msType} onChange={(e) => setMsType(e.target.value)}>
-                  {MS_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-                </select>
-                <input type="date" value={msDate} onChange={(e) => setMsDate(e.target.value)} style={{ maxWidth: 150 }} />
-                <input placeholder="תיאור (לא חובה)" value={msLabel} onChange={(e) => setMsLabel(e.target.value)} />
-                <button className="edit-btn" disabled={saving || !msDate} onClick={() => void addMilestone()}>הוסף</button>
-              </div>
-              <p className="tpl-text">התאריך העברי מחושב אוטומטית והאירוע חוזר כל שנה לפי הלוח העברי.</p>
-            </section>
-            <section>
-              <h3>ציוני דרך ({(apt.milestones ?? []).length})</h3>
-              {(apt.milestones ?? []).length === 0 ? <p className="placeholder">אין ציוני דרך.</p> : (
-                <ul className="task-list">
-                  {(apt.milestones ?? []).map((m, i) => {
-                    const ms = m as { id?: unknown; label?: string; day?: number; monthName?: string };
-                    const days = ms.day && ms.monthName ? daysUntil(ms.monthName, ms.day) : null;
-                    return (
-                      <li key={i} className="task">
-                        <span className="task-text">
-                          {String(ms.label ?? '')}
-                          {ms.day && ms.monthName ? ` · ${formatHebrew(ms.day, ms.monthName)}` : ''}
-                        </span>
-                        <span className="task-meta">
-                          {days !== null && (days === 0 ? 'היום!' : `בעוד ${days} ימים`)}
-                          <button className="chip-x" title="הסרה" onClick={() => void removeMilestone(ms.id)}>✕</button>
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
-          </>
-        )}
-
-        {tab === 'tasks' && (
           <>
             <section className="quick-add">
               <div className="quick-add-row">
@@ -480,6 +460,78 @@ export function FamilyCard({ bldg, apt, db, onClose, onSave, onSplit }: Props) {
                       {(t.due || t.date) ? <span className="task-meta">{String(t.due ?? t.date)}</span> : null}
                     </li>
                   ))}
+                </ul>
+              )}
+            </section>
+          </>
+        
+            <section>
+              <h3>יומן פעילות ({logs.length})</h3>
+              {logs.length === 0 ? <p className="placeholder">אין תיעוד עדיין — התיעוד הראשון במרחק שורה אחת למעלה.</p> : (
+                <ul>
+                  {logs.map((l, i) => (
+                    <li key={i}><strong>{l.date ?? ''}</strong> {l.type ? `· ${l.type}` : ''} — {String(l.text ?? l.notes ?? '')}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
+        )}
+
+        {tab === 'milestones' && (
+          <>
+            <div className="channel-tabs" style={{ alignSelf: 'flex-start', marginBottom: 8 }}>
+              <button className={msRecurring ? 'chan active' : 'chan'} onClick={() => setMsRecurring(true)}>🔄 ספירלי</button>
+              <button className={!msRecurring ? 'chan active' : 'chan'} onClick={() => setMsRecurring(false)}>📌 חד פעמי</button>
+            </div>
+            <section className="quick-add">
+              <div className="quick-add-row">
+                <select className="board-select" value={msType} onChange={(e) => setMsType(e.target.value)}>
+                  {MS_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                </select>
+                <span className="channel-tabs">
+                  <button className={msDateMode === 'greg' ? 'chan active' : 'chan'} onClick={() => setMsDateMode('greg')}>📅 לועזי</button>
+                  <button className={msDateMode === 'heb' ? 'chan active' : 'chan'} onClick={() => setMsDateMode('heb')}>🗓️ עברי</button>
+                </span>
+              </div>
+              <div className="quick-add-row">
+                {msDateMode === 'greg' ? (
+                  <input type="date" value={msDate} onChange={(e) => setMsDate(e.target.value)} style={{ maxWidth: 150 }} />
+                ) : (
+                  <>
+                    <select className="board-select" value={msHebDay} onChange={(e) => setMsHebDay(Number(e.target.value))}>
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{formatHebrew(d, '').trim()}</option>)}
+                    </select>
+                    <select className="board-select" value={msHebMonth} onChange={(e) => setMsHebMonth(e.target.value)}>
+                      {['תשרי','חשוון','כסלו','טבת','שבט','אדר','אדר א׳','אדר ב׳','ניסן','אייר','סיוון','תמוז','אב','אלול'].map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </>
+                )}
+                <input placeholder="תיאור (לא חובה)" value={msLabel} onChange={(e) => setMsLabel(e.target.value)} />
+                <button className="edit-btn" disabled={saving || (msDateMode === 'greg' && !msDate)} onClick={() => void addMilestone()}>הוסף</button>
+              </div>
+              <p className="tpl-text">התאריך העברי מחושב אוטומטית והאירוע חוזר כל שנה לפי הלוח העברי.</p>
+            </section>
+            <section>
+              <h3>ציוני דרך ({(apt.milestones ?? []).length})</h3>
+              {(apt.milestones ?? []).length === 0 ? <p className="placeholder">אין ציוני דרך.</p> : (
+                <ul className="task-list">
+                  {(apt.milestones ?? []).map((m, i) => {
+                    const ms = m as { id?: unknown; label?: string; day?: number; monthName?: string };
+                    const days = ms.day && ms.monthName ? daysUntil(ms.monthName, ms.day) : null;
+                    return (
+                      <li key={i} className="task">
+                        <span className="task-text">
+                          {String(ms.label ?? '')}
+                          {ms.day && ms.monthName ? ` · ${formatHebrew(ms.day, ms.monthName)}` : ''}
+                        </span>
+                        <span className="task-meta">
+                          {days !== null && (days === 0 ? 'היום!' : `בעוד ${days} ימים`)}
+                          <button className="chip-x" title="הסרה" onClick={() => void removeMilestone(ms.id)}>✕</button>
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>

@@ -41,11 +41,12 @@ function cleanPhone(p: string) { return p.replace(/\D/g, ''); }
 
 export function FamiliesTable({
   db, initialQuery = '', onOpenBuilding,
-}: { db: Db; initialQuery?: string; onOpenBuilding?: (key: string) => void }) {
+  filterStyle = '', filterTag = '',
+}: { db: Db; initialQuery?: string; onOpenBuilding?: (key: string) => void; filterStyle?: string; filterTag?: string }) {
   const [query, setQuery] = useState(initialQuery);
   const [sort, setSort] = useState<{ column: string; direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
-  const [styleFilter, setStyleFilter] = useState('');
-  const [tagFilter, setTagFilter] = useState('');
+  const styleFilter = filterStyle;
+  const tagFilter = filterTag;
   const [smartView, setSmartView] = useState('v_all');
   const [colsMenu, setColsMenu] = useState(false);
   const [selected, setSelected] = useState<{ bldg: string; idx: number } | null>(null);
@@ -274,20 +275,6 @@ export function FamiliesTable({
             </select>
           </label>
         )}
-        <label className="filter-pill">
-          <i className="fas fa-palette" /> סגנון
-          <select value={styleFilter} onChange={(e) => setStyleFilter(e.target.value)}>
-            <option value="">הכל</option>
-            {allStyles.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </label>
-        <label className="filter-pill">
-          <i className="fas fa-tags" /> תגיות
-          <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
-            <option value="">הכל</option>
-            {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </label>
       </div>
 
       <div className="table-wrap">

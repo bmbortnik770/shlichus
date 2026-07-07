@@ -126,6 +126,9 @@ export function App() {
   const [tableQuery, setTableQuery] = useState('');
   const [openBldg, setOpenBldg] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [gStyle, setGStyle] = useState('');
+  const [gTag, setGTag] = useState('');
 
   useEffect(() => {
     void load();
@@ -194,6 +197,30 @@ export function App() {
           </nav>
         </div>
 
+        {db && (
+          <div className="filter-row" style={{ justifyContent: 'center', marginTop: 12 }}>
+            <label className="filter-pill">
+              <i className="fas fa-palette" /> סגנון
+              <select value={gStyle} onChange={(e) => setGStyle(e.target.value)}>
+                <option value="">הכל</option>
+                {((db.__SETTINGS__?.styles ?? []) as string[]).map((st) => <option key={st} value={st}>{st}</option>)}
+              </select>
+            </label>
+            <label className="filter-pill">
+              <i className="fas fa-tags" /> תגיות
+              <select value={gTag} onChange={(e) => setGTag(e.target.value)}>
+                <option value="">הכל</option>
+                {((db.__SETTINGS__?.tags ?? []) as string[]).map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
+            {(gStyle || gTag) && (
+              <button className="aud-chip active" onClick={() => { setGStyle(''); setGTag(''); }}>
+                נקה פילטרים ✕
+              </button>
+            )}
+          </div>
+        )}
+
         {view === 'activity' && (
           <div className="sub-nav">
             {ACTIVITY_SUBS.map((s) => (
@@ -220,21 +247,21 @@ export function App() {
             <>
               {view === 'map' && (
                 <Suspense fallback={<p className="placeholder">טוען מפה…</p>}>
-                  <MapView db={db} onOpenBuilding={setOpenBldg} />
+                  <MapView db={db} onOpenBuilding={setOpenBldg} filterStyle={gStyle} filterTag={gTag} />
                 </Suspense>
               )}
               {openBldg && <BuildingModal db={db} bldg={openBldg} onClose={() => setOpenBldg(null)} />}
               {paletteOpen && (
                 <CommandPalette
                   db={db}
-                  onNavigate={setView}
+                  onNavigate={(v) => (v === 'settings' ? setSettingsOpen(true) : setView(v))}
                   onOpenFamily={openTableWith}
                   onToggleDark={toggleDark}
                   onSync={() => void pullFromCloud()}
                   onClose={() => setPaletteOpen(false)}
                 />
               )}
-              {view === 'table' && <FamiliesTable db={db} initialQuery={tableQuery} onOpenBuilding={setOpenBldg} />}
+              {view === 'table' && <FamiliesTable db={db} initialQuery={tableQuery} onOpenBuilding={setOpenBldg} filterStyle={gStyle} filterTag={gTag} />}
               {view === 'activity' && activitySub === 'dashboard' && <DashboardView db={db} onOpenFamily={openTableWith} />}
               {view === 'activity' && activitySub === 'tasks' && <TasksView db={db} onOpenFamily={openTableWith} />}
               {view === 'activity' && activitySub === 'events' && <EventsView db={db} />}
@@ -242,7 +269,17 @@ export function App() {
               {view === 'activity' && activitySub === 'circles' && <CirclesView db={db} />}
               {view === 'comm' && <CommView db={db} />}
               {view === 'donations' && <DonationsView db={db} onOpenFamily={openTableWith} />}
-              {view === 'settings' && <SettingsView db={db} />}
+              {settingsOpen && (
+                <div className="drawer-backdrop" onClick={() => setSettingsOpen(false)}>
+                  <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+                    <header className="drawer-head" style={{ marginBottom: 10 }}>
+                      <h2><i className="fas fa-sliders" style={{ color: 'var(--accent)', marginInlineEnd: 8 }} />הגדרות מערכת</h2>
+                      <button className="close-btn" onClick={() => setSettingsOpen(false)} aria-label="סגירה">✕</button>
+                    </header>
+                    <SettingsView db={db} />
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -266,7 +303,7 @@ export function App() {
           <button
             className="close-btn"
             title="הגדרות"
-            onClick={() => setView('settings')}
+            onClick={() => setSettingsOpen(true)}
           >
             <i className="fas fa-cog" />
           </button>

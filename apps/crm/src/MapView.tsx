@@ -64,7 +64,7 @@ function bldgMarkerColor(db: Db, key: string, mode: ColorMode): string {
   return SEVERITY_COLORS[maxVal]!;
 }
 
-export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: string) => void }) {
+export function MapView({ db, onOpenBuilding, filterStyle = '', filterTag = '' }: { db: Db; onOpenBuilding: (key: string) => void; filterStyle?: string; filterTag?: string }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -129,6 +129,12 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
       const entry = getBuilding(db, key)!;
       const apts = liveApts(entry.apts);
       if (apts.length === 0) continue; // רק בניינים עם משפחות — כמו בישן
+      // הפילטרים הגלובליים מסננים גם את המפה — כמו filteredRes ב-refreshMap
+      if (filterStyle || filterTag) {
+        const show = apts.some((a) =>
+          (!filterStyle || a.style === filterStyle) && (!filterTag || (a.tags ?? []).includes(filterTag)));
+        if (!show) continue;
+      }
       const coords = (entry.info?.coords ?? key.split(',').map(Number)) as [number, number];
       if (!Array.isArray(coords) || isNaN(coords[0]!) || isNaN(coords[1]!)) continue;
 
@@ -271,7 +277,7 @@ export function MapView({ db, onOpenBuilding }: { db: Db; onOpenBuilding: (key: 
   useEffect(() => {
     if (mapRef.current) buildMarkers(mapRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, colorMode]);
+  }, [db, colorMode, filterStyle, filterTag]);
 
   const flyToHome = () => {
     // זהה ל-flyToHome בישן
