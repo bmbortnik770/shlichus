@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { buildingKeys, getBuilding, getCategories, liveApts, type Db } from '@shlichus/core';
 import { useCrm, familyCount } from './store';
 import { FamiliesTable } from './FamiliesTable';
@@ -151,6 +151,17 @@ export function App() {
     if (typeof c === 'string' && c) document.documentElement.style.setProperty('--accent', c);
   }, [db]);
 
+  // מסך פתיחה מההגדרות — כמו currentMainView = appSettings.defaultView בישן
+  const appliedDefaultView = useRef(false);
+  useEffect(() => {
+    if (db && !appliedDefaultView.current) {
+      appliedDefaultView.current = true;
+      const dv = String(db.__SETTINGS__?.defaultView ?? 'map');
+      setView(dv === 'kanban' ? 'activity' : dv);
+      if (dv === 'kanban') setActivitySub('kanban');
+    }
+  }, [db]);
+
   const openTableWith = (q: string) => {
     setTableQuery(q);
     setView('table');
@@ -231,7 +242,7 @@ export function App() {
               {view === 'activity' && activitySub === 'circles' && <CirclesView db={db} />}
               {view === 'comm' && <CommView db={db} />}
               {view === 'donations' && <DonationsView db={db} onOpenFamily={openTableWith} />}
-              {view === 'settings' && <SettingsView db={db} />}
+              {view === 'settings' && <SettingsView db={db} onGoMap={() => setView('map')} />}
             </>
           )}
         </div>

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { Db } from '@shlichus/core';
-import { mergeDb, saveLocal } from '@shlichus/core';
+import { DEFAULT_SCORING_RULES, type ScoringRules, mergeDb, saveLocal } from '@shlichus/core';
 import { useCrm } from './store';
 import { ImportCsv } from './ImportCsv';
 
-/** ייצוא גיבוי JSON מלא — כמו exportData בישן */
+/* מבנה זהה למודל ההגדרות הישן: מיקום מרכזי → אזור השליחות → מראה ותצוגה →
+   תגיות/סגנונות/שדות → גיבוי → ניקוד מעורבות → קמפיינים → ניקוד וסימון אוטומטי */
+
 function exportBackup(db: Db) {
   const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -14,52 +16,304 @@ function exportBackup(db: Db) {
   URL.revokeObjectURL(a.href);
 }
 
-function ListEditor({
-  title,
-  items,
-  onChange,
-  placeholder,
-}: {
-  title: string;
-  items: string[];
-  onChange: (next: string[]) => void;
-  placeholder: string;
-}) {
-  const [draft, setDraft] = useState('');
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
+
+/** 1. מיקום מרכזי במפה — כמו primaryLocation בישן */
+function HomeLocationCard({ db }: { db: Db }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const home = (db.__SETTINGS__?.homeLocation ?? {}) as { address?: string; coords?: [number, number] };
+  const [editing, setEditing] = useState(false);
+  const [addr, setAddr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const locate = async () => {
+    if (!addr.trim()) return;
+    setBusy(true); setMsg('');
+    try {
+      const res = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addr.trim())}.json?country=il&language=he&access_token=${MAPBOX_TOKEN}`
+      );
+      const data = (await res.json()) as { features?: { center: [number, number]; place_name: string }[] };
+      const f = data.features?.[0];
+      if (!f) { setMsg('הכתובת לא נמצאה — נסה לדייק'); return; }
+      // אותם מפתחות כמו confirmPrimaryChange בישן
+      await updateSettings({
+        primaryLocation: { coords: f.center, address: f.place_name },
+        homeLocation: { coords: f.center, address: f.place_name, isChabad: true },
+      });
+      setMsg('כתובת בית חב״ד עודכנה ונשמרה!');
+      setEditing(false);
+    } catch {
+      setMsg('שגיאה באיתור הכתובת');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="settings-card">
-      <h3>{title}</h3>
+      <h3><i className="fas fa-map-marker-alt" /> מיקום מרכזי במפה</h3>
+      <p className="tpl-text">כתובת בית חב״ד: <strong>{home.address ?? 'לא הוגדר'}</strong></p>
+      {!editing ? (
+        <button className="login-btn" style={{ alignSelf: 'flex-start' }} onClick={() => setEditing(true)}>
+          <i className="fas fa-pen" /> שנה כתובת
+        </button>
+      ) : (
+        <div className="chip-add">
+          <input placeholder="חפש את הכתובת הקבועה…" value={addr} onChange={(e) => setAddr(e.target.value)} />
+          <button className="login-btn" disabled={busy || !addr.trim()} onClick={() => void locate()}>
+            {busy ? 'מאתר…' : 'שמור'}
+          </button>
+        </div>
+      )}
+      {msg && <p className="tpl-text">{msg}</p>}
+    </div>
+  );
+}
+
+/** 2. אזור השליחות — שם + תיחום, כמו shlichutAreaDetails בישן */
+function TerritoryCard({ db, onGoMap }: { db: Db; onGoMap: () => void }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const territory = (db.__SETTINGS__?.territory ?? {}) as Record<string, unknown>;
+  const [name, setName] = useState(String(territory.missionName ?? ''));
+  const hasPolygon = Array.isArray(territory.polygon) && (territory.polygon as unknown[]).length >= 3;
+
+  return (
+    <div className="settings-card">
+      <h3><i className="fas fa-draw-polygon" /> אזור השליחות</h3>
+      <label className="edit-field">
+        <span><i className="fas fa-tag" /> שם מקום השליחות</span>
+        <input value={name} placeholder="למשל: שכונת רמות, בית חב״ד..." onChange={(e) => setName(e.target.value)} />
+      </label>
+      <div className="edit-actions">
+        <button className="login-btn" onClick={() => void updateSettings({ territory: { ...territory, missionName: name.trim() } })}>
+          שמירת שם
+        </button>
+        <button className="login-btn" onClick={onGoMap}>
+          <i className="fas fa-draw-polygon" /> {hasPolygon ? 'עריכת תיחום במפה' : 'ציור תיחום במפה'}
+        </button>
+      </div>
+      <p className="tpl-text">{hasPolygon ? '✓ מוגדר תיחום שליחות' : 'טרם הוגדר תיחום'}</p>
+    </div>
+  );
+}
+
+/** 3. מראה ותצוגה — צבע נושא + מסך פתיחה, כמו בישן */
+function AppearanceCard({ db }: { db: Db }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const color = String(db.__SETTINGS__?.themeColor ?? '#3b82f6');
+  const defaultView = String(db.__SETTINGS__?.defaultView ?? 'map');
+
+  return (
+    <div className="settings-card">
+      <h3><i className="fas fa-palette" /> מראה ותצוגה</h3>
+      <label className="edit-field" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <span>צבע נושא</span>
+        <input
+          type="color" value={color}
+          onChange={(e) => {
+            document.documentElement.style.setProperty('--accent', e.target.value);
+            void updateSettings({ themeColor: e.target.value });
+          }}
+          style={{ width: 46, height: 32, border: 0, background: 'none', cursor: 'pointer' }}
+        />
+      </label>
+      <label className="edit-field" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <span>מסך פתיחה</span>
+        <select className="board-select" value={defaultView} onChange={(e) => void updateSettings({ defaultView: e.target.value })}>
+          <option value="map">מפה</option>
+          <option value="table">טבלה</option>
+          <option value="kanban">פרויקטים</option>
+        </select>
+      </label>
+    </div>
+  );
+}
+
+/** 4א. תגיות (עם צבע) */
+function TagsCard({ db }: { db: Db }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const tags = (db.__SETTINGS__?.tags ?? []) as string[];
+  const tagColors = (db.__SETTINGS__?.tagColors ?? {}) as Record<string, string>;
+  const [draft, setDraft] = useState('');
+
+  return (
+    <div className="settings-card">
+      <h3><i className="fas fa-tags" /> ניהול תגיות</h3>
       <div className="chip-row">
-        {items.map((item) => (
-          <span className="chip" key={item}>
-            {item}
-            <button
-              aria-label={`הסרת ${item}`}
-              onClick={() => onChange(items.filter((x) => x !== item))}
-            >
-              ✕
-            </button>
+        {tags.map((t) => (
+          <span className="chip" key={t}>
+            <input
+              type="color" value={tagColors[t] ?? '#3b82f6'} title="צבע התגית"
+              onChange={(e) => void updateSettings({ tagColors: { ...tagColors, [t]: e.target.value } })}
+              style={{ width: 18, height: 18, border: 0, padding: 0, background: 'none', cursor: 'pointer' }}
+            />
+            {t}
+            <button aria-label={`הסרת ${t}`} onClick={() => void updateSettings({ tags: tags.filter((x) => x !== t) })}>✕</button>
           </span>
         ))}
-        {items.length === 0 && <span className="placeholder">אין פריטים</span>}
+        {tags.length === 0 && <span className="placeholder">אין תגיות</span>}
       </div>
-      <form
-        className="chip-add"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const v = draft.trim();
-          if (v && !items.includes(v)) onChange([...items, v]);
-          setDraft('');
-        }}
-      >
-        <input value={draft} placeholder={placeholder} onChange={(e) => setDraft(e.target.value)} />
-        <button type="submit" className="login-btn">הוספה</button>
+      <form className="chip-add" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v && !tags.includes(v)) void updateSettings({ tags: [...tags, v] }); setDraft(''); }}>
+        <input value={draft} placeholder="שם תגית…" onChange={(e) => setDraft(e.target.value)} />
+        <button type="submit" className="login-btn">הוסף</button>
       </form>
     </div>
   );
 }
 
-/** סוגי האינטראקציה של הניקוד — ברירות המחדל של scoring.js בישן */
+/** 4ב. סגנונות וצבעים — כולל setItemColor כמו בישן */
+function StylesCard({ db }: { db: Db }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const styles = (db.__SETTINGS__?.styles ?? []) as string[];
+  const styleColors = (db.__SETTINGS__?.styleColors ?? {}) as Record<string, string>;
+  const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
+  const [draft, setDraft] = useState('');
+
+  return (
+    <div className="settings-card">
+      <h3><i className="fas fa-palette" /> ניהול סגנונות וצבעים</h3>
+      <div className="chip-row">
+        {styles.map((s, i) => (
+          <span className="chip" key={s}>
+            <input
+              type="color" value={styleColors[s] ?? CHART_COLORS[i % CHART_COLORS.length]} title="צבע הסגנון"
+              onChange={(e) => void updateSettings({ styleColors: { ...styleColors, [s]: e.target.value } })}
+              style={{ width: 18, height: 18, border: 0, padding: 0, background: 'none', cursor: 'pointer' }}
+            />
+            {s}
+            <button aria-label={`הסרת ${s}`} onClick={() => void updateSettings({ styles: styles.filter((x) => x !== s) })}>✕</button>
+          </span>
+        ))}
+      </div>
+      <form className="chip-add" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v && !styles.includes(v)) void updateSettings({ styles: [...styles, v] }); setDraft(''); }}>
+        <input value={draft} placeholder="סגנון חדש…" onChange={(e) => setDraft(e.target.value)} />
+        <button type="submit" className="login-btn">הוסף</button>
+      </form>
+    </div>
+  );
+}
+
+/** 4ג. שדות אישיים למשפחה — customFields כמו בישן */
+function CustomFieldsCard({ db }: { db: Db }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const fields = (db.__SETTINGS__?.customFields ?? []) as string[];
+  const [draft, setDraft] = useState('');
+
+  return (
+    <div className="settings-card">
+      <h3><i className="fas fa-list-alt" /> שדות אישיים למשפחה</h3>
+      <div className="chip-row">
+        {fields.map((f) => (
+          <span className="chip" key={f}>
+            {f}
+            <button aria-label={`הסרת ${f}`} onClick={() => void updateSettings({ customFields: fields.filter((x) => x !== f) })}>✕</button>
+          </span>
+        ))}
+        {fields.length === 0 && <span className="placeholder">אין שדות מותאמים</span>}
+      </div>
+      <form className="chip-add" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v && !fields.includes(v)) void updateSettings({ customFields: [...fields, v] }); setDraft(''); }}>
+        <input value={draft} placeholder="למשל: ארץ מוצא, תפקיד…" onChange={(e) => setDraft(e.target.value)} />
+        <button type="submit" className="login-btn">הוסף</button>
+      </form>
+    </div>
+  );
+}
+
+/** 7. קמפיינים וגיוס כספים — appSettings.campaigns כמו בישן */
+function CampaignsCard({ db }: { db: Db }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const campaigns = (db.__SETTINGS__?.campaigns ?? []) as { key: string; label: string; year?: number; active?: boolean; goal?: number }[];
+  const [draft, setDraft] = useState('');
+
+  return (
+    <div className="settings-card">
+      <h3><i className="fas fa-bullseye" /> קמפיינים וגיוס כספים</h3>
+      {campaigns.length === 0 && <p className="placeholder">אין קמפיינים עדיין.</p>}
+      <ul className="tpl-list">
+        {campaigns.map((c) => (
+          <li key={c.key}>
+            <div>
+              <strong>{c.label}</strong>
+              <span className="tpl-text"> · {c.year ?? ''} {c.active === false ? '· כבוי' : '· פעיל'}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                className="login-btn" style={{ padding: '3px 10px', fontSize: 12 }}
+                onClick={() => void updateSettings({ campaigns: campaigns.map((x) => x.key === c.key ? { ...x, active: x.active === false } : x) })}
+              >
+                {c.active === false ? 'הפעל' : 'כבה'}
+              </button>
+              <button className="close-btn" aria-label={`מחיקת ${c.label}`} onClick={() => void updateSettings({ campaigns: campaigns.filter((x) => x.key !== c.key) })}>✕</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="chip-add"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!draft.trim()) return;
+          // אותו מבנה כמו addCampaign בישן
+          void updateSettings({
+            campaigns: [...campaigns, { key: 'camp_' + Date.now(), label: draft.trim(), year: new Date().getFullYear(), active: true, goal: 0 }],
+          });
+          setDraft('');
+        }}
+      >
+        <input value={draft} placeholder="שם הקמפיין…" onChange={(e) => setDraft(e.target.value)} />
+        <button type="submit" className="login-btn">קמפיין חדש</button>
+      </form>
+    </div>
+  );
+}
+
+/** 8. ניקוד וסימון אוטומטי — scoringRules (צבעי הסמנים במפה!) */
+function ScoringRulesCard({ db }: { db: Db }) {
+  const updateSettings = useCrm((s) => s.updateSettings);
+  const rules = ((db.__SETTINGS__?.scoringRules ?? DEFAULT_SCORING_RULES) as ScoringRules);
+  const channels = rules.channels?.length ? rules.channels : DEFAULT_SCORING_RULES.channels;
+  const thresholds = rules.thresholds ?? DEFAULT_SCORING_RULES.thresholds;
+
+  const save = (next: ScoringRules) => void updateSettings({ scoringRules: next });
+
+  return (
+    <div className="settings-card">
+      <h3><i className="fas fa-traffic-light" /> ניקוד וסימון אוטומטי — צבעי המפה</h3>
+      <div className="score-grid">
+        {channels.map((c) => (
+          <div key={c.key} className="score-row" style={{ gap: 6 }}>
+            <span>{c.label ?? c.key}</span>
+            <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <input
+                type="number" dir="ltr" defaultValue={c.points} title="נקודות"
+                onBlur={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) save({ ...rules, channels: channels.map((x) => x.key === c.key ? { ...x, points: v } : x) }); }}
+              />
+              <small className="tpl-text">נק׳ /</small>
+              <input
+                type="number" dir="ltr" defaultValue={c.ttlDays} title="ימי תוקף"
+                onBlur={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) save({ ...rules, channels: channels.map((x) => x.key === c.key ? { ...x, ttlDays: v } : x) }); }}
+              />
+              <small className="tpl-text">ימים</small>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13 }}>🟢 ירוק מ-</span>
+        <input type="number" dir="ltr" defaultValue={thresholds.green} style={{ width: 60, padding: '4px 8px', border: '1px solid var(--line)', borderRadius: 8, textAlign: 'center' }}
+          onBlur={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) save({ ...rules, thresholds: { ...thresholds, green: v } }); }} />
+        <span style={{ fontSize: 13 }}>🟠 כתום מ-</span>
+        <input type="number" dir="ltr" defaultValue={thresholds.orange} style={{ width: 60, padding: '4px 8px', border: '1px solid var(--line)', borderRadius: 8, textAlign: 'center' }}
+          onBlur={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) save({ ...rules, thresholds: { ...thresholds, orange: v } }); }} />
+        <span className="tpl-text">מתחת — אדום · ללא קשר — אפור</span>
+      </div>
+    </div>
+  );
+}
+
+/** 6. ניקוד מעורבות וסוגי פעילות — interactionTypes כמו בישן */
 const DEFAULT_INTERACTION_TYPES = [
   { key: 'tefillin', label: 'הנחת תפילין', defaultScore: 15 },
   { key: 'mezuzah', label: 'בדיקת מזוזות', defaultScore: 20 },
@@ -74,120 +328,35 @@ const DEFAULT_INTERACTION_TYPES = [
   { key: 'donation', label: 'תרומה', defaultScore: 6 },
 ];
 
-/** מיקום בית — geocode דרך Mapbox כמו בישן, נשמר ל-homeLocation */
-function HomeLocationCard({ db }: { db: Db }) {
-  const updateSettings = useCrm((s) => s.updateSettings);
-  const home = (db.__SETTINGS__?.homeLocation ?? {}) as { address?: string; coords?: [number, number] };
-  const [addr, setAddr] = useState(home.address ?? '');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-
-  const locate = async () => {
-    if (!addr.trim()) return;
-    setBusy(true); setMsg('');
-    try {
-      const token = 'pk.eyJ1IjoiYm1ib3J0bmlrIiwiYSI6ImNtbWl0cGNxNDAxa3kycHNhbWJ4dTR4ZWEifQ.ZxzC27qBStO30yyu60X9eQ';
-      const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addr.trim())}.json?country=il&language=he&access_token=${token}`
-      );
-      const data = (await res.json()) as { features?: { center: [number, number]; place_name: string }[] };
-      const f = data.features?.[0];
-      if (!f) { setMsg('הכתובת לא נמצאה'); return; }
-      await updateSettings({ homeLocation: { coords: f.center, address: f.place_name, isChabad: true } });
-      setMsg(`✅ נשמר: ${f.place_name}`);
-    } catch {
-      setMsg('שגיאה באיתור הכתובת');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="settings-card">
-      <h3><i className="fas fa-house-chimney" /> מיקום בית / בית חב״ד</h3>
-      {home.address && <p className="tpl-text">נוכחי: {home.address}</p>}
-      <div className="chip-add">
-        <input placeholder="כתובת מלאה…" value={addr} onChange={(e) => setAddr(e.target.value)} />
-        <button className="login-btn" disabled={busy || !addr.trim()} onClick={() => void locate()}>
-          {busy ? 'מאתר…' : 'אתר ושמור'}
-        </button>
-      </div>
-      {msg && <p className="tpl-text">{msg}</p>}
-    </div>
-  );
-}
-
-/** מיתוג — שם השליחות + צבע ערכת נושא (themeColor כמו בישן) */
-function BrandingCard({ db }: { db: Db }) {
-  const updateSettings = useCrm((s) => s.updateSettings);
-  const territory = (db.__SETTINGS__?.territory ?? {}) as Record<string, unknown>;
-  const [name, setName] = useState(String(territory.missionName ?? ''));
-  const color = String(db.__SETTINGS__?.themeColor ?? '#3b82f6');
-
-  return (
-    <div className="settings-card">
-      <h3><i className="fas fa-paintbrush" /> מיתוג</h3>
-      <label className="edit-field">
-        <span>שם השליחות</span>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="למשל: בית חב״ד רמת אביב" />
-      </label>
-      <label className="edit-field" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <span>צבע ראשי</span>
-        <input
-          type="color"
-          value={color}
-          onChange={(e) => {
-            document.documentElement.style.setProperty('--accent', e.target.value);
-            void updateSettings({ themeColor: e.target.value });
-          }}
-          style={{ width: 46, height: 32, border: 0, background: 'none', cursor: 'pointer' }}
-        />
-      </label>
-      <button
-        className="login-btn"
-        onClick={() => void updateSettings({ territory: { ...territory, missionName: name.trim() } })}
-      >
-        שמירת מיתוג
-      </button>
-    </div>
-  );
-}
-
-/** הגדרות ניקוד — משקלים לסוגי אינטראקציה (interactionTypes כמו בישן) */
-function ScoringCard({ db }: { db: Db }) {
+function InteractionTypesCard({ db }: { db: Db }) {
   const updateSettings = useCrm((s) => s.updateSettings);
   const saved = (db.__SETTINGS__?.interactionTypes ?? []) as { key: string; label: string; defaultScore: number }[];
   const types = saved.length ? saved : DEFAULT_INTERACTION_TYPES;
 
-  const setScore = (key: string, score: number) => {
-    const next = types.map((t) => (t.key === key ? { ...t, defaultScore: score } : t));
-    void updateSettings({ interactionTypes: next });
-  };
-
   return (
     <div className="settings-card">
-      <h3><i className="fas fa-star-half-stroke" /> ניקוד מעורבות — משקל לכל פעולה</h3>
+      <h3><i className="fas fa-star-half-stroke" /> ניקוד מעורבות וסוגי פעילות</h3>
       <div className="score-grid">
         {types.map((t) => (
           <label key={t.key} className="score-row">
             <span>{t.label}</span>
             <input
-              type="number" min={0} max={100} dir="ltr"
-              defaultValue={t.defaultScore}
+              type="number" min={0} max={100} dir="ltr" defaultValue={t.defaultScore}
               onBlur={(e) => {
                 const v = parseInt(e.target.value, 10);
-                if (!isNaN(v) && v !== t.defaultScore) setScore(t.key, v);
+                if (!isNaN(v) && v !== t.defaultScore) {
+                  void updateSettings({ interactionTypes: types.map((x) => x.key === t.key ? { ...x, defaultScore: v } : x) });
+                }
               }}
             />
           </label>
         ))}
       </div>
-      <p className="tpl-text">המשקלים משותפים עם המערכת הקיימת ומשפיעים על ציון המעורבות בשתיהן.</p>
     </div>
   );
 }
 
-/** ניהול סוגי אירועים — אותו מבנה כמו appSettings.customEventTypes בישן */
+/** ניהול סוגי אירועים — customEventTypes כמו בישן */
 function EventTypesEditor({ db }: { db: Db }) {
   const updateSettings = useCrm((s) => s.updateSettings);
   const types = ((db.__SETTINGS__?.customEventTypes ?? []) as { id: string; label: string; emoji?: string; recurring?: boolean }[]);
@@ -202,24 +371,11 @@ function EventTypesEditor({ db }: { db: Db }) {
         {types.map((t) => (
           <li key={t.id}>
             <div><strong>{t.emoji} {t.label}</strong>{t.recurring ? <span className="tpl-text"> · חוזר שנתית</span> : null}</div>
-            <button
-              className="close-btn" aria-label={`מחיקת ${t.label}`}
-              onClick={() => void updateSettings({ customEventTypes: types.filter((x) => x.id !== t.id) })}
-            >✕</button>
+            <button className="close-btn" aria-label={`מחיקת ${t.label}`} onClick={() => void updateSettings({ customEventTypes: types.filter((x) => x.id !== t.id) })}>✕</button>
           </li>
         ))}
       </ul>
-      <form
-        className="chip-add"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!label.trim()) return;
-          void updateSettings({
-            customEventTypes: [...types, { id: 'custom_' + Date.now(), label: label.trim(), emoji, color: '#3b82f6', recurring }],
-          });
-          setLabel('');
-        }}
-      >
+      <form className="chip-add" onSubmit={(e) => { e.preventDefault(); if (!label.trim()) return; void updateSettings({ customEventTypes: [...types, { id: 'custom_' + Date.now(), label: label.trim(), emoji, color: '#3b82f6', recurring }] }); setLabel(''); }}>
         <input value={emoji} onChange={(e) => setEmoji(e.target.value)} style={{ maxWidth: 56, textAlign: 'center' }} />
         <input value={label} placeholder="שם סוג האירוע…" onChange={(e) => setLabel(e.target.value)} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5 }}>
@@ -231,95 +387,33 @@ function EventTypesEditor({ db }: { db: Db }) {
   );
 }
 
-export function SettingsView({ db }: { db: Db }) {
-  const updateSettings = useCrm((s) => s.updateSettings);
-  const settings = db.__SETTINGS__ ?? {};
-  const tags = (settings.tags ?? []) as string[];
-  const styles = (settings.styles ?? []) as string[];
-  const templates = (settings.templates ?? []) as { title?: string; text?: string }[];
-  const [tplTitle, setTplTitle] = useState('');
-  const [tplText, setTplText] = useState('');
-
+export function SettingsView({ db, onGoMap }: { db: Db; onGoMap?: () => void }) {
   return (
     <section>
       <div className="table-toolbar">
-        <h2 className="view-title">הגדרות</h2>
+        <h2 className="view-title"><i className="fas fa-cog" /> הגדרות</h2>
       </div>
+
+      {/* סדר הסקשנים זהה למודל ההגדרות הישן */}
       <div className="settings-grid">
-        <ListEditor
-          title="תגיות"
-          items={tags}
-          placeholder="תגית חדשה…"
-          onChange={(next) => void updateSettings({ tags: next })}
-        />
-        <ListEditor
-          title="סגנונות / סטטוסים"
-          items={styles}
-          placeholder="סגנון חדש…"
-          onChange={(next) => void updateSettings({ styles: next })}
-        />
-        <div className="settings-card">
-          <h3>תבניות הודעה</h3>
-          {templates.length === 0 && <p className="placeholder">אין תבניות</p>}
-          <ul className="tpl-list">
-            {templates.map((t, i) => (
-              <li key={i}>
-                <div>
-                  <strong>{t.title}</strong>
-                  <div className="tpl-text">{t.text}</div>
-                </div>
-                <button
-                  className="close-btn"
-                  aria-label={`מחיקת ${t.title}`}
-                  onClick={() => void updateSettings({ templates: templates.filter((_, x) => x !== i) })}
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-          <form
-            className="tpl-add"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!tplTitle.trim() || !tplText.trim()) return;
-              void updateSettings({ templates: [...templates, { title: tplTitle.trim(), text: tplText.trim() }] });
-              setTplTitle('');
-              setTplText('');
-            }}
-          >
-            <input value={tplTitle} placeholder="שם התבנית" onChange={(e) => setTplTitle(e.target.value)} />
-            <textarea rows={2} value={tplText} placeholder="טקסט — ‏[שם] יוחלף בשם המשפחה" onChange={(e) => setTplText(e.target.value)} />
-            <button type="submit" className="login-btn">הוספת תבנית</button>
-          </form>
-        </div>
-      </div>
-      <div className="settings-grid" style={{ marginTop: 14 }}>
         <HomeLocationCard db={db} />
-        <BrandingCard db={db} />
+        <TerritoryCard db={db} onGoMap={onGoMap ?? (() => {})} />
+        <AppearanceCard db={db} />
+        <TagsCard db={db} />
+        <StylesCard db={db} />
+        <CustomFieldsCard db={db} />
       </div>
-      <div style={{ marginTop: 14 }}>
-        <ScoringCard db={db} />
-      </div>
+
       <div className="settings-card" style={{ marginTop: 14 }}>
-        <h3>סוגי אירועים מותאמים</h3>
-        <EventTypesEditor db={db} />
-      </div>
-      <div style={{ marginTop: 14 }}>
-        <ImportCsv onDone={() => window.location.reload()} />
-      </div>
-      <div className="settings-card" style={{ marginTop: 14 }}>
-        <h3>גיבוי ושחזור</h3>
+        <h3><i className="fas fa-database" /> גיבוי</h3>
         <div className="edit-actions">
           <button className="login-btn" onClick={() => exportBackup(db)}>
-            <i className="fas fa-download" /> ייצוא גיבוי מלא (JSON)
+            <i className="fas fa-download" /> גיבוי ידני (JSON)
           </button>
           <label className="login-btn" style={{ cursor: 'pointer' }}>
-            <i className="fas fa-upload" /> ייבוא גיבוי
+            <i className="fas fa-upload" /> שחזור
             <input
-              type="file"
-              accept=".json"
-              style={{ display: 'none' }}
+              type="file" accept=".json" style={{ display: 'none' }}
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
@@ -338,10 +432,27 @@ export function SettingsView({ db }: { db: Db }) {
         </div>
         <p className="tpl-text">הייבוא ממזג — רשומות חדשות מתווספות, קיימות מתעדכנות לפי החדש מביניהן.</p>
       </div>
-      <p className="drawer-note" style={{ marginTop: 16 }}>
-        השינויים נשמרים לענן ומשותפים עם המערכת הקיימת. הגדרות מתקדמות (קטגוריות, מיקום בית,
-        מיתוג, ניקוד) — בינתיים במערכת הקיימת.
-      </p>
+
+      <div style={{ marginTop: 14 }}>
+        <InteractionTypesCard db={db} />
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <ScoringRulesCard db={db} />
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <CampaignsCard db={db} />
+      </div>
+
+      <div className="settings-card" style={{ marginTop: 14 }}>
+        <h3><i className="fas fa-calendar-plus" /> סוגי אירועים מותאמים</h3>
+        <EventTypesEditor db={db} />
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <ImportCsv onDone={() => window.location.reload()} />
+      </div>
     </section>
   );
 }
