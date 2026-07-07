@@ -4,3 +4,4 @@ export * from './driveSync.js';
 export * from './storage.js';
 export * from './hebrewDate.js';
 export * from './territory.js';
+export * from './scoring.js';

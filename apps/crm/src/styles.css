@@ -399,13 +399,6 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
   background: var(--surface); border-radius: var(--radius-pill);
   padding: 5px 14px; font-size: 12px; color: var(--ink-soft); box-shadow: var(--shadow-sm);
 }
-.map-marker {
-  width: 30px; height: 30px; border-radius: 50% 50% 50% 4px;
-  background: var(--accent); color: #fff; border: 2px solid #fff;
-  font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow-sm);
-  transform: rotate(-45deg);
-}
-.map-marker:hover { filter: brightness(1.15); }
 .map-fallback { background: var(--surface); border-radius: var(--radius); padding: 28px; color: var(--ink-soft); box-shadow: var(--shadow-sm); }
 .map-controls {
   position: absolute; top: 12px; inset-inline-start: 56px;
@@ -425,6 +418,30 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
   padding: 7px 14px; font-size: 12px; color: var(--warning);
   font-weight: 700; box-shadow: var(--shadow-md);
 }
+/* סמן בית חב"ד — CSS זהה לישן (עיגול 770 + חץ) */
+.chabad-pin-wrapper { width: 50px; height: 65px; z-index: 1000; }
+.chabad-pin-container { display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; cursor: pointer; filter: drop-shadow(0 4px 10px rgba(0,0,0,.4)); transition: transform .2s ease-out; transform-origin: bottom center; }
+.chabad-pin-container:hover { transform: scale(1.1); }
+.chabad-pin-circle { width: 50px; height: 50px; background: #fff; border-radius: 50%; border: 3px solid #fff; box-sizing: border-box; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.chabad-pin-image { width: 100%; height: 100%; background-image: url('/shlichus/v2/770.jpg'); background-size: cover; background-position: center; }
+.chabad-pin-arrow { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 18px solid #fff; margin-top: -3px; }
+
+/* כפתור חזרה לבית חב"ד — עם תמונת 770 כמו בישן */
+.map-home-btn {
+  position: absolute; top: 62px; inset-inline-end: 12px;
+  width: 40px; height: 40px; border-radius: 10px;
+  border: 0; background: var(--surface);
+  cursor: pointer; box-shadow: var(--shadow-md);
+  display: flex; align-items: center; justify-content: center;
+}
+.home-770 {
+  width: 24px; height: 24px; border-radius: 5px;
+  border: 1px solid var(--accent);
+  background-image: url('/shlichus/v2/770.jpg');
+  background-size: cover; background-position: center;
+  display: block;
+}
+
 .map-style-btn {
   position: absolute; top: 12px; inset-inline-end: 12px;
   width: 40px; height: 40px; border-radius: 10px;
@@ -537,6 +554,17 @@ td:last-child { border-inline-end: 1px solid var(--line); border-start-end-radiu
   cursor: pointer; font-family: inherit; font-weight: 600;
 }
 .fam-chip:hover { background: var(--accent-soft); }
+.score-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.score-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 7px 12px; font-size: 13px;
+}
+.score-row input {
+  width: 58px; padding: 4px 8px; text-align: center;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface-2); color: var(--ink); font-family: inherit;
+}
 .channel-tabs { display: flex; gap: 4px; background: var(--surface-2); border-radius: var(--radius-pill); padding: 3px; }
 .chan { border: 0; background: none; padding: 6px 16px; border-radius: var(--radius-pill); font-size: 13px; color: var(--ink-soft); cursor: pointer; font-weight: 600; }
 .chan.active { background: var(--accent); color: #fff; }

@@ -32,7 +32,12 @@ const COMM_TABS = [
   { key: 'compose', label: 'כתיבה ושליחה', icon: 'fa-paper-plane' },
   { key: 'calls', label: 'חיוג', icon: 'fa-phone' },
   { key: 'history', label: 'היסטוריה', icon: 'fa-clock-rotate-left' },
+  { key: 'docs', label: 'תיעודים', icon: 'fa-file-lines' },
 ] as const;
+
+const DOC_CHANNELS: Record<string, string> = {
+  general: 'כללי', phone: 'שיחה', whatsapp: 'וואטסאפ', email: 'מייל', meeting: 'פגישה',
+};
 
 export function CommView({ db }: { db: Db }) {
   const updateApt = useCrm((s) => s.updateApt);
@@ -168,6 +173,7 @@ export function CommView({ db }: { db: Db }) {
       </div>
       {commTab === 'calls' && <CallsTab db={db} />}
       {commTab === 'history' && <HistoryTab db={db} />}
+      {commTab === 'docs' && <DocsTab db={db} />}
       {commTab === 'compose' && (
       <>
       <div className="table-toolbar" style={{ margin: '0 0 10px' }}>
@@ -358,6 +364,134 @@ function CallsTab({ db }: { db: Db }) {
             </div>
           </li>
         ))}
+      </ul>
+    </div>
+  );
+}
+
+/** טאב תיעודים — מסמכי שיחה, אותו מבנה convDocs כמו הישן */
+function DocsTab({ db }: { db: Db }) {
+  const updateApt = useCrm((s) => s.updateApt);
+  const [q, setQ] = useState('');
+  const [chanFilter, setChanFilter] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({
+    famKey: '', date: new Date().toISOString().slice(0, 10),
+    channel: 'general', title: '', body: '',
+  });
+
+  const families = useMemo(() => {
+    const out: { key: string; name: string }[] = [];
+    for (const key of buildingKeys(db)) {
+      const entry = getBuilding(db, key);
+      if (!entry) continue;
+      liveApts(entry.apts).forEach((a) =>
+        out.push({ key: `${key}|${entry.apts.indexOf(a)}`, name: a.name || key })
+      );
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name, 'he'));
+  }, [db]);
+
+  const docs = useMemo(() => {
+    const out: { name: string; date: string; channel: string; title: string; body: string }[] = [];
+    for (const key of buildingKeys(db)) {
+      const entry = getBuilding(db, key);
+      if (!entry) continue;
+      liveApts(entry.apts).forEach((a) => {
+        (((a as Record<string, unknown>).convDocs ?? []) as Record<string, unknown>[]).forEach((d) => {
+          out.push({
+            name: a.name || key,
+            date: String(d.date ?? ''),
+            channel: String(d.channel ?? 'general'),
+            title: String(d.title ?? ''),
+            body: String(d.body ?? ''),
+          });
+        });
+      });
+    }
+    return out.sort((a, b) => b.date.localeCompare(a.date));
+  }, [db]);
+
+  const saveDoc = async () => {
+    if (!form.famKey || !form.body.trim()) return;
+    const [bldg, idxStr] = form.famKey.split('|');
+    const idx = Number(idxStr);
+    const apt = getBuilding(db, bldg!)?.apts[idx];
+    if (!apt) return;
+    // אותו מבנה בדיוק כמו saveConvDoc בישן
+    const doc = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      date: form.date, channel: form.channel, docType: 'summary',
+      title: form.title.trim(), body: form.body.trim(), recordingUrl: '',
+      createdAt: Date.now(),
+    };
+    await updateApt(bldg!, idx, {
+      convDocs: [...(((apt as Record<string, unknown>).convDocs ?? []) as unknown[]), doc],
+    } as never);
+    setAdding(false);
+    setForm({ ...form, title: '', body: '' });
+  };
+
+  const filtered = docs.filter(
+    (d) =>
+      (!chanFilter || d.channel === chanFilter) &&
+      (!q.trim() || [d.name, d.title, d.body].some((f) => f.includes(q.trim())))
+  );
+
+  return (
+    <div className="comm-recipients" style={{ marginTop: 4 }}>
+      <div className="table-toolbar" style={{ margin: 0 }}>
+        <input type="search" placeholder="חיפוש בתיעודים…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className="board-select" value={chanFilter} onChange={(e) => setChanFilter(e.target.value)}>
+          <option value="">כל הערוצים</option>
+          {Object.entries(DOC_CHANNELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <button className="edit-btn" onClick={() => setAdding((v) => !v)}>
+          <i className="fas fa-plus" /> תיעוד חדש
+        </button>
+        <span className="count">{filtered.length} תיעודים</span>
+      </div>
+
+      {adding && (
+        <div className="quick-add">
+          <div className="quick-add-row">
+            <select className="board-select" value={form.famKey} onChange={(e) => setForm({ ...form, famKey: e.target.value })}>
+              <option value="">בחר משפחה…</option>
+              {families.map((f) => <option key={f.key} value={f.key}>{f.name}</option>)}
+            </select>
+            <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} style={{ maxWidth: 150 }} />
+            <select className="board-select" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>
+              {Object.entries(DOC_CHANNELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </div>
+          <div className="quick-add-row">
+            <input placeholder="כותרת (לא חובה)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          </div>
+          <div className="quick-add-row">
+            <textarea
+              rows={3} placeholder="סיכום השיחה…" value={form.body}
+              onChange={(e) => setForm({ ...form, body: e.target.value })}
+              style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, background: 'var(--surface)', color: 'var(--ink)' }}
+            />
+          </div>
+          <div className="quick-add-row">
+            <button className="save-btn" disabled={!form.famKey || !form.body.trim()} onClick={() => void saveDoc()}>שמירת תיעוד</button>
+          </div>
+        </div>
+      )}
+
+      <ul className="tpl-list" style={{ maxHeight: 440, overflowY: 'auto' }}>
+        {filtered.map((d, i) => (
+          <li key={i}>
+            <div>
+              <strong>{d.name}</strong> <span className="tag-chip">{DOC_CHANNELS[d.channel] ?? d.channel}</span>
+              {d.title && <div style={{ fontWeight: 600, fontSize: 13 }}>{d.title}</div>}
+              <div className="tpl-text">{d.body.slice(0, 120)}</div>
+            </div>
+            <span className="tpl-text" style={{ whiteSpace: 'nowrap' }}>{d.date}</span>
+          </li>
+        ))}
+        {filtered.length === 0 && <li className="placeholder">אין תיעודים עדיין.</li>}
       </ul>
     </div>
   );

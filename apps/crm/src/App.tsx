@@ -145,6 +145,12 @@ export function App() {
 
   const alerts = useMemo(() => (db ? upcomingAlerts(db) : []), [db]);
 
+  // צבע ערכת נושא מההגדרות — כמו appSettings.themeColor בישן
+  useEffect(() => {
+    const c = db?.__SETTINGS__?.themeColor;
+    if (typeof c === 'string' && c) document.documentElement.style.setProperty('--accent', c);
+  }, [db]);
+
   const openTableWith = (q: string) => {
     setTableQuery(q);
     setView('table');
