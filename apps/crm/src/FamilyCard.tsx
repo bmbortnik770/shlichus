@@ -16,7 +16,12 @@ const TABS = [
   { key: 'milestones', label: 'אבני דרך', icon: 'fa-calendar-star' },
   { key: 'tasks', label: 'משימות', icon: 'fa-check-double' },
   { key: 'donations', label: 'תרומות', icon: 'fa-hand-holding-heart' },
+  { key: 'docs', label: 'תיעוד', icon: 'fa-file-lines' },
 ] as const;
+
+const DOC_CHANNELS: Record<string, string> = {
+  general: 'כללי', phone: 'שיחה', whatsapp: 'וואטסאפ', email: 'מייל', meeting: 'פגישה',
+};
 
 // סוגי ציוני דרך כמו במערכת הקיימת
 const MS_TYPES = [
@@ -82,6 +87,9 @@ export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
   const [msType, setMsType] = useState('birthday');
   const [msLabel, setMsLabel] = useState('');
   const [msDate, setMsDate] = useState('');
+  const [docChannel, setDocChannel] = useState('general');
+  const [docTitle, setDocTitle] = useState('');
+  const [docBody, setDocBody] = useState('');
 
   const phone = apt.fatherPhone || apt.motherPhone || '';
   const wa = phone ? `https://wa.me/972${phone.replace(/\D/g, '').replace(/^0/, '')}` : '';
@@ -179,6 +187,23 @@ export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
 
   const restoreActive = async () => {
     await onSave({ lifeStatus: '', deceasedInfo: undefined } as Partial<Apartment>);
+  };
+
+  const addDoc = async () => {
+    if (!docBody.trim()) return;
+    setSaving(true);
+    // אותו מבנה בדיוק כמו saveConvDoc בישן
+    const doc = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      date: new Date().toISOString().slice(0, 10),
+      channel: docChannel, docType: 'summary',
+      title: docTitle.trim(), body: docBody.trim(), recordingUrl: '',
+      createdAt: Date.now(),
+    };
+    const existing = ((apt as Record<string, unknown>).convDocs ?? []) as unknown[];
+    await onSave({ convDocs: [...existing, doc] } as never);
+    setDocTitle(''); setDocBody('');
+    setSaving(false);
   };
 
   const addDonation = async () => {
@@ -407,6 +432,42 @@ export function FamilyCard({ bldg, apt, onClose, onSave, onSplit }: Props) {
                         <span className="task-text">{String(t.text ?? '')}</span>
                       </label>
                       {(t.due || t.date) ? <span className="task-meta">{String(t.due ?? t.date)}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
+        )}
+
+        {tab === 'docs' && (
+          <>
+            <section className="quick-add">
+              <div className="quick-add-row">
+                <select className="board-select" value={docChannel} onChange={(e) => setDocChannel(e.target.value)}>
+                  {Object.entries(DOC_CHANNELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+                <input placeholder="כותרת (לא חובה)" value={docTitle} onChange={(e) => setDocTitle(e.target.value)} />
+              </div>
+              <div className="quick-add-row">
+                <input
+                  placeholder="סיכום השיחה…" value={docBody}
+                  onChange={(e) => setDocBody(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void addDoc(); }}
+                />
+                <button className="edit-btn" disabled={saving || !docBody.trim()} onClick={() => void addDoc()}>שמור</button>
+              </div>
+            </section>
+            <section>
+              <h3>מסמכי שיחה ({(((apt as Record<string, unknown>).convDocs ?? []) as unknown[]).length})</h3>
+              {((((apt as Record<string, unknown>).convDocs ?? []) as Record<string, unknown>[])).length === 0 ? (
+                <p className="placeholder">אין תיעודים עדיין.</p>
+              ) : (
+                <ul>
+                  {[...(((apt as Record<string, unknown>).convDocs ?? []) as Record<string, unknown>[])].reverse().map((d, i) => (
+                    <li key={i}>
+                      <strong>{String(d.date ?? '')}</strong> · {DOC_CHANNELS[String(d.channel)] ?? String(d.channel ?? '')}
+                      {d.title ? ` · ${String(d.title)}` : ''} — {String(d.body ?? '').slice(0, 100)}
                     </li>
                   ))}
                 </ul>
