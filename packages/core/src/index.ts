@@ -5,3 +5,8 @@ export * from './storage.js';
 export * from './hebrewDate.js';
 export * from './territory.js';
 export * from './scoring.js';
+export * from './dates.js';
+export * from './today.js';
+export * from './connectors.js';
+export * from './backend.js';
+export * from './jewishCalendar.js';

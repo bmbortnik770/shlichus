@@ -2,6 +2,7 @@
  * ניקוד קשר וצבעי סטטוס — העתק התנהגותי מדויק של getAptScore/getStatusColor בישן.
  */
 import type { Apartment, AppSettings } from './types.js';
+import { parseLooseDate } from './dates.js';
 
 export interface ScoringChannel { key: string; label?: string; points: number; ttlDays: number }
 export interface ScoringRules {
@@ -41,7 +42,7 @@ export function getAptScore(a: Apartment, settings?: AppSettings): number {
     const ch = String(log.channel ?? TYPE_TO_KEY[String(log.type ?? '')] ?? '');
     const rule = chans.find((r) => r.key === ch);
     if (!rule) continue;
-    const t = new Date(String(log.date ?? '')).getTime();
+    const t = parseLooseDate(log.date)?.getTime();
     if (!t) continue;
     if ((now - t) / 86400000 <= rule.ttlDays) score += rule.points;
   }
