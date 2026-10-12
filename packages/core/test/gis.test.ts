@@ -154,7 +154,9 @@ describe('התאמת בניינים', () => {
     expect(m['שמואל תמיר 53']).toMatchObject({ method: 'geocode', confidence: 'high' });
     expect(m['שמואל תמיר 53']!.official!.id).toBe('jlm:1');
     expect(m['אברהם דוד ליכטמן 3']).toMatchObject({ method: 'address', relocate: true, categoryTo: 'education', unitsTo: 8 });
-    expect(m['ירמיהו ברדנוב']).toMatchObject({ method: 'point', confidence: 'medium', broken: true, renameTo: 'ירמיהו ברדנוב 7', families: 1 });
+    // בלי מספר בית: לא ממקמים ולא מנחשים לפי נקודה, גם אם יש בניין במקום
+    expect(m['ירמיהו ברדנוב']).toMatchObject({ official: null, waitingForNumber: true, families: 1 });
+    expect(m['ירמיהו ברדנוב']!.renameTo).toBeUndefined();
     expect(m['צבי לבנון 99']).toMatchObject({ official: null, confidence: 'none' });
   });
 
@@ -247,17 +249,20 @@ describe('רשימת תיקונים', () => {
   it('מפריד בין בטוח לבין מה שדורש החלטה, ואחרי החלה לא נשאר כלום', () => {
     const db = {
       'הרצל 5': { info: { coords: [35.2, 31.8] }, apts: [apt('כהן')] },
-      'הרצל': { info: { coords: [35.21, 31.8] }, apts: [apt('לוי')] }, // פגום + משפחה
+      'הרצל': { info: { coords: [35.21, 31.8] }, apts: [apt('לוי')] }, // בלי מספר — ממתין
+      'הרצל הרצל 7': { info: { coords: [35.3, 31.9] }, apts: [apt('גל')] }, // כתיב כפול, נקודה רחוקה — הכתובת קובעת
       'הרצל 9': { info: { coords: [36, 32] }, apts: [] }, // אין מבנה
     } as Db;
     const fixes = pendingFixes(db, matchBuildings(db, [A, B]));
     const by = Object.fromEntries(fixes.map((f) => [f.key, f]));
     expect(by['הרצל 5']).toMatchObject({ link: true, needsUser: false, units: 6 });
-    expect(by['הרצל']).toMatchObject({ renameTo: 'הרצל 7', needsUser: true, category: 'education' });
+    expect(by['הרצל']).toBeUndefined();
+    expect(by['הרצל הרצל 7']).toMatchObject({ renameTo: 'הרצל 7', needsUser: false, relocate: true, category: 'education' });
     expect(by['הרצל 9']).toMatchObject({ needsUser: true });
 
     for (const f of fixes) applyFix(db, f);
-    expect(buildingKeys(db).sort()).toEqual(['הרצל 5', 'הרצל 7', 'הרצל 9']);
+    expect(buildingKeys(db).sort()).toEqual(['הרצל', 'הרצל 5', 'הרצל 7', 'הרצל 9']);
+    expect(getBuilding(db, 'הרצל')!.info.gisId).toBeUndefined();
     expect(getBuilding(db, 'הרצל 7')!.info).toMatchObject({ gisId: 'jlm:2', category: 'education' });
     const again = pendingFixes(db, matchBuildings(db, [A, B]));
     expect(again.map((f) => f.key)).toEqual(['הרצל 9']);

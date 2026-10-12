@@ -9,8 +9,8 @@ import { useMapData } from '../mapData';
  * דיוק המפה: מה שמאומת מול מקור רשמי (או בלי משפחות) מתוקן בלחיצה אחת עם ביטול;
  * כל מה שנוגע במשפחות בלי אימות — מוצג לאישור אחד-אחד.
  */
-export function MapFixPanel({ db, noData, fixes, needUser, total, onClose, onFocus, onPick }: {
-  db: Db; noData: boolean; fixes: MapFix[]; needUser: number; total: number;
+export function MapFixPanel({ db, noData, fixes, waiting, needUser, total, onClose, onFocus, onPick }: {
+  db: Db; noData: boolean; fixes: MapFix[]; waiting: { key: string; families: number }[]; needUser: number; total: number;
   onClose: () => void; onFocus: (t: { id?: string; key?: string }) => void; onPick: (key: string) => void;
 }) {
   const { verify, checking, buildings, geo } = useMapData();
@@ -116,6 +116,18 @@ export function MapFixPanel({ db, noData, fixes, needUser, total, onClose, onFoc
               </div>
             </article>
           ))}
+        </section>
+      )}
+
+      {waiting.length > 0 && (
+        <section className="fix-block">
+          <h3 className="sheet-h">ממתינות למספר בית <span className="num">{waiting.length}</span></h3>
+          <p className="sheet-hint">לא מסומנות במפה עד שיעודכן מספר בית בכרטיס. המערכת לא מנחשת לפי מיקום.</p>
+          <ul className="fix-list">
+            {waiting.map((w) => (
+              <li key={w.key}><b>{w.key}</b><span className="sheet-hint">{w.families === 1 ? 'משפחה אחת' : `${w.families} משפחות`}</span></li>
+            ))}
+          </ul>
         </section>
       )}
     </aside>

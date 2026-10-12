@@ -446,6 +446,8 @@ export interface BuildingMatch {
   families: number;
   broken: boolean;
   brokenKind: BrokenKind | null;
+  /** כתובת בלי מספר בית: לא מסומנת במפה ולא מתוקנת לפי מיקום — ממתינה לעדכון ידני */
+  waitingForNumber: boolean;
   /** הצעת כתובת חדשה (לכתובת פגומה) — מפתח קיים או כתובת רשמית */
   renameTo?: string;
   /** הנקודה השמורה לא על המבנה */
@@ -463,10 +465,12 @@ function refPoint(info: BuildingInfo): LngLat | null {
 }
 
 /**
- * מתאים כל בניין ב-CRM למבנה רשמי. סדר האמון:
- * 1. הכתובת השמורה מופיעה כרשומת המבנה (העירייה)
+ * מתאים כל בניין ב-CRM למבנה רשמי. הכתובת שבכרטיס היא האמת — המיקום במפה
+ * נגזר ממנה ולא להפך. סדר האמון:
+ * 1. הכתובת מופיעה כרשומת המבנה (העירייה)
  * 2. נקודת הכתובת הרשמית (GovMap) נופלת על מבנה — כניסה נוספת מאומתת
- * 3. המבנה במיקום השמור — לא מאומת
+ * 3. המבנה במיקום השמור — רק כשהכתובת לא נמצאה ברישום, ולא מאומת
+ * כתובת בלי מספר בית לא ממוקמת בכלל עד שיעודכן מספר.
  */
 export function matchBuildings(db: Db, officials: OfficialBuilding[], geo: Record<string, GeoHit | null> = {}): BuildingMatch[] {
   const keys = buildingKeys(db).filter((k) => k !== '__NO_ADDRESS__');
@@ -477,6 +481,10 @@ export function matchBuildings(db: Db, officials: OfficialBuilding[], geo: Recor
     const ref = refPoint(info);
     const kind = brokenKind(key);
     const broken = kind !== null;
+    if (kind === 'nonum') {
+      out.push({ key, official: null, method: null, confidence: 'none', families: familiesIn(entry.apts), broken, brokenKind: kind, waitingForNumber: true, relocate: false });
+      continue;
+    }
     // כתובת עם מילה כפולה עדיין כתובת אמיתית — מחפשים לפי הכתיב המתוקן
     const lookup = kind === 'doubled' ? cleanAddress(key) : kind ? null : key;
     let official: OfficialBuilding | null = null;
@@ -502,7 +510,7 @@ export function matchBuildings(db: Db, officials: OfficialBuilding[], geo: Recor
     }
 
     const m: BuildingMatch = {
-      key, official, method, families: familiesIn(entry.apts), broken, brokenKind: kind,
+      key, official, method, families: familiesIn(entry.apts), broken, brokenKind: kind, waitingForNumber: false,
       confidence: method === 'address' || method === 'geocode' || method === 'manual' ? 'high' : method ? 'medium' : 'none',
       relocate: !!(official && ref && distanceToPolygonM(ref, official.polygon) > 0),
     };
@@ -646,7 +654,7 @@ export function pendingFixes(db: Db, matches: BuildingMatch[], geo: Record<strin
   const out: MapFix[] = [];
   for (const m of matches) {
     const info = getBuilding(db, m.key)?.info;
-    if (!info) continue;
+    if (!info || m.waitingForNumber) continue;
     if (!m.official) {
       out.push({ key: m.key, match: m, link: false, relocate: false, needsUser: true });
       continue;

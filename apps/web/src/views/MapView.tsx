@@ -282,7 +282,7 @@ export function MapView({ db }: { db: Db }) {
           onPick={(key) => { setPickFor(key); setPanel(null); }} />
       )}
       {panel === 'fix' && (
-        <MapFixPanel db={db} noData={!buildings.length} fixes={fixes} needUser={needUser} total={matches.length} onClose={() => setPanel(null)}
+        <MapFixPanel db={db} noData={!buildings.length} fixes={fixes} waiting={matches.filter((m) => m.waitingForNumber).map((m) => ({ key: m.key, families: m.families }))} needUser={needUser} total={matches.length} onClose={() => setPanel(null)}
           onFocus={focus} onPick={(key) => { setPickFor(key); setPanel(null); }} />
       )}
     </div>

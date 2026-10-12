@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import {
   type BBox, type BuildingMatch, type Db, type GeoHit, type GisSource, type LngLat, type OfficialBuilding,
   GIS_SOURCES, addressMatchesOfficial, bboxOf, buildingKeys, cacheGet, cachePut, fetchBuildingsFor, geocodeAddress,
-  getBuilding, isBrokenAddress, matchBuildings, territoryPolygon,
+  brokenKind, cleanAddress, getBuilding, matchBuildings, territoryPolygon,
 } from '@shlichus/core';
 
 /** העיר של השליחות — לחיפוש כתובות רשמי */
@@ -89,7 +89,13 @@ export const useMapData = create<MapDataState>((set, get) => ({
     set({ checking: true });
     const geo = { ...(await cacheGet<Record<string, GeoHit | null>>(`geo:${city}`)) ?? {}, ...get().geo };
     if (city) {
-      const need = buildingKeys(db).filter((k) => !(k in geo) && !isBrokenAddress(k) && !buildings.some((b) => addressMatchesOfficial(k, b)));
+      // כתובת בכתיב כפול ("דוד ניב ניב 18") נבדקת לפי הכתיב המתוקן; בלי מספר או משובשת — אין מה לבדוק
+      const need = buildingKeys(db).filter((k) => {
+        const kind = brokenKind(k);
+        if (k in geo || kind === 'garbled' || kind === 'nonum') return false;
+        const addr = kind === 'doubled' ? cleanAddress(k) : k;
+        return !buildings.some((b) => addressMatchesOfficial(addr, b));
+      });
       for (const k of need) {
         try { geo[k] = await geocodeAddress(k, city); } catch { /* רשת — ננסה בפעם הבאה */ }
         await new Promise((r) => setTimeout(r, 120));

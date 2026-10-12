@@ -121,7 +121,7 @@ export function toGeoJson(db: Db, views: Map<string, BuildingView>, mode: ColorM
 export function orphansGeoJson(db: Db, matches: BuildingMatch[]): FC {
   const features: GeoJSON.Feature[] = [];
   for (const m of matches) {
-    if (m.official) continue;
+    if (m.official || m.waitingForNumber) continue; // בלי מספר בית — לא מסמנים במפה
     const c = getBuilding(db, m.key)?.info.coords as LngLat | null | undefined;
     if (!c) continue;
     features.push({ type: 'Feature', properties: { key: m.key, fam: m.families }, geometry: { type: 'Point', coordinates: c } });
