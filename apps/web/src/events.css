@@ -1,0 +1,39 @@
+/* ---------- אירועים ---------- */
+.ev-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 10px; }
+.ev-strip.past { opacity: .75; margin-top: 10px; }
+.ev-card { text-align: start; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; font: inherit; color: inherit; }
+.ev-card:hover { border-color: var(--accent); }
+.ev-card > b { font-family: var(--f-display); font-size: 17px; font-weight: 600; }
+.ev-when { font-size: 12.5px; font-weight: 700; color: var(--accent); }
+.ev-nums { display: flex; gap: 14px; margin-top: 6px; font-size: 13px; color: var(--muted); }
+.ev-nums b { color: var(--fg); }
+.ev-empty { padding: 18px; color: var(--muted); }
+.cal { padding: 16px 18px; margin-top: 18px; }
+.cal-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.cal-head h2 { margin: 0; font-family: var(--f-display); font-size: 17px; font-weight: 600; }
+.cal-kinds { margin: 12px 0 6px; }
+.cal-kinds .num { color: var(--faint); font-weight: 500; }
+.cal-days { list-style: none; margin: 0; padding: 0; }
+.cal-days > li { display: grid; grid-template-columns: 170px minmax(0,1fr); gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.cal-date { display: flex; flex-direction: column; line-height: 1.35; }
+.cal-date b { font-family: var(--f-display); font-weight: 600; }
+.cal-date span { font-size: 12.5px; color: var(--faint); }
+.cal-date .heb { color: var(--muted); }
+.cal-days ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cal-days ul li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cal-days .t { flex: 1 1 180px; min-width: 0; }
+.kdot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+.k-event .kdot { background: var(--accent); } .k-holiday .kdot { background: var(--warm); }
+.k-yahrzeit .kdot { background: var(--mourn); } .k-birthday .kdot { background: var(--cool); }
+.k-anniversary .kdot { background: var(--hot); } .k-barmitzva .kdot { background: var(--ok); }
+.k-yahrzeit .t { color: var(--mourn); font-weight: 600; }
+.ev-form { display: flex; flex-direction: column; gap: 10px; }
+.ev-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ev-form .fld input, .ev-form .fld textarea { background: var(--bg); }
+.ev-regs { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ev-regs h3 { margin: 0; font-family: var(--f-display); font-size: 14px; font-weight: 600; }
+.ev-regs .num { color: var(--accent); }
+@media (max-width: 760px) {
+  .cal-days > li { grid-template-columns: minmax(0,1fr); gap: 6px; }
+  .cal-date { flex-direction: row; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+}

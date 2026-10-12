@@ -13,3 +13,4 @@ export * from './jewishCalendar.js';
 export * from './gis.js';
 export * from './families.js';
 export * from './tasks.js';
+export * from './events.js';

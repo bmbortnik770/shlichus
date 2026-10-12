@@ -256,6 +256,7 @@ export function computeToday(db: Db, opts: TodayOptions = {}): TodayResult {
 
   // אירועי קהילה ומשימות כלליות עם תאריך
   for (const ev of (db.meta?.events ?? []) as Record<string, unknown>[]) {
+    if (ev.cancelled) continue;
     const d = parseLooseDate(ev.date);
     if (!d) continue;
     const inDays = daysBetween(now, d);

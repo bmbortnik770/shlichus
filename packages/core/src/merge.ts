@@ -128,8 +128,10 @@ function mergeMeta(local: Db['meta'], remote: Db['meta']): NonNullable<Db['meta'
     base.generalTasks = [...map.values()];
   }
 
-  // אירועים: איחוד לפי id; לכפילות — הרשומה עם יותר נרשמים/נוכחות (הצטברות משטח)
-  type Ev = { id?: string; registrants?: unknown[]; attendance?: unknown[] };
+  // אירועים: איחוד לפי id. שדות האירוע (שם, תאריך, ביטול) — מהגרסה שעודכנה אחרונה (updatedAt);
+  // נרשמים — איחוד לפי שם (אף נרשם לא הולך לאיבוד); נוכחות — מהגרסה העדכנית אם שתיהן נערכו כאן,
+  // אחרת איחוד (אפליקציית השטח מוסיפה נוכחות בלי חותמת זמן)
+  type Ev = { id?: string; updatedAt?: number; registrants?: { name?: string }[]; attendance?: string[] };
   const lEvents = (local?.events ?? []) as Ev[];
   const rEvents = (remote?.events ?? []) as Ev[];
   if (lEvents.length || rEvents.length) {
@@ -139,7 +141,15 @@ function mergeMeta(local: Db['meta'], remote: Db['meta']): NonNullable<Db['meta'
       const existing = map.get(key);
       if (!existing) { map.set(key, ev); continue; }
       const size = (e: Ev) => (e.registrants?.length ?? 0) + (e.attendance?.length ?? 0);
-      map.set(key, size(ev) >= size(existing) ? ev : existing);
+      const newer = (ev.updatedAt ?? 0) !== (existing.updatedAt ?? 0)
+        ? ((ev.updatedAt ?? 0) > (existing.updatedAt ?? 0) ? ev : existing)
+        : ev.updatedAt ? existing // אותה חותמת בדיוק — העותק המקומי (הראשון) נשאר
+        : size(ev) >= size(existing) ? ev : existing;
+      const regs = new Map<string, { name?: string }>();
+      for (const r of [...(existing.registrants ?? []), ...(ev.registrants ?? [])]) regs.set(String(r.name ?? JSON.stringify(r)), r);
+      const bothStamped = !!ev.updatedAt && !!existing.updatedAt;
+      const attendance = bothStamped ? (newer.attendance ?? []) : [...new Set([...(existing.attendance ?? []), ...(ev.attendance ?? [])])];
+      map.set(key, { ...newer, registrants: [...regs.values()], attendance });
     }
     base.events = [...map.values()];
   }
