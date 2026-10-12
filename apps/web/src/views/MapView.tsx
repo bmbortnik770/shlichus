@@ -10,7 +10,7 @@ import { Icon } from '../icons';
 import { useStore } from '../store';
 import { useToast } from '../ui';
 import { missionCity, useMapData } from '../mapData';
-import { type ColorMode, buildViews, findView, orphansGeoJson, readPalette, territoryMask, toGeoJson } from '../map/features';
+import { type ColorMode, buildViews, findView, prepareBaseMap, orphansGeoJson, readPalette, territoryMask, toGeoJson } from '../map/features';
 import { BuildingCard } from './BuildingCard';
 import { MapFixPanel } from './MapFix';
 
@@ -71,14 +71,8 @@ export function MapView({ db }: { db: Db }) {
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-left');
     map.on('load', () => {
       // הבניינים של Mapbox יורדים — מוצג רק מה שנשמר ונלחץ
-      for (const l of map.getStyle().layers ?? []) {
-        if ((l as { 'source-layer'?: string })['source-layer'] === 'building') map.setLayoutProperty(l.id, 'visibility', 'none');
-        // שמות רחובות ומקומות בשם המקומי (עברית) במקום אנגלית
-        if (l.type === 'symbol') {
-          const tf = map.getLayoutProperty(l.id, 'text-field');
-          if (tf && JSON.stringify(tf).includes('name_en')) map.setLayoutProperty(l.id, 'text-field', JSON.parse(JSON.stringify(tf).replace(/"name_en"/g, '"name"')));
-        }
-      }
+      // הבניינים של Mapbox יורדים — מוצג רק מה שנשמר ונלחץ; שמות בעברית
+      prepareBaseMap(map);
       const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
       map.addSource('terr', { type: 'geojson', data: empty });
       map.addSource('shapes', { type: 'geojson', data: empty, promoteId: 'id' });
@@ -169,6 +163,12 @@ export function MapView({ db }: { db: Db }) {
     (map.getSource('labels') as mapboxgl.GeoJSONSource).setData(labels);
     (map.getSource('orphans') as mapboxgl.GeoJSONSource).setData(orphansGeoJson(db, matches));
     (map.getSource('terr') as mapboxgl.GeoJSONSource).setData(territoryMask(db));
+    // תצוגת התיחום מההגדרות: קו גבול (עם הכהיה עדינה), הכהיית החוץ, או בלי
+    const disp = String((db.__SETTINGS__?.territory as { displayMode?: string } | undefined)?.displayMode ?? 'border');
+    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    map.setLayoutProperty('terr-line', 'visibility', disp === 'none' ? 'none' : 'visible');
+    map.setLayoutProperty('terr-mask', 'visibility', disp === 'none' ? 'none' : 'visible');
+    map.setPaintProperty('terr-mask', 'fill-opacity', disp === 'fill' ? (dark ? 0.55 : 0.22) : (dark ? 0.35 : 0.07));
   }, [ready, db, views, matches, mode]);
 
   // סימון הנבחר

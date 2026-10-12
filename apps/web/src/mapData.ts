@@ -76,6 +76,8 @@ export const useMapData = create<MapDataState>((set, get) => ({
       // מורידים עם שוליים, כדי שהרחבה קטנה של האזור לא תחייב הורדה חוזרת
       const wide = bboxOf([[area[0], area[1]], [area[2], area[3]]], 250);
       const { source, buildings } = await fetchBuildingsFor(wide);
+      // העירייה לא ענתה והגיע רק המקור הארצי — לא מחליפים עותק עירוני טוב שכבר שמור; ננסה שוב בפעם הבאה
+      if (cached?.level === 'municipal' && source.level === 'national') return;
       const entry: Cached = { area: wide, at: Date.now(), sourceId: source.id, sourceName: source.name, level: source.level, buildings };
       await cachePut(CACHE_KEY, entry);
       set({ buildings, source: { id: source.id, name: source.name, level: source.level }, fetchedAt: entry.at, status: 'ready' });

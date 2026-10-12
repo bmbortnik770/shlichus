@@ -1,0 +1,38 @@
+/* ---------- הגדרות ---------- */
+.set-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; align-items: start; }
+.set-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.set-card.wide { grid-column: 1 / -1; margin-bottom: 14px; }
+.set-card h2 { margin: 0; font-family: var(--f-display); font-size: 16px; font-weight: 600; }
+.set-card .fld input { background: var(--bg); }
+.set-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.set-row input:not([type="color"]) { flex: 1 1 180px; }
+.num-in { width: 72px; font: inherit; text-align: center; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+.inline-in { font: inherit; color: var(--fg); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; }
+.inline-in:hover, .inline-in:focus { border-color: var(--line); background: var(--bg); }
+.swatch { width: 22px; height: 22px; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 50%; }
+.accents { display: flex; flex-wrap: wrap; gap: 8px; }
+.acc { display: inline-flex; gap: 8px; align-items: center; border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 5px 12px 5px 8px; font-weight: 600; font-size: 13.5px; color: var(--muted); }
+.acc i { width: 16px; height: 16px; border-radius: 50%; background: var(--a); }
+.acc[aria-pressed="true"] { border-color: var(--a); color: var(--fg); box-shadow: inset 0 0 0 1px var(--a); }
+.score-tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.score-tbl th { text-align: start; font-size: 12px; color: var(--faint); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.score-tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.th-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.th-row .dot { margin-inline-start: 10px; }
+.file-btn { cursor: pointer; align-self: flex-start; }
+.map-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+.map-grid select { background: var(--bg); }
+.preview-tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.preview-tbl table { border-collapse: collapse; font-size: 12.5px; }
+.preview-tbl td { padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+/* עורך תיחום */
+.tv { display: grid; grid-template-columns: minmax(0,1fr) 260px; gap: 14px; }
+.tv-map { height: 460px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); cursor: crosshair; }
+.tv-side { display: flex; flex-direction: column; gap: 12px; }
+.tv-stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; }
+.tv-stats div { background: var(--sunken); border-radius: 9px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; }
+.tv-stats b { font-family: var(--f-display); font-size: 17px; }
+.tv-stats span { font-size: 11px; color: var(--faint); }
+.tv-side .fix-acts { flex-direction: column; align-items: stretch; }
+.tv-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); padding: 0; cursor: grab; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+@media (max-width: 860px) { .tv { grid-template-columns: minmax(0,1fr); } .tv-map { height: 360px; } .map-grid { grid-template-columns: minmax(0,1fr); } }

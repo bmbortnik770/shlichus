@@ -2,6 +2,7 @@
  * הפיכת הנתונים לשכבות מפה: כל מבנה רשמי = פוליגון אחד (או חלק לכל כניסה), צבוע לפי המצב שנבחר.
  * המבנים של Mapbox מוסתרים — מה שרואים על המפה הוא בדיוק מה שנלחץ ונשמר.
  */
+import type mapboxgl from 'mapbox-gl';
 import {
   type Apartment, type BuildingMatch, type Db, type GeoHit, type LngLat, type MapUnit, type OfficialBuilding,
   categoryFromUse, displayName, getBuilding, getCategories, getStatusColor, labelPoint,
@@ -166,4 +167,15 @@ export function territoryMask(db: Db): FC {
       { type: 'Feature', properties: { kind: 'line' }, geometry: { type: 'LineString', coordinates: ring } },
     ],
   };
+}
+
+/** בסיס המפה: מסתיר את הבניינים של Mapbox (מוצגים רק המבנים שלנו) ומציג שמות בשם המקומי (עברית) */
+export function prepareBaseMap(map: mapboxgl.Map): void {
+  for (const l of map.getStyle().layers ?? []) {
+    if ((l as { 'source-layer'?: string })['source-layer'] === 'building') map.setLayoutProperty(l.id, 'visibility', 'none');
+    if (l.type === 'symbol') {
+      const tf = map.getLayoutProperty(l.id, 'text-field');
+      if (tf && JSON.stringify(tf).includes('name_en')) map.setLayoutProperty(l.id, 'text-field', JSON.parse(JSON.stringify(tf).replace(/"name_en"/g, '"name"')));
+    }
+  }
 }

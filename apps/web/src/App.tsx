@@ -11,6 +11,8 @@ import { Tasks } from './views/Tasks';
 import { Events } from './views/Events';
 import { Donations } from './views/Donations';
 import { Messages } from './views/Messages';
+import { Settings } from './views/Settings';
+import { applyAccent } from './accent';
 
 type View = 'today' | 'community' | 'map' | 'messages' | 'donations' | 'events' | 'tasks' | 'connections' | 'settings';
 
@@ -28,9 +30,6 @@ const FOOT: typeof NAV = [
   { key: 'settings', label: 'הגדרות', icon: 'gear' },
 ];
 
-/** מסכים שכבר נבנו בממשק החדש */
-const BUILT: View[] = ['today', 'connections', 'map', 'community', 'tasks', 'events', 'donations', 'messages'];
-
 function viewFromHash(): View {
   const h = location.hash.replace('#', '') as View;
   return [...NAV, ...FOOT].some((n) => n.key === h) ? h : 'today';
@@ -41,6 +40,8 @@ export function App() {
   const [view, setView] = useState<View>(viewFromHash);
 
   useEffect(() => { void load(); }, [load]);
+  const accent = db?.__SETTINGS__?.webAccent as string | undefined;
+  useEffect(() => { applyAccent(accent); }, [accent]);
   useEffect(() => {
     const on = () => setView(viewFromHash());
     window.addEventListener('hashchange', on);
@@ -86,7 +87,7 @@ export function App() {
         {view === 'events' && <Events db={db} />}
         {view === 'donations' && <Donations db={db} />}
         {view === 'messages' && <Messages db={db} />}
-        {!BUILT.includes(view) && <Soon label={[...NAV, ...FOOT].find((n) => n.key === view)!.label} />}
+        {view === 'settings' && <Settings db={db} />}
       </main>
 
       <nav className="tabbar" aria-label="ניווט">
@@ -160,15 +161,6 @@ function Search({ db }: { db: Db }) {
   );
 }
 
-function Soon({ label }: { label: string }) {
-  return (
-    <section className="panel soon">
-      <h2>{label}</h2>
-      <p>המסך הזה נבנה מחדש בעיצוב החדש. בינתיים כל האפשרויות שלו זמינות בגרסה הקיימת, על אותם נתונים.</p>
-      <a className="btn" href="/shlichus/v2/">לגרסה הקיימת</a>
-    </section>
-  );
-}
 
 function Welcome({ sync, onLogin }: { sync: string; onLogin: () => void }) {
   return (
