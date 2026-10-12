@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Apartment, type Db, buildingKeys, displayName, getBuilding } from '@shlichus/core';
 import { Icon, type IconName } from './icons';
 import { useStore } from './store';
-import { ToastHost } from './ui';
+import { ConfirmHost, ToastHost } from './ui';
 import { Home } from './views/Home';
 import { Connections } from './views/Connections';
 import { MapView } from './views/MapView';
+import { Community } from './views/Community';
 
 type View = 'today' | 'community' | 'map' | 'messages' | 'donations' | 'events' | 'tasks' | 'connections' | 'settings';
 
@@ -22,6 +23,9 @@ const FOOT: typeof NAV = [
   { key: 'connections', label: 'חיבורים', icon: 'plug' },
   { key: 'settings', label: 'הגדרות', icon: 'gear' },
 ];
+
+/** מסכים שכבר נבנו בממשק החדש */
+const BUILT: View[] = ['today', 'connections', 'map', 'community'];
 
 function viewFromHash(): View {
   const h = location.hash.replace('#', '') as View;
@@ -73,7 +77,8 @@ export function App() {
         {view === 'today' && <Home db={db} onNavigate={go} />}
         {view === 'connections' && <Connections db={db} />}
         {view === 'map' && <MapView db={db} />}
-        {view !== 'today' && view !== 'connections' && view !== 'map' && <Soon label={[...NAV, ...FOOT].find((n) => n.key === view)!.label} />}
+        {view === 'community' && <Community db={db} />}
+        {!BUILT.includes(view) && <Soon label={[...NAV, ...FOOT].find((n) => n.key === view)!.label} />}
       </main>
 
       <nav className="tabbar" aria-label="ניווט">
@@ -84,6 +89,7 @@ export function App() {
         ))}
       </nav>
       <ToastHost />
+      <ConfirmHost />
     </div>
   );
 }

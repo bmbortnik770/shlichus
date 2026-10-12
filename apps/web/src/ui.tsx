@@ -69,3 +69,29 @@ export function useCopy() {
   };
   return { copied, copy };
 }
+
+/* ---------- אישור פעולה (במקום confirm של הדפדפן) ---------- */
+interface ConfirmState {
+  req: { title: string; message: string; confirm: string; danger: boolean; resolve: (ok: boolean) => void } | null;
+  ask: (opts: { title: string; message: string; confirm?: string; danger?: boolean }) => Promise<boolean>;
+}
+export const useConfirm = create<ConfirmState>((set) => ({
+  req: null,
+  ask: ({ title, message, confirm = 'אישור', danger = false }) =>
+    new Promise<boolean>((resolve) => set({ req: { title, message, confirm, danger, resolve } })),
+}));
+
+export function ConfirmHost() {
+  const req = useConfirm((s) => s.req);
+  if (!req) return null;
+  const done = (ok: boolean) => { req.resolve(ok); useConfirm.setState({ req: null }); };
+  return (
+    <Dialog title={req.title} onClose={() => done(false)}>
+      <p style={{ margin: 0 }}>{req.message}</p>
+      <div className="dialog-acts">
+        <button className="btn" onClick={() => done(false)}>ביטול</button>
+        <button className={`btn ${req.danger ? 'btn-danger' : 'btn-primary'}`} onClick={() => done(true)}>{req.confirm}</button>
+      </div>
+    </Dialog>
+  );
+}
