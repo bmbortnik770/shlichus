@@ -10,3 +10,4 @@ export * from './today.js';
 export * from './connectors.js';
 export * from './backend.js';
 export * from './jewishCalendar.js';
+export * from './gis.js';

@@ -96,6 +96,11 @@ export interface BuildingInfo {
   units?: unknown;
   updatedAt?: number;
   _coordSource?: string;
+  /** מזהה המבנה הרשמי (למשל "jlm:57580023") — הזהות היציבה של הבניין במפה */
+  gisId?: string;
+  /** מצבה: הבניין הועבר לכתובת הזו */
+  movedTo?: string;
+  deletedAt?: number;
   [k: string]: unknown;
 }
 
@@ -151,6 +156,26 @@ export function getBuilding(db: Db, key: string): BuildingEntry | undefined {
   return undefined;
 }
 
+/** בניינים חיים בלבד — בלי מצבות של בניינים שהועברו לכתובת אחרת */
 export function buildingKeys(db: Db): string[] {
+  return allBuildingKeys(db).filter((k) => {
+    const info = getBuilding(db, k)!.info;
+    return !info?.movedTo && !info?.deletedAt;
+  });
+}
+
+/** כל רשומות הבניינים כולל מצבות — לשימוש המיזוג */
+export function allBuildingKeys(db: Db): string[] {
   return Object.keys(db).filter((k) => isBuildingKey(k) && getBuilding(db, k));
+}
+
+/** הכתובת העדכנית של בניין (עוקב אחרי העברות) */
+export function resolveBuildingKey(db: Db, key: string): string {
+  let k = key;
+  for (let i = 0; i < 8; i++) {
+    const to = getBuilding(db, k)?.info?.movedTo;
+    if (typeof to !== 'string' || !to) break;
+    k = to;
+  }
+  return k;
 }

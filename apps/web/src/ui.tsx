@@ -16,7 +16,8 @@ export const useToast = create<ToastState>((set) => ({
   show: (text, undo) => {
     clearTimeout(timer);
     set({ text, undo: undo ?? null });
-    timer = setTimeout(() => set({ text: null, undo: null }), 5000);
+    // עם ביטול — יותר זמן להתחרט
+    timer = setTimeout(() => set({ text: null, undo: null }), undo ? 10000 : 5000);
   },
   hide: () => set({ text: null, undo: null }),
 }));

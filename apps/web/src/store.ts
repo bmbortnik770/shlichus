@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { type Db, type InteractionLog, type SyncStatus, DriveBackend, getBuilding } from '@shlichus/core';
+import { type Db, type InteractionLog, type SyncStatus, DriveBackend, aptIdentity, getBuilding } from '@shlichus/core';
 import { browserTokens, hasValidSession, interactiveLogin } from './auth';
 
 const backend = new DriveBackend(browserTokens);
@@ -22,6 +22,11 @@ interface State {
   /** רישום קשר עם משפחה — מיידי בממשק, השמירה רצה ברקע; מחזיר פונקציית ביטול */
   logContact: (bldg: string, idx: number, type: ContactType) => () => void;
   updateSettings: (patch: Record<string, unknown>) => Promise<void>;
+  /**
+   * שינוי כלשהו בנתונים: צילום מצב, החלה, שמירה ברקע. מחזיר ביטול שמחזיר
+   * בדיוק את המצב הקודם (משמש לתיקוני מפה גורפים).
+   */
+  mutate: (fn: (db: Db) => void) => () => void;
 }
 
 function todayIso(): string {
@@ -96,6 +101,37 @@ export const useStore = create<State>((set, get) => {
         const cur = e?.apts[idx];
         if (!e || !cur) return;
         e.apts[idx] = { ...cur, interactions: (cur.interactions ?? []).filter((l) => l.id !== log.id), updatedAt: Date.now() };
+        void persist();
+      };
+    },
+
+    mutate: (fn) => {
+      const db = get().db;
+      if (!db) return () => {};
+      const before = structuredClone(db);
+      fn(db);
+      void persist();
+      return () => {
+        const cur = get().db ?? {};
+        const restored = structuredClone(before);
+        const now = Date.now();
+        // הביטול עצמו הוא שינוי חדש: כל בניין שהשתנה מקבל חותמות עדכניות כדי לנצח במיזוג,
+        // ודירות שנוספו לו בשינוי נשמרות כמחוקות (אחרת עותק הענן היה מחזיר אותן)
+        for (const k of Object.keys(cur)) {
+          const now_ = getBuilding(cur, k);
+          if (!now_) continue;
+          const was = getBuilding(restored, k);
+          if (!was) {
+            restored[k] = { info: { deletedAt: now, updatedAt: now }, apts: [] };
+            continue;
+          }
+          if (JSON.stringify(was) === JSON.stringify(now_)) continue;
+          const had = new Set(was.apts.map(aptIdentity));
+          for (const a of now_.apts) if (!had.has(aptIdentity(a))) was.apts.push({ ...a, deletedAt: now, updatedAt: now });
+          was.apts = was.apts.map((a) => ({ ...a, updatedAt: now }));
+          was.info = { ...was.info, updatedAt: now };
+        }
+        set({ db: restored });
         void persist();
       };
     },

@@ -8,7 +8,7 @@
  * 4. בניינים שקיימים רק מקומית נשמרים (כמו בישן — union).
  */
 import type { Apartment, Board, Db, BuildingEntry } from './types.js';
-import { buildingKeys, getBuilding } from './types.js';
+import { allBuildingKeys, getBuilding, resolveBuildingKey } from './types.js';
 
 /** מפתח זהות לדירה: id יציב אם קיים, אחרת name_num (תאימות לישן) */
 export function aptIdentity(a: Apartment): string {
@@ -60,7 +60,7 @@ export function mergeDb(local: Db, remote: Db): Db {
 
   const result: Db = structuredClone(local);
 
-  for (const key of buildingKeys(remote)) {
+  for (const key of allBuildingKeys(remote)) {
     const remoteEntry = getBuilding(remote, key)!;
     const localEntry = getBuilding(result, key);
     if (!localEntry) {
@@ -70,6 +70,8 @@ export function mergeDb(local: Db, remote: Db): Db {
     localEntry.apts = mergeApts(localEntry.apts ?? [], remoteEntry.apts ?? []);
     localEntry.info = mergeInfo(localEntry, remoteEntry);
   }
+
+  redirectMoved(result);
 
   result.__BOARDS__ = mergeBoards(local.__BOARDS__, remote.__BOARDS__);
 
@@ -85,6 +87,22 @@ export function mergeDb(local: Db, remote: Db): Db {
 
   result.meta = mergeMeta(local.meta, remote.meta);
   return result;
+}
+
+/**
+ * בניין שהועבר (מצבה עם movedTo) לא מחזיק דירות: דירות שהגיעו אליו מעותק ישן
+ * או ממכשיר אחר עוברות לכתובת החדשה, בלי כפילויות.
+ */
+function redirectMoved(db: Db): void {
+  for (const key of allBuildingKeys(db)) {
+    const entry = getBuilding(db, key)!;
+    if (!entry.info?.movedTo) continue;
+    if (entry.apts?.length) {
+      const target = getBuilding(db, resolveBuildingKey(db, key));
+      if (target && target !== entry) target.apts = mergeApts(target.apts ?? [], entry.apts.filter((a) => !a.deletedAt));
+    }
+    entry.apts = [];
+  }
 }
 
 /**

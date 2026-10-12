@@ -5,6 +5,7 @@ import { useStore } from './store';
 import { ToastHost } from './ui';
 import { Home } from './views/Home';
 import { Connections } from './views/Connections';
+import { MapView } from './views/MapView';
 
 type View = 'today' | 'community' | 'map' | 'messages' | 'donations' | 'events' | 'tasks' | 'connections' | 'settings';
 
@@ -64,14 +65,15 @@ export function App() {
         </div>
       </nav>
 
-      <main className="main">
+      <main className={`main${view === 'map' ? ' main-map' : ''}`}>
         <div className="topbar">
           <Search db={db} />
           <SyncBadge sync={sync} error={syncError} onLogin={() => void login()} />
         </div>
         {view === 'today' && <Home db={db} onNavigate={go} />}
         {view === 'connections' && <Connections db={db} />}
-        {view !== 'today' && view !== 'connections' && <Soon label={[...NAV, ...FOOT].find((n) => n.key === view)!.label} />}
+        {view === 'map' && <MapView db={db} />}
+        {view !== 'today' && view !== 'connections' && view !== 'map' && <Soon label={[...NAV, ...FOOT].find((n) => n.key === view)!.label} />}
       </main>
 
       <nav className="tabbar" aria-label="ניווט">

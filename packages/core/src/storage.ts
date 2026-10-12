@@ -56,3 +56,20 @@ export async function migrateFromLocalStorage(): Promise<Db | null> {
     return null;
   }
 }
+
+/** מטמון כללי באותו מאגר (למשל שכבת מבנים רשמית) — לא חלק מקובץ הנתונים */
+export async function cacheGet<T>(key: string): Promise<T | null> {
+  try {
+    return ((await op<unknown>('readonly', (s) => s.get(`cache:${key}`) as IDBRequest<unknown>)) as T) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function cachePut(key: string, value: unknown): Promise<void> {
+  try {
+    await op('readwrite', (s) => s.put(structuredClone(value), `cache:${key}`));
+  } catch {
+    /* מטמון בלבד — כשל לא עוצר כלום */
+  }
+}

@@ -222,8 +222,9 @@ export const useCrm = create<CrmState>((set, get) => {
     const db = get().db;
     if (!db) return;
     const existing = getBuilding(db, bldg);
-    if (!existing) {
-      (db as Record<string, unknown>)[bldg] = { info: { code: '', rep: '', notes: '', ...info }, apts: [] };
+    if (!existing || existing.info.movedTo || existing.info.deletedAt) {
+      // גם כתובת שהועברה בעבר ונבחרה שוב — נפתחת מחדש כבניין חי
+      (db as Record<string, unknown>)[bldg] = { info: { code: '', rep: '', notes: '', ...info, updatedAt: Date.now() }, apts: [] };
     } else if (!existing.info.polygon && info.polygon) {
       existing.info = { ...existing.info, polygon: info.polygon };
     } else {
