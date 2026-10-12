@@ -15,3 +15,4 @@ export * from './families.js';
 export * from './tasks.js';
 export * from './events.js';
 export * from './donations.js';
+export * from './messaging.js';

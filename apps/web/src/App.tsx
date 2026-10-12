@@ -10,6 +10,7 @@ import { Community } from './views/Community';
 import { Tasks } from './views/Tasks';
 import { Events } from './views/Events';
 import { Donations } from './views/Donations';
+import { Messages } from './views/Messages';
 
 type View = 'today' | 'community' | 'map' | 'messages' | 'donations' | 'events' | 'tasks' | 'connections' | 'settings';
 
@@ -28,7 +29,7 @@ const FOOT: typeof NAV = [
 ];
 
 /** מסכים שכבר נבנו בממשק החדש */
-const BUILT: View[] = ['today', 'connections', 'map', 'community', 'tasks', 'events', 'donations'];
+const BUILT: View[] = ['today', 'connections', 'map', 'community', 'tasks', 'events', 'donations', 'messages'];
 
 function viewFromHash(): View {
   const h = location.hash.replace('#', '') as View;
@@ -84,6 +85,7 @@ export function App() {
         {view === 'tasks' && <Tasks db={db} />}
         {view === 'events' && <Events db={db} />}
         {view === 'donations' && <Donations db={db} />}
+        {view === 'messages' && <Messages db={db} />}
         {!BUILT.includes(view) && <Soon label={[...NAV, ...FOOT].find((n) => n.key === view)!.label} />}
       </main>
 
