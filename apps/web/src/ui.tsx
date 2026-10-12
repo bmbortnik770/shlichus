@@ -36,12 +36,17 @@ export function ToastHost() {
 /* ---------- דיאלוג ---------- */
 export function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  // פוקוס פעם אחת בפתיחה (לא בכל רינדור — אחרת כל הקשה מקפיצה לשדה הראשון)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    ref.current?.querySelector<HTMLElement>('textarea, input, select, button')?.focus();
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); closeRef.current(); } };
     document.addEventListener('keydown', onKey);
-    ref.current?.querySelector<HTMLElement>('textarea, input, button')?.focus();
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
   return (
     <div className="dialog-back" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="dialog" role="dialog" aria-modal="true" aria-label={title} ref={ref}>

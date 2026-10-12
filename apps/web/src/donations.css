@@ -1,0 +1,32 @@
+/* ---------- תרומות ---------- */
+.don-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.kpi { padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.kpi span { font-size: 12.5px; color: var(--faint); font-weight: 600; }
+.kpi b { font-family: var(--f-display); font-size: 26px; font-weight: 600; }
+.kpi small { color: var(--faint); font-size: 12.5px; }
+.don-grid { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); gap: 12px; margin-bottom: 16px; }
+.don-grid h2 { margin: 0 0 12px; font-family: var(--f-display); font-size: 15px; font-weight: 600; }
+.don-chart, .don-camps { padding: 16px 18px; }
+.bars { display: grid; grid-template-columns: repeat(12, minmax(0,1fr)); gap: 6px; height: 190px; align-items: end; }
+.bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; min-width: 0; }
+.bar { width: 100%; max-width: 34px; background: var(--accent); border-radius: 5px 5px 2px 2px; min-height: 2px; }
+.bar-val { font-size: 10px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bar-lbl { font-size: 11px; color: var(--faint); }
+.camp { display: flex; flex-direction: column; gap: 5px; width: 100%; border: 0; background: none; padding: 8px 6px; border-radius: 8px; text-align: start; font: inherit; color: inherit; }
+.camp:hover, .camp.on { background: var(--sunken); }
+.camp-top { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.camp-top .num { color: var(--muted); }
+.camp-bar { height: 7px; background: var(--sunken); border-radius: 99px; overflow: hidden; }
+.camp.on .camp-bar, .camp:hover .camp-bar { background: var(--surface); }
+.camp-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.donors { list-style: none; margin: 0; padding: 0; }
+.donors li { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); cursor: pointer; }
+.donors li:first-child { border-top: 0; }
+.donors li:hover { background: var(--sunken); }
+.dn-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dn-main span { font-size: 13px; color: var(--faint); }
+.dn-total { font-family: var(--f-display); font-size: 17px; }
+.camp-edit { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr) auto; gap: 8px; align-items: center; }
+.camp-edit input { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; min-width: 0; }
+@media (max-width: 900px) { .don-grid { grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 560px) { .bar-val { display: none; } .bars { gap: 3px; height: 150px; } }
