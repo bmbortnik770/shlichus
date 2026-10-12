@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   type BBox, type BuildingMatch, type Db, type GeoHit, type GisSource, type LngLat, type OfficialBuilding,
-  GIS_SOURCES, addressMatchesOfficial, bboxOf, buildingKeys, cacheGet, cachePut, fetchBuildingsFor, geocodeAddress,
+  GIS_SOURCES, bboxOf, buildingKeys, cacheGet, cachePut, fetchBuildingsFor, geocodeAddress,
   brokenKind, cleanAddress, getBuilding, matchBuildings, territoryPolygon,
 } from '@shlichus/core';
 
@@ -29,6 +29,8 @@ export function missionArea(db: Db): BBox | null {
 }
 
 const CACHE_DAYS = 30;
+let running: Promise<void> | null = null;
+const kindAddress = (k: string) => (brokenKind(k) === 'doubled' ? cleanAddress(k) : k);
 const CACHE_KEY = 'gis:mission';
 const covers = (a: BBox, b: BBox) => a[0] <= b[0] && a[1] <= b[1] && a[2] >= b[2] && a[3] >= b[3];
 
@@ -83,26 +85,31 @@ export const useMapData = create<MapDataState>((set, get) => ({
     }
   },
 
-  verify: async (db) => {
-    const { buildings } = get();
-    const city = missionCity(db);
-    set({ checking: true });
-    const geo = { ...(await cacheGet<Record<string, GeoHit | null>>(`geo:${city}`)) ?? {}, ...get().geo };
-    if (city) {
-      // כתובת בכתיב כפול ("דוד ניב ניב 18") נבדקת לפי הכתיב המתוקן; בלי מספר או משובשת — אין מה לבדוק
-      const need = buildingKeys(db).filter((k) => {
-        const kind = brokenKind(k);
-        if (k in geo || kind === 'garbled' || kind === 'nonum') return false;
-        const addr = kind === 'doubled' ? cleanAddress(k) : k;
-        return !buildings.some((b) => addressMatchesOfficial(addr, b));
-      });
-      for (const k of need) {
-        try { geo[k] = await geocodeAddress(k, city); } catch { /* רשת — ננסה בפעם הבאה */ }
-        await new Promise((r) => setTimeout(r, 120));
+  verify: (db) => {
+    // ריצה אחת בכל פעם; בקשה בזמן ריצה (למשל אחרי שינוי שם כתובת) מקבלת סבב נוסף אחריה
+    if (running) return running.then(() => get().verify(db));
+    running = (async () => {
+      const city = missionCity(db);
+      set({ checking: true });
+      const geo = { ...(await cacheGet<Record<string, GeoHit | null>>(`geo:${city}`)) ?? {}, ...get().geo };
+      set({ geo: { ...geo } });
+      if (city) {
+        // כל כתובת עם מספר בית מקבלת את נקודת הכניסה הרשמית שלה — זה מה שמחלק בניין לכניסות.
+        // כתיב כפול ("דוד ניב ניב 18") נבדק לפי הכתיב המתוקן; בלי מספר או משובשת — אין מה לבדוק
+        const need = buildingKeys(db).filter((k) => {
+          const kind = brokenKind(k);
+          return !(k in geo) && kind !== 'garbled' && kind !== 'nonum';
+        });
+        for (let i = 0; i < need.length; i++) {
+          const k = need[i]!;
+          try { geo[k] = await geocodeAddress(kindAddress(k), city); } catch { /* רשת — ננסה בפעם הבאה */ }
+          if (i % 10 === 9) { set({ geo: { ...geo } }); await cachePut(`geo:${city}`, geo); }
+          await new Promise((r) => setTimeout(r, 120));
+        }
+        await cachePut(`geo:${city}`, geo);
       }
-      await cachePut(`geo:${city}`, geo);
-    }
-    set({ geo, checking: false });
-    return matchBuildings(db, buildings, geo);
+      set({ geo, checking: false });
+    })().finally(() => { running = null; });
+    return running.then(() => matchBuildings(db, get().buildings, get().geo));
   },
 }));

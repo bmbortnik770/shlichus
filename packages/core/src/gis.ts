@@ -688,3 +688,107 @@ export function applyFix(db: Db, fix: MapFix, opts: { manual?: boolean; skipRena
 export function linkManually(db: Db, key: string, b: OfficialBuilding): void {
   linkBuilding(db, key, b, 'manual');
 }
+
+// ─── חלוקת בניין לכניסות ───────────────────────────────────────────
+
+/** חיתוך פוליגון בחצי-מישור: נשאר הצד של m שממנו d מצביע החוצה (Sutherland–Hodgman) */
+function clipHalfPlane(pts: number[][], d: number[], m: number[]): number[][] {
+  const side = (p: number[]) => (p[0]! - m[0]!) * d[0]! + (p[1]! - m[1]!) * d[1]!;
+  const out: number[][] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!, b = pts[(i + 1) % pts.length]!;
+    const sa = side(a), sb = side(b);
+    if (sa <= 0) out.push(a);
+    if ((sa < 0 && sb > 0) || (sa > 0 && sb < 0)) {
+      const t = sa / (sa - sb);
+      out.push([a[0]! + t * (b[0]! - a[0]!), a[1]! + t * (b[1]! - a[1]!)]);
+    }
+  }
+  return out;
+}
+
+/**
+ * מחלק מבנה בין הכניסות שלו: כל נקודה במבנה שייכת לכניסה הקרובה אליה.
+ * החלקים צמודים, בלי רווחים ובלי חפיפות. null = אי אפשר לחלק (פחות משתי כניסות,
+ * או כניסות שנופלות כמעט באותה נקודה).
+ */
+export function splitByEntrances(poly: LngLat[], entrances: { key: string; point: LngLat }[]): { key: string; polygon: LngLat[] }[] | null {
+  if (entrances.length < 2 || poly.length < 3) return null;
+  const [lng0, lat0] = poly[0]!;
+  const kx = mPerDegLng(lat0);
+  const toM = (p: LngLat) => [(p[0] - lng0) * kx, (p[1] - lat0) * M_PER_DEG_LAT];
+  const toLL = (p: number[]): LngLat => [r7(p[0]! / kx + lng0), r7(p[1]! / M_PER_DEG_LAT + lat0)];
+  const P = poly.map(toM);
+  const E = entrances.map((e) => toM(e.point));
+  for (let i = 0; i < E.length; i++) for (let j = i + 1; j < E.length; j++) {
+    if (Math.hypot(E[i]![0]! - E[j]![0]!, E[i]![1]! - E[j]![1]!) < 2) return null;
+  }
+  const parts = entrances.map((e, i) => {
+    let cur = P;
+    for (let j = 0; j < E.length && cur.length; j++) {
+      if (j === i) continue;
+      const d = [E[j]![0]! - E[i]![0]!, E[j]![1]! - E[i]![1]!];
+      const m = [(E[i]![0]! + E[j]![0]!) / 2, (E[i]![1]! + E[j]![1]!) / 2];
+      cur = clipHalfPlane(cur, d, m);
+    }
+    return { key: e.key, polygon: cur.map(toLL) };
+  });
+  // כניסה שלא קיבלה שטח ממשי (נקודה רחוקה מאוד מהמבנה) — אין חלוקה אמינה
+  return parts.every((p) => p.polygon.length >= 3 && polygonAreaM2(p.polygon) >= 4) ? parts : null;
+}
+
+/** יחידה במפה: בניין שלם, או כניסה אחת שלו כשיש בו כמה כתובות */
+export interface MapUnit {
+  /** מזהה: מזהה המבנה, או "<מבנה>#<כתובת>" לכניסה */
+  id: string;
+  building: OfficialBuilding;
+  polygon: LngLat[];
+  keys: string[];
+  /** כתובות אחרות שלך באותו מבנה (לכניסה) */
+  siblings: string[];
+  apts: number | null;
+  aptsSource: 'verified' | 'city' | 'estimate' | null;
+}
+
+/** נקודת הכניסה של כתובת: הנקודה הרשמית (GovMap) אם על המבנה או צמודה אליו */
+export function entrancePoint(key: string, b: OfficialBuilding, geo: Record<string, GeoHit | null>): LngLat | null {
+  const hit = geo[key];
+  return hit && distanceToPolygonM(hit.point, b.polygon) <= 15 ? hit.point : null;
+}
+
+const verifiedUnits = (db: Db, key: string): number | null => {
+  const u = getBuilding(db, key)?.info.units as { source?: string; count?: number } | undefined;
+  return u?.source === 'VERIFIED' && u.count ? u.count : null;
+};
+
+/**
+ * היחידות של מבנה אחד. כמה כתובות עם נקודות כניסה רשמיות — המבנה מתחלק;
+ * דירות לכניסה = מספר שתוקן ידנית, אחרת הערכה (דירות הבניין / מספר הכניסות).
+ */
+export function unitsForBuilding(db: Db, b: OfficialBuilding, keys: string[], geo: Record<string, GeoHit | null>): MapUnit[] {
+  const whole = (): MapUnit[] => {
+    const verified = keys.length === 1 ? verifiedUnits(db, keys[0]!) : null;
+    return [{ id: b.id, building: b, polygon: b.polygon, keys, siblings: [], apts: verified ?? b.apts, aptsSource: verified ? 'verified' : b.apts ? 'city' : null }];
+  };
+  if (keys.length < 2) return whole();
+  const pts = keys.map((key) => ({ key, point: entrancePoint(key, b, geo) }));
+  if (pts.some((p) => !p.point)) return whole();
+  const parts = splitByEntrances(b.polygon, pts as { key: string; point: LngLat }[]);
+  if (!parts) return whole();
+  const perEntrance = b.apts ? Math.max(1, Math.round(b.apts / Math.max(b.entrances ?? 0, parts.length))) : null;
+  return parts.map((p) => {
+    const verified = verifiedUnits(db, p.key);
+    return {
+      id: `${b.id}#${p.key}`, building: b, polygon: p.polygon, keys: [p.key], siblings: keys.filter((k) => k !== p.key),
+      apts: verified ?? perEntrance, aptsSource: verified ? 'verified' : perEntrance ? 'estimate' : null,
+    };
+  });
+}
+
+/** תיקון ידני של מספר הדירות — מסומן "מאומת" ולא נדרס בשום תיקון אוטומטי */
+export function setVerifiedUnits(db: Db, key: string, count: number): void {
+  const e = getBuilding(db, key);
+  if (!e) return;
+  const prev = (e.info.units ?? {}) as Record<string, unknown>;
+  e.info = { ...e.info, units: { ...prev, source: 'VERIFIED', count, verifiedAt: Date.now() }, updatedAt: Date.now() };
+}

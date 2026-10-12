@@ -3,7 +3,7 @@ import {
   type Db, type GeoHit, type OfficialBuilding, buildingKeys, getBuilding, mergeDb, resolveBuildingKey,
   addressMatchesOfficial, categoryFromUse, distanceToPolygonM, geocodeAddress, isBrokenAddress, labelPoint,
   linkBuilding, matchBuildings, moveBuilding, parseAddress, parseJerusalemFeature, parseOsmElement,
-  pointInPolygon, polygonInTerritory, streetTokens, fetchBuildingsFor, fetchJerusalemBuildings, preferredAddress, pendingFixes, applyFix, linkManually, cleanAddress, brokenKind,
+  pointInPolygon, polygonInTerritory, streetTokens, fetchBuildingsFor, fetchJerusalemBuildings, preferredAddress, splitByEntrances, unitsForBuilding, setVerifiedUnits, polygonAreaM2, pendingFixes, applyFix, linkManually, cleanAddress, brokenKind,
 } from '../src/index.js';
 
 /** ריבוע של כ-20 מ' סביב נקודה */
@@ -274,5 +274,45 @@ describe('רשימת תיקונים', () => {
     const m = matchBuildings(db, [A, B]).find((x) => x.key === 'הרצל 5')!;
     expect(m).toMatchObject({ method: 'manual', confidence: 'high' });
     expect(m.official!.id).toBe('jlm:2');
+  });
+});
+
+describe('חלוקה לכניסות', () => {
+  // בניין ארוך ~60x15 מ' עם שתי כניסות בצדדים
+  const long: [number, number][] = [[35.2, 31.8], [35.20063, 31.8], [35.20063, 31.80014], [35.2, 31.80014]];
+  const e16: [number, number] = [35.20015, 31.79998];
+  const e18: [number, number] = [35.20048, 31.79998];
+
+  it('כל חלק מכיל את הכניסה שלו, והשטחים מסתכמים לבניין כולו', () => {
+    const parts = splitByEntrances(long, [{ key: 'דוד ניב 16', point: e16 }, { key: 'דוד ניב 18', point: e18 }])!;
+    expect(parts).toHaveLength(2);
+    const total = polygonAreaM2(long);
+    const sum = parts.reduce((s, p) => s + polygonAreaM2(p.polygon), 0);
+    expect(Math.abs(sum - total) / total).toBeLessThan(0.01);
+    // כל חלק בצד של הכניסה שלו
+    expect(labelPoint(parts[0]!.polygon)[0]).toBeLessThan(labelPoint(parts[1]!.polygon)[0]);
+    expect(pointInPolygon([35.2001, 31.80007], parts[0]!.polygon)).toBe(true);
+    expect(pointInPolygon([35.2006, 31.80007], parts[1]!.polygon)).toBe(true);
+  });
+
+  it('לא מחלק כשהכניסות כמעט באותה נקודה או כשיש פחות משתיים', () => {
+    expect(splitByEntrances(long, [{ key: 'א', point: e16 }])).toBeNull();
+    expect(splitByEntrances(long, [{ key: 'א', point: e16 }, { key: 'ב', point: [e16[0] + 0.000005, e16[1]] }])).toBeNull();
+  });
+
+  it('יחידות: כניסות עם הערכת דירות, ומספר שתוקן ידנית גובר', () => {
+    const b: OfficialBuilding = { id: 'jlm:16', polygon: long, street: 'דוד ניב', num: 16, apts: 47, floors: 8, entrances: 4, use: '' };
+    const db = { 'דוד ניב 16': { info: {}, apts: [] }, 'דוד ניב 18': { info: {}, apts: [] } } as Db;
+    const geo = { 'דוד ניב 16': { text: '', id: '', point: e16 }, 'דוד ניב 18': { text: '', id: '', point: e18 } };
+    let units = unitsForBuilding(db, b, ['דוד ניב 16', 'דוד ניב 18'], geo);
+    expect(units.map((u) => u.id)).toEqual(['jlm:16#דוד ניב 16', 'jlm:16#דוד ניב 18']);
+    expect(units[1]).toMatchObject({ keys: ['דוד ניב 18'], siblings: ['דוד ניב 16'], apts: 12, aptsSource: 'estimate' }); // 47/4
+    setVerifiedUnits(db, 'דוד ניב 18', 16);
+    units = unitsForBuilding(db, b, ['דוד ניב 16', 'דוד ניב 18'], geo);
+    expect(units[1]).toMatchObject({ apts: 16, aptsSource: 'verified' });
+    // בלי נקודת כניסה לאחת הכתובות — הבניין נשאר שלם
+    expect(unitsForBuilding(db, b, ['דוד ניב 16', 'דוד ניב 18'], { 'דוד ניב 16': geo['דוד ניב 16'] })).toHaveLength(1);
+    // כתובת יחידה עם מספר מאומת
+    expect(unitsForBuilding(db, b, ['דוד ניב 18'], {})[0]).toMatchObject({ apts: 16, aptsSource: 'verified' });
   });
 });

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   type Apartment, type Db, type GisInfo, displayName, getBuilding, getCategories, getStatusColor,
-  lastContact, linkBuilding, preferredAddress, statusSeverity,
+  lastContact, linkBuilding, preferredAddress, setVerifiedUnits, statusSeverity,
 } from '@shlichus/core';
 import { Icon } from '../icons';
 import { type ContactType, useStore } from '../store';
@@ -15,8 +15,8 @@ const METHOD_TEXT: Record<string, string> = {
   point: 'שויך לפי מיקום בלבד',
 };
 
-export function BuildingCard({ db, view, orphanKey, onClose, onPick }: {
-  db: Db; view: BuildingView | null; orphanKey?: string; onClose: () => void; onPick: (key: string) => void;
+export function BuildingCard({ db, view, orphanKey, onClose, onPick, onSelectKey }: {
+  db: Db; view: BuildingView | null; orphanKey?: string; onClose: () => void; onPick: (key: string) => void; onSelectKey: (key: string) => void;
 }) {
   if (!view) {
     // כתובת ב-CRM בלי מבנה
@@ -30,16 +30,17 @@ export function BuildingCard({ db, view, orphanKey, onClose, onPick }: {
       </aside>
     );
   }
-  return <Card db={db} view={view} onClose={onClose} onPick={onPick} />;
+  return <Card db={db} view={view} onClose={onClose} onPick={onPick} onSelectKey={onSelectKey} />;
 }
 
-function Card({ db, view, onClose, onPick }: { db: Db; view: BuildingView; onClose: () => void; onPick: (key: string) => void }) {
+function Card({ db, view, onClose, onPick, onSelectKey }: {
+  db: Db; view: BuildingView; onClose: () => void; onPick: (key: string) => void; onSelectKey: (key: string) => void;
+}) {
   const mutate = useStore((s) => s.mutate);
   const toast = useToast((s) => s.show);
   const [adding, setAdding] = useState(false);
   const { b, keys } = view;
   const title = keys[0] ?? preferredAddress(db, b);
-  const official = b.num ? `${b.street} ${b.num}` : b.street;
   const info = keys[0] ? getBuilding(db, keys[0])?.info : undefined;
   const gis = info?.gis as GisInfo | undefined;
   const cats = getCategories(db);
@@ -71,7 +72,16 @@ function Card({ db, view, onClose, onPick }: { db: Db; view: BuildingView; onClo
 
   return (
     <aside className="sheet" aria-label="כרטיס בניין">
-      <Head title={title} sub={keys.length > 1 ? `כניסות: ${keys.slice(1).join(' · ')}` : official && official !== title ? `ברישום: ${official}` : ''} onClose={onClose} />
+      {/* הכותרת היא תמיד הכתובת שלך — המספר שעל השלט */}
+      <Head title={title} sub="" onClose={onClose} />
+      {(view.siblings.length > 0 || keys.length > 1) && (
+        <div className="siblings">
+          <span>{view.siblings.length ? 'כניסות נוספות בבניין:' : 'כתובות נוספות בבניין:'}</span>
+          {(view.siblings.length ? view.siblings : keys.slice(1)).map((k) => (
+            <button key={k} className="chip-f" onClick={() => onSelectKey(k)}>{k}</button>
+          ))}
+        </div>
+      )}
 
       <div className="tags-row">
         <span className={`pill ${view.inTerritory ? 'in' : 'out'}`}>{view.inTerritory ? 'בתוך התיחום' : 'מחוץ לתיחום'}</span>
@@ -81,9 +91,12 @@ function Card({ db, view, onClose, onPick }: { db: Db; view: BuildingView; onClo
       </div>
 
       <section className="facts" aria-label="נתוני הבניין">
-        <Fact n={apts ?? '—'} l="דירות" />
+        <AptsFact view={view} editable={keys.length <= 1} onSave={(n) => {
+          const undo = mutate((d) => { setVerifiedUnits(d, ensureKey(d), n); });
+          toast(`נשמר: ${n} דירות`, undo);
+        }} />
         <Fact n={b.floors ?? '—'} l="קומות" />
-        <Fact n={b.entrances ?? (keys.length || '—')} l="כניסות" />
+        <Fact n={b.entrances ?? (keys.length || '—')} l="כניסות בבניין" />
         <Fact n={fams} l="משפחות מוכרות" />
         <div className="ring" style={{ ['--p' as string]: `${cover ?? 0}` }} aria-label={cover == null ? 'כיסוי לא ידוע' : `כיסוי ${cover}%`}>
           <span>{cover == null ? '—' : `${cover}%`}</span>
@@ -138,6 +151,32 @@ function Head({ title, sub, onClose }: { title: string; sub: string; onClose: ()
       <button className="icon-btn" onClick={onClose} aria-label="סגירה"><Icon name="x" /></button>
     </header>
   );
+}
+
+const SOURCE_TEXT = { verified: 'מאומת', city: 'לפי העירייה', estimate: 'הערכה' } as const;
+
+/**
+ * מספר הדירות + מקור המספר. לחיצה מאפשרת לתקן; מספר מתוקן מסומן "מאומת"
+ * וגובר על נתוני העירייה ועל ההערכה לכניסה.
+ */
+function AptsFact({ view, editable, onSave }: { view: BuildingView; editable: boolean; onSave: (n: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(String(view.apts ?? ''));
+  const src = view.aptsSource ? SOURCE_TEXT[view.aptsSource] : 'לא ידוע';
+  if (editing) {
+    return (
+      <form className="fact fact-edit" onSubmit={(e) => { e.preventDefault(); const n = parseInt(val, 10); if (n > 0) { onSave(n); setEditing(false); } }}>
+        <input value={val} onChange={(e) => setVal(e.target.value.replace(/D/g, ''))} inputMode="numeric" aria-label="מספר דירות" autoFocus />
+        <button className="link" type="submit">שמירה</button>
+      </form>
+    );
+  }
+  const n = view.apts == null ? '—' : view.aptsSource === 'estimate' ? `~${view.apts}` : view.apts;
+  return editable ? (
+    <button className="fact fact-btn" onClick={() => { setVal(String(view.apts ?? '')); setEditing(true); }} title="לחץ לתיקון מספר הדירות">
+      <b className="num">{n}</b><span>דירות · {src}</span><i className="fact-hint">תיקון</i>
+    </button>
+  ) : <Fact n={n} l={`דירות · ${src}`} />;
 }
 
 function Fact({ n, l }: { n: number | string; l: string }) {

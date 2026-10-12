@@ -1,11 +1,11 @@
 /**
- * הפיכת הנתונים לשכבות מפה: כל מבנה רשמי = פוליגון אחד, צבוע לפי המצב שנבחר.
+ * הפיכת הנתונים לשכבות מפה: כל מבנה רשמי = פוליגון אחד (או חלק לכל כניסה), צבוע לפי המצב שנבחר.
  * המבנים של Mapbox מוסתרים — מה שרואים על המפה הוא בדיוק מה שנלחץ ונשמר.
  */
 import {
-  type Apartment, type BuildingMatch, type Db, type LngLat, type OfficialBuilding,
+  type Apartment, type BuildingMatch, type Db, type GeoHit, type LngLat, type MapUnit, type OfficialBuilding,
   categoryFromUse, displayName, getBuilding, getCategories, getStatusColor, labelPoint,
-  liveApts, polygonInTerritory, statusSeverity, territoryPolygon,
+  liveApts, parseAddress, polygonInTerritory, statusSeverity, territoryPolygon, unitsForBuilding,
 } from '@shlichus/core';
 
 export type ColorMode = 'status' | 'category' | 'coverage';
@@ -38,44 +38,66 @@ export function readPalette(): Palette {
 export const families = (apts: Apartment[] | undefined) => liveApts(apts).filter((a) => !!displayName(a));
 
 export interface BuildingView {
+  /** מזהה היחידה במפה: בניין שלם, או "<מבנה>#<כתובת>" לכניסה */
+  id: string;
   b: OfficialBuilding;
+  polygon: LngLat[];
   keys: string[];
+  /** כתובות שלך בכניסות האחרות של אותו בניין */
+  siblings: string[];
   families: { key: string; apt: Apartment; idx: number }[];
   severity: number;
   apts: number | null;
+  aptsSource: MapUnit['aptsSource'];
   category: string | null;
   inTerritory: boolean;
   match: BuildingMatch | null;
 }
 
-/** תצוגה מאוחדת לכל מבנה: הכתובות שעליו, המשפחות, הסיווג והתיחום */
-export function buildViews(db: Db, buildings: OfficialBuilding[], matches: BuildingMatch[]): Map<string, BuildingView> {
+/**
+ * תצוגה לכל יחידה במפה. בניין עם כמה כתובות שלך מתחלק לכניסות (לפי נקודות
+ * הכתובת הרשמיות), כך שכל כניסה נלחצת, נצבעת ומציגה את המשפחות שלה.
+ */
+export function buildViews(db: Db, buildings: OfficialBuilding[], matches: BuildingMatch[], geo: Record<string, GeoHit | null>): Map<string, BuildingView> {
   const terr = territoryPolygon(db);
-  const views = new Map<string, BuildingView>();
-  for (const b of buildings) {
-    views.set(b.id, { b, keys: [], families: [], severity: -1, apts: b.apts, category: null, inTerritory: polygonInTerritory(b.polygon, terr), match: null });
-  }
+  const keysBy = new Map<string, string[]>();
+  const matchBy = new Map<string, BuildingMatch>();
   for (const m of matches) {
     if (!m.official) continue;
-    const v = views.get(m.official.id);
-    if (!v) continue;
-    v.keys.push(m.key);
-    v.match ??= m;
-    const entry = getBuilding(db, m.key)!;
-    entry.apts.forEach((apt, idx) => {
-      if (apt.deletedAt || !displayName(apt)) return;
-      v.families.push({ key: m.key, apt, idx });
-      v.severity = Math.max(v.severity, statusSeverity(getStatusColor(apt, db.__SETTINGS__)));
-    });
-    v.category ??= (entry.info.category as string | undefined) ?? null;
-    const units = (entry.info.units as { count?: number; source?: string } | undefined);
-    if (units?.source === 'VERIFIED' && units.count) v.apts = units.count;
+    matchBy.set(m.key, m);
+    keysBy.set(m.official.id, [...(keysBy.get(m.official.id) ?? []), m.key]);
   }
-  for (const v of views.values()) {
-    v.keys.sort((a, c) => (getBuilding(db, c)!.apts.length - getBuilding(db, a)!.apts.length));
-    v.category ??= categoryFromUse(v.b.use) ?? (v.b.apts ? 'residential' : null);
+  const famCount = (k: string) => families(getBuilding(db, k)?.apts).length;
+  const views = new Map<string, BuildingView>();
+  for (const b of buildings) {
+    const keys = (keysBy.get(b.id) ?? []).sort((a, c) => famCount(c) - famCount(a));
+    for (const u of unitsForBuilding(db, b, keys, geo)) {
+      const v: BuildingView = {
+        id: u.id, b, polygon: u.polygon, keys: u.keys, siblings: u.siblings, families: [], severity: -1,
+        apts: u.apts, aptsSource: u.aptsSource, category: null, inTerritory: polygonInTerritory(u.polygon, terr),
+        match: u.keys[0] ? matchBy.get(u.keys[0]) ?? null : null,
+      };
+      for (const key of u.keys) {
+        const entry = getBuilding(db, key)!;
+        entry.apts.forEach((apt, idx) => {
+          if (apt.deletedAt || !displayName(apt)) return;
+          v.families.push({ key, apt, idx });
+          v.severity = Math.max(v.severity, statusSeverity(getStatusColor(apt, db.__SETTINGS__)));
+        });
+        v.category ??= (entry.info.category as string | undefined) ?? null;
+      }
+      v.category ??= categoryFromUse(b.use) ?? (b.apts ? 'residential' : null);
+      views.set(v.id, v);
+    }
   }
   return views;
+}
+
+/** היחידה שמציגה כתובת מסוימת, או בניין לפי המזהה הרשמי שלו */
+export function findView(views: Map<string, BuildingView>, target: { id?: string; key?: string }): BuildingView | null {
+  if (target.id) return views.get(target.id) ?? [...views.values()].find((v) => v.b.id === target.id) ?? null;
+  if (target.key) return [...views.values()].find((v) => v.keys.includes(target.key!)) ?? null;
+  return null;
 }
 
 function colorFor(v: BuildingView, mode: ColorMode, pal: Palette, catColors: Map<string, string>): string {
@@ -102,17 +124,19 @@ export function toGeoJson(db: Db, views: Map<string, BuildingView>, mode: ColorM
   const shapes: GeoJSON.Feature[] = [];
   const labels: GeoJSON.Feature[] = [];
   for (const v of views.values()) {
-    const ring = [...v.b.polygon, v.b.polygon[0]!];
+    const ring = [...v.polygon, v.polygon[0]!];
+    // המספר שעל השלט: של הכתובת שלך, ורק בלעדיה — של הרישום
+    const signNum = v.keys[0] ? parseAddress(v.keys[0]).num : v.b.num;
     const props = {
-      id: v.b.id,
+      id: v.id,
       color: colorFor(v, mode, pal, catColors),
       h: Math.max(1, v.b.floors ?? 2) * 3.2,
       inT: v.inTerritory ? 1 : 0,
       fam: v.families.length,
-      num: v.b.num ? String(v.b.num) : '',
+      num: signNum ? String(signNum) : '',
     };
-    shapes.push({ type: 'Feature', id: v.b.id, properties: props, geometry: { type: 'Polygon', coordinates: [ring] } });
-    labels.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: labelPoint(v.b.polygon) } });
+    shapes.push({ type: 'Feature', id: v.id, properties: props, geometry: { type: 'Polygon', coordinates: [ring] } });
+    labels.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: labelPoint(v.polygon) } });
   }
   return { shapes: { type: 'FeatureCollection', features: shapes }, labels: { type: 'FeatureCollection', features: labels } };
 }

@@ -3,14 +3,14 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '../map/map.css';
 import {
-  type Db, type LngLat, addressMatchesOfficial, bboxOf, buildingAt, geocodeAddress, getCategories,
-  labelPoint, linkManually, matchBuildings, pendingFixes,
+  type Db, type LngLat, addressMatchesOfficial, bboxOf, buildingAt, buildingKeys, geocodeAddress, getCategories,
+  labelPoint, linkManually, matchBuildings, pendingFixes, pointInPolygon,
 } from '@shlichus/core';
 import { Icon } from '../icons';
 import { useStore } from '../store';
 import { useToast } from '../ui';
 import { missionCity, useMapData } from '../mapData';
-import { type ColorMode, buildViews, orphansGeoJson, readPalette, territoryMask, toGeoJson } from '../map/features';
+import { type ColorMode, buildViews, findView, orphansGeoJson, readPalette, territoryMask, toGeoJson } from '../map/features';
 import { BuildingCard } from './BuildingCard';
 import { MapFixPanel } from './MapFix';
 
@@ -44,9 +44,14 @@ export function MapView({ db }: { db: Db }) {
   const [q, setQ] = useState('');
 
   useEffect(() => { void load(db); }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
+  // נקודות הכניסה הרשמיות ברקע (נשמרות במטמון) — מהן המפה מחלקת בניינים לכניסות
+  const verify = useMapData((s) => s.verify);
+  // גם כשכתובות משתנות (תיקון כתיב, כתובת חדשה) — הכתובת החדשה מקבלת נקודת כניסה
+  const keysSig = useMemo(() => buildingKeys(db).join('|'), [db]);
+  useEffect(() => { if (status === 'ready' && buildings.length) void verify(db); }, [status, buildings.length, keysSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const matches = useMemo(() => matchBuildings(db, buildings, geo), [db, buildings, geo]);
-  const views = useMemo(() => buildViews(db, buildings, matches), [db, buildings, matches]);
+  const views = useMemo(() => buildViews(db, buildings, matches, geo), [db, buildings, matches, geo]);
   // בלי שכבת מבנים אין מול מה לבדוק — לא מציגים "בעיות" שהן בעצם חוסר נתונים
   const fixes = useMemo(() => (buildings.length ? pendingFixes(db, matches, geo) : []), [db, matches, geo, buildings.length]);
 
@@ -133,7 +138,9 @@ export function MapView({ db }: { db: Db }) {
     const onClick = (e: mapboxgl.MapMouseEvent) => {
       const f = map.queryRenderedFeatures(e.point, { layers: CLICKABLE.filter((l) => map.getLayer(l)) })[0];
       if (pickFor) {
-        const b = f?.properties?.id ? buildings.find((x) => x.id === f.properties!.id) : null;
+        // יחידה של כניסה ("<מבנה>#<כתובת>") — משייכים למבנה עצמו
+        const bid = String(f?.properties?.id ?? '').split('#')[0];
+        const b = bid ? buildings.find((x) => x.id === bid) : null;
         if (!b) { toast('יש ללחוץ על בניין'); return; }
         const key = pickFor;
         const undo = mutate((d) => linkManually(d, key, b));
@@ -196,31 +203,28 @@ export function MapView({ db }: { db: Db }) {
 
   const flyTo = (pt: LngLat) => mapRef.current?.easeTo({ center: pt, zoom: Math.max(mapRef.current.getZoom(), 17.6), duration: 700 });
   const focus = (target: { id?: string; key?: string }) => {
+    const v = findView(views, target);
+    if (v) { setSel({ id: v.id }); flyTo(labelPoint(v.polygon)); return; }
     setSel(target);
-    const v = target.id ? views.get(target.id) : undefined;
-    if (v) flyTo(labelPoint(v.b.polygon));
-    else if (target.key) {
-      const m = matches.find((x) => x.key === target.key);
-      if (m?.official) { setSel({ id: m.official.id }); flyTo(labelPoint(m.official.polygon)); }
-      else {
-        const c = (db[target.key] as { info?: { coords?: LngLat } } | undefined)?.info?.coords;
-        if (c) flyTo(c);
-      }
-    }
+    const c = target.key ? (db[target.key] as { info?: { coords?: LngLat } } | undefined)?.info?.coords : undefined;
+    if (c) flyTo(c);
   };
+  /** היחידה (בניין או כניסה) שהנקודה בתוכה */
+  const viewAt = (pt: LngLat) => [...views.values()].find((v) => pointInPolygon(pt, v.polygon))
+    ?? findView(views, { id: buildingAt(pt, buildings, 15)?.id });
 
   // ── חיפוש כתובת: קודם במבנים המוכרים, אחר כך בנקודת הכתובת הרשמית ──
   const search = async () => {
     const text = q.trim();
     if (!text) return;
     const known = matches.find((m) => m.key === text || m.key.replace(/\s+/g, ' ') === text);
-    if (known?.official) { focus({ id: known.official.id }); setPanel('card'); return; }
+    if (known?.official) { focus({ key: known.key }); setPanel('card'); return; }
     const off = buildings.find((b) => addressMatchesOfficial(text, b));
     if (off) { focus({ id: off.id }); setPanel('card'); return; }
     const hit = await geocodeAddress(text, missionCity(db)).catch(() => null);
     if (!hit) { toast('הכתובת לא נמצאה ברישום הרשמי. כדאי לבדוק את מספר הבית.'); return; }
-    const b = buildingAt(hit.point, buildings, 15);
-    if (b) { focus({ id: b.id }); setPanel('card'); }
+    const v = viewAt(hit.point);
+    if (v) { focus({ id: v.id }); setPanel('card'); }
     else { flyTo(hit.point); toast('הכתובת נמצאה, אבל אין במקום מבנה ידוע'); }
   };
 
@@ -279,7 +283,7 @@ export function MapView({ db }: { db: Db }) {
 
       {panel === 'card' && (selView || sel?.key) && (
         <BuildingCard db={db} view={selView} orphanKey={sel?.key} onClose={() => { setPanel(null); setSel(null); }}
-          onPick={(key) => { setPickFor(key); setPanel(null); }} />
+          onPick={(key) => { setPickFor(key); setPanel(null); }} onSelectKey={(key) => focus({ key })} />
       )}
       {panel === 'fix' && (
         <MapFixPanel db={db} noData={!buildings.length} fixes={fixes} waiting={matches.filter((m) => m.waitingForNumber).map((m) => ({ key: m.key, families: m.families }))} needUser={needUser} total={matches.length} onClose={() => setPanel(null)}
