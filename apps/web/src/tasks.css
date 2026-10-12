@@ -1,0 +1,36 @@
+/* ---------- משימות ---------- */
+.task-add { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; margin-bottom: 16px; align-items: center; }
+.task-add input { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.task-add input:first-child { flex: 2 1 240px; }
+.task-add input[type="date"] { flex: 0 1 160px; }
+.task-add input[list] { flex: 1 1 180px; }
+.task-add .err { flex-basis: 100%; }
+.task-group { padding: 14px 16px 6px; margin-bottom: 12px; }
+.task-group h2 { margin: 0 0 6px; font-family: var(--f-display); font-size: 15px; font-weight: 600; display: flex; gap: 6px; align-items: baseline; }
+.task-group h2 .num { color: var(--faint); font-weight: 500; }
+.tg-overdue h2 { color: var(--hot); }
+.tg-today h2 { color: var(--accent); }
+.task-group ul { list-style: none; margin: 0; padding: 0; }
+.task-group li { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.task-group li:first-child { border-top: 0; }
+.task-group li .tx { flex: 1 1 200px; min-width: 0; }
+.task-group li.done .tx { color: var(--faint); text-decoration: line-through; }
+.task-group .check { width: 24px; height: 24px; border-radius: 7px; border: 1.5px solid var(--line); background: var(--surface); display: grid; place-items: center; color: transparent; flex: none; }
+.task-group .check:hover { border-color: var(--accent); color: var(--accent); }
+.task-group .check[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
+.board-add { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.board-add input { font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; flex: 0 1 300px; min-width: 0; }
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: start; }
+.kcol { background: var(--sunken); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+.kcol h3 { margin: 2px 4px 4px; font-family: var(--f-display); font-size: 14px; font-weight: 600; display: flex; gap: 6px; }
+.kcol h3 .num { color: var(--faint); font-weight: 500; }
+.kcard { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; cursor: grab; box-shadow: var(--shadow); }
+.kcard:active { cursor: grabbing; }
+.kcard-acts { display: flex; gap: 6px; align-items: center; }
+.kcard-acts select { font: inherit; font-size: 12.5px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; flex: 1; min-width: 0; }
+.kcard-acts .ib { width: 28px; height: 28px; }
+
+@media (max-width: 760px) {
+  .kanban { grid-auto-columns: 82%; }
+}

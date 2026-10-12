@@ -12,3 +12,4 @@ export * from './backend.js';
 export * from './jewishCalendar.js';
 export * from './gis.js';
 export * from './families.js';
+export * from './tasks.js';
