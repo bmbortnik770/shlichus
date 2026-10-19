@@ -16,6 +16,28 @@ export interface BuildingCategory {
   defaultFields?: unknown[];
 }
 
+export interface InstitutionField { id: string; label: string; type: 'text' | 'phone' | 'textarea' | 'url' }
+
+/**
+ * כרטיס מוסד לבניין שאינו מגורים — אותם שדות ותת-סוגים כמו tmCategories בישן.
+ * נשמר ב-info.institutionName, info.institutionData {שדה: ערך}, info.subCategoryId, info.notes.
+ */
+export const INSTITUTION_FIELDS: Record<string, InstitutionField[]> = {
+  synagogue: [{ id: 'contactName', label: 'שם הרב / איש קשר', type: 'text' }, { id: 'phone', label: 'טלפון', type: 'phone' }, { id: 'prayerTimes', label: 'זמני תפילה', type: 'textarea' }, { id: 'hours', label: 'שעות פעילות', type: 'text' }],
+  education: [{ id: 'contactName', label: 'שם המנהל / איש קשר', type: 'text' }, { id: 'phone', label: 'טלפון', type: 'phone' }, { id: 'ageGroup', label: 'גילאים', type: 'text' }, { id: 'hours', label: 'שעות פעילות', type: 'text' }],
+  medical: [{ id: 'contactName', label: 'שם הרופא / איש קשר', type: 'text' }, { id: 'phone', label: 'טלפון', type: 'phone' }, { id: 'hours', label: 'שעות קבלה', type: 'text' }, { id: 'specialty', label: 'התמחות', type: 'text' }],
+  business: [{ id: 'contactName', label: 'שם בעל העסק / איש קשר', type: 'text' }, { id: 'phone', label: 'טלפון', type: 'phone' }, { id: 'hours', label: 'שעות פתיחה', type: 'text' }, { id: 'website', label: 'אתר אינטרנט', type: 'url' }],
+  offices: [{ id: 'contactName', label: 'איש קשר', type: 'text' }, { id: 'phone', label: 'טלפון', type: 'phone' }, { id: 'hours', label: 'שעות פעילות', type: 'text' }, { id: 'website', label: 'אתר', type: 'url' }],
+};
+export const SUB_CATEGORIES: Record<string, { id: string; name: string }[]> = {
+  residential: [{ id: 'residential_apt', name: 'דירת מגורים' }, { id: 'residential_house', name: 'בית פרטי' }, { id: 'residential_bldg', name: 'בניין מגורים' }],
+  synagogue: [{ id: 'synagogue_chabad', name: 'בית חב"ד' }, { id: 'synagogue_general', name: 'בית כנסת' }, { id: 'synagogue_institution', name: 'מוסד דתי' }],
+  education: [{ id: 'education_kindergarten', name: 'גן ילדים' }, { id: 'education_school', name: 'בית ספר' }, { id: 'education_college', name: 'מכללה / אוניברסיטה' }, { id: 'education_other', name: 'מוסד חינוכי אחר' }],
+  medical: [{ id: 'medical_clinic', name: 'קליניקה / מרפאה' }, { id: 'medical_pharmacy', name: 'בית מרקחת' }, { id: 'medical_hospital', name: 'בית חולים' }, { id: 'medical_other', name: 'שירות רפואי אחר' }],
+  business: [{ id: 'business_store', name: 'חנות' }, { id: 'business_restaurant', name: 'מסעדה / בית קפה' }, { id: 'business_office', name: 'משרד / עסק' }, { id: 'business_other', name: 'עסק אחר' }],
+  offices: [{ id: 'offices_govt', name: 'מוסד ממשלתי' }, { id: 'offices_org', name: 'עמותה / ארגון' }, { id: 'offices_general', name: 'משרד כללי' }],
+};
+
 /** 7 קטגוריות ברירת המחדל — אותם מזהים וצבעים כמו tmCategories בישן */
 export const DEFAULT_CATEGORIES: BuildingCategory[] = [
   { id: 'residential', name: 'מגורים', color: '#3b82f6', emoji: '🏠', isDefault: true, hasCard: true },

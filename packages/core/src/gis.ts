@@ -792,3 +792,35 @@ export function setVerifiedUnits(db: Db, key: string, count: number): void {
   const prev = (e.info.units ?? {}) as Record<string, unknown>;
   e.info = { ...e.info, units: { ...prev, source: 'VERIFIED', count, verifiedAt: Date.now() }, updatedAt: Date.now() };
 }
+
+// ─── בניין ידני ─────────────────────────────────────────────────────
+
+interface ManualShape { polygon: LngLat[]; apts: number | null; floors: number | null }
+
+/** בניינים שהמשתמש הוסיף בעצמו (כשאין מבנה ברישום) — מוצגים במפה כמו מבנה רשמי */
+export function manualBuildings(db: Db): OfficialBuilding[] {
+  const out: OfficialBuilding[] = [];
+  for (const key of buildingKeys(db)) {
+    const m = getBuilding(db, key)?.info.manualBuilding as ManualShape | undefined;
+    if (!m?.polygon?.length) continue;
+    const p = parseAddress(key);
+    out.push({ id: `manual:${key}`, polygon: m.polygon, street: p.street, num: p.num, apts: m.apts ?? null, floors: m.floors ?? null, entrances: 1, use: '' });
+  }
+  return out;
+}
+
+/** הוספת בניין ידני בנקודה: ריבוע של כ-14 מטר, מקושר לכתובת (חדשה או קיימת) */
+export function addManualBuilding(db: Db, key: string, point: LngLat, opts: { apts?: number; floors?: number; category?: string } = {}): OfficialBuilding {
+  const [lng, lat] = point;
+  const dy = 7 / 111320;
+  const dx = 7 / (111320 * Math.cos((lat * Math.PI) / 180));
+  const polygon: LngLat[] = [[lng - dx, lat - dy], [lng + dx, lat - dy], [lng + dx, lat + dy], [lng - dx, lat + dy]];
+  if (!getBuilding(db, key) || getBuilding(db, key)!.info.movedTo) db[key] = { info: { code: '', rep: '', notes: '' }, apts: [] };
+  const e = getBuilding(db, key)!;
+  e.info = { ...e.info, coords: point, manualBuilding: { polygon, apts: opts.apts ?? null, floors: opts.floors ?? null }, updatedAt: Date.now() };
+  const p = parseAddress(key);
+  const b: OfficialBuilding = { id: `manual:${key}`, polygon, street: p.street, num: p.num, apts: opts.apts ?? null, floors: opts.floors ?? null, entrances: 1, use: '' };
+  linkBuilding(db, key, b, 'manual', { category: opts.category });
+  if (opts.apts) setVerifiedUnits(db, key, opts.apts);
+  return b;
+}

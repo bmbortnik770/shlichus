@@ -10,7 +10,18 @@ import {
   liveApts, parseAddress, polygonInTerritory, statusSeverity, territoryPolygon, unitsForBuilding,
 } from '@shlichus/core';
 
-export type ColorMode = 'status' | 'category' | 'coverage';
+export type ColorMode = 'status' | 'category' | 'coverage' | 'style' | 'tag';
+
+/** צבעים לסגנונות (לפי סדר הסגנונות בהגדרות) */
+export const STYLE_COLORS = ['#2f6fae', '#b7791f', '#1f7a4d', '#c2410c', '#5b4b8a', '#0e7490', '#be185d', '#4d7c0f'];
+export interface ColorOpts { styles?: string[]; tag?: string }
+
+/** הסגנון הנפוץ בין המשפחות בבניין */
+export function dominantStyle(v: { families: { apt: Apartment }[] }): string {
+  const n = new Map<string, number>();
+  for (const f of v.families) if (f.apt.style) n.set(f.apt.style, (n.get(f.apt.style) ?? 0) + 1);
+  return [...n.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+}
 
 export interface Palette {
   empty: string; outside: string; line: string; selected: string; accent: string;
@@ -102,7 +113,14 @@ export function findView(views: Map<string, BuildingView>, target: { id?: string
   return null;
 }
 
-function colorFor(v: BuildingView, mode: ColorMode, pal: Palette, catColors: Map<string, string>): string {
+function colorFor(v: BuildingView, mode: ColorMode, pal: Palette, catColors: Map<string, string>, opts: ColorOpts): string {
+  const none = v.inTerritory ? pal.empty : pal.outside;
+  if (mode === 'style') {
+    const st = dominantStyle(v);
+    const i = (opts.styles ?? []).indexOf(st);
+    return st ? STYLE_COLORS[(i < 0 ? 0 : i) % STYLE_COLORS.length]! : none;
+  }
+  if (mode === 'tag') return opts.tag && v.families.some((f) => (f.apt.tags ?? []).includes(opts.tag!)) ? pal.accent : v.families.length ? pal.sev[0] : none;
   if (mode === 'category') return (v.category && catColors.get(v.category)) || (v.inTerritory ? pal.empty : pal.outside);
   if (mode === 'coverage') {
     if (!v.apts) return v.families.length ? pal.coverage[1] : v.inTerritory ? pal.empty : pal.outside;
@@ -121,7 +139,7 @@ function mix(a: string, b: string, t: number): string {
 
 type FC = GeoJSON.FeatureCollection;
 
-export function toGeoJson(db: Db, views: Map<string, BuildingView>, mode: ColorMode, pal: Palette): { shapes: FC; labels: FC } {
+export function toGeoJson(db: Db, views: Map<string, BuildingView>, mode: ColorMode, pal: Palette, opts: ColorOpts = {}): { shapes: FC; labels: FC } {
   const catColors = new Map(getCategories(db).map((c) => [c.id, c.color]));
   const shapes: GeoJSON.Feature[] = [];
   const labels: GeoJSON.Feature[] = [];
@@ -131,7 +149,7 @@ export function toGeoJson(db: Db, views: Map<string, BuildingView>, mode: ColorM
     const signNum = v.keys[0] ? parseAddress(v.keys[0]).num : v.b.num;
     const props = {
       id: v.id,
-      color: colorFor(v, mode, pal, catColors),
+      color: colorFor(v, mode, pal, catColors, opts),
       h: Math.max(1, v.b.floors ?? 2) * 3.2,
       inT: v.inTerritory ? 1 : 0,
       fam: v.families.length,

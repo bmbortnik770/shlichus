@@ -107,3 +107,24 @@
 
 .map-src { position: absolute; bottom: 14px; inset-inline-end: 12px; z-index: 2; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; font-size: 11px; color: var(--faint); }
 .map-top .com-switch { box-shadow: var(--shadow); }
+
+/* תוספות מפה: בית חב"ד, בחירת תגית, דיאגרמת סוגים */
+.home-mark { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--surface); background: var(--accent); color: #fff; font: 700 11px/1 var(--f-display, inherit); display: grid; place-items: center; box-shadow: 0 3px 12px rgba(0,0,0,.3); cursor: pointer; padding: 0; overflow: hidden; }
+.home-mark img { width: 100%; height: 100%; object-fit: cover; }
+.map-sel { height: 36px; }
+.cat-chart { display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
+.cat-chart span b { margin-inline-start: auto; font-weight: 600; }
+.cat-chart span { display: flex; gap: 6px; align-items: center; }
+.cat-bar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; margin-bottom: 4px; }
+.cat-bar i { display: block; height: 100%; min-width: 3px; }
+.nav-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.nav-row .btn { text-decoration: none; color: var(--fg); padding: 6px 12px; font-size: 13.5px; }
+.bd { display: flex; flex-direction: column; gap: 8px; }
+.bd-list { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 14px; }
+.bd-list dt { color: var(--faint); } .bd-list dd { margin: 0; white-space: pre-wrap; }
+.bd-form .fld input, .bd-form .fld select, .bd-form .fld textarea { font: inherit; font-size: 14px; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%; }
+.bd-form .fld { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.inst { background: var(--sunken); border-radius: 12px; padding: 12px; }
+button.apt { font: inherit; color: inherit; cursor: pointer; }
+button.apt:not(.known):hover, button.apt.picked { outline: 2px solid var(--accent); outline-offset: -2px; }
+.slot-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--accent-soft); border-radius: 10px; padding: 8px 10px; margin-top: 8px; }
