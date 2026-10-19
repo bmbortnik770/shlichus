@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import {
-  type CommunityEvent, type Db, type FamilyRef, addRegistrant, createEvent, displayName, familyPhones, formatHebrew,
-  getBuilding, hebrewDateLine, hebrewParts, listEvents, listFamilies, nextOccurrence, parseLooseDate, toggleAttendance,
-  upcomingOccasions, updateEvent,
+  type CommunityEvent, type Db, type FamilyRef, addEventType, addRegistrant, addTask, createEvent, displayName, eventStats,
+  familyPhones, formatHebrew, getBuilding, getEventTypes, hebrewDateLine, hebrewParts, listEvents, listFamilies, nextOccurrence,
+  parseLooseDate, removeEventType, toggleAttendance, upcomingOccasions, updateEvent,
 } from '@shlichus/core';
 import { Icon } from '../icons';
 import { useStore } from '../store';
 import { Dialog, useConfirm, useToast } from '../ui';
 import { FamilyCard } from './FamilyCard';
+import { useNav } from '../nav';
 import '../community.css';
 import '../events.css';
 
@@ -24,6 +25,11 @@ const daysFrom = (a: Date, b: Date) => Math.round((startOfDay(b).getTime() - sta
 const gregShort = (d: Date) => d.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' });
 const relDay = (n: number) => (n === 0 ? 'היום' : n === 1 ? 'מחר' : n < 7 ? `בעוד ${n} ימים` : n < 14 ? 'בשבוע הבא' : `בעוד ${n} ימים`);
 const hebOf = (d: Date) => { const h = hebrewParts(d); return h ? formatHebrew(h.day, h.monthName) : ''; };
+const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const eventLine = (e: { name: string; date?: string; time?: string; location?: string }) => {
+  const d = e.date ? new Date(`${e.date}T12:00:00`) : null;
+  return [e.name, d ? `${gregShort(d)} (${hebOf(d)})` : '', e.time ? `בשעה ${e.time}` : '', e.location ? `ב${e.location}` : ''].filter(Boolean).join(', ');
+};
 
 export function Events({ db }: { db: Db }) {
   const [range, setRange] = useState(30);
@@ -31,7 +37,11 @@ export function Events({ db }: { db: Db }) {
   const [openFam, setOpenFam] = useState<FamilyRef | null>(null);
   const [openEv, setOpenEv] = useState<string | 'new' | null>(null);
   const [showPast, setShowPast] = useState(false);
+  const [typesOpen, setTypesOpen] = useState(false);
+  const mutate = useStore((s) => s.mutate);
+  const toast = useToast((s) => s.show);
   const now = new Date();
+  const typeById = new Map(getEventTypes(db).map((t) => [t.id, t]));
 
   const events = useMemo(() => listEvents(db), [db]);
   const upcomingEv = events.filter((e) => { const d = parseLooseDate(e.date); return !d || daysFrom(now, d) >= 0; }).reverse();
@@ -50,7 +60,8 @@ export function Events({ db }: { db: Db }) {
         // אבן דרך חד-פעמית שתאריכה עבר — לא חוזרת
         if (m.recurring === false && m.gregDate && daysFrom(now, new Date(`${m.gregDate}T12:00:00`)) < 0) continue;
         const kind = (['yahrzeit', 'birthday', 'anniversary', 'barmitzva'].includes(String(m.type)) ? m.type : 'other') as Kind;
-        out.push({ date: next, inDays, kind, title: String(m.label ?? ''), family: { bldg: r.bldg, idx: r.idx, name } });
+        const ct = typeById.get(String(m.type));
+        out.push({ date: next, inDays, kind, title: `${ct?.custom && ct.emoji ? `${ct.emoji} ` : ''}${String(m.label ?? '')}`, family: { bldg: r.bldg, idx: r.idx, name } });
       }
     }
     for (const day of upcomingOccasions(now, range)) {
@@ -70,6 +81,22 @@ export function Events({ db }: { db: Db }) {
   const byDay = new Map<number, CalItem[]>();
   for (const i of shown) byDay.set(i.inDays, [...(byDay.get(i.inDays) ?? []), i]);
   const counts = (k: Kind) => items.filter((i) => i.kind === k).length;
+  const stats = useMemo(() => eventStats(db), [db]);
+  const famItems = items.filter((i) => i.family);
+  const kpis = [
+    { n: famItems.length, l: `תאריכים של משפחות ב-${range} ימים` },
+    { n: famItems.filter((i) => i.inDays === 0).length, l: 'היום', hot: true },
+    { n: famItems.filter((i) => i.inDays <= 7).length, l: 'השבוע' },
+    { n: items.filter((i) => i.kind === 'yahrzeit').length, l: 'יארצייטים' },
+    { n: stats.upcoming, l: 'אירועי קהילה קרובים' },
+    { n: stats.attendRate == null ? '—' : `${stats.attendRate}%`, l: 'הגיעו מהנרשמים (אירועים שעברו)' },
+  ];
+  const taskFor = (i: CalItem) => {
+    if (!i.family) return;
+    const text = `${i.title} — ${i.family.name} (${relDay(i.inDays)})`;
+    const undo = mutate((d) => addTask(d, text, isoOf(new Date(i.date.getTime() - (i.inDays > 2 ? 2 : 0) * DAY)), i.family));
+    toast('נוספה משימה בכרטיס המשפחה', undo);
+  };
 
   return (
     <>
@@ -79,7 +106,14 @@ export function Events({ db }: { db: Db }) {
           <h1>אירועים</h1>
           <p className="lede">אירועי הקהילה, החגים, והתאריכים של המשפחות. הכל בלוח אחד.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setOpenEv('new')}><Icon name="plus" size={16} />אירוע חדש</button>
+        <div className="hello-acts">
+          <button className="btn" onClick={() => setTypesOpen(true)}>סוגי תאריכים</button>
+          <button className="btn btn-primary" onClick={() => setOpenEv('new')}><Icon name="plus" size={16} />אירוע חדש</button>
+        </div>
+      </section>
+
+      <section className="ev-kpis" aria-label="מדדים">
+        {kpis.map((k) => <div key={k.l} className={`panel ev-kpi${k.hot && Number(k.n) > 0 ? ' hot' : ''}`}><b className="num">{k.n}</b><span>{k.l}</span></div>)}
       </section>
 
       <section className="ev-strip" aria-label="אירועי קהילה קרובים">
@@ -119,6 +153,7 @@ export function Events({ db }: { db: Db }) {
                       <i className="kdot" />
                       <span className="t">{i.title}</span>
                       {i.family && <button className="chip-f" onClick={() => setOpenFam(i.family!)}>{i.family.name}</button>}
+                      {i.family && <button className="link cal-task" onClick={() => taskFor(i)} title="משימה בכרטיס המשפחה">+ משימה</button>}
                       {i.eventId && <button className="chip-f" onClick={() => setOpenEv(i.eventId!)}>פרטים</button>}
                     </li>
                   ))}
@@ -130,6 +165,7 @@ export function Events({ db }: { db: Db }) {
       </section>
 
       {openEv && <EventDialog db={db} id={openEv} onClose={() => setOpenEv(null)} onCreated={setOpenEv} />}
+      {typesOpen && <TypesDialog db={db} onClose={() => setTypesOpen(false)} />}
       {openFam && getBuilding(db, openFam.bldg)?.apts[openFam.idx] && <FamilyCard db={db} fref={openFam} onClose={() => setOpenFam(null)} onMoved={setOpenFam} />}
     </>
   );
@@ -201,6 +237,19 @@ function EventDialog({ db, id, onClose, onCreated }: { db: Db; id: string; onClo
       </form>
 
       {ev && (
+        <div className="ev-acts">
+          <button className="btn" onClick={() => { onClose(); useNav.getState().sendTo([], `שלום [שם], אנחנו שמחים להזמין אתכם: ${eventLine(ev)}. נשמח לראותכם!`); }}><Icon name="chat" size={15} />הזמנת משפחות</button>
+          <button className="btn" disabled={!ev.registrants.some((r) => r.famRef)} onClick={() => {
+            onClose();
+            useNav.getState().sendTo(ev.registrants.map((r) => r.famRef).filter((x): x is string => !!x), `שלום [שם], תזכורת: ${eventLine(ev)}. מחכים לכם!`);
+          }}><Icon name="chat" size={15} />הודעה לנרשמים</button>
+          <button className="btn" onClick={() => {
+            const undo = mutate((d) => addTask(d, `מעקב אחרי ${ev.name}`, ev.date ?? ''));
+            toast('נוספה משימת מעקב', undo);
+          }}><Icon name="tasks" size={15} />משימת מעקב</button>
+        </div>
+      )}
+      {ev && (
         <section className="ev-regs">
           <h3>נרשמים <span className="num">{ev.registrants.length}</span> · הגיעו <span className="num">{ev.attendance.length}</span></h3>
           <form className="fc-add" onSubmit={(e) => { e.preventDefault(); register(); }}>
@@ -218,6 +267,45 @@ function EventDialog({ db, id, onClose, onCreated }: { db: Db; id: string; onClo
           </ul>
         </section>
       )}
+    </Dialog>
+  );
+}
+
+/** סוגי תאריכים למשפחות — מובנים ומותאמים (כמו eventTypesModal בישן) */
+function TypesDialog({ db, onClose }: { db: Db; onClose: () => void }) {
+  const mutate = useStore((s) => s.mutate);
+  const toast = useToast((s) => s.show);
+  const [label, setLabel] = useState('');
+  const [emoji, setEmoji] = useState('📅');
+  const [recurring, setRecurring] = useState(true);
+  const types = getEventTypes(db);
+  return (
+    <Dialog title="סוגי תאריכים" onClose={onClose}>
+      <p className="dialog-note">הסוגים מופיעים בכרטיס המשפחה, בלשונית "חיים ומועדים". סוג חוזר מופיע כל שנה.</p>
+      <ul className="fc-list">
+        {types.map((t) => (
+          <li key={t.id}>
+            <span>{t.emoji} {t.label}</span>
+            <span className="fc-li-end">
+              <span className="pill pill-s">{t.recurring ? 'חוזר כל שנה' : 'חד-פעמי'}</span>
+              {t.custom && <button className="ib" aria-label={`מחיקת ${t.label}`} onClick={() => { const undo = mutate((d) => removeEventType(d, t.id)); toast(`הסוג "${t.label}" נמחק`, undo); }}><Icon name="x" size={13} /></button>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <form className="fc-add" onSubmit={(e) => {
+        e.preventDefault();
+        const l = label.trim();
+        if (!l || types.some((t) => t.label === l)) return;
+        const undo = mutate((d) => { addEventType(d, { label: l, emoji, recurring }); });
+        toast(`הסוג "${l}" נוסף`, undo);
+        setLabel('');
+      }}>
+        <input value={emoji} onChange={(e) => setEmoji(e.target.value)} aria-label="סמל" className="emoji-in" />
+        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="סוג חדש, למשל: יום עלייה ארצה" aria-label="שם הסוג" />
+        <label className="chk-row"><input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />חוזר כל שנה</label>
+        <button className="btn btn-primary" disabled={!label.trim() || types.some((t) => t.label === label.trim())}>הוספה</button>
+      </form>
     </Dialog>
   );
 }

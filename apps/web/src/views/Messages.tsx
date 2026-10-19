@@ -13,9 +13,9 @@ import { useNav } from '../nav';
 import '../community.css';
 import '../messages.css';
 
-type Tab = 'send' | 'calls' | 'history' | 'templates';
+type Tab = 'send' | 'calls' | 'history' | 'docs' | 'templates';
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'send', label: 'שליחה' }, { key: 'calls', label: 'חיוג' }, { key: 'history', label: 'היסטוריה' },
+  { key: 'send', label: 'שליחה' }, { key: 'calls', label: 'חיוג' }, { key: 'history', label: 'היסטוריה' }, { key: 'docs', label: 'תיעודים' },
   { key: 'templates', label: 'תבניות' },
 ];
 const CHANNELS: { key: Channel; label: string }[] = [{ key: 'whatsapp', label: 'וואטסאפ' }, { key: 'sms', label: 'SMS' }, { key: 'email', label: 'מייל' }];
@@ -44,6 +44,7 @@ export function Messages({ db }: { db: Db }) {
       {tab === 'send' && <Send db={db} />}
       {tab === 'calls' && <Calls db={db} onOpen={setOpenFam} />}
       {tab === 'history' && <History db={db} onOpen={setOpenFam} />}
+      {tab === 'docs' && <AllDocs db={db} onOpen={setOpenFam} />}
       {tab === 'templates' && <Templates db={db} />}
       {openFam && getBuilding(db, openFam.bldg)?.apts[openFam.idx] && <FamilyCard db={db} fref={openFam} onClose={() => setOpenFam(null)} onMoved={setOpenFam} />}
     </>
@@ -56,7 +57,7 @@ function Send({ db }: { db: Db }) {
   const mutate = useStore((s) => s.mutate);
   const toast = useToast((s) => s.show);
   const [channel, setChannel] = useState<Channel>('whatsapp');
-  const [text, setText] = useState(() => readDraft().text ?? '');
+  const [text, setText] = useState(() => useNav.getState().msgText ?? readDraft().text ?? '');
   const [subject, setSubject] = useState(() => readDraft().subject ?? 'הודעה מבית חב"ד');
   const [manual, setManual] = useState<Manual[]>([]);
   const [mName, setMName] = useState('');
@@ -68,7 +69,7 @@ function Send({ db }: { db: Db }) {
   const [q, setQ] = useState('');
   // מסומנים שהגיעו מרשימת הקהילה
   const [sel, setSel] = useState<Set<string>>(() => new Set(useNav.getState().msgPreset ?? []));
-  useEffect(() => { useNav.setState({ msgPreset: null }); }, []);
+  useEffect(() => { useNav.setState({ msgPreset: null, msgText: null }); }, []);
   // טיוטה נשמרת במכשיר עד שהיא נשלחת או נמחקת
   useEffect(() => {
     try { if (text.trim()) localStorage.setItem(DRAFT_KEY, JSON.stringify({ text, subject })); else localStorage.removeItem(DRAFT_KEY); } catch { /* */ }
@@ -281,6 +282,48 @@ function Calls({ db, onOpen }: { db: Db; onOpen: (r: FamilyRef) => void }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+/* ───────── תיעודים מכל המשפחות (כמו renderAllConvDocs) ───────── */
+
+const DOC_CH: Record<string, string> = { general: 'כללי', phone: 'שיחה', whatsapp: 'וואטסאפ', email: 'מייל', meeting: 'פגישה' };
+const DOC_TY: Record<string, string> = { summary: 'סיכום', thread: 'שרשור', transcript: 'תמליל', recording_link: 'הקלטה' };
+
+function AllDocs({ db, onOpen }: { db: Db; onOpen: (r: FamilyRef) => void }) {
+  const [q, setQ] = useState('');
+  const [ch, setCh] = useState('');
+  const [ty, setTy] = useState('');
+  const items = useMemo(() => {
+    const out: { ref: FamilyRef; name: string; d: Record<string, unknown> }[] = [];
+    for (const r of listFamilies(db)) for (const d of ((r.apt as Record<string, unknown>).convDocs ?? []) as Record<string, unknown>[]) out.push({ ref: r, name: displayName(r.apt) || r.bldg, d });
+    return out.sort((a, b) => Number(b.d.createdAt ?? 0) - Number(a.d.createdAt ?? 0));
+  }, [db]);
+  const ql = q.trim().toLowerCase();
+  const shown = items.filter(({ name, d }) => (!ch || d.channel === ch) && (!ty || d.docType === ty)
+    && (!ql || [name, d.title, d.body].map((x) => String(x ?? '')).join(' ').toLowerCase().includes(ql)));
+  return (
+    <section className="panel hist">
+      <div className="com-bar">
+        <label className="search com-search"><Icon name="search" size={15} /><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש בתיעודים" /></label>
+        <select className="sel" value={ty} onChange={(e) => setTy(e.target.value)} aria-label="סוג"><option value="">כל הסוגים</option>{Object.entries(DOC_TY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+        <select className="sel" value={ch} onChange={(e) => setCh(e.target.value)} aria-label="ערוץ"><option value="">כל הערוצים</option>{Object.entries(DOC_CH).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+        <span className="meta">{shown.length} תיעודים</span>
+      </div>
+      {shown.length === 0 ? <p className="muted">{items.length ? 'אין תיעוד שמתאים לסינון.' : 'אין עדיין תיעודים. פותחים כרטיס משפחה ← תיעוד.'}</p> : (
+        <ol className="timeline">
+          {shown.slice(0, 150).map(({ ref, name, d }, k) => (
+            <li key={k}>
+              <b>{String(d.title || DOC_TY[String(d.docType)] || 'תיעוד')}</b>
+              <button className="chip-f" onClick={() => onOpen(ref)}>{name}</button>
+              <span className="meta">{String(d.date ?? '')} · {DOC_CH[String(d.channel)] ?? ''} · {DOC_TY[String(d.docType)] ?? 'סיכום'}</span>
+              {d.recordingUrl ? <p><a href={String(d.recordingUrl)} target="_blank" rel="noreferrer">האזנה להקלטה</a></p> : null}
+              {d.body ? <p>{String(d.body)}</p> : null}
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type Apartment, type Db, type FamilyRef, type InteractionLog, type Milestone, type Pledge, type Task, type LifeEvent,
   DIRECTION_LABELS, LIFE_TYPES, NO_ADDRESS_KEY, PLEDGE_STATUS,
-  addDonationFull, addLifeEvent, addPledge, brokenKind, buildingKeys, circleIds, circleName, dateAlerts, daysUntil, deleteFamily,
+  addDonationFull, addLifeEvent, getEventTypes, addPledge, brokenKind, buildingKeys, circleIds, circleName, dateAlerts, daysUntil, deleteFamily,
   displayName, engagementLabel, engagementScore, familyAddress, familyPhones, formatHebrew, geocodeAddress, getAptScore,
   getBuilding, getCircles, getInteractionTypes, getStatusColor, hebrewParts, hebrewYear, lastContact, lifeLabel, logTypeKey,
   makeLog, memberName, memberOptions, moveFamily, nextOccurrence, recalcPledges, removeDonation, removeLifeEvent, removePledge,
@@ -18,10 +18,6 @@ type Tab = 'details' | 'activity' | 'donations' | 'dates' | 'docs';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'details', label: 'פרטים' }, { key: 'activity', label: 'פעילות' }, { key: 'donations', label: 'תרומות' },
   { key: 'dates', label: 'חיים ומועדים' }, { key: 'docs', label: 'תיעוד' },
-];
-const MS_TYPES = [
-  { key: 'birthday', label: 'יום הולדת' }, { key: 'yahrzeit', label: 'יארצייט' }, { key: 'anniversary', label: 'יום נישואין' },
-  { key: 'barmitzva', label: 'בר/בת מצווה' }, { key: 'other', label: 'אחר' },
 ];
 const HEB_MONTHS = ['תשרי', 'חשוון', 'כסלו', 'טבת', 'שבט', 'אדר', 'אדר א׳', 'אדר ב׳', 'ניסן', 'אייר', 'סיוון', 'תמוז', 'אב', 'אלול'];
 const DOC_CHANNELS: Record<string, string> = { general: 'כללי', phone: 'שיחה', whatsapp: 'וואטסאפ', email: 'מייל', meeting: 'פגישה' };
@@ -150,7 +146,7 @@ export function FamilyCard({ db, fref, onClose, onMoved }: { db: Db; fref: Famil
           )}
           {tab === 'activity' && <Activity db={db} apt={apt} onSave={save} ask={ask} />}
           {tab === 'donations' && <Donations db={db} apt={apt} fref={fref} run={run} ask={ask} />}
-          {tab === 'dates' && <Dates apt={apt} fref={fref} run={run} onSave={save} ask={ask} />}
+          {tab === 'dates' && <Dates db={db} apt={apt} fref={fref} run={run} onSave={save} ask={ask} />}
           {tab === 'docs' && <Docs apt={apt} onSave={save} ask={ask} />}
         </div>
       </aside>
@@ -668,7 +664,7 @@ function PledgeDialog({ apt, campaigns, onClose, onSave }: { apt: Apartment; cam
 
 /* ───────── חיים ומועדים: אירועי חיים + אבני דרך ───────── */
 
-function Dates({ apt, fref, run, onSave, ask }: { apt: Apartment; fref: FamilyRef; run: Run; onSave: (p: Partial<Apartment>, msg?: string) => void; ask: Ask }) {
+function Dates({ db, apt, fref, run, onSave, ask }: { db: Db; apt: Apartment; fref: FamilyRef; run: Run; onSave: (p: Partial<Apartment>, msg?: string) => void; ask: Ask }) {
   const toast = useToast((s) => s.show);
   const [lType, setLType] = useState('birth');
   const [lDate, setLDate] = useState(todayIso());
@@ -720,13 +716,14 @@ function Dates({ apt, fref, run, onSave, ask }: { apt: Apartment; fref: FamilyRe
 
       <div className="fc-sec">
         <h3>אבני דרך ומועדים</h3>
-        <Milestones apt={apt} onSave={onSave} ask={ask} />
+        <Milestones apt={apt} onSave={onSave} ask={ask} types={getEventTypes(db).map((t) => ({ key: t.id, label: `${t.emoji ? `${t.emoji} ` : ''}${t.label}`, recurring: t.recurring }))} />
       </div>
     </>
   );
 }
 
-function Milestones({ apt, onSave, ask }: { apt: Apartment; onSave: (p: Partial<Apartment>, msg?: string) => void; ask: Ask }) {
+function Milestones({ apt, onSave, ask, types }: { apt: Apartment; onSave: (p: Partial<Apartment>, msg?: string) => void; ask: Ask; types: { key: string; label: string; recurring: boolean }[] }) {
+  const MS_TYPES = types;
   const [type, setType] = useState('birthday');
   const [mode, setMode] = useState<'greg' | 'heb'>('heb');
   const [date, setDate] = useState('');
@@ -749,7 +746,7 @@ function Milestones({ apt, onSave, ask }: { apt: Apartment; onSave: (p: Partial<
       if (!h) { setErr('צריך לבחור תאריך'); return; }
       day = h.day; monthName = h.monthName;
     }
-    const typeLabel = MS_TYPES.find((t) => t.key === type)?.label ?? type;
+    const typeLabel = (MS_TYPES.find((t) => t.key === type)?.label ?? type).replace(/^\S+\s/u, (m) => (/\p{Extended_Pictographic}/u.test(m) ? '' : m));
     onSave({ milestones: [...list, { id: Date.now(), type, label: label.trim() || `${typeLabel} — ${apt.name ?? ''}`, day, monthName, gregDate: greg, recurring }] }, 'אבן הדרך נוספה');
     setLabel(''); setDate(''); setErr('');
   };
@@ -761,7 +758,7 @@ function Milestones({ apt, onSave, ask }: { apt: Apartment; onSave: (p: Partial<
     <>
       <div className="fc-add-col">
         <div className="fc-add">
-          <select value={type} onChange={(e) => setType(e.target.value)} aria-label="סוג">{MS_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select>
+          <select value={type} onChange={(e) => { setType(e.target.value); setRecurring(MS_TYPES.find((t) => t.key === e.target.value)?.recurring ?? true); }} aria-label="סוג">{MS_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select>
           <div className="seg-s" role="group" aria-label="סוג תאריך">
             <button type="button" aria-pressed={mode === 'heb'} onClick={() => setMode('heb')}>עברי</button>
             <button type="button" aria-pressed={mode === 'greg'} onClick={() => setMode('greg')}>לועזי</button>

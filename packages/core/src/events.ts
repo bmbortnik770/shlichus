@@ -55,3 +55,39 @@ export function toggleAttendance(db: Db, id: string, name: string): void {
     return { ...e, attendance: att.includes(name) ? att.filter((n) => n !== name) : [...att, name], updatedAt: Date.now() };
   }));
 }
+
+/** סוגי תאריכים למשפחה (אבני דרך) — מובנים + מותאמים (__SETTINGS__.customEventTypes כמו בישן) */
+export interface EventType { id: string; label: string; emoji?: string; color?: string; recurring: boolean; custom?: boolean }
+export const BUILTIN_EVENT_TYPES: EventType[] = [
+  { id: 'birthday', label: 'יום הולדת', emoji: '🎂', recurring: true },
+  { id: 'yahrzeit', label: 'יארצייט', emoji: '🕯️', recurring: true },
+  { id: 'anniversary', label: 'יום נישואין', emoji: '💍', recurring: true },
+  { id: 'barmitzva', label: 'בר/בת מצווה', emoji: '📜', recurring: false },
+  { id: 'other', label: 'אחר', emoji: '📅', recurring: true },
+];
+export function getEventTypes(db: Db): EventType[] {
+  const custom = ((db.__SETTINGS__?.customEventTypes ?? []) as EventType[]).filter((t) => t && t.id && t.label).map((t) => ({ ...t, custom: true }));
+  return [...BUILTIN_EVENT_TYPES, ...custom];
+}
+export function addEventType(db: Db, t: { label: string; emoji?: string; color?: string; recurring: boolean }): string {
+  const id = `custom_${Date.now()}`;
+  const list = (db.__SETTINGS__?.customEventTypes ?? []) as EventType[];
+  db.__SETTINGS__ = { ...(db.__SETTINGS__ ?? {}), customEventTypes: [...list, { id, label: t.label, emoji: t.emoji || '📅', color: t.color || '#64748b', recurring: t.recurring }], updatedAt: Date.now() };
+  return id;
+}
+export function removeEventType(db: Db, id: string): void {
+  const list = (db.__SETTINGS__?.customEventTypes ?? []) as EventType[];
+  db.__SETTINGS__ = { ...(db.__SETTINGS__ ?? {}), customEventTypes: list.filter((t) => t.id !== id), updatedAt: Date.now() };
+}
+
+/** מדדי אירועי הקהילה: קרובים, נרשמים, שיעור הגעה באירועים שעברו */
+export function eventStats(db: Db, now = new Date()): { upcoming: number; past: number; registrants: number; attended: number; attendRate: number | null } {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  let upcoming = 0, past = 0, regs = 0, att = 0, pastRegs = 0;
+  for (const e of listEvents(db)) {
+    const t = parseLooseDate(e.date)?.getTime();
+    regs += e.registrants.length;
+    if (t !== undefined && t < today) { past++; pastRegs += e.registrants.length; att += e.attendance.length; } else upcoming++;
+  }
+  return { upcoming, past, registrants: regs, attended: att, attendRate: pastRegs ? Math.round((att / pastRegs) * 100) : null };
+}
