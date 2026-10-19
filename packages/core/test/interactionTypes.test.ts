@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_INTERACTION_TYPES, engagementLabel, engagementScore, getAptScore, guessTypeKey, logTypeKey, makeLog, typeInfo } from '../src/index.js';
+import { DEFAULT_INTERACTION_TYPES, engagementLabel, engagementScore, getAptScore, guessTypeKey, logTypeKey, makeLog, personalize, typeInfo } from '../src/index.js';
 
 describe('סוגי פעילות', () => {
   it('ברירת מחדל כשאין הגדרה, ומותאם כשיש', () => {
@@ -35,5 +35,13 @@ describe('סוגי פעילות', () => {
     expect(engagementLabel(75).label).toBe('מעורב מאוד');
     expect(engagementLabel(0).level).toBe('cold');
     expect(DEFAULT_INTERACTION_TYPES).toHaveLength(13);
+  });
+});
+
+describe('משתני מיזוג', () => {
+  it('שם, שם האב, שם האם, כתובת', () => {
+    expect(personalize('שלום [שם האב] ו[שם האם] [שם], [כתובת]', { name: 'כהן', father: 'אברהם', mother: 'שרה' }, 'דוד ניב 16'))
+      .toBe('שלום אברהם ושרה כהן, דוד ניב 16');
+    expect(personalize('משפחת [שם]', {})).toBe('משפחה יקרה');
   });
 });

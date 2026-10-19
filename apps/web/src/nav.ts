@@ -36,6 +36,9 @@ interface NavState {
   focusKey: string | null;
   showOnMap: (bldg: string) => void;
   paletteOpen: boolean;
+  /** נמענים מוכנים לשליחה (מהמסומנים ברשימה) — נצרכים פעם אחת במסך ההודעות */
+  msgPreset: string[] | null;
+  sendTo: (keys: string[]) => void;
   setPalette: (v: boolean) => void;
 }
 
@@ -45,5 +48,7 @@ export const useNav = create<NavState>((set) => ({
   focusKey: null,
   showOnMap: (bldg) => { set({ focusKey: bldg }); go('community', 'map'); },
   paletteOpen: false,
+  msgPreset: null,
+  sendTo: (keys) => { set({ msgPreset: keys }); go('messages'); },
   setPalette: (paletteOpen) => set({ paletteOpen }),
 }));

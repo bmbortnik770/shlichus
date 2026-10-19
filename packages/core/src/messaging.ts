@@ -25,10 +25,13 @@ export const refKey = (r: FamilyRef) => `${r.bldg}|${r.idx}`;
 
 const stamp = (d = new Date()) => `${d.toLocaleDateString('he-IL')} ${d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
 
-/** "[שם]" → שם המשפחה (או שם האב/האם) */
-export function personalize(text: string, apt: Pick<Apartment, 'name' | 'father' | 'mother'>): string {
+/** משתני מיזוג: [שם] → שם המשפחה, [שם האב], [שם האם], [כתובת] */
+export const MERGE_FIELDS = ['[שם]', '[שם האב]', '[שם האם]', '[כתובת]'] as const;
+export function personalize(text: string, apt: Pick<Apartment, 'name' | 'father' | 'mother'>, address = ''): string {
   const name = apt.name?.trim() || apt.father?.trim() || apt.mother?.trim() || '';
-  return text.replace(/\[\s*שם\s*\]/g, name || 'משפחה יקרה').replace(/משפחת משפחה יקרה/g, 'משפחה יקרה');
+  const t = text.replace(/\[\s*שם האב\s*\]/g, apt.father?.trim() || '').replace(/\[\s*שם האם\s*\]/g, apt.mother?.trim() || '')
+    .replace(/\[\s*כתובת\s*\]/g, address);
+  return t.replace(/\[\s*שם\s*\]/g, name || 'משפחה יקרה').replace(/משפחת משפחה יקרה/g, 'משפחה יקרה');
 }
 
 export function circleIds(apt: Apartment): string[] {

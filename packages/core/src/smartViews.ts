@@ -7,6 +7,7 @@ import type { Apartment } from './types.js';
 import { NO_ADDRESS_KEY } from './types.js';
 import { familyPhones } from './families.js';
 import { parseLooseDate } from './dates.js';
+import { guessTypeKey, logTypeKey } from './interactionTypes.js';
 
 export interface SmartView { id: string; name: string; rule: string; param1?: string; param2?: string; value?: string }
 
@@ -26,7 +27,7 @@ const MONTH = 1000 * 60 * 60 * 24 * 30;
 function lastOf(apt: Apartment, type?: string): Date | null {
   let max: Date | null = null;
   for (const l of apt.interactions ?? []) {
-    if (type && l.type !== type) continue;
+    if (type && l.type !== type && logTypeKey(l) !== guessTypeKey(type) && logTypeKey(l) !== type) continue;
     const d = parseLooseDate(l.date);
     if (d && (!max || d > max)) max = d;
   }

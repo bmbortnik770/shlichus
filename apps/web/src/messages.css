@@ -52,3 +52,6 @@
 .mx { border: 0; background: none; color: var(--faint); font-size: 15px; line-height: 1; padding: 0 4px; }
 .mx:hover { color: var(--hot); }
 @media (max-width: 900px) { .send-grid { grid-template-columns: minmax(0,1fr); } }
+.merge-chips { align-items: center; }
+.manual-add { display: flex; gap: 6px; flex-wrap: wrap; }
+.manual-add input { flex: 1 1 120px; font: inherit; font-size: 14px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-width: 0; }

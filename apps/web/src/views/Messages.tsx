@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   type Channel, type Circle, type Db, type FamilyRef, type Recipient, type Template, circleName, displayName, getBuilding, getCircles,
-  getSegments, getTemplates, listFamilies, logCall, logSent, personalize, recipients, refKey, sendLink, sentCount,
+  MERGE_FIELDS, getSegments, getTemplates, listFamilies, logCall, logSent, personalize, recipients, refKey, sendLink, sentCount,
   newCircle, setCircleMember, setSetting,
 } from '@shlichus/core';
 import { Icon } from '../icons';
@@ -9,6 +9,7 @@ import { useStore } from '../store';
 import { Dialog, useConfirm, useToast } from '../ui';
 import { FamilyCard } from './FamilyCard';
 import { agoText } from './Community';
+import { useNav } from '../nav';
 import '../community.css';
 import '../messages.css';
 
@@ -20,6 +21,10 @@ const TABS: { key: Tab; label: string }[] = [
 const CHANNELS: { key: Channel; label: string }[] = [{ key: 'whatsapp', label: 'וואטסאפ' }, { key: 'sms', label: 'SMS' }, { key: 'email', label: 'מייל' }];
 const CIRCLE_COLORS = ['#0e6b64', '#2f6fae', '#b7791f', '#c2410c', '#5b4b8a', '#1f7a4d'];
 const parseKey = (k: string): FamilyRef => { const i = k.lastIndexOf('|'); return { bldg: k.slice(0, i), idx: Number(k.slice(i + 1)) }; };
+const DRAFT_KEY = 'shlichus_msg_draft';
+const readDraft = (): { text?: string; subject?: string } => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); } catch { return {}; } };
+/** נמען ידני — מספר או מייל שאינם במערכת (לא נרשם בכרטיס) */
+type Manual = { key: string; name: string; phone: string; email: string; manual: true };
 
 export function Messages({ db }: { db: Db }) {
   const [tab, setTab] = useState<Tab>('send');
@@ -51,14 +56,23 @@ function Send({ db }: { db: Db }) {
   const mutate = useStore((s) => s.mutate);
   const toast = useToast((s) => s.show);
   const [channel, setChannel] = useState<Channel>('whatsapp');
-  const [text, setText] = useState('');
-  const [subject, setSubject] = useState('הודעה מבית חב"ד');
+  const [text, setText] = useState(() => readDraft().text ?? '');
+  const [subject, setSubject] = useState(() => readDraft().subject ?? 'הודעה מבית חב"ד');
+  const [manual, setManual] = useState<Manual[]>([]);
+  const [mName, setMName] = useState('');
+  const [mTo, setMTo] = useState('');
   const [quick, setQuick] = useState<'all' | 'd30' | 'd60' | 'never' | 'tasks'>('all');
   const [style, setStyle] = useState('');
   const [tag, setTag] = useState('');
   const [circle, setCircle] = useState('');
   const [q, setQ] = useState('');
-  const [sel, setSel] = useState<Set<string>>(new Set());
+  // מסומנים שהגיעו מרשימת הקהילה
+  const [sel, setSel] = useState<Set<string>>(() => new Set(useNav.getState().msgPreset ?? []));
+  useEffect(() => { useNav.setState({ msgPreset: null }); }, []);
+  // טיוטה נשמרת במכשיר עד שהיא נשלחת או נמחקת
+  useEffect(() => {
+    try { if (text.trim()) localStorage.setItem(DRAFT_KEY, JSON.stringify({ text, subject })); else localStorage.removeItem(DRAFT_KEY); } catch { /* */ }
+  }, [text, subject]);
   const [queue, setQueue] = useState<{ keys: string[]; at: number; sent: Set<string> } | null>(null);
   const [segDlg, setSegDlg] = useState(false);
 
@@ -79,10 +93,25 @@ function Send({ db }: { db: Db }) {
     if (circle && !r.circles.includes(circle)) return false;
     return !q.trim() || `${r.name} ${r.bldg} ${r.phone}`.includes(q.trim());
   });
-  const chosen = all.filter((r) => sel.has(r.key));
-  const byKey = new Map(all.map((r) => [r.key, r]));
-  const aptOf = (r: Recipient) => getBuilding(db, r.bldg)!.apts[r.idx]!;
-  const preview = chosen[0] ? personalize(text, aptOf(chosen[0])) : personalize(text, { name: 'כהן' });
+  const manualOk = manual.filter((m) => (channel === 'email' ? m.email : m.phone));
+  const chosen: (Recipient | Manual)[] = [...all.filter((r) => sel.has(r.key)), ...manualOk];
+  const byKey = new Map<string, Recipient | Manual>([...all.map((r) => [r.key, r] as const), ...manualOk.map((m) => [m.key, m] as const)]);
+  const isManual = (r: Recipient | Manual): r is Manual => 'manual' in r;
+  const textFor = (r: Recipient | Manual) => {
+    if (isManual(r)) return personalize(text, { name: r.name });
+    const apt = getBuilding(db, r.bldg)!.apts[r.idx]!;
+    return personalize(text, apt, r.bldg === '__NO_ADDRESS__' ? '' : r.bldg);
+  };
+  const preview = chosen[0] ? textFor(chosen[0]) : personalize(text, { name: 'כהן', father: 'אברהם', mother: 'שרה' }, 'דוד ניב 16');
+  const addManual = () => {
+    const to = mTo.trim();
+    if (!to) return;
+    const email = to.includes('@') ? to : '';
+    const phone = email ? '' : to.replace(/[^\d+]/g, '');
+    if (!email && phone.length < 9) return;
+    setManual((m) => [...m, { key: `manual:${to}`, name: mName.trim(), phone, email, manual: true }]);
+    setMName(''); setMTo('');
+  };
 
   // ── מצב שליחה רצופה ──
   if (queue) {
@@ -94,17 +123,17 @@ function Send({ db }: { db: Db }) {
         <div className="queue-head">
           <b>שליחה רצופה · {Math.min(queue.at + 1, queue.keys.length)} מתוך {queue.keys.length}</b>
           <span className="meter"><i style={{ width: `${(queue.sent.size / queue.keys.length) * 100}%` }} /></span>
-          <button className="btn" onClick={() => { setQueue(null); setSel(new Set()); }}>{done ? 'סיום' : 'עצירה'}</button>
+          <button className="btn" onClick={() => { if (done) { setText(''); setManual([]); } setQueue(null); setSel(new Set()); }}>{done ? 'סיום' : 'עצירה'}</button>
         </div>
         {done || !cur ? (
           <div className="fix-done"><Icon name="done" size={22} /><div><b>נשלחו {queue.sent.size} הודעות</b><span>כל הודעה תועדה בכרטיס המשפחה.</span></div></div>
         ) : (
           <div className="queue-card">
-            <div className="q-who"><b>{cur.name}</b><span dir="ltr">{channel === 'email' ? cur.email : cur.phone}</span><span className="meta">קשר אחרון: {cur.daysSince === null ? 'אין' : agoText(new Date(Date.now() - cur.daysSince * 86400000))}</span></div>
-            <p className="q-text">{personalize(text, aptOf(cur))}</p>
+            <div className="q-who"><b>{cur.name || (channel === 'email' ? cur.email : cur.phone)}</b><span dir="ltr">{channel === 'email' ? cur.email : cur.phone}</span>{isManual(cur) ? <span className="meta">נמען ידני · לא נרשם בכרטיס</span> : <span className="meta">קשר אחרון: {cur.daysSince === null ? 'אין' : agoText(new Date(Date.now() - cur.daysSince * 86400000))}</span>}</div>
+            <p className="q-text">{textFor(cur)}</p>
             <div className="fix-acts">
-              <a className="btn btn-primary" href={sendLink(channel, cur, personalize(text, aptOf(cur)), subject)} target="_blank" rel="noreferrer"
-                onClick={() => { mutate((d) => logSent(d, cur, channel, personalize(text, aptOf(cur)))); setQueue((x) => (x ? { ...x, at: x.at + 1, sent: new Set(x.sent).add(cur.key) } : x)); }}>
+              <a className="btn btn-primary" href={sendLink(channel, cur, textFor(cur), subject)} target="_blank" rel="noreferrer"
+                onClick={() => { if (!isManual(cur)) mutate((d) => logSent(d, cur, channel, textFor(cur))); setQueue((x) => (x ? { ...x, at: x.at + 1, sent: new Set(x.sent).add(cur.key) } : x)); }}>
                 <Icon name={channel === 'email' ? 'chat' : 'wa'} size={16} />פתיחה ב{CHANNELS.find((c) => c.key === channel)!.label} ותיעוד
               </a>
               <button className="btn" onClick={next}>דילוג</button>
@@ -114,7 +143,7 @@ function Send({ db }: { db: Db }) {
         )}
         {queue.keys.length > 1 && (
           <ul className="queue-list">
-            {queue.keys.map((k, i) => <li key={k} className={queue.sent.has(k) ? 'sent' : i === queue.at ? 'cur' : ''}>{byKey.get(k)?.name}{queue.sent.has(k) ? ' ✓' : ''}</li>)}
+            {queue.keys.map((k, i) => <li key={k} className={queue.sent.has(k) ? 'sent' : i === queue.at ? 'cur' : ''}>{byKey.get(k)?.name || k.replace('manual:', '')}{queue.sent.has(k) ? ' ✓' : ''}</li>)}
           </ul>
         )}
       </section>
@@ -135,7 +164,11 @@ function Send({ db }: { db: Db }) {
         )}
         {channel === 'email' && <label className="fld"><span>נושא</span><input value={subject} onChange={(e) => setSubject(e.target.value)} /></label>}
         <label className="fld"><span>ההודעה</span><textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder="שלום משפחת [שם]," /></label>
-        <button className="chip-f" onClick={() => setText((t) => `${t}[שם]`)}>הוספת [שם]</button>
+        <div className="chips merge-chips">
+          <span className="meta">הוספה לטקסט:</span>
+          {MERGE_FIELDS.map((f) => <button key={f} className="chip-f" onClick={() => setText((t) => `${t}${f}`)}>{f}</button>)}
+          {text.trim() && <button className="link" onClick={() => setText('')}>מחיקת הטיוטה</button>}
+        </div>
         {text.trim() && <div className="preview"><span className="meta">כך זה ייראה{chosen[0] ? ` אצל ${chosen[0].name}` : ''}:</span><p>{preview}</p></div>}
         <button className="btn btn-primary send-go" disabled={!text.trim() || !chosen.length} onClick={() => setQueue({ keys: chosen.map((r) => r.key), at: 0, sent: new Set() })}>
           {chosen.length ? `שליחה ל-${chosen.length} נמענים` : 'בחר נמענים'}
@@ -161,13 +194,23 @@ function Send({ db }: { db: Db }) {
             </select>
           )}
         </div>
+        <form className="manual-add" onSubmit={(e) => { e.preventDefault(); addManual(); }}>
+          <input value={mName} onChange={(e) => setMName(e.target.value)} placeholder="שם (לא חובה)" aria-label="שם נמען ידני" />
+          <input value={mTo} onChange={(e) => setMTo(e.target.value)} placeholder={channel === 'email' ? 'מייל שאינו במערכת' : 'מספר שאינו במערכת'} dir="ltr" aria-label="נמען ידני" />
+          <button className="btn" disabled={!mTo.trim()}>הוספה</button>
+        </form>
+        {manual.length > 0 && (
+          <div className="chips">
+            {manual.map((m) => <span key={m.key} className="pill pill-accent">{m.name || m.phone || m.email}<button className="ib-s" aria-label="הסרה" onClick={() => setManual((x) => x.filter((y) => y.key !== m.key))}>×</button></span>)}
+          </div>
+        )}
         <div className="aud-acts">
           <button className="link" onClick={() => setSel(new Set([...sel, ...filtered.map((r) => r.key)]))}>בחירת כל המוצגים</button>
           {sel.size > 0 && <button className="link" onClick={() => setSel(new Set())}>ניקוי</button>}
           {sel.size > 0 && <button className="link" onClick={() => setSegDlg(true)}>שמירה כסגמנט</button>}
         </div>
         <ul className="aud-list">
-          {filtered.map((r) => (
+          {[...filtered.filter((r) => sel.has(r.key)), ...filtered.filter((r) => !sel.has(r.key))].map((r) => (
             <li key={r.key}>
               <label className="chk-row">
                 <input type="checkbox" checked={sel.has(r.key)} onChange={() => setSel((x) => { const n = new Set(x); if (n.has(r.key)) n.delete(r.key); else n.add(r.key); return n; })} />
