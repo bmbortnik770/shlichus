@@ -17,3 +17,4 @@ export * from './events.js';
 export * from './donations.js';
 export * from './messaging.js';
 export * from './importer.js';
+export * from './fieldUpdates.js';

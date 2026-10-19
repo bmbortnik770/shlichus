@@ -5,6 +5,7 @@ import {
 } from '@shlichus/core';
 import { Icon } from '../icons';
 import { type ContactType, useStore } from '../store';
+import { useNav } from '../nav';
 import { useToast } from '../ui';
 import { type BuildingView, readPalette } from '../map/features';
 
@@ -242,7 +243,7 @@ function Families({ db, rows }: { db: Db; rows: { key: string; apt: Apartment; i
           <li key={`${key}:${idx}`}>
             <i className="dot" style={{ background: pal.sev[Math.max(0, sev)] }} />
             <div className="fam-main">
-              <b>{displayName(apt)}</b>
+              <button className="link fam-open" onClick={() => useNav.getState().openFamily({ bldg: key, idx })}>{displayName(apt)}</button>
               <span className="sheet-hint">{apt.num ? `דירה ${apt.num} · ` : ''}{days == null ? 'עוד לא היה קשר' : `קשר אחרון ${ago(days)}`}</span>
             </div>
             <div className="fam-acts">

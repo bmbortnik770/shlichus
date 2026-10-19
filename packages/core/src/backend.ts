@@ -9,6 +9,7 @@ import type { Db } from './types.js';
 import { DriveSync, type TokenProvider } from './driveSync.js';
 import { mergeDb } from './merge.js';
 import { loadLocal, migrateFromLocalStorage, saveLocal } from './storage.js';
+import { applyOutbox, fetchOutbox } from './fieldUpdates.js';
 
 export type SyncStatus = 'offline' | 'syncing' | 'synced' | 'auth-needed' | 'error';
 
@@ -47,6 +48,17 @@ export class DriveBackend implements StorageBackend {
   async saveLocal(db: Db): Promise<void> {
     db.meta = { ...(db.meta ?? { lastModified: 0 }), lastModified: Date.now() };
     await saveLocal(db);
+  }
+
+  /**
+   * עדכונים מאפליקציית השטח: מחיל על db (במקום) ומחזיר כמה יושמו.
+   * הקבצים עוברים לסל רק אחרי שהשמירה לענן הצליחה — אחרת עדכון היה הולך לאיבוד.
+   */
+  async fieldUpdates(db: Db): Promise<{ applied: number; commit: () => Promise<void> }> {
+    const files = await fetchOutbox(this.sync);
+    if (!files.length) return { applied: 0, commit: async () => {} };
+    const { applied, trash } = applyOutbox(db, files);
+    return { applied, commit: async () => { for (const id of trash) { try { await this.sync.trash(id); } catch { /* ננסה בסבב הבא */ } } } };
   }
 
   async save(db: Db): Promise<Db> {

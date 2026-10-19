@@ -12,10 +12,10 @@ import { agoText } from './Community';
 import '../community.css';
 import '../messages.css';
 
-type Tab = 'send' | 'calls' | 'history' | 'templates' | 'circles';
+type Tab = 'send' | 'calls' | 'history' | 'templates';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'send', label: 'שליחה' }, { key: 'calls', label: 'חיוג' }, { key: 'history', label: 'היסטוריה' },
-  { key: 'templates', label: 'תבניות' }, { key: 'circles', label: 'מעגלים' },
+  { key: 'templates', label: 'תבניות' },
 ];
 const CHANNELS: { key: Channel; label: string }[] = [{ key: 'whatsapp', label: 'וואטסאפ' }, { key: 'sms', label: 'SMS' }, { key: 'email', label: 'מייל' }];
 const CIRCLE_COLORS = ['#0e6b64', '#2f6fae', '#b7791f', '#c2410c', '#5b4b8a', '#1f7a4d'];
@@ -40,7 +40,6 @@ export function Messages({ db }: { db: Db }) {
       {tab === 'calls' && <Calls db={db} onOpen={setOpenFam} />}
       {tab === 'history' && <History db={db} onOpen={setOpenFam} />}
       {tab === 'templates' && <Templates db={db} />}
-      {tab === 'circles' && <Circles db={db} onOpen={setOpenFam} />}
       {openFam && getBuilding(db, openFam.bldg)?.apts[openFam.idx] && <FamilyCard db={db} fref={openFam} onClose={() => setOpenFam(null)} onMoved={setOpenFam} />}
     </>
   );
@@ -339,7 +338,7 @@ function TemplateForm({ t, onCancel, onSave }: { t: Template; onCancel: () => vo
 
 /* ───────── מעגלים ───────── */
 
-function Circles({ db, onOpen }: { db: Db; onOpen: (r: FamilyRef) => void }) {
+export function Circles({ db, onOpen }: { db: Db; onOpen: (r: FamilyRef) => void }) {
   const mutate = useStore((s) => s.mutate);
   const toast = useToast((s) => s.show);
   const ask = useConfirm((s) => s.ask);

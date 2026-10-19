@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isDark } from '../themeMode';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { type Db, type LngLat, bboxOf, getTerritory, polygonAreaM2, polygonInTerritory } from '@shlichus/core';
@@ -27,7 +28,7 @@ export function TerritoryEditor({ db }: { db: Db }) {
 
   useEffect(() => {
     if (!box.current) return;
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = isDark();
     const s = db.__SETTINGS__ ?? {};
     const center = ((s.homeLocation as { coords?: LngLat } | undefined)?.coords ?? [35.2137, 31.7683]) as LngLat;
     const map = new mapboxgl.Map({ container: box.current, style: dark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11', center, zoom: 15.5, attributionControl: false });
@@ -35,6 +36,9 @@ export function TerritoryEditor({ db }: { db: Db }) {
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-left');
     map.on('load', () => {
       prepareBaseMap(map);
+      // המסגרת מקבלת את גודלה הסופי רק אחרי שהמסך נפרס — מודדים שוב, אחרת חלק מהמפה לא מצויר
+      requestAnimationFrame(() => map.resize());
+      map.once('idle', () => { map.resize(); map.triggerRepaint(); });
       const pal = readPalette();
       const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
       map.addSource('tb', { type: 'geojson', data: empty });

@@ -8,6 +8,7 @@ import { Icon } from '../icons';
 import { useStore } from '../store';
 import { useConfirm, useToast } from '../ui';
 import { FamilyCard } from './FamilyCard';
+import { useNav } from '../nav';
 import '../community.css';
 
 type Status = 'all' | 'attention' | 'drifting' | 'ok' | 'never' | 'noaddr';
@@ -287,6 +288,7 @@ export function Community({ db }: { db: Db }) {
                           {c.id === 'name' ? <span className="nm"><i className={`dot ${SEV_CLASS[sev]}`} />{displayName(r.apt) || 'ללא שם'}</span>
                             : c.id === 'tags' ? (r.apt.tags ?? []).map((t) => <span key={t} className="tg">{t}</span>)
                             : c.id === 'address' && r.bldg === NO_ADDRESS_KEY ? <span className="noaddr">ללא כתובת</span>
+                            : c.id === 'address' ? <button className="link addr-link" title="הצגה במפה" onClick={(e) => { e.stopPropagation(); useNav.getState().showOnMap(r.bldg); }}>{familyAddress(r.bldg, r.apt)}</button>
                             : c.id === 'actions' ? <RowActions apt={r.apt} />
                             : cell(r, c.id)}
                         </td>

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import {
   type Apartment, type Db, type Occasion, type TodayItem,
-  computeToday, getBuilding, hebrewDateLine, isConnectorActive, parseLooseDate, upcomingOccasions,
+  computeToday, getBuilding, hebrewDateLine, isConnectorActive, listTasks, parseLooseDate, setTaskDone, taskGroup, upcomingOccasions,
 } from '@shlichus/core';
 import { Icon } from '../icons';
 import { useStore } from '../store';
+import { useNav } from '../nav';
 import { Dialog, useCopy, useToast } from '../ui';
 
 type Filter = 'all' | 'urgent' | 'dates' | 'lost';
@@ -173,7 +174,7 @@ export function Home({ db, onNavigate }: { db: Db; onNavigate: (v: string) => vo
                   <li key={key(item)} className={`person k-${r0.kind}${isDone ? ' done' : ''}`}>
                     <div className="av" style={{ ['--dot' as string]: dotKind(item) }}>{initials(item.name)}</div>
                     <div className="who">
-                      <div><b>{item.name}</b><span className="meta">{item.address}{item.daysSinceContact !== null ? ` · קשר אחרון לפני ${item.daysSinceContact} ימים` : ''}</span></div>
+                      <div><button className="link nm-link" onClick={() => useNav.getState().openFamily({ bldg: item.bldg, idx: item.idx })}>{item.name}</button><span className="meta">{item.address}{item.daysSinceContact !== null ? ` · קשר אחרון לפני ${item.daysSinceContact} ימים` : ''}</span></div>
                       {item.reasons.map((r) => (
                         <div className={`why k-${r.kind}`} key={r.kind + r.detail}><span className="tag">{r.label}</span><span>{r.detail}</span></div>
                       ))}
@@ -194,6 +195,7 @@ export function Home({ db, onNavigate }: { db: Db; onNavigate: (v: string) => vo
         </div>
 
         <aside className="side">
+          <TodayTasks db={db} onAll={() => onNavigate('tasks')} />
           <section className="panel">
             <h3>השבוע הקרוב</h3>
             {week.length === 0 ? <p className="lede" style={{ fontSize: 14 }}>אין תאריכים מיוחדים השבוע.</p> : (
@@ -267,5 +269,27 @@ function MessageDialog({ occasion, families, waPro, onClose }: { occasion: Occas
         <button className="btn btn-primary" onClick={() => void copy(text)}><Icon name="copy" size={16} />{copied ? 'הועתק' : 'העתקת ההודעה'}</button>
       </div>
     </Dialog>
+  );
+}
+
+/** משימות שבאיחור ולהיום — סימון ביצוע ישירות מכאן (כמו בלוח הבקרה הקודם) */
+function TodayTasks({ db, onAll }: { db: Db; onAll: () => void }) {
+  const mutate = useStore((s) => s.mutate);
+  const showToast = useToast((s) => s.show);
+  const list = useMemo(() => listTasks(db).filter((t) => ['overdue', 'today'].includes(taskGroup(t))), [db]);
+  if (!list.length) return null;
+  return (
+    <section className="panel today-tasks">
+      <h3>משימות להיום <span className="num">{list.length}</span></h3>
+      <ul>
+        {list.slice(0, 6).map((t) => (
+          <li key={t.id} className={taskGroup(t) === 'overdue' ? 'late' : ''}>
+            <button className="tcheck" aria-label="סימון כבוצעה" onClick={() => { const undo = mutate((d) => setTaskDone(d, t, true)); showToast('המשימה סומנה כבוצעה', undo); }}><Icon name="done" size={13} /></button>
+            <span className="tt">{t.text}{t.family && <span className="meta"> · {t.family.name}</span>}</span>
+          </li>
+        ))}
+      </ul>
+      <button className="link" onClick={onAll}>{list.length > 6 ? `עוד ${list.length - 6} משימות` : 'לכל המשימות'}</button>
+    </section>
   );
 }

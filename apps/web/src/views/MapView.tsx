@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { isDark } from '../themeMode';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '../map/map.css';
 import {
   type Db, type LngLat, addressMatchesOfficial, bboxOf, buildingAt, buildingKeys, geocodeAddress, getCategories,
-  labelPoint, linkManually, matchBuildings, pendingFixes, pointInPolygon,
+  labelPoint, lastContact, linkManually, matchBuildings, pendingFixes, pointInPolygon,
 } from '@shlichus/core';
 import { Icon } from '../icons';
 import { useStore } from '../store';
 import { useToast } from '../ui';
 import { missionCity, useMapData } from '../mapData';
+import { useNav } from '../nav';
 import { type ColorMode, buildViews, findView, prepareBaseMap, orphansGeoJson, readPalette, territoryMask, toGeoJson } from '../map/features';
 import { BuildingCard } from './BuildingCard';
 import { MapFixPanel } from './MapFix';
@@ -28,7 +30,7 @@ const MODES: { key: ColorMode; label: string }[] = [
 ];
 const CLICKABLE = ['b-fill', 'b-3d', 'b-fam', 'orphans'];
 
-export function MapView({ db }: { db: Db }) {
+export function MapView({ db, switcher }: { db: Db; switcher?: ReactNode }) {
   const { buildings, status, error, source, geo, load } = useMapData();
   const mutate = useStore((s) => s.mutate);
   const toast = useToast((s) => s.show);
@@ -42,6 +44,7 @@ export function MapView({ db }: { db: Db }) {
   const [pickFor, setPickFor] = useState<string | null>(null);
   const [hover, setHover] = useState<string>('');
   const [q, setQ] = useState('');
+  const [legendOpen, setLegendOpen] = useState(false);
 
   useEffect(() => { void load(db); }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
   // נקודות הכניסה הרשמיות ברקע (נשמרות במטמון) — מהן המפה מחלקת בניינים לכניסות
@@ -58,7 +61,7 @@ export function MapView({ db }: { db: Db }) {
   // ── יצירת המפה פעם אחת ──
   useEffect(() => {
     if (!box.current) return;
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = isDark();
     const s = db.__SETTINGS__ ?? {};
     const center = ((s.homeLocation as { coords?: LngLat } | undefined)?.coords ?? s.center ?? [35.2137, 31.7683]) as LngLat;
     const map = new mapboxgl.Map({
@@ -67,12 +70,16 @@ export function MapView({ db }: { db: Db }) {
       center, zoom: 16.4, attributionControl: false,
     });
     mapRef.current = map;
+    (window as unknown as { __shlichusMap?: mapboxgl.Map }).__shlichusMap = map; // לבדיקות
     map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-left');
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-left');
     map.on('load', () => {
       // הבניינים של Mapbox יורדים — מוצג רק מה שנשמר ונלחץ
       // הבניינים של Mapbox יורדים — מוצג רק מה שנשמר ונלחץ; שמות בעברית
       prepareBaseMap(map);
+      // המסגרת מקבלת את גודלה הסופי רק אחרי שהמסך נפרס — מודדים שוב, אחרת חלק מהמפה לא מצויר
+      requestAnimationFrame(() => map.resize());
+      map.once('idle', () => { map.resize(); map.triggerRepaint(); });
       const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
       map.addSource('terr', { type: 'geojson', data: empty });
       map.addSource('shapes', { type: 'geojson', data: empty, promoteId: 'id' });
@@ -165,7 +172,7 @@ export function MapView({ db }: { db: Db }) {
     (map.getSource('terr') as mapboxgl.GeoJSONSource).setData(territoryMask(db));
     // תצוגת התיחום מההגדרות: קו גבול (עם הכהיה עדינה), הכהיית החוץ, או בלי
     const disp = String((db.__SETTINGS__?.territory as { displayMode?: string } | undefined)?.displayMode ?? 'border');
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = isDark();
     map.setLayoutProperty('terr-line', 'visibility', disp === 'none' ? 'none' : 'visible');
     map.setLayoutProperty('terr-mask', 'visibility', disp === 'none' ? 'none' : 'visible');
     map.setPaintProperty('terr-mask', 'fill-opacity', disp === 'fill' ? (dark ? 0.55 : 0.22) : (dark ? 0.35 : 0.07));
@@ -234,11 +241,40 @@ export function MapView({ db }: { db: Db }) {
   const aptsInT = [...views.values()].reduce((s, v) => s + (v.inTerritory && (v.category ?? 'residential') === 'residential' ? v.apts ?? 0 : 0), 0);
   const needUser = fixes.filter((f) => f.needsUser).length;
 
+  // ── לוח התוצאות של השליחות: כמה מהשכונה מכירים, ומה הקשר החודש לעומת החודש הקודם ──
+  const progress = useMemo(() => {
+    const now = Date.now();
+    let contacted = 0, prev = 0, empty = 0;
+    for (const v of views.values()) {
+      if (!v.inTerritory) continue;
+      if ((v.category ?? 'residential') === 'residential' && !v.families.length && (v.apts ?? 1) > 0) empty++;
+      for (const f of v.families) {
+        const d = lastContact(f.apt);
+        if (!d) continue;
+        const days = (now - d.getTime()) / 86400000;
+        if (days <= 30) contacted++;
+        else if (days <= 60) prev++;
+      }
+    }
+    return { contacted, prev, empty };
+  }, [views]);
+  const pct = aptsInT ? Math.min(100, Math.round((familiesInT / aptsInT) * 100)) : 0;
+
+  // בניין שנבחר ממסך אחר ("הצג במפה")
+  const { focusKey } = useNav();
+  useEffect(() => {
+    if (!focusKey || !ready || !views.size) return;
+    focus({ key: focusKey });
+    setPanel('card');
+    useNav.setState({ focusKey: null });
+  }, [focusKey, ready, views]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="mapv">
       <div className="map-box" ref={box} />
 
       <div className="map-top">
+        {switcher}
         <form className="map-search" onSubmit={(e) => { e.preventDefault(); void search(); }}>
           <Icon name="search" size={16} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="כתובת או בניין" aria-label="חיפוש כתובת במפה" />
@@ -248,6 +284,7 @@ export function MapView({ db }: { db: Db }) {
             <button key={m.key} aria-pressed={mode === m.key} onClick={() => setMode(m.key)}>{m.label}</button>
           ))}
         </div>
+        <button className="btn map-btn legend-toggle" aria-pressed={legendOpen} onClick={() => setLegendOpen(!legendOpen)}>מקרא</button>
         <button className="btn map-btn" aria-pressed={is3d} onClick={() => setIs3d(!is3d)}>{is3d ? 'דו-ממד' : 'תלת-ממד'}</button>
         <button className={`btn map-btn${fixes.length ? ' has-fix' : ''}`} onClick={() => setPanel(panel === 'fix' ? null : 'fix')}>
           <Icon name="tasks" size={16} />דיוק המפה
@@ -264,14 +301,20 @@ export function MapView({ db }: { db: Db }) {
 
       {hoverText && !pickFor && <div className="hover-chip">{hoverText}</div>}
 
-      <Legend db={db} mode={mode} />
+      <Legend db={db} mode={mode} open={legendOpen} />
 
-      <div className="map-stats">
-        <div><b className="num">{familiesInT}</b><span>משפחות בתיחום</span></div>
-        <div><b className="num">{aptsInT || '—'}</b><span>דירות מגורים</span></div>
-        <div><b className="num">{aptsInT ? `${Math.round((familiesInT / aptsInT) * 100)}%` : '—'}</b><span>כיסוי</span></div>
-        {source && <div className="src" title={source.level === 'municipal' ? 'כתובות, דירות וקומות רשמיים' : 'צורות מבנים; כתובות מאומתות מול GovMap'}>מקור: {source.name}</div>}
+      <div className="map-progress" aria-label="התקדמות השליחות">
+        <div className="prog">
+          <div className="prog-top"><b>{familiesInT}</b>משפחות מוכרות{aptsInT ? <> מתוך <b>{aptsInT.toLocaleString('he-IL')}</b> דירות</> : null}</div>
+          {aptsInT > 0 && <div className="prog-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${Math.max(pct, 1)}%` }} /></div>}
+          <small>{aptsInT ? `${pct}% מהדירות בתיחום` : 'מספר הדירות בתיחום לא ידוע'}</small>
+        </div>
+        <div className="prog-mini"><button onClick={() => setMode('status')} title="צביעה לפי קשר"><b>{progress.contacted}</b> בקשר החודש</button>
+          <small>{progress.contacted === progress.prev ? 'כמו בחודש הקודם' : <>בחודש הקודם {progress.prev} <span className={progress.contacted > progress.prev ? 'up' : 'down'}>{progress.contacted > progress.prev ? '▲' : '▼'}</span></>}</small>
+        </div>
+        <div className="prog-mini"><button onClick={() => setMode('coverage')} title="צביעה לפי כיסוי"><b>{progress.empty}</b> בניינים בלי משפחה מוכרת</button></div>
       </div>
+      {source && <div className="map-src" title={source.level === 'municipal' ? 'כתובות, דירות וקומות רשמיים' : 'צורות מבנים; כתובות מאומתות מול GovMap'}>מקור: {source.name}</div>}
 
       {status === 'loading' && <div className="map-state">טוען את מבני האזור…</div>}
       {status === 'error' && (
@@ -298,14 +341,14 @@ function labelOf(v: { keys: string[]; b: { street: string; num: number | null } 
   return v.b.num ? `${v.b.street} ${v.b.num}` : v.b.street || 'בניין';
 }
 
-function Legend({ db, mode }: { db: Db; mode: ColorMode }) {
+function Legend({ db, mode, open }: { db: Db; mode: ColorMode; open: boolean }) {
   const pal = readPalette();
   const items: [string, string][] =
     mode === 'status' ? [[pal.sev[1], 'בקשר'], [pal.sev[2], 'מתרחקים'], [pal.sev[3], 'צריך תשומת לב'], [pal.sev[0], 'לא היה קשר'], [pal.empty, 'בלי משפחות מוכרות']]
     : mode === 'category' ? getCategories(db).map((c) => [c.color, c.name] as [string, string])
     : [[pal.coverage[1], 'רוב הדירות מוכרות'], [mix2(pal), 'חלק מהדירות'], [pal.empty, 'אף דירה לא מוכרת']];
   return (
-    <div className="legend" aria-label="מקרא">
+    <div className={`legend${open ? ' open' : ''}`} aria-label="מקרא">
       {items.map(([c, l]) => <span key={l}><i style={{ background: c }} />{l}</span>)}
       <span><i className="terr" />גבול התיחום</span>
     </div>

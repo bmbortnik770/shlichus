@@ -19,6 +19,12 @@ interface State {
   syncError: string | null;
   load: () => Promise<void>;
   login: () => Promise<void>;
+  /** סנכרון יזום: משיכה מהענן + עדכוני שטח */
+  syncNow: (manual?: boolean) => Promise<void>;
+  logout: () => void;
+  lastSync: number | null;
+  /** מצב מקומי — עבודה בלי חשבון גוגל (הנתונים נשמרים רק במכשיר) */
+  startLocal: () => void;
   /** רישום קשר עם משפחה — מיידי בממשק, השמירה רצה ברקע; מחזיר פונקציית ביטול */
   logContact: (bldg: string, idx: number, type: ContactType) => () => void;
   updateSettings: (patch: Record<string, unknown>) => Promise<void>;
@@ -33,6 +39,10 @@ function todayIso(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+/** מאזינים להודעה "יושמו N עדכוני שטח" */
+const fieldListeners = new Set<(n: number) => void>();
+export const onFieldUpdates = (fn: (n: number) => void) => { fieldListeners.add(fn); return () => { fieldListeners.delete(fn); }; };
 
 export const useStore = create<State>((set, get) => {
   /** שמירה מקומית מיידית + סנכרון לענן ברקע */
@@ -60,15 +70,36 @@ export const useStore = create<State>((set, get) => {
     try {
       const merged = await backend.pull(get().db);
       if (merged) set({ db: merged, status: 'ready' });
-      set({ sync: 'synced' });
+      set({ sync: 'synced', lastSync: Date.now() });
+      await fieldUpdates();
     } catch (e) {
       const auth = e instanceof Error && e.name === 'AuthRequiredError';
       set({ sync: auth ? 'auth-needed' : 'error', syncError: auth ? null : 'לא הצלחנו להתחבר לענן. מציג את הנתונים שבמכשיר.' });
     }
   };
 
+  /** עדכונים מאפליקציית השטח — מוחלים, נשמרים לענן, ורק אז הקבצים מנוקים */
+  const fieldUpdates = async () => {
+    const db = get().db;
+    if (!db || !hasValidSession()) return;
+    try {
+      const { applied, commit } = await backend.fieldUpdates(db);
+      if (!applied) { await commit(); return; }
+      await persist();
+      if (get().sync === 'synced') await commit();
+      fieldListeners.forEach((fn) => fn(applied));
+    } catch { /* ננסה בסבב הבא */ }
+  };
+
   return {
     db: null,
+    lastSync: null,
+    syncNow: async () => { if (hasValidSession()) await pull(); else set({ sync: 'auth-needed' }); },
+    logout: () => {
+      try { localStorage.removeItem('gdrive_session'); } catch { /* */ }
+      set({ sync: 'auth-needed' });
+    },
+    startLocal: () => set({ db: { meta: { lastModified: Date.now() } }, status: 'ready', sync: 'offline' }),
     status: 'loading',
     sync: 'offline',
     syncError: null,

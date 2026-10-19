@@ -3,6 +3,7 @@
  * המבנים של Mapbox מוסתרים — מה שרואים על המפה הוא בדיוק מה שנלחץ ונשמר.
  */
 import type mapboxgl from 'mapbox-gl';
+import { isDark } from '../themeMode';
 import {
   type Apartment, type BuildingMatch, type Db, type GeoHit, type LngLat, type MapUnit, type OfficialBuilding,
   categoryFromUse, displayName, getBuilding, getCategories, getStatusColor, labelPoint,
@@ -19,7 +20,7 @@ export interface Palette {
 export function readPalette(): Palette {
   const css = getComputedStyle(document.documentElement);
   const v = (n: string) => css.getPropertyValue(n).trim();
-  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = isDark();
   return {
     empty: dark ? '#3a4744' : '#cfd8d5',
     outside: dark ? '#252e2c' : '#e6ebe9',

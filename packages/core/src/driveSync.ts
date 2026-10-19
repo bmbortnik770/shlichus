@@ -95,6 +95,35 @@ export class DriveSync {
     return this.folderId;
   }
 
+  // ─── עדכונים מאפליקציית השטח (תיקיית field-updates, קבצי mobile_update_*) ───
+
+  private fieldFolderId: string | null = null;
+
+  /** קבצי העדכונים שממתינים, מהישן לחדש */
+  async listFieldUpdates(): Promise<{ id: string; name: string; createdTime?: string }[]> {
+    const root = await this.ensureFolder();
+    if (!root) return [];
+    if (!this.fieldFolderId) {
+      const fq = encodeURIComponent(`name='field-updates' and mimeType='application/vnd.google-apps.folder' and '${root}' in parents and trashed=false`);
+      const fr = await this.request(`${DRIVE}/files?q=${fq}&spaces=drive&fields=files(id)`, {}, 'find field-updates');
+      this.fieldFolderId = ((await fr.json()) as { files?: { id: string }[] }).files?.[0]?.id ?? null;
+      if (!this.fieldFolderId) return [];
+    }
+    const q = encodeURIComponent(`name contains 'mobile_update_' and trashed=false and '${this.fieldFolderId}' in parents`);
+    const res = await this.request(`${DRIVE}/files?q=${q}&spaces=drive&fields=files(id,name,createdTime)&orderBy=createdTime`, {}, 'list field updates');
+    return ((await res.json()) as { files?: { id: string; name: string; createdTime?: string }[] }).files ?? [];
+  }
+
+  async downloadJson<T = unknown>(fileId: string): Promise<T> {
+    const res = await this.request(`${DRIVE}/files/${fileId}?alt=media`, {}, 'download');
+    return (await res.json()) as T;
+  }
+
+  /** העברה לסל (כמו trashDriveFile במערכת הקיימת) */
+  async trash(fileId: string): Promise<void> {
+    await this.request(`${DRIVE}/files/${fileId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) }, 'trash');
+  }
+
   private async findFile(): Promise<{ id: string; headRevisionId: string } | null> {
     const folderId = await this.ensureFolder();
     const parentQ = folderId ? ` and '${folderId}' in parents` : '';
