@@ -71,8 +71,8 @@
 @media (max-width: 760px) {
   /* בטלפון: פס ההתקדמות בתחתית, המקרא נפתח בלחיצה */
   .map-progress { top: auto; bottom: 10px; }
-  .main-map .legend { display: none; }
-  .main-map .legend.open { display: flex; bottom: 120px; }
+  .main-map .map-legend { display: none; }
+  .main-map .map-legend.open { display: flex; bottom: 120px; }
   .map-src { display: none; }
   .btn.legend-toggle { display: inline-flex; }
 }
@@ -100,4 +100,13 @@
 @media (max-width: 760px) {
   .qa { inset-inline-end: 16px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
   .qa-btn { width: 50px; height: 50px; }
+}
+/* מפה בטלפון: שורה אחת — מצבי צבע בגלילה, "מקרא" ו"כלים"; שאר הכפתורים נפתחים מ"כלים" */
+.btn.tools-toggle { display: none; }
+@media (max-width: 760px) {
+  .main-map .map-top .seg:not(.com-switch) { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .main-map .map-top .map-btn:not(.legend-toggle):not(.tools-toggle) { display: none; }
+  .main-map .map-top.tools-open .map-btn { display: inline-flex; }
+  .btn.tools-toggle { display: inline-flex; gap: 6px; }
+  .app:has(.main-map) .qa { bottom: calc(222px + env(safe-area-inset-bottom, 0px)); }
 }

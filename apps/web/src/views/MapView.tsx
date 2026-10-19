@@ -48,6 +48,8 @@ export function MapView({ db, switcher }: { db: Db; switcher?: ReactNode }) {
   const [hover, setHover] = useState<string>('');
   const [q, setQ] = useState('');
   const [legendOpen, setLegendOpen] = useState(false);
+  /** בטלפון: כלי המפה המשניים מקופלים מאחורי "כלים" */
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [tag, setTag] = useState('');
   const [sat, setSat] = useState(false);
   /** הוספת בניין ידני: מצב בחירת נקודה, ואחריו טופס */
@@ -316,7 +318,7 @@ export function MapView({ db, switcher }: { db: Db; switcher?: ReactNode }) {
     <div className="mapv">
       <div className="map-box" ref={box} />
 
-      <div className="map-top">
+      <div className={`map-top${toolsOpen ? ' tools-open' : ''}`}>
         {switcher}
         <form className="map-search" onSubmit={(e) => { e.preventDefault(); void search(); }}>
           <Icon name="search" size={16} />
@@ -331,6 +333,7 @@ export function MapView({ db, switcher }: { db: Db; switcher?: ReactNode }) {
           <select className="sel map-sel" value={tag} onChange={(e) => setTag(e.target.value)} aria-label="איזו תגית">{tags.map((t) => <option key={t}>{t}</option>)}</select>
         )}
         <button className="btn map-btn legend-toggle" aria-pressed={legendOpen} onClick={() => setLegendOpen(!legendOpen)}>מקרא</button>
+        <button className="btn map-btn tools-toggle" aria-expanded={toolsOpen} onClick={() => setToolsOpen(!toolsOpen)}>כלים{fixes.length ? <span className="fix-count">{fixes.length}</span> : null}</button>
         <button className="btn map-btn" aria-pressed={is3d} onClick={() => setIs3d(!is3d)}>{is3d ? 'דו-ממד' : 'תלת-ממד'}</button>
         <button className="btn map-btn" aria-pressed={sat} onClick={() => setSat(!sat)}>לוויין</button>
         {home?.coords && <button className="btn map-btn" onClick={() => mapRef.current?.easeTo({ center: home.coords!, zoom: 17.2, duration: 700 })} title="חזרה לבית חב״ד"><Icon name="home" size={16} />הביתה</button>}
@@ -431,7 +434,7 @@ function Legend({ db, mode, open, views, tag }: { db: Db; mode: ColorMode; open:
     return { m, total };
   }, [views]);
   return (
-    <div className={`legend${open ? ' open' : ''}`} aria-label="מקרא">
+    <div className={`map-legend${open ? ' open' : ''}`} aria-label="מקרא">
       {mode === 'category' ? (
         <div className="cat-chart" aria-label="סוגי הבניינים בתיחום">
           <div className="cat-bar">
