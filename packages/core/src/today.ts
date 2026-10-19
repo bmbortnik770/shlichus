@@ -8,6 +8,7 @@
 import type { Apartment, Db } from './types.js';
 import { buildingKeys, getBuilding, NO_ADDRESS_KEY } from './types.js';
 import { liveApts } from './merge.js';
+import { dateAlerts } from './lifecycle.js';
 import { formatHebrew, hebrewParts, normalizeMonth } from './hebrewDate.js';
 import { daysBetween, parseLooseDate } from './dates.js';
 
@@ -222,6 +223,18 @@ export function computeToday(db: Db, opts: TodayOptions = {}): TodayResult {
         priority = Math.max(priority, base - hit.inDays * 4);
         if (hit.kind === 'yahrzeit' && hit.inDays <= 3) urgent = true;
         if (hit.inDays === 0) urgent = true;
+      }
+
+      // תאריכי לידה (ילדים והורים), בר/בת מצווה מתקרבים, וימי שנה לאירועי חיים
+      for (const a of dateAlerts(apt, now)) {
+        const window = a.kind === 'barmitzva' ? 60 : a.kind === 'life' ? 14 : datesWindow;
+        if (a.inDays > window) continue;
+        const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + a.inDays, 12);
+        const kind: ReasonKind = a.kind === 'life' ? 'occasion' : a.kind;
+        if (a.inDays <= upcomingWindow) upcoming.push({ date, inDays: a.inDays, hebrew: win.dates[a.inDays]?.hebrew ?? '', kind, title: `${a.title} · ${name}`, bldg, idx });
+        reasons.push({ kind, label: a.kind === 'barmitzva' ? 'בר/בת מצווה' : a.kind === 'life' ? 'יום שנה' : 'יום הולדת', detail: `${a.title}, ${relativeDay(a.inDays, date)}`, inDays: a.inDays });
+        priority = Math.max(priority, (a.kind === 'barmitzva' ? 70 : 75) - Math.min(a.inDays, 30));
+        if (a.inDays === 0 || (a.kind === 'barmitzva' && a.inDays <= 7)) urgent = true;
       }
 
       // תרומה אחרונה שאחריה לא תועד שום קשר

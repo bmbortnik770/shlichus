@@ -18,3 +18,6 @@ export * from './donations.js';
 export * from './messaging.js';
 export * from './importer.js';
 export * from './fieldUpdates.js';
+export * from './lifecycle.js';
+export * from './smartViews.js';
+export * from './pledges.js';
