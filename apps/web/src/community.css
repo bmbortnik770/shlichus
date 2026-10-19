@@ -123,3 +123,43 @@
   .fc-log { margin-inline-start: 0; }
   .fc-save { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* כרטיס משפחה — תוספות */
+.pill-s { font-size: 11.5px; padding: 1px 8px; }
+.pill-accent { background: var(--accent-soft); color: var(--accent); }
+.pill.eng-hot { background: var(--accent-soft); color: var(--ok); } .pill.eng-warm { background: var(--warm-soft); color: var(--warm); }
+.pill.eng-cool { background: var(--hot-soft); color: var(--hot); } .pill.eng-cold { background: var(--cold-soft); color: var(--cold); }
+.fc-alerts { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 22px 10px; }
+.fc-hint { font-size: 13px; }
+.fc-li-end { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-inline-start: auto; }
+.fc-h-act { margin-inline-start: auto; font-size: 13px; font-family: var(--f-body, inherit); }
+.fc-sec h3 { display: flex; gap: 6px; align-items: baseline; }
+.fc-kid { display: grid; grid-template-columns: minmax(0,1.2fr) auto minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) auto; gap: 6px; align-items: center; }
+.fc-kid input { width: 100%; }
+.fc-kid-heb { grid-column: 1 / -1; margin-top: -2px; }
+.fc-filters > input { flex: 2 1 160px; }
+.timeline li::before { border-color: var(--dot, var(--accent)); }
+.timeline .tl-del, .timeline .tl-acts { margin-inline-start: auto; }
+.tl-acts { display: inline-flex; gap: 8px; align-items: center; }
+.timeline li .tl-del { opacity: .35; } .timeline li:hover .tl-del { opacity: 1; }
+.doc-body { max-height: 220px; overflow: auto; }
+.pledge-main { display: flex; flex-direction: column; gap: 4px; min-width: 160px; flex: 1; }
+.pbar { height: 6px; background: var(--sunken); border-radius: 99px; overflow: hidden; max-width: 220px; }
+.pbar > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.pledge.st-fulfilled .pbar > i { background: var(--ok); }
+.pledge.st-cancelled { opacity: .55; }
+.btn-s { padding: 4px 10px; font-size: 13px; }
+@media (max-width: 640px) {
+  .fc-kid { grid-template-columns: minmax(0,1fr) auto auto; }
+  .fc-kid input[type="date"] { grid-column: 1 / 3; }
+  .fc-alerts { padding-inline: 16px; }
+}
+/* בלי זה שורת הלשוניות מתכווצת לאפס כשהתוכן ארוך */
+.drawer > * { flex-shrink: 0; }
+.fc-add-col > input { font: inherit; font-size: 14.5px; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+.fc-add-col > input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+@media (max-width: 640px) {
+  .fc-save { flex-wrap: nowrap; overflow-x: auto; }
+  .fc-save .btn-primary { min-width: 0; flex: 1 0 auto; }
+  .fc-save .btn:not(.btn-primary) { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+}

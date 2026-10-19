@@ -89,12 +89,12 @@ export function setSetting(db: Db, patch: Record<string, unknown>): void {
 }
 
 /** הוספה/הסרה ממעגל — באותו מבנה כמו circles-hub במערכת הקיימת ({id, member}) */
-export function setCircleMember(db: Db, ref: FamilyRef, circleId: string, member: boolean): void {
+export function setCircleMember(db: Db, ref: FamilyRef, circleId: string, member: boolean, who = 'family'): void {
   const apt = getBuilding(db, ref.bldg)?.apts[ref.idx];
   if (!apt) return;
   const entries = ((apt.connectionCircles ?? []) as (string | { id?: string; member?: string })[])
     .filter((e) => (typeof e === 'string' ? e : e.id) !== circleId);
-  updateFamily(db, ref, { connectionCircles: member ? [...entries, { id: circleId, member: 'family' }] : entries });
+  updateFamily(db, ref, { connectionCircles: member ? [...entries, { id: circleId, member: who }] : entries });
 }
 
 export function newCircle(db: Db, label: string): string {

@@ -21,3 +21,4 @@ export * from './fieldUpdates.js';
 export * from './lifecycle.js';
 export * from './smartViews.js';
 export * from './pledges.js';
+export * from './interactionTypes.js';
