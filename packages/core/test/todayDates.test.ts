@@ -20,3 +20,16 @@ describe('היום: תאריכי לידה ואירועי חיים', () => {
     expect(t.upcoming.map((u) => u.title).join('|')).toContain('חיה');
   });
 });
+
+describe('היום: תאריכים לא נדחקים', () => {
+  it('בר מצווה בעוד 20 יום מופיעה גם כשיש 20 משפחות שהתרחקו', () => {
+    const now = new Date(2026, 9, 19, 9);
+    const db: Record<string, unknown> = { meta: { lastModified: 0 } };
+    db['א 1'] = { info: {}, apts: Array.from({ length: 20 }, (_, i) => ({ name: `רחוק${i}`, interactions: [{ date: '2025-01-01', type: 'שיחה' }] })) };
+    db['ב 2'] = { info: {}, apts: [{ name: 'כהן', childrenList: [{ name: 'מנחם', gender: 'boy', dob: '2013-11-08' }], interactions: [{ date: '2026-10-18', type: 'שיחה' }] }] };
+    const t = computeToday(db as unknown as Db, { now });
+    expect(t.items.some((i) => i.name.includes('כהן'))).toBe(true);
+    expect(t.items.length).toBeLessThanOrEqual(20);
+    expect(t.items.length).toBeGreaterThanOrEqual(10);
+  });
+});

@@ -194,7 +194,8 @@ export class DriveSync {
    * שמירה בטוחה: push, ועל קונפליקט — pull, מיזוג, push שוב.
    * מחזירה את המסד הסופי (אחרי מיזוג אם היה) כדי שהאפליקציה תאמץ אותו.
    */
-  async safeSave(db: Db, maxRetries = 3): Promise<Db> {
+  /** @param base הגרסה המשותפת האחרונה — כדי שבהתנגשות יישמרו השינויים של שני הצדדים */
+  async safeSave(db: Db, maxRetries = 3, base?: Db | null): Promise<Db> {
     let current = db;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -203,7 +204,7 @@ export class DriveSync {
       } catch (e) {
         if (!(e instanceof ConflictError) || attempt === maxRetries) throw e;
         const remote = await this.pull();
-        if (remote) current = mergeDb(current, remote.db);
+        if (remote) current = mergeDb(current, remote.db, base);
       }
     }
     return current;

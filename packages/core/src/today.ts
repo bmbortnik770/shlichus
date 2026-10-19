@@ -73,8 +73,10 @@ export interface TodayOptions {
   urgentLostDays?: number;
   /** כמה זמן אחרי תרומה עדיין מציעים להודות */
   thanksWindowDays?: number;
-  /** כמה אנשים לכל היותר ברשימת היום */
+  /** כמה אנשים ברשימת היום (יכול לגדול כדי לפנות מקום לכל סוג תזכורת, עד פי 2) */
   limit?: number;
+  /** מקומות מובטחים לכל סוג תזכורת — כדי שבר מצווה או יארצייט לא יידחקו ע"י משפחות שהתרחקו */
+  perKind?: number;
 }
 
 export interface TodayResult {
@@ -287,5 +289,23 @@ export function computeToday(db: Db, opts: TodayOptions = {}): TodayResult {
 
   items.sort((a, b) => Number(b.urgent) - Number(a.urgent) || b.priority - a.priority || a.name.localeCompare(b.name, 'he'));
   upcoming.sort((a, b) => a.inDays - b.inDays);
-  return { items: items.slice(0, limit), upcoming, pulse };
+  return { items: pickItems(items, limit, opts.perKind ?? 3), upcoming, pulse };
+}
+
+/**
+ * בחירת הרשימה: קודם מקומות מובטחים לכל סוג תזכורת (לפי סדר העדיפות), ואז השלמה עד המכסה.
+ * הסדר הסופי נשמר כמו במיון. התקרה: פי 2 מהמכסה.
+ */
+function pickItems(sorted: TodayItem[], limit: number, perKind: number): TodayItem[] {
+  const picked = new Set<TodayItem>();
+  const used = new Map<ReasonKind, number>();
+  for (const it of sorted) {
+    if (picked.size >= limit * 2) break;
+    const r = it.reasons.find((x) => (used.get(x.kind) ?? 0) < perKind);
+    if (!r) continue;
+    picked.add(it);
+    for (const x of it.reasons) used.set(x.kind, (used.get(x.kind) ?? 0) + 1);
+  }
+  for (const it of sorted) { if (picked.size >= limit) break; picked.add(it); }
+  return sorted.filter((it) => picked.has(it));
 }

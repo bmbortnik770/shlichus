@@ -1,0 +1,27 @@
+# בדיקות אוטומטיות בכל דחיפה: לוגיקה (vitest), טיפוסים ובנייה של שני הממשקים
+name: CI
+on:
+  push:
+    branches: [crm-source, main]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: בדיקות הליבה
+        run: pnpm --filter @shlichus/core test
+      - name: טיפוסים — ליבה
+        run: pnpm --filter @shlichus/core typecheck
+      - name: בנייה — הממשק החדש
+        run: pnpm --filter ./apps/web build
+      - name: בנייה — v2
+        run: pnpm --filter ./apps/crm build

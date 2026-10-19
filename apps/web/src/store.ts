@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { type Db, type InteractionLog, type SyncStatus, DriveBackend, aptIdentity, getBuilding } from '@shlichus/core';
+import { type Db, type InteractionLog, type SyncStatus, DriveBackend, aptIdentity, getBuilding, mergeDb } from '@shlichus/core';
 import { browserTokens, hasValidSession, interactiveLogin } from './auth';
 
 const backend = new DriveBackend(browserTokens);
@@ -45,20 +45,41 @@ const fieldListeners = new Set<(n: number) => void>();
 export const onFieldUpdates = (fn: (n: number) => void) => { fieldListeners.add(fn); return () => { fieldListeners.delete(fn); }; };
 
 export const useStore = create<State>((set, get) => {
+  /**
+   * שמירות רצות אחת-אחת. rev עולה בכל שינוי; אם השתנה משהו בזמן שמירה/משיכה —
+   * ממזגים את השינוי עם התוצאה (מול העותק שנשלח) ושומרים שוב, כך ששום שינוי לא הולך לאיבוד.
+   */
+  let rev = 0;
+  let inFlight = false;
+  let again = false;
   /** שמירה מקומית מיידית + סנכרון לענן ברקע */
   const persist = async () => {
     const db = get().db;
     if (!db) return;
+    rev++;
     set({ db: { ...db } });
+    if (inFlight) { again = true; return; }
+    inFlight = true;
+    try {
+      do { again = false; await persistOnce(); } while (again);
+    } finally { inFlight = false; }
+  };
+  const persistOnce = async () => {
+    const db = get().db;
+    if (!db) return;
     if (!hasValidSession()) {
       set({ sync: 'auth-needed' });
       await backend.saveLocal(db); // בלי חיבור — שומרים במכשיר בלבד, בלי לחכות לטוקן
       return;
     }
     set({ sync: 'syncing', syncError: null });
+    const startRev = rev;
+    const sent = structuredClone(db);
     try {
       const final = await backend.save(db);
-      set({ db: { ...final }, sync: 'synced' });
+      const cur = get().db;
+      if (rev !== startRev && cur) { set({ db: mergeDb(cur, final, sent), sync: 'synced' }); again = true; }
+      else set({ db: { ...final }, sync: 'synced' });
     } catch (e) {
       const auth = e instanceof Error && e.name === 'AuthRequiredError';
       set({ sync: auth ? 'auth-needed' : 'error', syncError: auth ? null : 'נשמר במכשיר. הסנכרון לענן יושלם בחיבור הבא.' });
@@ -68,8 +89,13 @@ export const useStore = create<State>((set, get) => {
   const pull = async () => {
     set({ sync: 'syncing', syncError: null });
     try {
-      const merged = await backend.pull(get().db);
-      if (merged) set({ db: merged, status: 'ready' });
+      const startRev = rev;
+      const before = get().db;
+      const sent = before ? structuredClone(before) : null;
+      const merged = await backend.pull(before);
+      const cur = get().db;
+      if (merged && rev !== startRev && cur && sent) { set({ db: mergeDb(cur, merged, sent), status: 'ready' }); void persist(); }
+      else if (merged) set({ db: merged, status: 'ready' });
       set({ sync: 'synced', lastSync: Date.now() });
       await fieldUpdates();
     } catch (e) {

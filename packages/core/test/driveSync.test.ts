@@ -108,3 +108,24 @@ describe('DriveSync — בקרת גרסאות (באג 4 בישן)', () => {
     expect(state.db.meta!.lastModified).toBe(7);
   });
 });
+
+describe('DriveSync — שני מכשירים על אותה משפחה (מיזוג תלת-כיווני)', () => {
+  it('מכשיר א שומר תיעוד, מכשיר ב שומר תרומה — בענן נשארים שניהם', async () => {
+    const start = { meta: { lastModified: 1 }, 'דוד ניב 16': { info: {}, apts: [{ id: 'a1', name: 'כהן', updatedAt: 10, interactions: [], donations: [] }] } } as unknown as Db;
+    const state = { db: structuredClone(start), revision: 'rev1' };
+    const fetchFn = fakeDrive(state) as unknown as typeof fetch;
+    const A = new DriveSync({ tokenProvider: tokens(), fetchFn });
+    const B = new DriveSync({ tokenProvider: tokens(), fetchFn });
+    const a = (await A.pull())!.db;
+    const b = (await B.pull())!.db;
+    const base = structuredClone(start);
+    const fam = (d: Db) => (d['דוד ניב 16'] as { apts: Record<string, unknown>[] }).apts[0]!;
+    fam(a).interactions = [{ date: '2026-10-19', type: 'ביקור' }]; fam(a).updatedAt = 20;
+    await A.safeSave(a, 3, base);
+    fam(b).donations = [{ date: '2026-10-19', amount: 180 }]; fam(b).updatedAt = 30;
+    await B.safeSave(b, 3, base);
+    const cloud = fam(state.db);
+    expect(cloud.interactions).toHaveLength(1);
+    expect(cloud.donations).toHaveLength(1);
+  });
+});

@@ -8,7 +8,12 @@
 import type { Db } from './types.js';
 import { DriveSync, type TokenProvider } from './driveSync.js';
 import { mergeDb } from './merge.js';
-import { loadLocal, migrateFromLocalStorage, saveLocal } from './storage.js';
+import { cacheGet, cachePut, loadLocal, migrateFromLocalStorage, saveLocal } from './storage.js';
+
+/** הגרסה האחרונה שידוע שהיא בענן — הבסיס למיזוג תלת-כיווני */
+const BASE_KEY = 'sync:base';
+const getBase = () => cacheGet<Db>(BASE_KEY).catch(() => null);
+const setBase = (db: Db) => cachePut(BASE_KEY, db).catch(() => {});
 import { applyOutbox, fetchOutbox } from './fieldUpdates.js';
 
 export type SyncStatus = 'offline' | 'syncing' | 'synced' | 'auth-needed' | 'error';
@@ -40,8 +45,9 @@ export class DriveBackend implements StorageBackend {
   async pull(local: Db | null): Promise<Db | null> {
     const remote = await this.sync.pull();
     if (!remote) return null;
-    const merged = local ? mergeDb(local, remote.db) : remote.db;
+    const merged = local ? mergeDb(local, remote.db, await getBase()) : remote.db;
     await saveLocal(merged);
+    await setBase(remote.db);
     return merged;
   }
 
@@ -66,14 +72,24 @@ export class DriveBackend implements StorageBackend {
     await saveLocal(db);
     if (!this.sync.fileId) {
       const pulled = await this.sync.pull();
+      // שמירה לפני המשיכה הראשונה: קודם ממזגים עם מה שבענן, אחרת שינויים ממכשיר אחר היו נדרסים
+      if (pulled) {
+        const base = await getBase();
+        const merged = mergeDb(db, pulled.db, base);
+        for (const k of Object.keys(db)) if (!(k in merged)) delete db[k];
+        Object.assign(db, merged);
+        await setBase(pulled.db);
+      }
       if (!pulled) {
         // לקוח חדש בלי קובץ בענן — יוצרים אחד
         await this.sync.createFile(db);
+        await setBase(db);
         return db;
       }
     }
-    const final = await this.sync.safeSave(db);
+    const final = await this.sync.safeSave(db, 3, await getBase());
     await saveLocal(final);
+    await setBase(final);
     return final;
   }
 }

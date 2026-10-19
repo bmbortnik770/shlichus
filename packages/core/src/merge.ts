@@ -23,13 +23,66 @@ function newerApt(a: Apartment, b: Apartment): Apartment {
   return bt > at ? b : a;
 }
 
-function mergeApts(local: Apartment[], remote: Apartment[]): Apartment[] {
+/** השוואה יציבה (סדר מפתחות לא משנה) */
+function stable(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
+  if (v && typeof v === 'object') return `{${Object.keys(v as object).sort().map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`).join(',')}}`;
+  return JSON.stringify(v ?? null);
+}
+const same = (a: unknown, b: unknown) => stable(a) === stable(b);
+
+/**
+ * מיזוג רשימה מול הגרסה המשותפת האחרונה (base): פריט שנמחק באחד הצדדים — נמחק;
+ * פריט שנוסף באחד הצדדים — נשמר. פריט שנערך = נמחק הישן + נוסף החדש.
+ */
+function mergeList(local: unknown[], remote: unknown[], base: unknown[]): unknown[] {
+  const inBase = new Set(base.map(stable));
+  const inLocal = new Set(local.map(stable));
+  const inRemote = new Set(remote.map(stable));
+  const out: unknown[] = [];
+  const seen = new Set<string>();
+  const keep = (x: unknown) => { const k = stable(x); if (!seen.has(k)) { seen.add(k); out.push(x); } };
+  for (const x of local) { const k = stable(x); if (inRemote.has(k) || !inBase.has(k)) keep(x); }
+  for (const x of remote) { const k = stable(x); if (!inLocal.has(k) && !inBase.has(k)) keep(x); }
+  return out;
+}
+
+/**
+ * מיזוג תלת-כיווני של רשומה (משפחה / הגדרות): לכל שדה — אם רק צד אחד שינה אותו מאז
+ * הסנכרון האחרון, השינוי שלו נשמר; אם שניהם שינו רשימה — מאחדים; אם שניהם שינו ערך — המאוחר.
+ */
+function mergeRecord<T extends Record<string, unknown>>(local: T, remote: T, base: T, remoteIsNewer: boolean): T {
+  const out: Record<string, unknown> = {};
+  for (const k of new Set([...Object.keys(local), ...Object.keys(remote)])) {
+    const lv = local[k], rv = remote[k], bv = base[k];
+    if (same(lv, rv)) out[k] = lv;
+    else if (same(lv, bv)) out[k] = rv;
+    else if (same(rv, bv)) out[k] = lv;
+    else if (Array.isArray(lv) || Array.isArray(rv)) out[k] = mergeList((lv ?? []) as unknown[], (rv ?? []) as unknown[], Array.isArray(bv) ? bv : []);
+    else out[k] = remoteIsNewer ? rv : lv;
+    if (out[k] === undefined) delete out[k];
+  }
+  return out as T;
+}
+
+function mergeApts(local: Apartment[], remote: Apartment[], base: Apartment[] = []): Apartment[] {
+  const baseMap = new Map(base.map((a) => [aptIdentity(a), a]));
   const map = new Map<string, Apartment>();
   for (const a of local) map.set(aptIdentity(a), a);
   for (const r of remote) {
     const key = aptIdentity(r);
     const existing = map.get(key);
-    map.set(key, existing ? newerApt(existing, r) : r);
+    const b = baseMap.get(key);
+    if (!existing) map.set(key, r);
+    // מחיקה, או אין גרסה משותפת — כמו קודם: הגרסה המאוחרת
+    else if (!b || existing.deletedAt || r.deletedAt) map.set(key, newerApt(existing, r));
+    else {
+      const rNewer = (r.updatedAt ?? 0) > (existing.updatedAt ?? 0);
+      const m = mergeRecord(existing as Record<string, unknown>, r as Record<string, unknown>, b as Record<string, unknown>, rNewer) as Apartment;
+      m.updatedAt = Math.max(existing.updatedAt ?? 0, r.updatedAt ?? 0) || undefined;
+      if (m.updatedAt === undefined) delete m.updatedAt;
+      map.set(key, m);
+    }
   }
   return [...map.values()];
 }
@@ -54,7 +107,11 @@ function mergeBoards(local: Board[] | undefined, remote: Board[] | undefined): B
   return [...map.values()];
 }
 
-export function mergeDb(local: Db, remote: Db): Db {
+/**
+ * @param base הגרסה האחרונה שסונכרנה עם הענן (אם ידועה) — מאפשרת לשמור שינויים של שני
+ *             המכשירים באותה משפחה במקום לבחור אחד מהם.
+ */
+export function mergeDb(local: Db, remote: Db, base?: Db | null): Db {
   if (!remote) return local;
   if (!local) return remote;
 
@@ -67,7 +124,7 @@ export function mergeDb(local: Db, remote: Db): Db {
       result[key] = structuredClone(remoteEntry);
       continue;
     }
-    localEntry.apts = mergeApts(localEntry.apts ?? [], remoteEntry.apts ?? []);
+    localEntry.apts = mergeApts(localEntry.apts ?? [], remoteEntry.apts ?? [], base ? getBuilding(base, key)?.apts ?? [] : []);
     localEntry.info = mergeInfo(localEntry, remoteEntry);
   }
 
@@ -82,7 +139,10 @@ export function mergeDb(local: Db, remote: Db): Db {
   else if (rs) {
     const lt = ls.updatedAt ?? local.meta?.lastModified ?? 0;
     const rt = rs.updatedAt ?? remote.meta?.lastModified ?? 0;
-    result.__SETTINGS__ = rt > lt ? rs : ls;
+    const bs = base?.__SETTINGS__;
+    result.__SETTINGS__ = bs
+      ? { ...mergeRecord(ls as Record<string, unknown>, rs as Record<string, unknown>, bs as Record<string, unknown>, rt > lt), updatedAt: Math.max(lt, rt) }
+      : rt > lt ? rs : ls;
   }
 
   result.meta = mergeMeta(local.meta, remote.meta);
