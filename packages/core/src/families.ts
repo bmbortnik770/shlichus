@@ -115,3 +115,22 @@ export function waLink(phone: string, text?: string): string {
   const intl = phone.replace(/[^\d]/g, '').replace(/^0/, '972');
   return `https://wa.me/${intl}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
 }
+
+/** שינוי שם לתגית או לסגנון — ברשימה בהגדרות ובכל המשפחות. מחזיר כמה משפחות עודכנו */
+export function renameListValue(db: Db, kind: 'tags' | 'styles', from: string, to: string): number {
+  const name = to.trim();
+  if (!name || name === from) return 0;
+  const s = db.__SETTINGS__ ?? {};
+  const list = ((s[kind] ?? []) as string[]).map((x) => (x === from ? name : x)).filter((x, i, a) => a.indexOf(x) === i);
+  const colorsKey = kind === 'tags' ? 'tagColors' : 'styleColors';
+  const colors = { ...((s[colorsKey] ?? {}) as Record<string, string>) };
+  if (colors[from]) { colors[name] = colors[from]!; delete colors[from]; }
+  db.__SETTINGS__ = { ...s, [kind]: list, [colorsKey]: colors, updatedAt: Date.now() };
+  let n = 0;
+  for (const r of listFamilies(db)) {
+    if (kind === 'tags' && (r.apt.tags ?? []).includes(from)) {
+      updateFamily(db, r, { tags: [...new Set((r.apt.tags ?? []).map((t) => (t === from ? name : t)))] }); n++;
+    } else if (kind === 'styles' && r.apt.style === from) { updateFamily(db, r, { style: name }); n++; }
+  }
+  return n;
+}

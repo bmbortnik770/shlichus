@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
-  type BuildingCategory, type Db, type Mapping, DEFAULT_SCORING_RULES, IMPORT_FIELDS, type ScoringRules, displayName,
-  familyPhones, geocodeAddress, getCategories, getTerritory, guessMapping, importRows, listFamilies, mergeDb, parseCsv, setSetting,
+  type BuildingCategory, type Db, type Direction, type InteractionType, type Mapping, DEFAULT_SCORING_RULES, DIRECTION_LABELS,
+  IMPORT_FIELDS, type ScoringRules, displayName, familyPhones, geocodeAddress, getCategories, getInteractionTypes, getTerritory,
+  guessMapping, importRows, listFamilies, mergeDb, parseCsv, renameListValue, scoreWeights, setSetting, updateFamily,
 } from '@shlichus/core';
 import { Icon } from '../icons';
 import { useStore } from '../store';
@@ -83,6 +84,15 @@ function General({ db }: { db: Db }) {
           <button className="btn" disabled={!Number(goal) || Number(goal) === Number(s.weeklyGoal ?? 20)} onClick={() => save({ weeklyGoal: Number(goal) }, 'היעד עודכן')}>שמירה</button></span>
       </section>
       <section className="panel set-card">
+        <h2>לוגו</h2>
+        <p className="sheet-hint">מופיע בתפריט ובסימון בית חב״ד במפה.</p>
+        <div className="logo-row">
+          {s.logo ? <img className="logo-prev" src={String(s.logo)} alt="הלוגו" /> : <div className="logo-prev empty">ש</div>}
+          <label className="btn file-btn">{s.logo ? 'החלפה' : 'העלאת לוגו'}<input type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void shrinkImage(f).then((url) => save({ logo: url, branding: { ...((s.branding ?? {}) as object), logo: url } }, 'הלוגו עודכן')); e.target.value = ''; }} /></label>
+          {s.logo ? <button className="btn btn-ghost-danger" onClick={() => save({ logo: '', branding: { ...((s.branding ?? {}) as object), logo: '' } }, 'הלוגו הוסר')}>הסרה</button> : null}
+        </div>
+      </section>
+      <section className="panel set-card">
         <h2>צבע המערכת</h2>
         <div className="accents">
           {ACCENTS.map((a) => (
@@ -94,6 +104,23 @@ function General({ db }: { db: Db }) {
       </section>
     </div>
   );
+}
+
+/** הקטנת תמונה ל-192 פיקסלים (נשמרת בקובץ הנתונים) */
+function shrinkImage(f: File, max = 192): Promise<string> {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      res(c.toDataURL('image/png'));
+    };
+    img.onerror = rej;
+    img.src = URL.createObjectURL(f);
+  });
 }
 
 /* ───────── אזור השליחות ───────── */
@@ -122,11 +149,12 @@ function Area({ db }: { db: Db }) {
 
 /* ───────── רשימות ───────── */
 
-function ChipList({ title, hint, items, colors, onChange, onColor, placeholder }: {
+function ChipList({ title, hint, items, colors, onChange, onColor, onRename, placeholder }: {
   title: string; hint?: string; items: string[]; colors?: Record<string, string>; placeholder: string;
-  onChange: (next: string[]) => void; onColor?: (item: string, color: string) => void;
+  onChange: (next: string[]) => void; onColor?: (item: string, color: string) => void; onRename?: (from: string, to: string) => void;
 }) {
   const [draft, setDraft] = useState('');
+  const [renaming, setRenaming] = useState<string | null>(null);
   const ask = useConfirm((s) => s.ask);
   return (
     <section className="panel set-card">
@@ -136,7 +164,7 @@ function ChipList({ title, hint, items, colors, onChange, onColor, placeholder }
         {items.map((it) => (
           <span className="mchip" key={it}>
             {onColor && <input type="color" className="swatch" value={colors?.[it] ?? '#0e6b64'} onChange={(e) => onColor(it, e.target.value)} aria-label={`צבע ${it}`} />}
-            {it}
+            {onRename ? <button className="mchip-name" title="שינוי שם" onClick={() => setRenaming(it)}>{it}</button> : it}
             <button className="mx" aria-label={`הסרת ${it}`} onClick={() => void (async () => { if (await ask({ title: 'הסרה', message: `להסיר את "${it}" מהרשימה? משפחות שכבר מסומנות לא משתנות.`, confirm: 'הסרה' })) onChange(items.filter((x) => x !== it)); })()}>×</button>
           </span>
         ))}
@@ -146,12 +174,33 @@ function ChipList({ title, hint, items, colors, onChange, onColor, placeholder }
         <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} aria-label={`הוספה ל${title}`} />
         <button className="btn" disabled={!draft.trim()}>הוספה</button>
       </form>
+      {renaming && onRename && <RenameDialog value={renaming} existing={items} onClose={() => setRenaming(null)} onSave={(to) => { onRename(renaming, to); setRenaming(null); }} />}
     </section>
+  );
+}
+
+function RenameDialog({ value, existing, onClose, onSave }: { value: string; existing: string[]; onClose: () => void; onSave: (to: string) => void }) {
+  const [v, setV] = useState(value);
+  const t = v.trim();
+  const clash = t !== value && existing.includes(t);
+  return (
+    <Dialog title={`שינוי שם: ${value}`} onClose={onClose}>
+      <label className="fld"><span>שם חדש</span><input value={v} onChange={(e) => setV(e.target.value)} /></label>
+      <p className="dialog-note">{clash ? 'השם כבר קיים — המשפחות יאוחדו תחתיו.' : 'השם יתעדכן בכל המשפחות שמסומנות בו.'}</p>
+      <div className="dialog-acts"><button className="btn" onClick={onClose}>ביטול</button><button className="btn btn-primary" disabled={!t || t === value} onClick={() => onSave(t)}>שמירה</button></div>
+    </Dialog>
   );
 }
 
 function Lists({ db }: { db: Db }) {
   const save = useSetting();
+  const mutate = useStore((st) => st.mutate);
+  const toast = useToast((st) => st.show);
+  const rename = (kind: 'tags' | 'styles') => (from: string, to: string) => {
+    let n = 0;
+    const undo = mutate((d) => { n = renameListValue(d, kind, from, to); });
+    toast(`"${from}" שונה ל"${to}"${n ? ` · עודכנו ${n} משפחות` : ''}`, undo);
+  };
   const s = db.__SETTINGS__ ?? {};
   const t = getTerritory(db);
   const cats = getCategories(db);
@@ -161,9 +210,9 @@ function Lists({ db }: { db: Db }) {
   return (
     <div className="set-grid">
       <ChipList title="תגיות" items={(s.tags ?? []) as string[]} colors={(s.tagColors ?? {}) as Record<string, string>} placeholder="תגית חדשה"
-        onChange={(tags) => save({ tags })} onColor={(it, c) => save({ tagColors: { ...((s.tagColors ?? {}) as object), [it]: c } })} />
+        onChange={(tags) => save({ tags })} onRename={rename('tags')} onColor={(it, c) => save({ tagColors: { ...((s.tagColors ?? {}) as object), [it]: c } })} />
       <ChipList title="סגנונות" items={(s.styles ?? []) as string[]} colors={(s.styleColors ?? {}) as Record<string, string>} placeholder="סגנון חדש"
-        onChange={(styles) => save({ styles })} onColor={(it, c) => save({ styleColors: { ...((s.styleColors ?? {}) as object), [it]: c } })} />
+        onChange={(styles) => save({ styles })} onRename={rename('styles')} onColor={(it, c) => save({ styleColors: { ...((s.styleColors ?? {}) as object), [it]: c } })} />
       <ChipList title="שדות אישיים למשפחה" hint="שדות נוספים שמופיעים בכרטיס כל משפחה, למשל ארץ מוצא." items={(s.customFields ?? []) as string[]} placeholder="שם השדה"
         onChange={(customFields) => save({ customFields })} />
       <section className="panel set-card">
@@ -241,7 +290,52 @@ function Scoring({ db }: { db: Db }) {
           <span className="dot hot" />מתחת לזה: צריך תשומת לב
         </div>
       </section>
+      <InteractionTypesEditor db={db} />
     </div>
+  );
+}
+
+/** סוגי הפעילות (כמו scoring.js): שם, כיוון, משקל לציון המעורבות, צבע; וזמן מחצית */
+function InteractionTypesEditor({ db }: { db: Db }) {
+  const save = useSetting();
+  const s = db.__SETTINGS__;
+  const types = getInteractionTypes(s);
+  const w = scoreWeights(s);
+  const decay = Number(s?.scoreDecayDays) > 0 ? Number(s?.scoreDecayDays) : 90;
+  const [label, setLabel] = useState('');
+  const write = (next: InteractionType[], weights: Record<string, number>, msg: string) => save({ interactionTypes: next, scoreWeights: weights }, msg);
+  const setT = (key: string, patch: Partial<InteractionType>) => write(types.map((t) => (t.key === key ? { ...t, ...patch } : t)), w, 'הסוג עודכן');
+  return (
+    <section className="panel set-card wide">
+      <h2>סוגי פעילות וציון מעורבות</h2>
+      <p className="sheet-hint">הסוגים שמופיעים בתיעוד בכרטיס המשפחה. כל סוג שווה נקודות לציון המעורבות (0–100), והנקודות נחלשות עם הזמן.</p>
+      <table className="score-tbl it-tbl">
+        <thead><tr><th>צבע</th><th>סוג</th><th>כיוון</th><th>נקודות</th><th /></tr></thead>
+        <tbody>
+          {types.map((t) => (
+            <tr key={t.key}>
+              <td><input type="color" className="swatch" value={t.color} onChange={(e) => setT(t.key, { color: e.target.value })} aria-label={`צבע ${t.label}`} /></td>
+              <td><input className="inline-in" defaultValue={t.label} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== t.label) setT(t.key, { label: v }); }} aria-label="שם הסוג" /></td>
+              <td><select className="sel" value={t.direction} onChange={(e) => setT(t.key, { direction: e.target.value as Direction })} aria-label="כיוון">{(Object.keys(DIRECTION_LABELS) as Direction[]).map((d) => <option key={d} value={d}>{DIRECTION_LABELS[d]}</option>)}</select></td>
+              <td><input className="num-in" defaultValue={w[t.key] ?? t.defaultScore} inputMode="numeric" aria-label={`נקודות ל${t.label}`} onBlur={(e) => { const v = parseInt(e.target.value, 10); if (Number.isFinite(v) && v >= 0 && v !== (w[t.key] ?? t.defaultScore)) write(types, { ...w, [t.key]: v }, 'הנקודות עודכנו'); }} /></td>
+              <td>{t.key !== 'other' && <button className="ib" aria-label={`מחיקת ${t.label}`} onClick={() => { const nw = { ...w }; delete nw[t.key]; write(types.filter((x) => x.key !== t.key), nw, `"${t.label}" נמחק`); }}><Icon name="x" size={13} /></button>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <form className="fc-add" onSubmit={(e) => {
+        e.preventDefault();
+        const l = label.trim();
+        if (!l || types.some((t) => t.label === l)) return;
+        const key = `t_${Date.now().toString(36)}`;
+        write([...types, { key, label: l, color: '#64748b', direction: 'outgoing', defaultScore: 10 }], { ...w, [key]: 10 }, `"${l}" נוסף`);
+        setLabel('');
+      }}>
+        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="סוג פעילות חדש, למשל: התוועדות" aria-label="סוג פעילות חדש" />
+        <button className="btn" disabled={!label.trim()}>הוספה</button>
+      </form>
+      <div className="th-row">ציון יורד לחצי אחרי <input className="num-in" defaultValue={decay} inputMode="numeric" aria-label="זמן מחצית בימים" onBlur={(e) => { const v = parseInt(e.target.value, 10); if (v > 0 && v !== decay) save({ scoreDecayDays: v }, 'עודכן'); }} /> ימים</div>
+    </section>
   );
 }
 
@@ -255,6 +349,34 @@ function DataTab({ db }: { db: Db }) {
   const [mapping, setMapping] = useState<Mapping>({});
   const [contacts, setContacts] = useState<{ name: string; phone: string; sel: boolean }[] | null>(null);
   const [busy, setBusy] = useState('');
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [fills, setFills] = useState<{ ref: { bldg: string; idx: number }; name: string; field: string; label: string; value: string; sel: boolean }[] | null>(null);
+
+  /** גיליון גוגל: קודם דרך החיבור לגוגל (כמו בישן), ואם אין הרשאה — גיליון ששותף בקישור */
+  const fetchSheet = async () => {
+    const m = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!m) { toast('הקישור לא נראה כמו גיליון של גוגל שיטס'); return; }
+    const id = m[1]!;
+    const gid = sheetUrl.match(/[#&?]gid=(\d+)/)?.[1] ?? '';
+    setBusy('sheet');
+    try {
+      let values: string[][] | null = null;
+      const token = await browserTokens.getToken().catch(() => null);
+      if (token) {
+        const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/A1:Z5000`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+        if (r?.ok) values = ((await r.json()) as { values?: string[][] }).values ?? null;
+      }
+      if (!values) {
+        const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv${gid ? `&gid=${gid}` : ''}`);
+        if (!r.ok) throw new Error(String(r.status));
+        values = parseCsv(await r.text());
+      }
+      if (!values || values.length < 2) { toast('הגיליון ריק'); return; }
+      setRows(values); setMapping(guessMapping(values[0]!));
+    } catch {
+      toast('לא הצלחנו לקרוא את הגיליון. בגוגל שיטס: שיתוף ← "כל מי שיש לו את הקישור" ← צפייה, ואז לנסות שוב.');
+    } finally { setBusy(''); }
+  };
 
   const onFile = async (f: File) => {
     const text = await f.text();
@@ -294,15 +416,17 @@ function DataTab({ db }: { db: Db }) {
       if (!token) { toast('צריך להתחבר לגוגל'); return; }
       const have = new Set(listFamilies(db).flatMap((f) => familyPhones(f.apt)));
       const found: { name: string; phone: string; sel: boolean }[] = [];
+      const all: { name: string; phones: string[]; email: string }[] = [];
       let page = '';
       do {
         const url = new URL('https://people.googleapis.com/v1/people/me/connections');
-        url.searchParams.set('personFields', 'names,phoneNumbers');
+        url.searchParams.set('personFields', 'names,phoneNumbers,emailAddresses');
         url.searchParams.set('pageSize', '1000');
         if (page) url.searchParams.set('pageToken', page);
         const r = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
         if (!r.ok) throw new Error(String(r.status));
-        const d = (await r.json()) as { connections?: { names?: { displayName?: string }[]; phoneNumbers?: { value?: string }[] }[]; nextPageToken?: string };
+        const d = (await r.json()) as { connections?: { names?: { displayName?: string }[]; phoneNumbers?: { value?: string }[]; emailAddresses?: { value?: string }[] }[]; nextPageToken?: string };
+        all.push(...(d.connections ?? []).map((c) => ({ name: c.names?.[0]?.displayName ?? '', phones: (c.phoneNumbers ?? []).map((p) => (p.value ?? '').replace(/[^\d+]/g, '').replace(/^\+972/, '0')).filter((p) => p.length >= 9), email: c.emailAddresses?.[0]?.value ?? '' })));
         for (const c of d.connections ?? []) {
           const name = c.names?.[0]?.displayName ?? '';
           const phone = c.phoneNumbers?.[0]?.value ?? '';
@@ -312,7 +436,25 @@ function DataTab({ db }: { db: Db }) {
         page = d.nextPageToken ?? '';
       } while (page);
       setContacts(found);
-      if (!found.length) toast('כל אנשי הקשר שלך כבר במערכת');
+      // השלמת פרטים למשפחות קיימות: מייל לפי טלפון זהה, טלפון לפי שם מלא (שם פרטי + משפחה)
+      const sugg: NonNullable<typeof fills> = [];
+      for (const f of listFamilies(db)) {
+        const a = f.apt;
+        const name = displayName(a);
+        const ph = familyPhones(a);
+        const byPhone = all.find((c) => c.phones.some((p) => ph.includes(p)));
+        if (byPhone?.email && !a.fatherEmail && !a.motherEmail) sugg.push({ ref: f, name, field: 'fatherEmail', label: 'מייל', value: byPhone.email, sel: true });
+        for (const [role, phoneKey] of [['father', 'fatherPhone'], ['mother', 'motherPhone']] as const) {
+          const first = a[role]?.trim();
+          if (!first || !a.name || a[phoneKey]) continue;
+          const last = a.name.trim();
+          const full = `${first} ${last}`;
+          const c = all.find((x) => x.phones.length && (x.name === full || x.name === `${last} ${first}`));
+          if (c && !ph.includes(c.phones[0]!)) sugg.push({ ref: f, name, field: phoneKey, label: role === 'father' ? 'טלפון האב' : 'טלפון האם', value: c.phones[0]!, sel: true });
+        }
+      }
+      setFills(sugg.length ? sugg : null);
+      if (!found.length && !sugg.length) toast('כל אנשי הקשר שלך כבר במערכת, ואין פרטים להשלים');
     } catch { toast('לא הצלחנו לקרוא את אנשי הקשר. צריך להפעיל את חיבור אנשי הקשר בגוגל.'); } finally { setBusy(''); }
   };
   const importContacts = () => {
@@ -332,8 +474,16 @@ function DataTab({ db }: { db: Db }) {
         <label className="btn file-btn"><Icon name="plus" size={16} />בחירת קובץ<input type="file" accept=".csv,.txt,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); e.target.value = ''; }} /></label>
       </section>
       <section className="panel set-card">
+        <h2>ייבוא מגוגל שיטס</h2>
+        <p className="sheet-hint">הדבק קישור לגיליון. אם הגיליון לא שלך — צריך לשתף אותו "לכל מי שיש לו את הקישור".</p>
+        <form className="fc-add" onSubmit={(e) => { e.preventDefault(); void fetchSheet(); }}>
+          <input value={sheetUrl} onChange={(e) => setSheetUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" dir="ltr" aria-label="קישור לגיליון" />
+          <button className="btn" disabled={!sheetUrl.trim() || busy === 'sheet'}>{busy === 'sheet' ? 'קורא…' : 'קריאת הגיליון'}</button>
+        </form>
+      </section>
+      <section className="panel set-card">
         <h2>אנשי קשר מגוגל</h2>
-        <p className="sheet-hint">מציג אנשי קשר מהטלפון שעוד לא במערכת, ואתה בוחר את מי להוסיף.</p>
+        <p className="sheet-hint">מציג אנשי קשר מהטלפון שעוד לא במערכת, ואתה בוחר את מי להוסיף. גם משלים טלפונים ומיילים חסרים למשפחות שכבר קיימות.</p>
         <button className="btn" disabled={busy === 'contacts'} onClick={() => void scanContacts()}>{busy === 'contacts' ? 'סורק…' : 'סריקת אנשי קשר'}</button>
       </section>
       <section className="panel set-card">
@@ -363,6 +513,23 @@ function DataTab({ db }: { db: Db }) {
           </div>
           <div className="dialog-acts"><button className="btn" onClick={() => setRows(null)}>ביטול</button>
             <button className="btn btn-primary" disabled={mapping.name === undefined && mapping.father === undefined} onClick={runImport}>ייבוא</button></div>
+        </Dialog>
+      )}
+      {fills && (
+        <Dialog title={`השלמת פרטים · ${fills.length}`} onClose={() => setFills(null)}>
+          <p className="dialog-note">נמצאו באנשי הקשר פרטים שחסרים בכרטיסי המשפחות. סמן מה להשלים.</p>
+          <ul className="aud-list">
+            {fills.map((f, i) => (
+              <li key={i}><label className="chk-row"><input type="checkbox" checked={f.sel} onChange={() => setFills((arr) => arr!.map((x, j) => (j === i ? { ...x, sel: !x.sel } : x)))} />{f.name} · {f.label}</label><span className="meta" dir="ltr">{f.value}</span></li>
+            ))}
+          </ul>
+          <div className="dialog-acts"><button className="btn" onClick={() => setFills(null)}>ביטול</button>
+            <button className="btn btn-primary" disabled={!fills.some((f) => f.sel)} onClick={() => {
+              const sel = fills.filter((f) => f.sel);
+              const undo = mutate((d) => { for (const f of sel) updateFamily(d, f.ref, { [f.field]: f.value }); });
+              toast(`הושלמו ${sel.length} פרטים`, undo);
+              setFills(null);
+            }}>השלמה</button></div>
         </Dialog>
       )}
       {contacts && contacts.length > 0 && (

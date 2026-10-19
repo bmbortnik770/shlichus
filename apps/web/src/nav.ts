@@ -11,15 +11,18 @@ export type CommunityTab = 'map' | 'people' | 'circles';
 const VIEWS: View[] = ['today', 'community', 'messages', 'tasks', 'events', 'donations', 'connections', 'settings', 'activity', 'more'];
 const TAB_KEY = 'shlichus_community_tab';
 
-export function parseHash(): { view: View; tab: CommunityTab } {
+export function parseHash(): { view: View; tab: CommunityTab; hub: string } {
   const [v, t] = location.hash.replace('#', '').split('/');
   const lastTab = (() => { try { return (localStorage.getItem(TAB_KEY) as CommunityTab) || 'map'; } catch { return 'map'; } })();
   // תאימות לכתובות קודמות (#map)
-  if (v === 'map') return { view: 'community', tab: 'map' };
+  if (v === 'map') return { view: 'community', tab: 'map', hub: '' };
   const view = (VIEWS as string[]).includes(v ?? '') ? (v as View) : 'today';
   const tab = (['map', 'people', 'circles'] as string[]).includes(t ?? '') ? (t as CommunityTab) : lastTab;
-  return { view, tab };
+  // מסך קבוצה (#activity/<קבוצה>) — הקבוצות מוגדרות בסידור התפריט
+  return { view, tab, hub: view === 'activity' ? t || 'activity' : '' };
 }
+
+export const goHub = (id: string) => { location.hash = `activity/${id}`; };
 
 export function go(view: View, tab?: CommunityTab): void {
   if (view === 'community') {

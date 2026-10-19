@@ -1,0 +1,19 @@
+/* סידור התפריט */
+.ne { display: flex; flex-direction: column; gap: 10px; }
+.ne-group { border: 1px solid var(--line); border-radius: 12px; padding: 8px; background: var(--bg); transition: border-color .15s, background .15s; }
+.ne-group.over { border-color: var(--accent); background: var(--accent-soft); }
+.ne-ghead { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 0 2px 6px; }
+.ne-glabel { font: inherit; font-weight: 700; font-size: 13.5px; border: 1px dashed transparent; background: none; color: var(--fg); padding: 3px 6px; border-radius: 6px; flex: 1; min-width: 0; }
+.ne-glabel:hover, .ne-glabel:focus { border-color: var(--line); background: var(--surface); outline: none; }
+.ne-items, .ne-mobile { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ne-items li, .ne-mobile li { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 5px 8px; font-size: 14px; }
+.ne-items li[draggable="true"] { cursor: grab; }
+.ne-items li.dragging { opacity: .4; }
+.ne-items li.ne-empty { justify-content: center; color: var(--faint); border-style: dashed; background: none; font-size: 13px; padding: 10px; }
+.ne-grip { color: var(--faint); letter-spacing: -2px; font-size: 12px; }
+.ne-name { flex: 1; min-width: 0; }
+.ne-ib { width: 28px !important; height: 28px !important; font-size: 14px; }
+.ne-mobile li b { color: var(--faint); font-size: 12px; width: 14px; }
+.ne-mobile li.ne-more { background: none; border-style: dashed; color: var(--muted); }
+.ne-sug { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.ne-sug > span { flex: 1 1 200px; }
